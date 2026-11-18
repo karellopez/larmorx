@@ -533,7 +533,10 @@ pub fn strtol(s: &[u8]) -> (i64, usize) {
         return (0, 0);
     }
     let v = if neg { -v } else { v };
-    (v.clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64, i)
+    (
+        v.clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64,
+        i,
+    )
 }
 
 /// `sscanf(s, "%d", &v)`: the value, or `None` when it assigns none (the variable left as it was).
@@ -541,7 +544,11 @@ fn sscanf_d(g: &mut Globals, s: &str) -> Option<i32> {
     let mut b = Bytes::new(s.as_bytes());
     let mut sc = Scanf::new(&mut b);
     let v = sc.d(&mut g.errno, true);
-    if sc.finish(&mut g.errno) == 1 { v } else { None }
+    if sc.finish(&mut g.errno) == 1 {
+        v
+    } else {
+        None
+    }
 }
 
 /// The C program's `%g` of a `float`.
@@ -602,13 +609,7 @@ impl Args<'_> {
     }
 
     /// `get_floats(argc, argv, &i, vals, n)`: `(float) strtod(...)`.
-    fn floats(
-        &self,
-        g: &Globals,
-        r: &mut Run,
-        i: &mut usize,
-        n: usize,
-    ) -> Result<Vec<f32>, Fatal> {
+    fn floats(&self, g: &Globals, r: &mut Run, i: &mut usize, n: usize) -> Result<Vec<f32>, Fatal> {
         let a = self.a;
         let opt = &a[*i];
         if *i + n >= a.len() {
@@ -710,7 +711,10 @@ fn direction(
 ) -> Result<[f32; 3], Fatal> {
     let mut d = args.three(g, r, i)?;
     // `sqrt` of the `float` sum is C++'s `float` overload; the NaNs as the official build makes them
-    let sum = sse::add(sse::add(sse::mul(d[0], d[0]), sse::mul(d[1], d[1])), sse::mul(d[2], d[2]));
+    let sum = sse::add(
+        sse::add(sse::mul(d[0], d[0]), sse::mul(d[1], d[1])),
+        sse::mul(d[2], d[2]),
+    );
     let magnitude = sse::sqrt(sum);
     if magnitude == 0.0 {
         return Err(fail_usage(
@@ -1041,7 +1045,7 @@ pub fn parse_options(g: &mut Globals, r: &mut Run, argv: &[String]) -> Result<Op
                     } else {
                         "out_orientation"
                     };
-                    let _ = write!(r.out, "ERROR: with {what} string {s}\n");
+                    let _ = writeln!(r.out, "ERROR: with {what} string {s}");
                     let _ = r.out.write_all(&msg);
                     let _ = r.out.write_all(b"\n");
                     return Err(Fatal::Exit(1));
@@ -1462,10 +1466,7 @@ pub fn parse_options(g: &mut Globals, r: &mut Run, argv: &[String]) -> Result<Op
                 let name = &arg[2..];
                 let _ = writeln!(r.out, "{name} = {n}");
                 if n < 0 {
-                    return Err(fail_out(
-                        r,
-                        &format!("ERROR: {name} cannot be negative\n"),
-                    ));
+                    return Err(fail_out(r, &format!("ERROR: {name} cannot be negative\n")));
                 }
                 if arg == "--nskip" {
                     o.nskip = n;
@@ -1674,7 +1675,9 @@ pub fn check_options(g: &mut Globals, r: &mut Run, o: &mut Options) -> Result<()
             &format!("\n{}: unknown template volume type {t}\n", g.progname),
         ));
     }
-    if o.force_out_type_flag != 0 && o.forced_out_type == MRI_VOLUME_TYPE_UNKNOWN && o.ascii_flag == 0
+    if o.force_out_type_flag != 0
+        && o.forced_out_type == MRI_VOLUME_TYPE_UNKNOWN
+        && o.ascii_flag == 0
     {
         let t = o.out_type_string.clone().unwrap_or_default();
         return Err(fail_usage(

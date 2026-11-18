@@ -61,7 +61,7 @@ use std::path::Path;
 use larmorx_core::cfmt;
 use larmorx_core::cscan::strtof;
 use larmorx_core::defects::{
-    FS_1031, FS_1032, FS_1033, FS_1034, FS_1035, FS_1036, FS_1037, FS_949, FS_950,
+    FS_949, FS_950, FS_1031, FS_1032, FS_1033, FS_1034, FS_1035, FS_1036, FS_1037,
 };
 use larmorx_freesurfer_core::cscan::{self as fscan, Bytes, Scan, Scanf, Stream};
 use larmorx_freesurfer_core::fio::Tsv;
@@ -272,7 +272,10 @@ fn load_stat_table_fs(
         Ok(f) => f,
         Err(e) => {
             g.errno = e;
-            put(io.out, &[b"ERROR: could not open ", statfile.as_bytes(), b"\n"]);
+            put(
+                io.out,
+                &[b"ERROR: could not open ", statfile.as_bytes(), b"\n"],
+            );
             return Ok(None);
         }
     };
@@ -295,7 +298,10 @@ fn load_stat_table_fs(
         Err(e) => {
             // the file went away between the two opens: FreeSurfer reads a NULL stream (a crash)
             g.errno = e;
-            put(io.out, &[b"ERROR: could not open ", statfile.as_bytes(), b"\n"]);
+            put(
+                io.out,
+                &[b"ERROR: could not open ", statfile.as_bytes(), b"\n"],
+            );
             return Ok(None);
         }
     };
@@ -353,7 +359,10 @@ fn load_stat_table_csv(
         Ok(f) => f,
         Err(e) => {
             g.errno = e;
-            put(io.out, &[b"ERROR: could not open ", statfile.as_bytes(), b"\n"]);
+            put(
+                io.out,
+                &[b"ERROR: could not open ", statfile.as_bytes(), b"\n"],
+            );
             return Ok((None, false));
         }
     };
@@ -429,7 +438,11 @@ fn load_stat_table_tsv(
     let tac = fio_extension(Some(statfile)).is_some_and(|e| e.eq_ignore_ascii_case("tac"));
     let c0 = if tac { 2 } else { 0 };
     let ncols = tsv.headers.len() as i32 - c0 as i32;
-    let _ = write!(io.out, "Found {ncols} data colums\nFound {} data rows\n", tsv.data.len());
+    let _ = write!(
+        io.out,
+        "Found {ncols} data colums\nFound {} data rows\n",
+        tsv.data.len()
+    );
     if tac && tsv.headers.len() < 2 {
         g.notices.add(
             &FS_1037,
@@ -465,7 +478,9 @@ fn load_stat_table_tsv(
         "LoadStatTableTSV: FreeSurfer writes the table's volume to junk.mgz in the working directory",
     );
     if g.notices.reproduce() {
-        mri_write(g, io.out, io.err, io.env, io.dir, &mut m, "junk.mgz", None, 0)?;
+        mri_write(
+            g, io.out, io.err, io.env, io.dir, &mut m, "junk.mgz", None, 0,
+        )?;
     }
     st.mri = Some(m);
     Ok(Some(st))
@@ -603,7 +618,9 @@ pub fn init_stat_table_from_mri(
 ) -> Result<Option<StatTable>, Fatal> {
     const WHAT: &str = "InitStatTableFromMRI";
     let mut st = alloc_stat_table(mri_in.nframes, mri_in.vg.width);
-    let copy = mri_copy(g, io.out, io.err, mri_in, None)?.into_new().expect("a copy");
+    let copy = mri_copy(g, io.out, io.err, mri_in, None)?
+        .into_new()
+        .expect("a copy");
     for r in 0..st.nrows {
         for c in 0..st.ncols {
             st.data[r as usize][c as usize] =
@@ -618,7 +635,10 @@ pub fn init_stat_table_from_mri(
         Ok(f) => f,
         Err(e) => {
             g.errno = e;
-            put(io.out, &[b"ERROR: could not open ", tablefile.as_bytes(), b"\n"]);
+            put(
+                io.out,
+                &[b"ERROR: could not open ", tablefile.as_bytes(), b"\n"],
+            );
             return Ok(None);
         }
     };
@@ -628,7 +648,11 @@ pub fn init_stat_table_from_mri(
     if ncols != st.ncols {
         put(
             io.out,
-            &[b"ERROR: Col numbers do not agree in MRI and:  ", tablefile.as_bytes(), b"\n"],
+            &[
+                b"ERROR: Col numbers do not agree in MRI and:  ",
+                tablefile.as_bytes(),
+                b"\n",
+            ],
         );
         return Ok(None);
     }
@@ -637,7 +661,11 @@ pub fn init_stat_table_from_mri(
     if nrows < st.nrows {
         put(
             io.out,
-            &[b"ERROR: Not enough row headers for MRI in:  ", tablefile.as_bytes(), b"\n"],
+            &[
+                b"ERROR: Not enough row headers for MRI in:  ",
+                tablefile.as_bytes(),
+                b"\n",
+            ],
         );
         return Ok(None);
     }
@@ -656,7 +684,10 @@ pub fn init_stat_table_from_mri(
         Ok(f) => f,
         Err(e) => {
             g.errno = e;
-            put(io.out, &[b"ERROR: could not open ", tablefile.as_bytes(), b"\n"]);
+            put(
+                io.out,
+                &[b"ERROR: could not open ", tablefile.as_bytes(), b"\n"],
+            );
             return Ok(None);
         }
     };

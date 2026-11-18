@@ -18,7 +18,9 @@ use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::matrix::Matrix;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_io::mriio::mri_read_volume;
-use larmorx_freesurfer_mri::mri::{MRI_FLOAT, MRI_INT, MRI_SHORT, MRI_UCHAR, Mri, mri_alloc_sequence};
+use larmorx_freesurfer_mri::mri::{
+    MRI_FLOAT, MRI_INT, MRI_SHORT, MRI_UCHAR, Mri, mri_alloc_sequence,
+};
 use larmorx_freesurfer_volumes::mri_convert::csv::read_csv;
 use larmorx_freesurfer_volumes::mri_convert::options::{Options, Run, parse};
 use larmorx_freesurfer_volumes::mri_convert::stat_table::{
@@ -77,7 +79,16 @@ const NUMBERS: &[&str] = &[
 ];
 
 fn word(g: &mut Gen) -> String {
-    let w = ["Left-Hippo", "x", "Volume_mm3", "a\"b", "c,d", "lh", "rh.thickness", "BrainSeg"];
+    let w = [
+        "Left-Hippo",
+        "x",
+        "Volume_mm3",
+        "a\"b",
+        "c,d",
+        "lh",
+        "rh.thickness",
+        "BrainSeg",
+    ];
     let mut s = g.pick(&w).to_owned();
     if g.chance(5) {
         s += &g.int(0, 99).to_string();
@@ -158,8 +169,16 @@ fn csv_text(g: &mut Gen) -> Vec<u8> {
         if num {
             return g.pick(NUMBERS).to_owned();
         }
-        g.pick(&["name", "\"quoted,field\"", "a\"\"b", "\"x\"y", "", " sp ", "z\r"])
-            .to_owned()
+        g.pick(&[
+            "name",
+            "\"quoted,field\"",
+            "a\"\"b",
+            "\"x\"y",
+            "",
+            " sp ",
+            "z\r",
+        ])
+        .to_owned()
     };
     let mut s = field(g, false);
     for _ in 0..ncols {
@@ -276,7 +295,17 @@ fn template(g: &mut Gen, w: i32, nframes: i32) -> (String, String) {
 fn arg_int(g: &mut Gen) -> String {
     if g.chance(6) {
         return g
-            .pick(&["", " 5", "+4", "12x", "2147483648", "99999999999999999999", "0x10", "1e3", "-"])
+            .pick(&[
+                "",
+                " 5",
+                "+4",
+                "12x",
+                "2147483648",
+                "99999999999999999999",
+                "0x10",
+                "1e3",
+                "-",
+            ])
             .to_owned();
     }
     g.int(-3, 30).to_string()
@@ -287,8 +316,10 @@ fn arg_float(g: &mut Gen) -> String {
     if g.chance(5) {
         return g.pick(NUMBERS).to_owned();
     }
-    g.pick(&["1", "0.5", "-2", "3.75", "0", "1.25", "256", "0.001", "1e-3", ""])
-        .to_owned()
+    g.pick(&[
+        "1", "0.5", "-2", "3.75", "0", "1.25", "256", "0.001", "1e-3", "",
+    ])
+    .to_owned()
 }
 
 /// The options and their arguments.
@@ -313,71 +344,390 @@ enum Kind {
 }
 
 const FLAGS: &[&str] = &[
-    "--debug", "--left-right-reverse", "--left-right-reverse-pix", "--left-right-swap-label",
-    "--flip-cols", "--slice-reverse", "--ascii", "--ascii+crsf", "--ascii-fcol", "--in_stats_table",
-    "--out_stats_table", "-c", "--conform", "--conform-dc", "--cw256", "--delete-cmds", "--sphinx",
-    "--no-rescale-dicom", "--bvec-scanner", "--bvec-voxel", "--no-analyze-rescale", "-nc",
-    "--nochange", "-so", "--store_orig_ras2vox", "-cm", "--conform_min", "-po", "--parse_only",
-    "-ii", "--in_info", "-oi", "--out_info", "-ti", "--template_info", "-is", "--in_stats", "-os",
-    "--out_stats", "-ro", "--read_only", "-nw", "--no_write", "-im", "--in_matrix", "-om",
-    "--out_matrix", "--force_ras_good", "--split", "--antialias", "-ds2", "--downsample2",
-    "--bfile-little-endian", "-dicomread3", "-dcm2niix", "--dcm2niix", "-no-dcm2niix",
-    "--no-dcm2niix", "-createBIDS", "--createBIDS", "-dcm2niix-createBIDS",
-    "--dcm2niix-createBIDS", "-dcm2niix-no-ForceStackSameSeries",
-    "--dcm2niix-no-ForceStackSameSeries", "-dcm2niix-singlefile", "--dcm2niix-singlefile",
-    "-siemens-ascii-dump", "-siemens-ascii-alt-dump", "-dicomread2", "-dicomread0",
-    "-siemensBVecsCross", "-no-siemensBVecsCross", "--mid-frame", "-roi", "--roi", "-fp",
-    "--fill_parcellation", "-zo", "--zero_outlines", "-nt", "--no_translate", "-cg", "--crop_gdf",
-    "--mosaic-fix-noascii", "--no-strip-pound", "-zgez", "--zero_ge_z_offset", "-nozgez",
-    "--no_zero_ge_z_offset", "--diag-debug", "--mra", "--auto-slice-res", "--no-dwi", "--no-ctab",
+    "--debug",
+    "--left-right-reverse",
+    "--left-right-reverse-pix",
+    "--left-right-swap-label",
+    "--flip-cols",
+    "--slice-reverse",
+    "--ascii",
+    "--ascii+crsf",
+    "--ascii-fcol",
+    "--in_stats_table",
+    "--out_stats_table",
+    "-c",
+    "--conform",
+    "--conform-dc",
+    "--cw256",
+    "--delete-cmds",
+    "--sphinx",
+    "--no-rescale-dicom",
+    "--bvec-scanner",
+    "--bvec-voxel",
+    "--no-analyze-rescale",
+    "-nc",
+    "--nochange",
+    "-so",
+    "--store_orig_ras2vox",
+    "-cm",
+    "--conform_min",
+    "-po",
+    "--parse_only",
+    "-ii",
+    "--in_info",
+    "-oi",
+    "--out_info",
+    "-ti",
+    "--template_info",
+    "-is",
+    "--in_stats",
+    "-os",
+    "--out_stats",
+    "-ro",
+    "--read_only",
+    "-nw",
+    "--no_write",
+    "-im",
+    "--in_matrix",
+    "-om",
+    "--out_matrix",
+    "--force_ras_good",
+    "--split",
+    "--antialias",
+    "-ds2",
+    "--downsample2",
+    "--bfile-little-endian",
+    "-dicomread3",
+    "-dcm2niix",
+    "--dcm2niix",
+    "-no-dcm2niix",
+    "--no-dcm2niix",
+    "-createBIDS",
+    "--createBIDS",
+    "-dcm2niix-createBIDS",
+    "--dcm2niix-createBIDS",
+    "-dcm2niix-no-ForceStackSameSeries",
+    "--dcm2niix-no-ForceStackSameSeries",
+    "-dcm2niix-singlefile",
+    "--dcm2niix-singlefile",
+    "-siemens-ascii-dump",
+    "-siemens-ascii-alt-dump",
+    "-dicomread2",
+    "-dicomread0",
+    "-siemensBVecsCross",
+    "-no-siemensBVecsCross",
+    "--mid-frame",
+    "-roi",
+    "--roi",
+    "-fp",
+    "--fill_parcellation",
+    "-zo",
+    "--zero_outlines",
+    "-nt",
+    "--no_translate",
+    "-cg",
+    "--crop_gdf",
+    "--mosaic-fix-noascii",
+    "--no-strip-pound",
+    "-zgez",
+    "--zero_ge_z_offset",
+    "-nozgez",
+    "--no_zero_ge_z_offset",
+    "--diag-debug",
+    "--mra",
+    "--auto-slice-res",
+    "--no-dwi",
+    "--no-ctab",
     "--remove-ctab",
 ];
 
-const TYPES: &[&str] = &["mgz", "nii", "MGZ", "mgh", "spm", "analyze", "cor", "gdf", "otl", "bogus"];
+const TYPES: &[&str] = &[
+    "mgz", "nii", "MGZ", "mgh", "spm", "analyze", "cor", "gdf", "otl", "bogus",
+];
 
 fn options() -> Vec<(&'static [&'static str], Kind)> {
     vec![
-        (&["-oval", "--outside_val", "--upsample", "--nthreads", "--threads", "--reduce"], Kind::Ints(1)),
-        (&["-oni", "-oic", "--out_i_count", "-onj", "-ojc", "--out_j_count", "-onk", "-okc", "--out_k_count"], Kind::Ints(1)),
-        (&["-ini", "-iic", "--in_i_count", "-inj", "-ijc", "--in_j_count", "-ink", "-ikc", "--in_k_count"], Kind::Ints(1)),
-        (&["--erode-seg", "--dil-seg", "--cutends", "-ns", "--no_scale", "-nth", "--nth_frame"], Kind::Ints(1)),
-        (&["-sp", "--smooth_parcellation"], Kind::Pick(3, &["14", "26", "20", "13", "27"])),
-        (&["--nslices-override", "--ncols-override", "--nrows-override", "--nskip", "--ndrop", "--diag"], Kind::Ints(1)),
-        (&["-r", "--reorder", "--shift", "--crop", "--cropsize"], Kind::Ints(3)),
+        (
+            &[
+                "-oval",
+                "--outside_val",
+                "--upsample",
+                "--nthreads",
+                "--threads",
+                "--reduce",
+            ],
+            Kind::Ints(1),
+        ),
+        (
+            &[
+                "-oni",
+                "-oic",
+                "--out_i_count",
+                "-onj",
+                "-ojc",
+                "--out_j_count",
+                "-onk",
+                "-okc",
+                "--out_k_count",
+            ],
+            Kind::Ints(1),
+        ),
+        (
+            &[
+                "-ini",
+                "-iic",
+                "--in_i_count",
+                "-inj",
+                "-ijc",
+                "--in_j_count",
+                "-ink",
+                "-ikc",
+                "--in_k_count",
+            ],
+            Kind::Ints(1),
+        ),
+        (
+            &[
+                "--erode-seg",
+                "--dil-seg",
+                "--cutends",
+                "-ns",
+                "--no_scale",
+                "-nth",
+                "--nth_frame",
+            ],
+            Kind::Ints(1),
+        ),
+        (
+            &["-sp", "--smooth_parcellation"],
+            Kind::Pick(3, &["14", "26", "20", "13", "27"]),
+        ),
+        (
+            &[
+                "--nslices-override",
+                "--ncols-override",
+                "--nrows-override",
+                "--nskip",
+                "--ndrop",
+                "--diag",
+            ],
+            Kind::Ints(1),
+        ),
+        (
+            &["-r", "--reorder", "--shift", "--crop", "--cropsize"],
+            Kind::Ints(3),
+        ),
         (&["-r4", "--reorder4"], Kind::Ints(4)),
         (&["--slice-crop"], Kind::Ints(2)),
         (&["--fsubsample"], Kind::Ints(3)),
-        (&["-ut", "--upper_thresh", "--invert_contrast", "-cs", "--conform_size", "--fwhm", "-tr", "-TI", "-te", "-flip_angle", "--slice-bias"], Kind::Floats(1)),
-        (&["-iis", "--in_i_size", "-ijs", "--in_j_size", "-iks", "--in_k_size", "-ois", "--out_i_size", "-ojs", "--out_j_size", "-oks", "--out_k_size"], Kind::Floats(1)),
-        (&["-iid", "--in_i_direction", "-ijd", "--in_j_direction", "-ikd", "--in_k_direction", "-oid", "--out_i_direction", "-ojd", "--out_j_direction", "-okd", "--out_k_direction"], Kind::Floats(3)),
-        (&["-ic", "--in_center", "-dic", "--delta_in_center", "-oc", "--out_center", "-vs", "--voxsize", "-voxsize", "-ds", "--downsample", "-downsample", "-dsold", "--downsampleold", "-downsampleold"], Kind::Floats(3)),
-        (&["--rescale", "-sc", "--scale", "-osc", "--out-scale"], Kind::Atof),
+        (
+            &[
+                "-ut",
+                "--upper_thresh",
+                "--invert_contrast",
+                "-cs",
+                "--conform_size",
+                "--fwhm",
+                "-tr",
+                "-TI",
+                "-te",
+                "-flip_angle",
+                "--slice-bias",
+            ],
+            Kind::Floats(1),
+        ),
+        (
+            &[
+                "-iis",
+                "--in_i_size",
+                "-ijs",
+                "--in_j_size",
+                "-iks",
+                "--in_k_size",
+                "-ois",
+                "--out_i_size",
+                "-ojs",
+                "--out_j_size",
+                "-oks",
+                "--out_k_size",
+            ],
+            Kind::Floats(1),
+        ),
+        (
+            &[
+                "-iid",
+                "--in_i_direction",
+                "-ijd",
+                "--in_j_direction",
+                "-ikd",
+                "--in_k_direction",
+                "-oid",
+                "--out_i_direction",
+                "-ojd",
+                "--out_j_direction",
+                "-okd",
+                "--out_k_direction",
+            ],
+            Kind::Floats(3),
+        ),
+        (
+            &[
+                "-ic",
+                "--in_center",
+                "-dic",
+                "--delta_in_center",
+                "-oc",
+                "--out_center",
+                "-vs",
+                "--voxsize",
+                "-voxsize",
+                "-ds",
+                "--downsample",
+                "-downsample",
+                "-dsold",
+                "--downsampleold",
+                "-downsampleold",
+            ],
+            Kind::Floats(3),
+        ),
+        (
+            &["--rescale", "-sc", "--scale", "-osc", "--out-scale"],
+            Kind::Atof,
+        ),
         (&["--rescale-voxel"], Kind::Scan(3)),
-        (&["--nspmzeropad", "--out_nspmzeropad", "--in_nspmzeropad"], Kind::Scan(1)),
-        (&["-i", "--input_volume", "-o", "--output_volume", "--new-transform-fname", "-at", "--apply_transform", "-T", "--like", "--devolvexfm", "--ctab", "-sn", "--subject_name", "-gis", "--gdf_image_stem", "-rl", "--reslice_like", "--dil-seg-mask", "-il", "--in_like", "--first-dicom", "-cf", "--color_file"], Kind::Str),
-        (&["-dcm2niix-outdir", "--dcm2niix-outdir", "-dcm2niix-info-dump", "--dcm2niix-info-dump", "-dcm2niix-dicom-flist", "--dcm2niix-dicom-flist", "-dcm2niix-opts", "--dcm2niix-opts"], Kind::Raw),
-        (&["-odt", "--out_data_type"], Kind::Pick(5, &["uchar", "SHORT", "int", "Float", "rgb", "double", ""])),
-        (&["-rt", "--resample_type"], Kind::Pick(5, &["interpolate", "NEAREST", "vote", "weighted", "cubic", "sinc", "bad"])),
-        (&["-it", "--in_type", "-ot", "--out_type", "-tt", "--template_type"], Kind::Pick(4, TYPES)),
-        (&["-io", "--in_orientation", "-oo", "--out_orientation"], Kind::Pick(5, &["LIA", "RAS", "lia", "PSL", "LIAS", "LLA", "xyz", "LI", "R1A"])),
-        (&["--left-right-mirror", "--left-right-keep"], Kind::Pick(2, &["lh", "rh", "LH", "both"])),
+        (
+            &["--nspmzeropad", "--out_nspmzeropad", "--in_nspmzeropad"],
+            Kind::Scan(1),
+        ),
+        (
+            &[
+                "-i",
+                "--input_volume",
+                "-o",
+                "--output_volume",
+                "--new-transform-fname",
+                "-at",
+                "--apply_transform",
+                "-T",
+                "--like",
+                "--devolvexfm",
+                "--ctab",
+                "-sn",
+                "--subject_name",
+                "-gis",
+                "--gdf_image_stem",
+                "-rl",
+                "--reslice_like",
+                "--dil-seg-mask",
+                "-il",
+                "--in_like",
+                "--first-dicom",
+                "-cf",
+                "--color_file",
+            ],
+            Kind::Str,
+        ),
+        (
+            &[
+                "-dcm2niix-outdir",
+                "--dcm2niix-outdir",
+                "-dcm2niix-info-dump",
+                "--dcm2niix-info-dump",
+                "-dcm2niix-dicom-flist",
+                "--dcm2niix-dicom-flist",
+                "-dcm2niix-opts",
+                "--dcm2niix-opts",
+            ],
+            Kind::Raw,
+        ),
+        (
+            &["-odt", "--out_data_type"],
+            Kind::Pick(5, &["uchar", "SHORT", "int", "Float", "rgb", "double", ""]),
+        ),
+        (
+            &["-rt", "--resample_type"],
+            Kind::Pick(
+                5,
+                &[
+                    "interpolate",
+                    "NEAREST",
+                    "vote",
+                    "weighted",
+                    "cubic",
+                    "sinc",
+                    "bad",
+                ],
+            ),
+        ),
+        (
+            &[
+                "-it",
+                "--in_type",
+                "-ot",
+                "--out_type",
+                "-tt",
+                "--template_type",
+            ],
+            Kind::Pick(4, TYPES),
+        ),
+        (
+            &["-io", "--in_orientation", "-oo", "--out_orientation"],
+            Kind::Pick(
+                5,
+                &[
+                    "LIA", "RAS", "lia", "PSL", "LIAS", "LLA", "xyz", "LI", "R1A",
+                ],
+            ),
+        ),
+        (
+            &["--left-right-mirror", "--left-right-keep"],
+            Kind::Pick(2, &["lh", "rh", "LH", "both"]),
+        ),
         (&["--left-right-swap-label-table"], Kind::Matrix2),
         (&["--autoalign"], Kind::Matrix),
         (&["-ait", "--apply_inverse_transform"], Kind::Exists),
         (&["--status", "--statusfile"], Kind::Write),
         (&["--sdcmlist"], Kind::Read),
         (&["-f", "--frame"], Kind::Frames),
-        (&["-u", "--usage", "--help", "-h", "-version2", "--version", "--bogus", "-x"], Kind::Rare),
+        (
+            &[
+                "-u",
+                "--usage",
+                "--help",
+                "-h",
+                "-version2",
+                "--version",
+                "--bogus",
+                "-x",
+            ],
+            Kind::Rare,
+        ),
         (FLAGS, Kind::Flag),
     ]
 }
 
 const OUT_NAMES: &[&str] = &[
-    "out.mgz", "out.mgz", "out.nii.gz", "out.nii", "out.mnc", "out.img", "out.xyz", "outname",
-    "out.mgh", "out.gdf", "COR-",
+    "out.mgz",
+    "out.mgz",
+    "out.nii.gz",
+    "out.nii",
+    "out.mnc",
+    "out.img",
+    "out.xyz",
+    "outname",
+    "out.mgh",
+    "out.gdf",
+    "COR-",
 ];
 
-const VALID_OUT: &[&str] = &["out.mgz", "out.nii.gz", "out.nii", "out.mnc", "out.img", "out.mgh"];
+const VALID_OUT: &[&str] = &[
+    "out.mgz",
+    "out.nii.gz",
+    "out.nii",
+    "out.mnc",
+    "out.img",
+    "out.mgh",
+];
 
 /// An argument of an option taking integers (`valid`: one it accepts).
 fn int_arg(g: &mut Gen, valid: bool) -> String {
@@ -391,8 +741,10 @@ fn int_arg(g: &mut Gen, valid: bool) -> String {
 /// An argument of an option taking numbers (`valid`: one it accepts, not 0).
 fn float_arg(g: &mut Gen, valid: bool) -> String {
     if valid {
-        g.pick(&["1", "0.5", "-2", "3.75", "1.25", "256", "1e-3", "2.", ".5", "nan", "inf"])
-            .to_owned()
+        g.pick(&[
+            "1", "0.5", "-2", "3.75", "1.25", "256", "1e-3", "2.", ".5", "nan", "inf",
+        ])
+        .to_owned()
     } else if g.chance(6) {
         "0".into()
     } else {
@@ -460,7 +812,8 @@ fn opt_case(g: &mut Gen, specs: &[(&'static str, Kind)]) -> String {
                     args.push(if !valid && g.chance(20) {
                         "n".repeat(g.pick(&[1023usize, 1024, 2000]))
                     } else if valid {
-                        g.pick(&["name", "sub01", "a b", "in_x.lta", "lh.mgz"]).to_owned()
+                        g.pick(&["name", "sub01", "a b", "in_x.lta", "lh.mgz"])
+                            .to_owned()
                     } else {
                         g.pick(&["name", "", "sub01"]).to_owned()
                     });
@@ -536,7 +889,10 @@ fn opt_case(g: &mut Gen, specs: &[(&'static str, Kind)]) -> String {
         // the names `-i` and `-o` do not give (the first positional name fills the input when
         // it is still empty, else the output)
         let given = |o: &[&str]| args.iter().any(|a| o.contains(&a.as_str()));
-        let (i, o) = (given(&["-i", "--input_volume"]), given(&["-o", "--output_volume"]));
+        let (i, o) = (
+            given(&["-i", "--input_volume"]),
+            given(&["-o", "--output_volume"]),
+        );
         let input = g.pick(&["in.mgz", "in.mgz", "in.nii.gz", "in.mgz@mgh", "in.mgz#3"]);
         let out = g.pick(VALID_OUT);
         match (i, o) {
@@ -549,7 +905,11 @@ fn opt_case(g: &mut Gen, specs: &[(&'static str, Kind)]) -> String {
         match g.below(6) {
             0 => vec![],
             1 => vec!["in.mgz".into()],
-            2 => vec!["in.mgz".into(), g.pick(OUT_NAMES).into(), "extra.mgz".into()],
+            2 => vec![
+                "in.mgz".into(),
+                g.pick(OUT_NAMES).into(),
+                "extra.mgz".into(),
+            ],
             _ => vec!["in.mgz".into(), g.pick(OUT_NAMES).into()],
         }
     };
@@ -602,19 +962,51 @@ fn prelude() -> Vec<String> {
         with(&["-x"]),
         with(&["-po"]),
         with(&[
-            "--parse_only", "-it", "mgz", "-ot", "nii", "-sn", "bert", "--invert_contrast", "2",
-            "-r", "1", "2", "3", "-r4", "1", "2", "3", "4", "-nt",
+            "--parse_only",
+            "-it",
+            "mgz",
+            "-ot",
+            "nii",
+            "-sn",
+            "bert",
+            "--invert_contrast",
+            "2",
+            "-r",
+            "1",
+            "2",
+            "3",
+            "-r4",
+            "1",
+            "2",
+            "3",
+            "4",
+            "-nt",
         ]),
         vec!["-i".into(), "a.mgz".into(), "-o".into(), "b.mgz".into()],
-        vec!["--input_volume".into(), "a.mgz".into(), "--output_volume".into(), "b.nii".into()],
+        vec![
+            "--input_volume".into(),
+            "a.mgz".into(),
+            "--output_volume".into(),
+            "b.nii".into(),
+        ],
         with(&["-dcm2niix", "-createBIDS", "-dcm2niix-outdir", "dir"]),
         with(&["-no-dcm2niix", "--createBIDS", "--dcm2niix-outdir", "dir"]),
         with(&["-dcm2niix-createBIDS"]),
         with(&["--antialias", "-vs", "1", "1", "1"]),
         with(&["--antialias"]),
         with(&["--antialias", "-vs", "1", "1", "1", "--fwhm", "2"]),
-        vec!["--out_stats_table".into(), "--like".into(), "t.dat".into(), "in.dat".into(), "out.dat".into()],
-        vec!["--out_stats_table".into(), "in.dat".into(), "out.dat".into()],
+        vec![
+            "--out_stats_table".into(),
+            "--like".into(),
+            "t.dat".into(),
+            "in.dat".into(),
+            "out.dat".into(),
+        ],
+        vec![
+            "--out_stats_table".into(),
+            "in.dat".into(),
+            "out.dat".into(),
+        ],
         vec!["--in_stats_table".into(), "in.dat".into(), "out.mgz".into()],
         with(&["--force_ras_good", "-iid", "1", "0", "0"]),
         with(&["-ds", "2", "2", "2", "-dsold", "2", "2", "2"]),
@@ -622,20 +1014,48 @@ fn prelude() -> Vec<String> {
         vec!["-ro".into(), "in.mgz".into()],
         vec!["-nw".into(), "in.mgz".into()],
         vec!["in.mgz".into(), "out".into()],
-        vec!["-it".into(), "spm".into(), "in.img".into(), "out.mgz".into()],
+        vec![
+            "-it".into(),
+            "spm".into(),
+            "in.img".into(),
+            "out.mgz".into(),
+        ],
         with(&["--nskip", "-1"]),
         with(&["--ndrop", "2", "--nskip", "3"]),
         with(&["--debug", "--debug"]),
         with(&["--statusfile", "st.txt"]),
         with(&["-f", "0", "1", "2", "-nt"]),
-        with(&["-T", "x.lta", "--like", "lk.mgz", "-ini", "4", "--slice-reverse", "--scale", "2"]),
+        with(&[
+            "-T",
+            "x.lta",
+            "--like",
+            "lk.mgz",
+            "-ini",
+            "4",
+            "--slice-reverse",
+            "--scale",
+            "2",
+        ]),
         with(&["-iid", "3", "4", "0", "-ojd", "0", "0", "0"]),
         // the NaNs of the direction's length: two NaN squares, a NaN from infinities
-        with(&["-iid", "nan", "-nan", "1", "-ijd", "-nan", "nan", "2", "-ikd", "inf", "0", "0"]),
-        with(&["-oid", "1", "nan", "-nan", "-ojd", "0", "-inf", "inf", "-okd", "-nan", "-nan", "3"]),
+        with(&[
+            "-iid", "nan", "-nan", "1", "-ijd", "-nan", "nan", "2", "-ikd", "inf", "0", "0",
+        ]),
+        with(&[
+            "-oid", "1", "nan", "-nan", "-ojd", "0", "-inf", "inf", "-okd", "-nan", "-nan", "3",
+        ]),
         with(&["--fwhm", "-nan", "-ut", "nan"]),
         with(&["-io", "lia", "-oo", "LLA"]),
-        with(&["--out_matrix", "-ti", "-onk", "7", "--in_like", "x.mgz", "-rl", "y.mgz"]),
+        with(&[
+            "--out_matrix",
+            "-ti",
+            "-onk",
+            "7",
+            "--in_like",
+            "x.mgz",
+            "-rl",
+            "y.mgz",
+        ]),
     ];
     let mut lines: Vec<String> = v
         .drain(..)
@@ -645,13 +1065,28 @@ fn prelude() -> Vec<String> {
         })
         .collect();
     let m: &[u8] = b"1 0 0 4\n0 1 0 -2\n0 0 1 3.5\n0 0 0 1\n";
-    lines.push(opt_line(&[("in_m.txt", m)], &["--autoalign", "in_m.txt", "in.mgz", "out.mgz"]));
+    lines.push(opt_line(
+        &[("in_m.txt", m)],
+        &["--autoalign", "in_m.txt", "in.mgz", "out.mgz"],
+    ));
     lines.push(opt_line(
         &[("in_m.txt", m), ("in_n.txt", b"2 0\n0 2\n")],
-        &["--left-right-swap-label-table", "in_m.txt", "in_n.txt", "in.mgz", "out.mgz"],
+        &[
+            "--left-right-swap-label-table",
+            "in_m.txt",
+            "in_n.txt",
+            "in.mgz",
+            "out.mgz",
+        ],
     ));
-    lines.push(opt_line(&[("in_t.lta", b"x")], &["-ait", "in_t.lta", "in.mgz", "out.mgz"]));
-    lines.push(opt_line(&[("in_l.txt", b"x")], &["--sdcmlist", "in_l.txt", "in.mgz", "out.mgz"]));
+    lines.push(opt_line(
+        &[("in_t.lta", b"x")],
+        &["-ait", "in_t.lta", "in.mgz", "out.mgz"],
+    ));
+    lines.push(opt_line(
+        &[("in_l.txt", b"x")],
+        &["--sdcmlist", "in_l.txt", "in.mgz", "out.mgz"],
+    ));
     lines
 }
 
@@ -676,12 +1111,23 @@ fn generate_seeded(seed: u64, n: usize) -> Vec<String> {
         let line = match k % 20 {
             0 => format!("csv {}", hex(&csv_text(&mut g))),
             1 => {
-                let name = g.pick(&["in_t.dat", "in_t.dat", "in_t.stats", "in_tbl", "in_t.DAT", "in_t."]);
+                let name = g.pick(&[
+                    "in_t.dat",
+                    "in_t.dat",
+                    "in_t.stats",
+                    "in_tbl",
+                    "in_t.DAT",
+                    "in_t.",
+                ]);
                 format!("lst {name} {}", hex(&fs_table(&mut g)))
             }
             2 => {
                 let name = g.pick(&["in_t.csv", "in_t.CSV", "in_t.csv"]);
-                let text = if g.chance(4) { fs_table(&mut g) } else { csv_text(&mut g) };
+                let text = if g.chance(4) {
+                    fs_table(&mut g)
+                } else {
+                    csv_text(&mut g)
+                };
                 format!("lst {name} {}", hex(&text))
             }
             3 => {
@@ -693,7 +1139,10 @@ fn generate_seeded(seed: u64, n: usize) -> Vec<String> {
                 };
                 format!("lst {name} {}", hex(&tsv_text(&mut g, tac)))
             }
-            4 => format!("lst {} -", g.pick(&["in_none.dat", "in_none.csv", "in_none.tsv", "in_none"])),
+            4 => format!(
+                "lst {} -",
+                g.pick(&["in_none.dat", "in_none.csv", "in_none.tsv", "in_none"])
+            ),
             5 | 6 => {
                 let w = g.int(1, 4) as i32;
                 let nf = g.int(1, 3) as i32;
@@ -702,7 +1151,10 @@ fn generate_seeded(seed: u64, n: usize) -> Vec<String> {
                 if k % 20 == 5 {
                     format!("ist {vol} {t} {h}")
                 } else {
-                    format!("wst {vol} {t} {h} {}", g.pick(&["out.txt", "out.txt", "nodir/out.txt"]))
+                    format!(
+                        "wst {vol} {t} {h} {}",
+                        g.pick(&["out.txt", "out.txt", "nodir/out.txt"])
+                    )
                 }
             }
             _ => opt_case(&mut g, &specs),
@@ -1001,9 +1453,19 @@ pub fn dump(o: &Options, g: &Globals, env: &Environment) -> String {
     let fl = |x: f32| Some(x);
     di(&mut d, "outside_val", o.outside_val.into());
     di(&mut d, "reorder_flag", o.reorder_flag.into());
-    dia(&mut d, "reorder_vals", o.reorder_vals.as_ref().map(|v| &v[..]), 3);
+    dia(
+        &mut d,
+        "reorder_vals",
+        o.reorder_vals.as_ref().map(|v| &v[..]),
+        3,
+    );
     di(&mut d, "reorder4_flag", o.reorder4_flag.into());
-    dia(&mut d, "reorder4_vals", o.reorder4_vals.as_ref().map(|v| &v[..]), 4);
+    dia(
+        &mut d,
+        "reorder4_vals",
+        o.reorder4_vals.as_ref().map(|v| &v[..]),
+        4,
+    );
     di(&mut d, "shiftdim_flag", o.shiftdim_flag.into());
     dia(&mut d, "shift_dim", o.shift_dim.as_ref().map(|v| &v[..]), 3);
     df(&mut d, "invert_val", fl(o.invert_val));
@@ -1011,7 +1473,11 @@ pub fn dump(o: &Options, g: &Globals, env: &Environment) -> String {
     ds(&mut d, "out_name", s(&o.out_name));
     di(&mut d, "conform_flag", o.conform_flag.into());
     di(&mut d, "ConfKeepDC", o.conf_keep_dc.into());
-    di(&mut d, "conform_width_256_flag", o.conform_width_256_flag.into());
+    di(
+        &mut d,
+        "conform_width_256_flag",
+        o.conform_width_256_flag.into(),
+    );
     di(&mut d, "conform_min", o.conform_min.into());
     df(&mut d, "conform_size", fl(o.conform_size));
     ds(&mut d, "AutoAlignFile", o.auto_align_file.as_deref());
@@ -1036,7 +1502,11 @@ pub fn dump(o: &Options, g: &Globals, env: &Environment) -> String {
     }
     ds(&mut d, "transform_fname", o.transform_fname.as_deref());
     di(&mut d, "transform_flag", o.transform_flag.into());
-    di(&mut d, "invert_transform_flag", o.invert_transform_flag.into());
+    di(
+        &mut d,
+        "invert_transform_flag",
+        o.invert_transform_flag.into(),
+    );
     ds(&mut d, "out_like_name", o.out_like_name.as_deref());
     di(&mut d, "out_like_flag", o.out_like_flag.into());
     di(&mut d, "crop_flag", o.crop_flag.into());
@@ -1047,29 +1517,61 @@ pub fn dump(o: &Options, g: &Globals, env: &Environment) -> String {
     di(&mut d, "UpsampleFlag", o.upsample_flag.into());
     di(&mut d, "UpsampleFactor", o.upsample_factor.into());
     for (k, a) in ["i", "j", "k"].iter().enumerate() {
-        di(&mut d, &format!("in_{a}_size_flag"), o.in_size_flag[k].into());
+        di(
+            &mut d,
+            &format!("in_{a}_size_flag"),
+            o.in_size_flag[k].into(),
+        );
         df(&mut d, &format!("in_{a}_size"), o.in_size[k]);
     }
     for (k, a) in ["i", "j", "k"].iter().enumerate() {
-        di(&mut d, &format!("out_{a}_size_flag"), o.out_size_flag[k].into());
+        di(
+            &mut d,
+            &format!("out_{a}_size_flag"),
+            o.out_size_flag[k].into(),
+        );
         df(&mut d, &format!("out_{a}_size"), o.out_size[k]);
     }
     for (k, a) in ["i", "j", "k"].iter().enumerate() {
-        di(&mut d, &format!("in_{a}_direction_flag"), o.in_direction_flag[k].into());
+        di(
+            &mut d,
+            &format!("in_{a}_direction_flag"),
+            o.in_direction_flag[k].into(),
+        );
         dfa(&mut d, &format!("in_{a}_directions"), o.in_directions[k]);
     }
     for (k, a) in ["i", "j", "k"].iter().enumerate() {
-        di(&mut d, &format!("out_{a}_direction_flag"), o.out_direction_flag[k].into());
+        di(
+            &mut d,
+            &format!("out_{a}_direction_flag"),
+            o.out_direction_flag[k].into(),
+        );
         dfa(&mut d, &format!("out_{a}_directions"), o.out_directions[k]);
     }
     ds(&mut d, "colortablefile", s(&o.colortablefile));
     di(&mut d, "in_orientation_flag", o.in_orientation_flag.into());
-    ds(&mut d, "in_orientation_string", o.in_orientation_string.as_deref());
-    di(&mut d, "out_orientation_flag", o.out_orientation_flag.into());
-    ds(&mut d, "out_orientation_string", o.out_orientation_string.as_deref());
+    ds(
+        &mut d,
+        "in_orientation_string",
+        o.in_orientation_string.as_deref(),
+    );
+    di(
+        &mut d,
+        "out_orientation_flag",
+        o.out_orientation_flag.into(),
+    );
+    ds(
+        &mut d,
+        "out_orientation_string",
+        o.out_orientation_string.as_deref(),
+    );
     di(&mut d, "in_center_flag", o.in_center_flag.into());
     dfa(&mut d, "in_center", o.in_center);
-    di(&mut d, "delta_in_center_flag", o.delta_in_center_flag.into());
+    di(
+        &mut d,
+        "delta_in_center_flag",
+        o.delta_in_center_flag.into(),
+    );
     dfa(&mut d, "delta_in_center", o.delta_in_center);
     di(&mut d, "out_center_flag", o.out_center_flag.into());
     dfa(&mut d, "out_center", o.out_center);
@@ -1101,13 +1603,21 @@ pub fn dump(o: &Options, g: &Globals, env: &Environment) -> String {
     di(&mut d, "in_flip_angle_flag", o.in_flip_angle_flag.into());
     df(&mut d, "in_flip_angle", fl(o.in_flip_angle));
     di(&mut d, "out_data_type", o.out_data_type.into());
-    ds(&mut d, "out_data_type_string", o.out_data_type_string.as_deref());
+    ds(
+        &mut d,
+        "out_data_type_string",
+        o.out_data_type_string.as_deref(),
+    );
     df(&mut d, "rescale_factor", fl(o.rescale_factor));
     df(&mut d, "scale_factor", fl(o.scale_factor));
     df(&mut d, "out_scale_factor", fl(o.out_scale_factor));
     di(&mut d, "rescale_voxel", o.rescale_voxel.into());
     for (k, a) in ["c", "r", "s"].iter().enumerate() {
-        diu(&mut d, &format!("rescale_voxel_{a}"), o.rescale_voxel_crs[k]);
+        diu(
+            &mut d,
+            &format!("rescale_voxel_{a}"),
+            o.rescale_voxel_crs[k],
+        );
     }
     ds(&mut d, "resample_type", o.resample_type.as_deref());
     di(&mut d, "resample_type_val", o.resample_type_val.into());
@@ -1117,9 +1627,21 @@ pub fn dump(o: &Options, g: &Globals, env: &Environment) -> String {
     di(&mut d, "force_out_type_flag", o.force_out_type_flag.into());
     di(&mut d, "forced_out_type", o.forced_out_type.into());
     ds(&mut d, "out_type_string", o.out_type_string.as_deref());
-    di(&mut d, "force_template_type_flag", o.force_template_type_flag.into());
-    di(&mut d, "forced_template_type", o.forced_template_type.into());
-    ds(&mut d, "template_type_string", o.template_type_string.as_deref());
+    di(
+        &mut d,
+        "force_template_type_flag",
+        o.force_template_type_flag.into(),
+    );
+    di(
+        &mut d,
+        "forced_template_type",
+        o.forced_template_type.into(),
+    );
+    ds(
+        &mut d,
+        "template_type_string",
+        o.template_type_string.as_deref(),
+    );
     ds(&mut d, "subject_name", s(&o.subject_name));
     ds(&mut d, "gdf_image_stem", s(&o.gdf_image_stem));
     di(&mut d, "reslice_like_flag", o.reslice_like_flag.into());
@@ -1136,7 +1658,10 @@ pub fn dump(o: &Options, g: &Globals, env: &Environment) -> String {
     di(&mut d, "SliceBias", o.slice_bias.into());
     df(&mut d, "SliceBiasAlpha", fl(o.slice_bias_alpha));
     di(&mut d, "subsample_flag", o.subsample_flag.into());
-    for (k, a) in ["SubSampStart", "SubSampDelta", "SubSampEnd"].iter().enumerate() {
+    for (k, a) in ["SubSampStart", "SubSampDelta", "SubSampEnd"]
+        .iter()
+        .enumerate()
+    {
         diu(&mut d, a, o.sub_samp[k]);
     }
     di(&mut d, "in_like_flag", o.in_like_flag.into());
@@ -1144,20 +1669,48 @@ pub fn dump(o: &Options, g: &Globals, env: &Environment) -> String {
     di(&mut d, "FirstDicom", o.first_dicom.into());
     ds(&mut d, "FirstDicomFile", o.first_dicom_file.as_deref());
     di(&mut d, "roi_flag", o.roi_flag.into());
-    di(&mut d, "fill_parcellation_flag", o.fill_parcellation_flag.into());
+    di(
+        &mut d,
+        "fill_parcellation_flag",
+        o.fill_parcellation_flag.into(),
+    );
     di(&mut d, "zero_outlines_flag", o.zero_outlines_flag.into());
-    di(&mut d, "smooth_parcellation_flag", o.smooth_parcellation_flag.into());
-    diu(&mut d, "smooth_parcellation_count", o.smooth_parcellation_count);
+    di(
+        &mut d,
+        "smooth_parcellation_flag",
+        o.smooth_parcellation_flag.into(),
+    );
+    diu(
+        &mut d,
+        "smooth_parcellation_count",
+        o.smooth_parcellation_count,
+    );
     di(&mut d, "color_file_flag", o.color_file_flag.into());
     ds(&mut d, "color_file_name", o.color_file_name.as_deref());
-    di(&mut d, "translate_labels_flag", o.translate_labels_flag.into());
+    di(
+        &mut d,
+        "translate_labels_flag",
+        o.translate_labels_flag.into(),
+    );
     di(&mut d, "no_scale_flag", o.no_scale_flag.into());
     di(&mut d, "nthframe", o.nthframe.into());
     di(&mut d, "LeftRightReverse", o.left_right_reverse.into());
-    di(&mut d, "LeftRightReversePix", o.left_right_reverse_pix.into());
-    di(&mut d, "LeftRightMirrorFlag", o.left_right_mirror_flag.into());
+    di(
+        &mut d,
+        "LeftRightReversePix",
+        o.left_right_reverse_pix.into(),
+    );
+    di(
+        &mut d,
+        "LeftRightMirrorFlag",
+        o.left_right_mirror_flag.into(),
+    );
     di(&mut d, "LeftRightKeepFlag", o.left_right_keep_flag.into());
-    ds(&mut d, "LeftRightMirrorHemi", o.left_right_mirror_hemi.as_deref());
+    ds(
+        &mut d,
+        "LeftRightMirrorHemi",
+        o.left_right_mirror_hemi.as_deref(),
+    );
     di(&mut d, "LeftRightSwapLabel", o.left_right_swap_label.into());
     dm(&mut d, "lhswap", o.lhswap.as_ref());
     dm(&mut d, "rhswap", o.rhswap.as_ref());
@@ -1195,13 +1748,33 @@ pub fn dump(o: &Options, g: &Globals, env: &Environment) -> String {
     di(&mut d, "UseDCM2NIIX", x.use_dcm2niix.into());
     di(&mut d, "DCM2NIIX_createBIDS", x.dcm2niix_create_bids.into());
     dp(&mut d, "DCM2NIIX_outdir", x.dcm2niix_outdir.as_deref());
-    di(&mut d, "DCM2NIIX_no_ForceStackSameSeries", x.dcm2niix_no_force_stack_same_series.into());
-    dp(&mut d, "DCM2NIIX_INFO_DUMP", x.dcm2niix_info_dump.as_deref());
-    dp(&mut d, "DCM2NIIX_DICOM_FLIST", x.dcm2niix_dicom_flist.as_deref());
-    di(&mut d, "DCM2NIIX_OnlySingleFile", x.dcm2niix_only_single_file.into());
+    di(
+        &mut d,
+        "DCM2NIIX_no_ForceStackSameSeries",
+        x.dcm2niix_no_force_stack_same_series.into(),
+    );
+    dp(
+        &mut d,
+        "DCM2NIIX_INFO_DUMP",
+        x.dcm2niix_info_dump.as_deref(),
+    );
+    dp(
+        &mut d,
+        "DCM2NIIX_DICOM_FLIST",
+        x.dcm2niix_dicom_flist.as_deref(),
+    );
+    di(
+        &mut d,
+        "DCM2NIIX_OnlySingleFile",
+        x.dcm2niix_only_single_file.into(),
+    );
     dp(&mut d, "DCM2NIIX_OPTS", x.dcm2niix_opts.as_deref());
     di(&mut d, "DoSiemensAsciiDump", x.do_siemens_ascii_dump.into());
-    di(&mut d, "DoSiemensAsciiAltDump", x.do_siemens_ascii_alt_dump.into());
+    di(
+        &mut d,
+        "DoSiemensAsciiAltDump",
+        x.do_siemens_ascii_alt_dump.into(),
+    );
     di(&mut d, "UseDICOMRead2", x.use_dicom_read2.into());
     dp(&mut d, "SDCMStatusFile", x.sdcm_status_file.as_deref());
     dp(&mut d, "SDCMListFile", x.sdcm_list_file.as_deref());
@@ -1216,7 +1789,9 @@ pub fn dump(o: &Options, g: &Globals, env: &Environment) -> String {
     di(
         &mut d,
         "DICOMReadFirstDicomFile[0]",
-        x.first_dicom_file.first().map_or(0, |&c| i64::from(c as i8)),
+        x.first_dicom_file
+            .first()
+            .map_or(0, |&c| i64::from(c as i8)),
     );
     for name in [
         "FS_LOAD_DWI",
@@ -1279,7 +1854,9 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
                 for row in &tbl {
                     res += &format!("{} ", row.len());
                     for f in row {
-                        res += &oh(Some(&f[..f.iter().position(|&c| c == 0).unwrap_or(f.len())]));
+                        res += &oh(Some(
+                            &f[..f.iter().position(|&c| c == 0).unwrap_or(f.len())],
+                        ));
                         res += " ";
                     }
                 }

@@ -291,8 +291,9 @@ by it.
 - **The open probe** (to come from the spec finisher, track E): calls of the functions of §2 to §4 by name
   on volumes (the fs-volume probe's line protocol) and matrices, compared bit for bit (NaNs as their bits),
   with the cases of §5 counted apart.
-- **Reference numbers (observed)**: on 6,900 seeded cases (23 functions; volumes up to 7 x 7 x 6 of every
+- **Reference numbers (observed)**: on 16,100 seeded cases (23 functions; volumes up to 7 x 7 x 6 of every
   type, 1 or 2 frames, ordinary and special voxels; transforms of random rotations, scales and
   translations, near-identities and special entries) FreeSurfer's lines are reproduced but where the
-  official code reads memory it does not own, crashes or hangs (152) and two FS-968 lines identical but for
-  the NaNs' bits.
+  official code reads memory it does not own, crashes or hangs (363), and four FS-968 lines are identical
+  but for the NaNs' bits. At one thread on the main machine, on a 256^3 float volume: `getPartials` 0.8 s
+  (FreeSurfer's peak 402 MB), `getBlur` 0.4 s, `MRIvalscale` 0.08 s, `subSample` 0.03 s.

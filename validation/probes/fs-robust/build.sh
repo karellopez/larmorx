@@ -53,6 +53,13 @@ lapack=(/usr/lib/x86_64-linux-gnu/lapack/liblapack.a /usr/lib/x86_64-linux-gnu/b
   "${libs[@]}" "${lapack[@]}" /usr/lib/x86_64-linux-gnu/libz.so -lm \
   "$ws/oracles/toolchains/gcc-8.4-ubuntu/usr/lib/gcc/x86_64-linux-gnu/8/libgomp.so" \
   /lib/x86_64-linux-gnu/libpthread.a -lcrypt -lrt -ldl
-sha256sum "$out/fsrobust" "$here/fsrobust.cpp" "${lapack[@]}" "$ws/oracles/core-math-preload/libcrmath.so" > "$out/BUILD_INFO.txt"
+# the speed and memory bench (bench.cpp), with the same objects and libraries
+"$gcc" "${flags[@]}" -c "$here/bench.cpp" -o "$out/bench.o"
+"$gcc" -fopenmp -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl,-z,muldefs -O3 \
+  "$out/bench.o" "${objs[@]}" -o "$out/bench" \
+  "${libs[@]}" "${lapack[@]}" /usr/lib/x86_64-linux-gnu/libz.so -lm \
+  "$ws/oracles/toolchains/gcc-8.4-ubuntu/usr/lib/gcc/x86_64-linux-gnu/8/libgomp.so" \
+  /lib/x86_64-linux-gnu/libpthread.a -lcrypt -lrt -ldl
+sha256sum "$out/fsrobust" "$out/bench" "$here/fsrobust.cpp" "$here/bench.cpp" "${lapack[@]}" "$ws/oracles/core-math-preload/libcrmath.so" > "$out/BUILD_INFO.txt"
 "$gcc" --version | head -1 >> "$out/BUILD_INFO.txt"
-echo "built $out/fsrobust"
+echo "built $out/fsrobust and $out/bench"

@@ -62,9 +62,9 @@ fn row_index(m: &Mri, y: i32, z: i32, f: i32) -> usize {
     (f as u64 * m.vox_per_vol + z as u64 * m.vox_per_slice + y as u64 * m.vox_per_row) as usize
 }
 
-/// The value `MRIvalscale` stores for `val` in a voxel of `ty`, as little-endian bytes (the
-/// clipping and rounding of its type's branch).
-fn scaled_bytes(g: &mut Globals, ty: i32, val: f32) -> Vec<u8> {
+/// Stores `val` into element `i` of a voxel buffer of type `ty` as `MRIvalscale`'s branch does
+/// (its clipping and rounding).
+fn store_scaled(g: &mut Globals, c: &mut [u8], ty: i32, i: usize, val: f32) {
     match ty {
         MRI_SHORT => {
             let mut v = val;
@@ -74,7 +74,7 @@ fn scaled_bytes(g: &mut Globals, ty: i32, val: f32) -> Vec<u8> {
             if v > f32::from(i16::MAX) {
                 v = f32::from(i16::MAX);
             }
-            (nint(g, wide(v)) as i16).to_le_bytes().to_vec()
+            c[2 * i..2 * i + 2].copy_from_slice(&(nint(g, wide(v)) as i16).to_le_bytes());
         }
         MRI_USHRT => {
             let mut v = val;
@@ -84,7 +84,7 @@ fn scaled_bytes(g: &mut Globals, ty: i32, val: f32) -> Vec<u8> {
             if v > f32::from(u16::MAX) {
                 v = f32::from(u16::MAX);
             }
-            (nint(g, wide(v)) as u16).to_le_bytes().to_vec()
+            c[2 * i..2 * i + 2].copy_from_slice(&(nint(g, wide(v)) as u16).to_le_bytes());
         }
         MRI_UCHAR => {
             // no lower clip: a negative value wraps modulo 256 (C's conversion to BUFTYPE)
@@ -92,9 +92,9 @@ fn scaled_bytes(g: &mut Globals, ty: i32, val: f32) -> Vec<u8> {
             if v > 255.0 {
                 v = 255.0;
             }
-            vec![nint(g, wide(v)) as u8]
+            c[i] = nint(g, wide(v)) as u8;
         }
-        _ => val.to_le_bytes().to_vec(),
+        _ => c[4 * i..4 * i + 4].copy_from_slice(&val.to_le_bytes()),
     }
 }
 
@@ -123,38 +123,25 @@ pub fn mri_valscale(
     s: f64,
     b: f64,
 ) -> Result<Ret<Mri>, Fatal> {
-    // the source's values first (the source may be the destination: every voxel is read before
-    // it is written, as in the C loop)
-    let src: &Mri = match &p {
-        Pair::New(src) | Pair::Given(src, _) => src,
-        Pair::Same(m) => m,
+    let (ty, w, h, d, nf) = {
+        let src: &Mri = match &p {
+            Pair::New(src) | Pair::Given(src, _) => src,
+            Pair::Same(m) => m,
+        };
+        (src.mtype, src.vg.width, src.vg.height, src.vg.depth, src.nframes)
     };
-    let ty = src.mtype;
-    let (w, h, d, nf) = (src.vg.width, src.vg.height, src.vg.depth, src.nframes);
-    let vals = if matches!(ty, MRI_FLOAT | MRI_SHORT | MRI_USHRT | MRI_UCHAR) {
-        let c = src.chunk.as_ref().expect("the source's voxels");
-        let mut vals = Vec::with_capacity((w.max(0) * h.max(0) * d.max(0) * nf.max(0)) as usize);
-        for f in 0..nf {
-            for z in 0..d {
-                for y in 0..h {
-                    let r = row_index(src, y, z, f);
-                    for x in 0..w as usize {
-                        vals.push(read_elem(c, ty, r + x));
-                    }
-                }
-            }
-        }
-        Some(vals)
-    } else {
-        None
-    };
+    let supported = matches!(ty, MRI_FLOAT | MRI_SHORT | MRI_USHRT | MRI_UCHAR);
     let mut fresh = None;
-    let dst: &mut Mri = match p {
-        Pair::New(src) => fresh.insert(mri_clone(g, out, err, src, None)?.unwrap_new()),
-        Pair::Given(_, d) => d,
-        Pair::Same(m) => m,
+    let (src, dst): (Option<&Mri>, &mut Mri) = match p {
+        Pair::New(src) => (
+            Some(src),
+            fresh.insert(mri_clone(g, out, err, src, None)?.unwrap_new()),
+        ),
+        Pair::Given(src, d) => (Some(src), d),
+        // the source is the destination: each voxel read before it is written, as in the C loop
+        Pair::Same(m) => (None, m),
     };
-    let Some(vals) = vals else {
+    if !supported {
         log::error_printf(
             g,
             err,
@@ -165,30 +152,29 @@ pub fn mri_valscale(
             Some(m) => Ret::New(m),
             None => Ret::Given,
         });
-    };
-    let size = match ty {
-        MRI_FLOAT => 4,
-        MRI_SHORT | MRI_USHRT => 2,
-        _ => 1,
-    };
-    let mut k = 0;
+    }
+    let mut dc = dst.chunk.take().expect("the destination's voxels");
     for f in 0..nf {
         for z in 0..d {
             for y in 0..h {
-                let r = row_index(dst, y, z, f);
+                let rd = row_index(dst, y, z, f);
+                let rs = match src {
+                    Some(sm) => row_index(sm, y, z, f),
+                    None => rd,
+                };
                 for x in 0..w as usize {
-                    let mut val = vals[k];
-                    k += 1;
+                    let mut val = match src {
+                        Some(sm) => read_elem(sm.chunk.as_ref().expect("the source's voxels"), ty, rs + x),
+                        None => read_elem(&dc, ty, rs + x),
+                    };
                     val = sub64(wide(val), b) as f32;
                     val = mul64(wide(val), s) as f32;
-                    let bytes = scaled_bytes(g, ty, val);
-                    let c = dst.chunk.as_mut().expect("the destination's voxels");
-                    let o = (r + x) * size;
-                    c[o..o + size].copy_from_slice(&bytes);
+                    store_scaled(g, &mut dc, ty, rd + x, val);
                 }
             }
         }
     }
+    dst.chunk = Some(dc);
     Ok(match fresh {
         Some(m) => Ret::New(m),
         None => Ret::Given,
@@ -476,20 +462,25 @@ pub fn get_partials(
         // fx
         let mdx = mri_convolve1d(g, out, err, mri, None, &der, MRI_WIDTH, f, 0)?.unwrap_new();
         let mdxby = mri_convolve1d(g, out, err, &mdx, None, &pre, MRI_HEIGHT, 0, 0)?.unwrap_new();
+        // each temporary freed as soon as FreeSurfer frees it (its memory peak)
+        drop(mdx);
         if is2d {
             mri_copy_frame(g, out, err, Pair::Given(&mdxby, &mut fx), 0, f)?;
         } else {
             mri_convolve1d(g, out, err, &mdxby, Some(&mut fx), &pre, MRI_DEPTH, 0, f)?;
         }
+        drop(mdxby);
         // fy
         let mbx = mri_convolve1d(g, out, err, mri, None, &pre, MRI_WIDTH, f, 0)?.unwrap_new();
         let mbxdy = mri_convolve1d(g, out, err, &mbx, None, &der, MRI_HEIGHT, 0, 0)?.unwrap_new();
         let mbxby = mri_convolve1d(g, out, err, &mbx, None, &pre, MRI_HEIGHT, 0, 0)?.unwrap_new();
+        drop(mbx);
         if is2d {
             mri_copy_frame(g, out, err, Pair::Given(&mbxdy, &mut fy), 0, f)?;
         } else {
             mri_convolve1d(g, out, err, &mbxdy, Some(&mut fy), &pre, MRI_DEPTH, 0, f)?;
         }
+        drop(mbxdy);
         // fz (from mbxby): `outfz = MRIconvolve1d(mbxby, outfz, ...)`, so a convolution that
         // fails (a destination type it does not write) leaves no fz, and the next frame's goes
         // into a new float volume

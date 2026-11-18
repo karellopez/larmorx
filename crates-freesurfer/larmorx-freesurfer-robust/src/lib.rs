@@ -11,3 +11,7 @@
 //! separate process (`docs/licensing.md`). Empty until its queue items bring the code
 //! (`docs/freesurfer/queue.md`); `PROVENANCE.md` lists what each item translates.
 #![forbid(unsafe_code)]
+
+pub mod costs;
+pub mod mymatrix;
+pub mod mymri;

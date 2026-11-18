@@ -69,6 +69,7 @@ MIXED = {
     "crates/larmorx-core/src/eigen_sym.rs": "Apache-2.0 AND MPL-2.0",
     "crates/larmorx-core/src/vnl_eigen.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-core/src/vnl_fixed.rs": "Apache-2.0 AND BSD-3-Clause",
+    "crates/larmorx-core/src/vnl_matrix.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-core/src/vnl_qr.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-core/src/vnl_svd.rs": "Apache-2.0 AND BSD-3-Clause",
     "crates/larmorx-core/src/vnl_svd_f32.rs": "Apache-2.0 AND BSD-3-Clause",

@@ -2991,6 +2991,12 @@ defects! {
         "sampling a B-spline whose degree is not 2 to 9 (one allocated and never computed, as the computation refuses other degrees) on a volume of one voxel, or with a degree above 9, reads interpolation indices never set or writes them past their arrays: memory contents or a crash; refused with a clear error";
     FS_965 = "FS-965", "FreeSurfer", true,
         "a histogram whose bin count is taken from the values' range (one bin per unit, asked for with 0 bins or fewer) of values spanning more than 67,108,864 asks for that many bins: gigabytes of memory allocated and filled, the program slow or killed; refused with a clear error";
+    FS_966 = "FS-966", "FreeSurfer", true,
+        "the principal axes of an image's intensities (the robust registration's initial orientation) are sorted by finding the largest and the smallest eigenvalue; when none is above another (all equal, or NaN) both are the first and the middle axis is read from a fourth column of the 3 x 3 eigenvector matrix: two numbers of the first column and one past the matrix (memory it does not own); corrected: the eigensystem's own order";
+    FS_967 = "FS-967", "FreeSurfer", true,
+        "the principal axes of an image with an infinite or NaN voxel have no covariance: the eigensystem then never returns (the program hangs) or stops without eigenvectors, which are read all the same (memory never written); refused with a clear error by default";
+    FS_968 = "FS-968", "FreeSurfer", true,
+        "the distance between two rigid transforms (the robust registration's convergence test) inverts the first with a singular value decomposition; on a matrix with an infinite or NaN entry the decomposition can stop without converging (a warning on standard error), and the distance is computed from the decomposition reached all the same (an arbitrary number); refused with a clear error by default";
 }
 
 /// The register entry with ID `id`.

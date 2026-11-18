@@ -1,0 +1,70 @@
+// SPDX-License-Identifier: LicenseRef-FreeSurfer
+// Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
+// 2026 Karel Lopez Vilaret.
+//! fs.robust against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the
+//! official build's output lines for the probe's cases of seed 1, recorded by
+//! `validation/probes/fs-robust/check.py --seed 1 --n <N>` on Linux x64 (FreeSurfer's
+//! `mri_robust_register/` files compiled with the official flags, the unit oracle's libraries),
+//! against the port's output with `reproduce` (lines where FreeSurfer reads or writes memory it does
+//! not own, crashes or hangs, the defects of `check.py`'s `SKIP`, hashed as `SKIP`).
+
+#[path = "fs_robust/cases.rs"]
+mod cases;
+
+use larmorx_core::defects::UpstreamDefects;
+use sha2::{Digest, Sha256};
+
+/// Recorded 2026-11-18 (queue 3.2-02, `fs.robust` 1 of 2: MyMRI's, MyMatrix's and CostFunctions'
+/// shared helpers, 23 commands): 2,300 cases, 2,248 lines identical, 52 hashed as `SKIP`, 2 as
+/// `NANBITS` (FS-968: identical but for the NaNs' bits).
+const N: usize = 2300;
+const OFFICIAL_SHA256: &str = "afdca92c06265190e0ff1f7a897995758181c306a471e510b0e91271ca1c934a";
+const SKIPPED: usize = 52;
+
+/// `check.py`'s `SKIP`.
+const SKIP: &[&str] = &[
+    "FS-288", "FS-53", "FS-58", "FS-290", "FS-294", "FS-47", "FS-48", "ITK-112", "ITK-115",
+    "ITK-116", "FS-300", "FS-302", "FS-303", "FS-304", "FS-305", "FS-306", "FS-307", "FS-308",
+    "FS-309", "FS-310", "FS-314", "FS-315", "FS-322", "FS-323", "FS-324", "FS-325", "FS-327",
+    "FS-330", "FS-463", "FS-465", "FS-467", "FS-163", "FS-469", "FS-470", "FS-471", "FS-473",
+    "FS-475", "FS-479", "FS-482", "FS-484", "FS-485", "FS-486", "FS-487", "FS-488", "FS-490",
+    "FS-491", "FS-493", "FS-496", "FS-497", "FS-498", "FS-499", "FS-501", "FS-502", "FS-504",
+    "FS-508", "FS-509", "FS-511", "FS-515", "FS-517", "FS-167", "FS-886", "FS-887", "FS-889",
+    "FS-890", "FS-957", "FS-964", "FS-965", "FS-540", "FS-541", "FS-546", "FS-548", "FS-549",
+    "FS-550", "FS-551", "FS-552", "FS-555", "FS-559", "FS-560", "FS-561", "FS-562", "FS-564",
+    "FS-567", "FS-568", "FS-569", "FS-570", "FS-571", "FS-573", "FS-575", "FS-579", "FS-581",
+    "FS-582", "FS-583", "FS-586", "FS-588", "FS-589", "FS-591", "FS-593", "FS-597", "FS-598",
+    "FS-600", "FS-601", "FS-615", "FS-618", "FS-966", "FS-967",
+];
+
+#[test]
+fn reproduce_gives_the_official_outputs() {
+    let mut h = Sha256::new();
+    let mut skipped = 0;
+    for line in cases::generate(1, N) {
+        let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
+        if ids.contains(&"FS-968") {
+            // check.py's NANBITS: compared there with every NaN read as one, hashed so here
+            h.update(b"NANBITS\n");
+        } else if ids.iter().any(|x| SKIP.contains(x)) {
+            skipped += 1;
+            h.update(b"SKIP\n");
+        } else {
+            h.update(out.as_bytes());
+            h.update(b"\n");
+        }
+    }
+    assert_eq!(skipped, SKIPPED);
+    let hex: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    assert_eq!(hex, OFFICIAL_SHA256);
+}
+
+/// The default differs from `reproduce` only where a defect it corrects is noted.
+#[test]
+fn fix_differs_only_with_a_notice() {
+    for line in cases::generate(1, N) {
+        let (r, _) = cases::run_line(&line, UpstreamDefects::Reproduce);
+        let (f, ids) = cases::run_line(&line, UpstreamDefects::Fix);
+        assert!(r == f || !ids.is_empty(), "{line}");
+    }
+}

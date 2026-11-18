@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Builds fsrobust (fsrobust.cpp) with FreeSurfer 8.2.0's robust-registration files
+# (mri_robust_register/ MyMRI.cpp, MyMatrix.cpp, CostFunctions.cpp, Quaternion.cpp, JointHisto.cpp,
+# compiled from the tag) against the unit oracle: its compiler (Ubuntu's gcc-8 8.4.0), the official
+# programs' compile flags (the unit oracle's compile_commands.json for mri_normalize, without
+# -Werror; the source paths mapped to the official build's, so __FILE__ prints as there), its
+# libraries (the official build's utils and packages, ITK 4.13.2's VNL), and Ubuntu 22.04's static
+# LAPACK and BLAS (liblapack-dev and libblas-dev 3.10.0-2ubuntu1, the code the official
+# mri_robust_register holds byte for byte: validation/investigations/complex-runtime/README.md)
+# with gfortran 11's runtime. Output:
+# <workspace>/oracles/freesurfer-8.2.0-probes/fs-robust/fsrobust.
+#
+#   validation/probes/fs-robust/build.sh [<workspace>]
+set -euo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+ws=${1:-$(cd "$here/../../../.." && pwd)}
+case "$ws" in */.claude/worktrees/*) ws=${ws%%/larmorx/.claude/worktrees/*} ;; esac
+unit=$ws/oracles/freesurfer-8.2.0-unit
+b=$unit/build/fs
+s=$unit/src/fs-shadow
+tag=$ws/tags/freesurfer-8.2.0
+rr=$tag/mri_robust_register
+itk=$unit/itk-4.13.2
+gcc=$unit/toolchain/bin/g++
+out=$ws/oracles/freesurfer-8.2.0-probes/fs-robust
+[ -x "$gcc" ] || { echo "no unit oracle toolchain at $unit (build.py all first)" >&2; exit 1; }
+mkdir -p "$out"
+flags=(-DHAVE_OPENGL -DHAVE_OPENMP -DHAVE_ZLIB -DITK_USE_SYSTEM_ZLIB -DLinux -DUSING_DCM2NIIXFSWRAPPER
+  -DUSING_MGH_NIFTI_IO -I"$s/include" -I"$b/include" -I"$s/packages/minc" -I"$s/packages/netcdf"
+  -I"$s/packages/nifti" -I"$rr" -I"$itk/include/ITK-4.13" -fopenmp -fno-builtin -Wall -Wextra
+  -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result
+  -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections
+  -ffunction-sections -O3 -DNDEBUG
+  -fmacro-prefix-map="$tag"=/home/rd521/space_freesurfer/build/docker_ubuntu22/trunk/rd521-8.2.0
+  -fopenmp -std=c++11)
+objs=()
+for f in MyMRI MyMatrix CostFunctions Quaternion JointHisto; do
+  "$gcc" "${flags[@]}" -c "$rr/$f.cpp" -o "$out/$f.o"
+  objs+=("$out/$f.o")
+done
+"$gcc" "${flags[@]}" -c "$here/fsrobust.cpp" -o "$out/fsrobust.o"
+libs=("$b/utils/libutils.a")
+for p in jpeg/libjpeg tiff/libtiff xml2/libxml2 minc/libminc netcdf/libnetcdf nrrdio/libnrrdio \
+  dicom/libdicom cephes/libcephes nifti/libnifti dcm2niix/libdcm2niixfs gifti/libgifti expat/libexpat; do
+  libs+=("$b/packages/$p.a")
+done
+for l in vnl_algo vnl v3p_netlib netlib vcl; do libs+=("$itk/lib/libitk$l-4.13.a"); done
+lapack=(/usr/lib/x86_64-linux-gnu/lapack/liblapack.a /usr/lib/x86_64-linux-gnu/blas/libblas.a
+  /usr/lib/gcc/x86_64-linux-gnu/11/libgfortran.a /usr/lib/gcc/x86_64-linux-gnu/11/libquadmath.a)
+"$gcc" -fopenmp -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl,-z,muldefs -Wl,--wrap=acos -O3 \
+  "$out/fsrobust.o" "${objs[@]}" -o "$out/fsrobust" \
+  "${libs[@]}" "${lapack[@]}" /usr/lib/x86_64-linux-gnu/libz.so -lm \
+  "$ws/oracles/toolchains/gcc-8.4-ubuntu/usr/lib/gcc/x86_64-linux-gnu/8/libgomp.so" \
+  /lib/x86_64-linux-gnu/libpthread.a -lcrypt -lrt -ldl
+# the speed and memory bench (bench.cpp), with the same objects and libraries
+"$gcc" "${flags[@]}" -c "$here/bench.cpp" -o "$out/bench.o"
+"$gcc" -fopenmp -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl,-z,muldefs -O3 \
+  "$out/bench.o" "${objs[@]}" -o "$out/bench" \
+  "${libs[@]}" "${lapack[@]}" /usr/lib/x86_64-linux-gnu/libz.so -lm \
+  "$ws/oracles/toolchains/gcc-8.4-ubuntu/usr/lib/gcc/x86_64-linux-gnu/8/libgomp.so" \
+  /lib/x86_64-linux-gnu/libpthread.a -lcrypt -lrt -ldl
+sha256sum "$out/fsrobust" "$out/bench" "$here/fsrobust.cpp" "$here/bench.cpp" "${lapack[@]}" "$ws/oracles/core-math-preload/libcrmath.so" > "$out/BUILD_INFO.txt"
+"$gcc" --version | head -1 >> "$out/BUILD_INFO.txt"
+echo "built $out/fsrobust and $out/bench"

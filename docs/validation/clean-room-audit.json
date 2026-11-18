@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-18-freesurfer-batch-57",
+ "dossier": "2026-11-18-freesurfer-batch-58",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 494028,
+  "accesses": 494133,
   "agents": 529,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 849,
-  "archived_files": 849,
+  "archive_checksums_matched": 851,
+  "archived_files": 851,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -450,9 +450,13 @@
    "2026-11-18-session-transcripts-freesurfer-batch-57": {
     "files": 8,
     "sha256": "d0d0520c0d8d8756859bdce713ee8638ff22165bd7058947beb299ea2d16c739"
+   },
+   "2026-11-18-session-transcripts-freesurfer-batch-58": {
+    "files": 3,
+    "sha256": "210d1c2248d2cc6af32fb2a5abecf04b967cc94180859428edc2032f18df86e2"
    }
   },
-  "commits_printed": 5073,
+  "commits_printed": 5083,
   "distinct_transcripts": 533,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
@@ -467,11 +471,11 @@
    "results_without_call": 0,
    "unresolved_paths": 9822
   },
-  "last_record": "2026-11-18 01:38 UTC",
+  "last_record": "2026-11-18 02:56 UTC",
   "live_files": 533,
-  "live_files_also_archived": 531,
+  "live_files_also_archived": 532,
   "sessions": 4,
-  "tool_calls": 139569,
+  "tool_calls": 139592,
   "tool_calls_by_tool": [
    [
     "Agent",
@@ -487,7 +491,7 @@
    ],
    [
     "Bash",
-    122535
+    122557
    ],
    [
     "CronCreate",
@@ -499,7 +503,7 @@
    ],
    [
     "Edit",
-    4658
+    4659
    ],
    [
     "EnterWorktree",
@@ -558,9 +562,9 @@
     7093
    ]
   ],
-  "transcript_bytes": 24471563974,
-  "transcript_files": 1382,
-  "unique_paths": 92127
+  "transcript_bytes": 24697046799,
+  "transcript_files": 1384,
+  "unique_paths": 92139
  },
  "levels": [
   [
@@ -641,7 +645,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "94c1a570"
+  "verdicts_repository": "912b3607"
  },
  "overview": {
   "agents_by_role": [

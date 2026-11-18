@@ -195,7 +195,11 @@ waits for `MRIsampleVolumeFrameType` (9434, 3.1-36).
   that buffer.
 - **FS-306**: `char buf[500]; strcpy(buf, fname)` in `TransformFileNameType`.
 - **FS-307**: `while (line[0] == '%') fgetl(line, 900, fp);` with `fgetl` at the end of the file
-  leaving `line` as it was.
+  leaving `line` as it was. Only a buffer that still starts with `%` there loops: a `#` comment or a
+  blank (or white-space) line read at the end replaces the buffer with that raw line, the loop ends and
+  the rows fail with `could not read row 1 from <f> (<the raw line with its newline>)` (relay 38, from
+  track E's open probe group `vrules4`; until then the port raised FS-307 at every end of the file
+  inside the loop; the probe's `lta_hand_cases.txt`).
 - **FS-308**, **FS-309**: `int type, nxforms;` without values and `sscanf(cp, ...)` with `cp` from
   `fgetl` (`NULL` at the end); the official build's garbage happened to give the port's 0 in 31 of the
   probe's cases (skipped all the same).

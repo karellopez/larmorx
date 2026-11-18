@@ -166,6 +166,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--only", help="comma-separated commands to keep (a check while porting; no official hash)"
     )
+    ap.add_argument(
+        "--cases",
+        type=Path,
+        help="a file of hand-written cases (hand_cases.py) instead of the seeded ones (no official hash)",
+    )
     a = ap.parse_args(argv)
     ws = workspace()
     if ws is None:
@@ -176,9 +181,13 @@ def main(argv: list[str] | None = None) -> int:
     inputs.mkdir(parents=True, exist_ok=True)
     tag = f"-{a.only.replace(',', '_')}" if a.only else ""
     cases_path = inputs / f"cases-{a.seed}-{a.n}{tag}.txt"
-    text = subprocess.run(
-        [str(port), "cases", str(a.seed), str(a.n)], check=True, capture_output=True, text=True
-    ).stdout
+    if a.cases:
+        cases_path = inputs / f"hand-{a.cases.stem}.txt"
+        text = a.cases.read_text(encoding="utf-8")
+    else:
+        text = subprocess.run(
+            [str(port), "cases", str(a.seed), str(a.n)], check=True, capture_output=True, text=True
+        ).stdout
     if a.only:
         keep = set(a.only.split(","))
         text = "".join(line for line in text.splitlines(True) if line.split()[0] in keep)

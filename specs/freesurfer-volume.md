@@ -1251,7 +1251,7 @@ out: the implementations' own tests, against §25's text). FS-319's guard is rea
 - A sample the trilinear sampler refuses (another volume type, at a point that is not whole) leaves its
   variable as it was: in the derivatives the last sample's value, before the first a value never
   written; in the gradients (one variable per neighbour) a value never written (FS-322: 0 in both
-  modes, noted; such a value is whatever the program's earlier work left on its stack, so the probe's
+  modes, noted; such a value is whatever the program's earlier steps left on its stack, so the probe's
   four runs may agree on it, and §69.3 lets a `vderiv` line where the candidate noted FS-322 differ in
   both modes).
 - **Neighbour counts** (frame 0 unless named; they return the count). Through the volume's boundary
@@ -1318,9 +1318,10 @@ out: the implementations' own tests, against §25's text). FS-319's guard is rea
      `specs/freesurfer-mri.md` §5); where the sampler fails (`SAMPLE_SINC` at a point that is not whole,
      a type the trilinear sampler refuses) the last value that succeeded is stored; before the first,
      a value FreeSurfer never wrote (FS-325): 0 in both modes, noted. FreeSurfer's value there is the
-     bytes earlier work in the same process left on its stack, which the guard runs do not change (they
-     move only the allocations), so the probe's four runs agree on it; C gives it no value, and another
-     caller or build leaves other bytes (§31's cubic line in `vresamp` shows other bytes than `vsample`'s).
+     bytes its own earlier steps of the call leave on the stack (the probe's runs fill the stack with
+     bytes 0, 90 and 165 before each call, and the value stays), so the probe's four runs agree on it;
+     C gives it no value, and another caller, path or build leaves other bytes (§31's cubic line in
+     `vresamp` shows other bytes than `vsample`'s).
      **(observed)**: `vlinear`, `lxf 0` with method 2 at points that are not whole, every sample refused:
      every voxel the NaN with all bits set in a float destination (`ffffffff`), `-2147483648` in an `int`
      one (`80000000`, the NaN's `nint`), for every source type and outside value tried. §69.3 lets a
@@ -3012,8 +3013,8 @@ standard error) are taken out and their IDs kept. Every line must be identical, 
   where they lie outside, FS-290);
 - in `--mode fix`, a line where the candidate noted a defect (the corrected result);
 - in both modes, a line where the candidate noted a defect whose value in FreeSurfer is memory it never
-  wrote, on the stack, where the probe's four runs agree only by accident of the probe's own earlier
-  work (the guard runs move only the allocations): FS-300 in `vsample` and `vresamp` (§18, §31: the
+  wrote, on the stack, where the probe's four runs agree only because the program's own earlier steps
+  leave the same bytes there (the runs' fills of the stack before each call do not reach them): FS-300 in `vsample` and `vresamp` (§18, §31: the
   cubic frame sampler's window points FreeSurfer never reads), FS-322 in `vderiv` (§28: a gradient's
   sample never written) and FS-325 in `vlinear` (§29: a linear transform's samples before the first
   that succeeds);

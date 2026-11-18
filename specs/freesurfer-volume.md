@@ -1044,10 +1044,17 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   `MRIgetVoxVal`/`MRIsetVoxVal` over N times the source's extent. The cached matrices are recomputed.
 - **`MRIupsampleNConserve(src, dst, N)`**: a source that is not float is first changed to floats
   (`MRISeqchangeType(src, MRI_FLOAT, 0, 0, 0)`); upsampled; every voxel of the result is then divided
-  by `N * N * N` (a 32-bit product, in `double`, stored as `float`). A change of type that fails leaves
-  FreeSurfer with no volume: it crashes (FS-319). In both modes, after the change of type's own error,
-  the program ends, code -4 (§6), `MRIupsampleNConserve(): no volume to upsample (FreeSurfer crashes
-  here)` + `\n`.
+  by `N * N * N` (a 32-bit product, in `double`, stored as `float`). A change of type that failed would
+  leave FreeSurfer with no volume, and it would crash (FS-319); **no input reaches it**: the change is
+  made with `f_low = f_high = 0`, so the histogram's low end adds no bin (`k` = 0, the minimum kept, or
+  NaN when the bin size is NaN or infinite) and the high end's `j * size + min` is never below that
+  (`j` and the size are not negative; NaN ends never compare as `min > max`), and the change's only
+  failure, `min > max`, cannot happen (the volume's allocation failing ends the program instead, §7).
+  Both implementations keep a guard for it all the same: after the change of type's own error, in both
+  modes, the program ends, code -4 (§6), `MRIupsampleNConserve(): no volume to upsample (FreeSurfer
+  crashes here)` + `\n`; no test can reach it (no `vres` line does: its `ups 2` crashes are FreeSurfer's
+  conversions of a volume with a registration matrix or a colour table, and an upsampling into the
+  source).
 - **`MRIdownsample2(src, dst)`**: a given `dst` of another type: `MRIdownsample2: source and dst must be
   same type` (`ERROR_UNSUPPORTED`), `NULL`. The extent is half the source's (rounded down); without
   `dst`, a new one of the source's type with its header. `dst` is cleared; each 2 x 2 x 2 block of frame
@@ -1121,11 +1128,11 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
 §69's group `vres` (the open probe's commands `setres`, `vfill`, `fillfg`, `explane`, `fillplane`, `ups`,
 `dns2`, `dnsn`, `mft`, `lim` and `chtype`; §69.2 says what it covers and gives its hash): identical with
 `reproduce` but where FreeSurfer reads memory it does not own or crashes (FS-52, FS-53, FS-58, FS-252,
-FS-289, FS-290 of the voxel access, FS-316's seeds past the extent, FS-319), lines the loop allows; the
+FS-289, FS-290 of the voxel access, FS-316's seeds past the extent), lines the loop allows; the
 default differs only where it notes a defect. Not in the probe's cases: a factor of 0 in
 `MRIdownsampleN` (its quotient, infinity, is FS-317's: FreeSurfer's -2147483648 is refused by the
 allocation, but the default's 2,147,483,647 would ask for a volume of that width, so the cases leave it
-out) and FS-319's end of the program: the implementations' own tests, against §25's text.
+out: the implementations' own tests, against §25's text). FS-319's guard is reached by no input (§25).
 
 ## 27. Frame-range samplers, the trilinear kernel and trilinear splatting (3.1-36)
 - **Trilinear corners** (shared by this section): a point unambiguously outside (§18's

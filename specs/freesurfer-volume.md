@@ -1312,7 +1312,7 @@ out: the implementations' own tests, against §25's text). FS-319's guard is rea
      a value FreeSurfer never wrote (FS-325): 0 in both modes, noted. FreeSurfer's value there is the
      bytes earlier work in the same process left on its stack, which the guard runs do not change (they
      move only the allocations), so the probe's four runs agree on it; C gives it no value, and another
-     caller or build leaves other bytes.
+     caller or build leaves other bytes (§31's cubic line in `vresamp` shows other bytes than `vsample`'s).
      **(observed)**: `vlinear`, `lxf 0` with method 2 at points that are not whole, every sample refused:
      every voxel the NaN with all bits set in a float destination (`ffffffff`), `-2147483648` in an `int`
      one (`80000000`, the NaN's `nint`), for every source type and outside value tried. §69.3 lets a
@@ -1382,7 +1382,10 @@ returns there): the implementations' own tests, against this text.
   (single-precision matrix product, the indices as floats); `si = (int) floor(si')` (x86-64's
   `-2147483648` for NaN and values beyond `int`), `si_f = si' - (float) si` in `float`, likewise j, k.
   - `SAMPLE_SINC` (2): §18's `MRIsincSampleVolumeFrame` at the point (as doubles), frame `f`, half-width
-    5; `SAMPLE_CUBIC` (3): `MRIcubicSampleVolumeFrame`; the value is the sample as a `float`. A sampler
+    5; `SAMPLE_CUBIC` (3): `MRIcubicSampleVolumeFrame` (its window points outside the source are memory
+    contents, FS-300, as §18 says: both modes take them as 0 and note FS-300; **(observed)**: `vresamp`, a
+    byte voxel 0x7f where those points as 0 give 0x8d; §69.3 lets a `vresamp` line where the candidate
+    noted FS-300 differ in both modes); the value is the sample as a `float`. A sampler
     that fails leaves the previous sample (a source type it refuses, whose destination nothing is stored
     into).
   - Otherwise the eight corners `val[a][b][c]` (column `si + a`, row `sj + b`, slice `sk + c`, frame `f`)
@@ -2984,7 +2987,7 @@ standard error) are taken out and their IDs kept. Every line must be identical, 
 - in `--mode fix`, a line where the candidate noted a defect (the corrected result);
 - in both modes, a line where the candidate noted a defect whose value in FreeSurfer is memory it never
   wrote, on the stack, where the probe's four runs agree only by accident of the probe's own earlier
-  work (the guard runs move only the allocations): FS-300 in `vsample` (§18: the
+  work (the guard runs move only the allocations): FS-300 in `vsample` and `vresamp` (§18, §31: the
   cubic frame sampler's window points FreeSurfer never reads), FS-322 in `vderiv` (§28: a gradient's
   sample never written) and FS-325 in `vlinear` (§29: a linear transform's samples before the first
   that succeeds);

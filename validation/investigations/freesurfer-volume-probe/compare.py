@@ -1711,7 +1711,9 @@ class Gen7(Gen6):
                 L.append(f"repval {a} {d} 1 {frm} {r.randint(0, 255)}")
             else:
                 L.append(f"repval {a} {d} 0 {self.fillv(r)} {self.fillv(r)}")
-        return [Batch("vresamp", "vresamp", L)]
+        # FS-300: the cubic frame sampler's window points outside the source are memory contents, as
+        # in vsample: a line noting it may differ
+        return [Batch("vresamp", "vresamp", L, both="FS-300")]
 
 
 GROUPS = [

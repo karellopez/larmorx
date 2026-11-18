@@ -905,7 +905,8 @@ an `int` label by truncation toward zero. A NaN or a value outside the `int` ran
   its end, where FreeSurfer reads memory it did not write (**(observed)**: most such lines differ
   between the probe's four runs). **Default:**
   after the row counts' check, before any voxel is written, the program ends, code -4 (§6),
-  `MRIlrswapSeg(): the label lists hold fewer numbers than rows (FreeSurfer reads past them)`;
+  `MRIlrswapSeg(): the label lists hold fewer numbers than rows (FreeSurfer reads past them)`, a text
+  with no `\n` of its own (unlike §22's table: its line is `error: ` + the text + `\n`, §6);
   **reproduce:** the numbers past a list's end are NaN (equal to no label: they swap nothing, and a
   voxel equal to the other list's number at that place takes the NaN as its new label, FS-311's
   conversion), the rest as below; FS-315 noted in both modes (**(observed)**: the probe's lines whose

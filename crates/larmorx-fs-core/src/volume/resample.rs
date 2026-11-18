@@ -100,7 +100,9 @@ struct ByteWalk {
 
 impl ByteWalk {
     fn read(&self, p: &mut Process, m: &Mri, q: [i32; 3]) -> u8 {
-        if let Some(b) = self.unstored.get(&q) {
+        if !self.unstored.is_empty()
+            && let Some(b) = self.unstored.get(&q)
+        {
             return *b;
         }
         let place = p.row_place(m, i64::from(q[0]), i64::from(q[1]), i64::from(q[2]), 0, 1);
@@ -114,7 +116,9 @@ impl ByteWalk {
         let place = p.row_place(m, i64::from(q[0]), i64::from(q[1]), i64::from(q[2]), 0, 1);
         if let (Place::In(o), Some(v)) = (place, m.voxels.as_deref_mut()) {
             v[o as usize] = b;
-            self.unstored.remove(&q);
+            if !self.unstored.is_empty() {
+                self.unstored.remove(&q);
+            }
             return;
         }
         let stored = matches!(place, Place::Other(_)) && p.mode().reproduce();
@@ -125,6 +129,114 @@ impl ByteWalk {
             self.unstored.insert(q, b);
         }
     }
+}
+
+/// The offsets of frame 0's first byte of each voxel position of a `w x h x d` walk in `m`
+/// (§25's byte walk), when every one lies inside the volume (no tensor rows, FS-960).
+fn byte_offsets(m: &Mri, w: i32, h: i32, d: i32) -> Option<(usize, usize)> {
+    let g = &m.geom;
+    let row = i64::from(g.width) * m.bytes_per_vox as i64;
+    let inside = m.kind != types::TENSOR
+        && m.nframes >= 1
+        && h <= g.height
+        && d <= g.depth
+        && i64::from(w) <= row;
+    let len = m.voxels.as_ref()?.len() as i64;
+    let need = (i64::from(g.depth) * i64::from(g.height)) * row;
+    (inside && need <= len).then_some((row as usize, g.height as usize))
+}
+
+/// `MRIfillFG`'s fill when every byte it reads or writes lies inside both volumes (§25): the
+/// sweeps then fill exactly the voxels joined to the seed by face neighbours whose source byte is
+/// at least `threshold`, so a walk of that set gives the same bytes and count. `None` where a byte
+/// lies elsewhere (the sweeps' own walk then follows §6's places).
+fn fill_fast(v: &mut Vols, e: [i32; 3], s: [i32; 3], threshold: i32, fill_val: i32) -> Option<i32> {
+    let (w, h, d) = (e[0], e[1], e[2]);
+    if (0..3).any(|k| s[k] < 0 || s[k] >= e[k]) {
+        return None;
+    }
+    let (srow, sh) = byte_offsets(v.a(), w, h, d)?;
+    let (drow, dh) = byte_offsets(v.d(), w, h, d)?;
+    let same = v.d_is_a();
+    let (wu, hu, du) = (w as usize, h as usize, d as usize);
+    let n = wu * hu * du;
+    let at = |row: usize, height: usize, x: usize, y: usize, z: usize| (z * height + y) * row + x;
+    let mut dst = vec![0u8; n];
+    {
+        let dv = v.d().voxels.as_deref()?;
+        for z in 0..du {
+            for y in 0..hu {
+                let o = at(drow, dh, 0, y, z);
+                dst[(z * hu + y) * wu..(z * hu + y + 1) * wu].copy_from_slice(&dv[o..o + wu]);
+            }
+        }
+    }
+    let src = if same {
+        None
+    } else {
+        let sv = v.a().voxels.as_deref()?;
+        let mut b = vec![0u8; n];
+        for z in 0..du {
+            for y in 0..hu {
+                let o = at(srow, sh, 0, y, z);
+                b[(z * hu + y) * wu..(z * hu + y + 1) * wu].copy_from_slice(&sv[o..o + wu]);
+            }
+        }
+        Some(b)
+    };
+    let ok = (0..=255).contains(&fill_val);
+    let fv = fill_val as u8;
+    if ok {
+        let low = fill_val.wrapping_sub(1) as u8;
+        for b in dst.iter_mut() {
+            if *b == fv {
+                *b = low;
+            }
+        }
+    }
+    let seed = (s[2] as usize * hu + s[1] as usize) * wu + s[0] as usize;
+    dst[seed] = fv;
+    let mut filled = 0i32;
+    if ok {
+        let mut stack = vec![seed];
+        while let Some(i) = stack.pop() {
+            let (x, y, z) = (i % wu, (i / wu) % hu, i / (wu * hu));
+            let mut visit = |j: usize, dst: &mut Vec<u8>, stack: &mut Vec<usize>| {
+                let sb = src.as_ref().map_or(dst[j], |b| b[j]);
+                if dst[j] != fv && i32::from(sb) >= threshold {
+                    dst[j] = fv;
+                    filled += 1;
+                    stack.push(j);
+                }
+            };
+            if x > 0 {
+                visit(i - 1, &mut dst, &mut stack);
+            }
+            if x + 1 < wu {
+                visit(i + 1, &mut dst, &mut stack);
+            }
+            if y > 0 {
+                visit(i - wu, &mut dst, &mut stack);
+            }
+            if y + 1 < hu {
+                visit(i + wu, &mut dst, &mut stack);
+            }
+            if z > 0 {
+                visit(i - wu * hu, &mut dst, &mut stack);
+            }
+            if z + 1 < du {
+                visit(i + wu * hu, &mut dst, &mut stack);
+            }
+        }
+    }
+    let dv = v.d_mut().voxels.as_deref_mut()?;
+    for z in 0..du {
+        for y in 0..hu {
+            let o = at(drow, dh, 0, y, z);
+            dv[o..o + wu].copy_from_slice(&dst[(z * hu + y) * wu..(z * hu + y + 1) * wu]);
+        }
+    }
+    Some(filled)
 }
 
 impl Process {
@@ -280,6 +392,10 @@ impl Process {
                     s[k] = e[k] - 1;
                 }
             }
+        }
+        if let Some(filled) = fill_fast(&mut v, e, s, threshold, fill_val) {
+            *npix = filled.wrapping_add(1);
+            return Ok(v.out());
         }
         let fv = fill_val as u8;
         let same = v.d_is_a();

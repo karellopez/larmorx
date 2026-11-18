@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-18-freesurfer-batch-61",
+ "dossier": "2026-11-18-freesurfer-batch-62",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 497435,
+  "accesses": 498115,
   "agents": 534,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 860,
-  "archived_files": 860,
+  "archive_checksums_matched": 862,
+  "archived_files": 862,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -466,9 +466,13 @@
    "2026-11-18-session-transcripts-freesurfer-batch-61": {
     "files": 5,
     "sha256": "b526f8ffb3403df0e232607e1a43fb1b1b011af3df67244bc51b0d70722152c5"
+   },
+   "2026-11-18-session-transcripts-freesurfer-batch-62": {
+    "files": 2,
+    "sha256": "00d5bb75a41399c2cbb20caf00426122b909d27c778f95a70241cdd5edd51d04"
    }
   },
-  "commits_printed": 5132,
+  "commits_printed": 5143,
   "distinct_transcripts": 538,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
@@ -483,11 +487,11 @@
    "results_without_call": 0,
    "unresolved_paths": 9836
   },
-  "last_record": "2026-11-18 12:08 UTC",
+  "last_record": "2026-11-18 13:02 UTC",
   "live_files": 538,
   "live_files_also_archived": 536,
   "sessions": 4,
-  "tool_calls": 140545,
+  "tool_calls": 140713,
   "tool_calls_by_tool": [
    [
     "Agent",
@@ -503,7 +507,7 @@
    ],
    [
     "Bash",
-    123447
+    123608
    ],
    [
     "CronCreate",
@@ -515,7 +519,7 @@
    ],
    [
     "Edit",
-    4666
+    4668
    ],
    [
     "EnterWorktree",
@@ -531,7 +535,7 @@
    ],
    [
     "ReadNotifications",
-    17
+    18
    ],
    [
     "SendMessage",
@@ -571,12 +575,12 @@
    ],
    [
     "Write",
-    7103
+    7107
    ]
   ],
-  "transcript_bytes": 25411177157,
-  "transcript_files": 1398,
-  "unique_paths": 92560
+  "transcript_bytes": 25644643417,
+  "transcript_files": 1400,
+  "unique_paths": 92663
  },
  "levels": [
   [
@@ -657,7 +661,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "6f24a306"
+  "verdicts_repository": "79fdcbbe"
  },
  "overview": {
   "agents_by_role": [

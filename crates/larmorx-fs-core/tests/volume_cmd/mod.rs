@@ -22,6 +22,7 @@ use larmorx_fs_core::maths::matrix::{MATRIX_REAL, Matrix};
 use larmorx_fs_core::maths::mfiles::CStream;
 use larmorx_fs_core::mri::{LinearTransform, Lta, Mri, Region, VolGeom, types};
 use larmorx_fs_core::volume::cma;
+use larmorx_fs_core::volume::deriv::Neighbours;
 use larmorx_fs_core::volume::geometry::SurfacePoint;
 use larmorx_fs_core::volume::ltaread::{FileSystem, TransformInputs};
 use larmorx_fs_core::volume::moves::axis;
@@ -941,6 +942,195 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
             };
             putv(l, r.as_ref());
             putv(l, Some(&a));
+        }
+        // part 6b: frame-range samplers, the trilinear kernel and splatting; derivatives,
+        // gradients and neighbour counts; linear transforms of a volume
+        "splat" => {
+            let mut a = getw(p, l)?;
+            let n = l.geti();
+            for _ in 0..n {
+                let k = l.geti();
+                let (x, y, z) = (l.getd(), l.getd(), l.getd());
+                let f = l.geti();
+                let v = l.getd();
+                let r = if k != 0 {
+                    p.mri_interpolate_into_volume_frame(&mut a, x, y, z, f, v)?
+                } else {
+                    p.mri_interpolate_into_volume(&mut a, x, y, z, v)?
+                };
+                l.puti(i64::from(r));
+            }
+            putv(l, Some(&a));
+        }
+        "sseq" | "sxyz" => {
+            const SLACK: i64 = 8;
+            let mut a = getw(p, l)?;
+            a.outside_val = l.getd();
+            let n = l.geti();
+            for _ in 0..n {
+                if c == "sseq" {
+                    let (x, y, z) = (l.getd(), l.getd(), l.getd());
+                    let (first, last, kind) = (l.geti(), l.geti(), l.geti());
+                    let cnt = if last >= first { i64::from(last) - i64::from(first) + 1 } else { 0 };
+                    let len = SLACK + i64::from(last.max(0)) + 1 + SLACK;
+                    let mut buf = vec![UNSET; len as usize];
+                    let r = {
+                        let mut put = |f: i32, v: f32| {
+                            let i = SLACK + i64::from(f);
+                            if (0..len).contains(&i) {
+                                buf[i as usize] = v;
+                            }
+                        };
+                        if kind == -1 {
+                            p.mri_sample_seq_volume(&a, x, y, z, first, last, &mut put)?
+                        } else {
+                            p.mri_sample_seq_volume_type(&a, x, y, z, first, last, kind, &mut put)?
+                        }
+                    };
+                    l.puti(i64::from(r));
+                    for f in 0..cnt {
+                        let i = SLACK + i64::from(first) + f;
+                        l.putf(if (0..len).contains(&i) { buf[i as usize] } else { UNSET });
+                    }
+                } else {
+                    let (x, y, z) = (l.geti(), l.geti(), l.geti());
+                    let (begin, end, _k) = (l.geti(), l.geti(), l.geti());
+                    let cnt = if end > begin { i64::from(end) - i64::from(begin) } else { 0 };
+                    let mut buf = vec![UNSET; cnt as usize];
+                    let r = {
+                        let mut put = |j: i32, v: f32| {
+                            if let Some(s) = usize::try_from(j).ok().and_then(|j| buf.get_mut(j)) {
+                                *s = v;
+                            }
+                        };
+                        p.mri_sample_volume_frame_xyz_int_n_range_floats(
+                            &a, x, y, z, begin, end, &mut put,
+                        )?
+                    };
+                    l.puti(i64::from(r));
+                    for v in buf {
+                        l.putf(v);
+                    }
+                }
+            }
+        }
+        "tkern" => {
+            let a = getw(p, l)?;
+            let n = l.geti();
+            for _ in 0..n {
+                let (x, y, z) = (l.getd(), l.getd(), l.getd());
+                let given = l.geti() == 0;
+                let k = p.mri_trilin_kernel(&a, x, y, z);
+                l.out(if given { "given" } else { "new" });
+                for w in k {
+                    l.putd(w);
+                }
+            }
+        }
+        "deriv" => {
+            let a = getw(p, l)?;
+            let s = l.getd();
+            p.mri_set_sample_volume_derivative_sign(s);
+            let n = l.geti();
+            for _ in 0..n {
+                let k = l.geti();
+                let (x, y, z) = (l.getd(), l.getd(), l.getd());
+                let (dx, dy, dz) = (l.getd(), l.getd(), l.getd());
+                let sigma = l.getd();
+                let mut mag = UNSETD;
+                let r = if k != 0 {
+                    p.mri_sample_volume_derivative_scale(&a, x, y, z, dx, dy, dz, &mut mag, sigma)?
+                } else {
+                    p.mri_sample_volume_derivative(&a, x, y, z, dx, dy, dz, &mut mag)?
+                };
+                l.puti(i64::from(r));
+                l.putd(mag);
+            }
+        }
+        "grad" => {
+            let a = getw(p, l)?;
+            let n = l.geti();
+            for _ in 0..n {
+                let k = l.geti();
+                let (x, y, z) = (l.getd(), l.getd(), l.getd());
+                let f = l.geti();
+                let (mut gx, mut gy, mut gz) = (UNSETD, UNSETD, UNSETD);
+                let r = if k != 0 {
+                    p.mri_sample_volume_gradient_frame(&a, x, y, z, &mut gx, &mut gy, &mut gz, f)?
+                } else {
+                    p.mri_sample_volume_gradient(&a, x, y, z, &mut gx, &mut gy, &mut gz)?
+                };
+                l.puti(i64::from(r));
+                l.putd(gx);
+                l.putd(gy);
+                l.putd(gz);
+            }
+        }
+        "nbrs" => {
+            let a = getw(p, l)?;
+            let n = l.geti();
+            for _ in 0..n {
+                let k = l.geti();
+                let (x, y, z) = (l.geti(), l.geti(), l.geti());
+                let (pp, q) = (l.geti(), l.geti());
+                let (lo, hi) = (l.getf(), l.getf());
+                let count = match k {
+                    0 => Neighbours::On(pp),
+                    1 => Neighbours::On3x3(pp),
+                    2 => Neighbours::InWindow(pp, q),
+                    3 => Neighbours::Value(pp),
+                    4 => Neighbours::InRange(pp, lo, hi),
+                    5 => Neighbours::Value3x3(pp),
+                    6 => Neighbours::Off(pp),
+                    7 => Neighbours::Off3x3(pp),
+                    _ => args::bad("unknown neighbour count"),
+                };
+                let r = p.mri_neighbours(&a, x, y, z, count)?;
+                l.puti(i64::from(r));
+            }
+        }
+        "setvals" => {
+            let mut a = getw(p, l)?;
+            let v = l.getf();
+            let r = p.mri_set_values(&mut a, v)?;
+            l.puti(i64::from(r));
+            putv(l, Some(&a));
+        }
+        "rasvox" => {
+            let a = getw(p, l)?;
+            let b = if l.take("null") { None } else { Some(getw(p, l)?) };
+            let m = l.getm(p)?;
+            let r = p.mri_ras_xform_to_voxel_xform(&a, b.as_ref(), m.as_ref())?;
+            l.putm(r.as_ref());
+        }
+        "lxf" => {
+            let k = l.geti();
+            let mut a = getw(p, l)?;
+            a.outside_val = l.getd();
+            let mut d = getdst(p, l, false)?;
+            let m = l.getm(p)?;
+            let interp = l.geti();
+            let r = match k {
+                0 => p.mri_linear_transform_interp(&mut a, dst(&mut d), m.as_ref(), interp)?,
+                1 => p.mri_linear_transform(&mut a, dst(&mut d), m.as_ref())?,
+                2 => p.mri_inverse_linear_transform(&mut a, dst(&mut d), m.as_ref())?,
+                3 => p.mri_apply_ras_linear_transform_interp(
+                    &mut a,
+                    dst(&mut d),
+                    m.as_ref(),
+                    interp,
+                )?,
+                4 => p.mri_apply_ras_linear_transform(&mut a, dst(&mut d), m.as_ref())?,
+                5 => p.mri_apply_ras_inverse_linear_transform(&mut a, dst(&mut d), m.as_ref())?,
+                _ => args::bad("unknown transform function"),
+            };
+            putres(l, r, &a, None, &d);
+        }
+        "rsmat" => {
+            let a = getw(p, l)?;
+            let b = getw(p, l)?;
+            let m = p.mri_get_resample_matrix(&a, &b)?;
+            l.putm(m.as_ref());
         }
         _ => args::bad("unknown command"),
     }

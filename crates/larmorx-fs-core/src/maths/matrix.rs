@@ -680,7 +680,7 @@ fn real_product_d(a: &Matrix, b: &Matrix, out: &mut Matrix) {
 /// The real product accumulated in float (§8.1 step 4) with the official build's operand order
 /// (§16): each product `m2(i, c) × m1(r, i)`; blocks of four `val + p0`, `p1 + val`, `p2 + val`,
 /// `val + p3`, then `val + p`.
-fn real_product_f(a: &Matrix, b: &Matrix, out: &mut Matrix) {
+pub(crate) fn real_product_f(a: &Matrix, b: &Matrix, out: &mut Matrix) {
     let (n, m) = (a.cols.max(0) as usize, b.cols.max(0) as usize);
     let simple = !out.is_complex() && out.cols == b.cols;
     // As `real_product_d`: plain arithmetic in each element's order (an operand order changes

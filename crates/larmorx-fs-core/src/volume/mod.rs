@@ -13,9 +13,12 @@
 
 pub mod arith;
 pub mod cma;
+pub mod deriv;
 pub mod extract;
+pub mod frames;
 pub mod geomblock;
 pub mod geometry;
+pub mod linear;
 pub mod ltaread;
 pub mod moves;
 pub mod resample;

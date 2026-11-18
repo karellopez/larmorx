@@ -21,6 +21,7 @@ pub mod geometry;
 pub mod linear;
 pub mod ltaread;
 pub mod moves;
+pub mod regrid;
 pub mod resample;
 pub mod sample;
 pub mod skull;

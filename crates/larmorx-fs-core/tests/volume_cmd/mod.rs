@@ -1132,6 +1132,32 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
             let m = p.mri_get_resample_matrix(&a, &b)?;
             l.putm(m.as_ref());
         }
+        // part 6c: resampling onto a template's grid, replacing a value
+        "rsfill" => {
+            let a = getw(p, l)?;
+            let b = getw(p, l)?;
+            let t = l.geti();
+            let fv = l.getf();
+            let plain = l.geti() != 0;
+            let r = if plain {
+                p.mri_resample(&a, &b, t)?
+            } else {
+                p.mri_resample_fill(&a, &b, t, fv)?
+            };
+            putv(l, r.as_ref());
+        }
+        "repval" => {
+            let mut a = getw(p, l)?;
+            let mut d = getdst(p, l, false)?;
+            let r = if l.geti() != 0 {
+                let (from, to) = (l.geti(), l.geti());
+                p.mri_replace_values_uchar(&mut a, dst(&mut d), from as u8, to as u8)?
+            } else {
+                let (from, to) = (l.getf(), l.getf());
+                p.mri_replace_values(&mut a, dst(&mut d), from, to)?
+            };
+            putres(l, r, &a, None, &d);
+        }
         _ => args::bad("unknown command"),
     }
     Ok(())
@@ -1279,6 +1305,7 @@ pub fn run_line(toks: &[String], mode: UpstreamDefects, env: &Environment) -> St
     }
     let (o, e) = (Buf::default(), Buf::default());
     let mut p = Process::new(env.clone(), mode, Box::new(o.clone()), Box::new(e.clone()));
+    p.progname = b"fs_volume_probe".to_vec();
     p.gdiag = gdiag;
     let mut l = Line::new(toks[first..].to_vec());
     let r = call(&mut p, &mut l);

@@ -1192,11 +1192,14 @@ out: the implementations' own tests, against §25's text). FS-319's guard is rea
   memory the program does not own (§6's direct access, FS-289, FS-290). Returns `NO_ERROR` (0).
 - `MRIsampleSeqVolume(mri, x, y, z, valvect, first, last)`: for each frame `first..=last` (none when
   `last < first`) the trilinear sample into `valvect[frame]` (the array indexed by the frame number
-  itself) as a `float`: the eight terms `weight * (double) voxel` summed left to right (the running sum
-  the first operand where NaNs meet). A point unambiguously outside gives `(float) outside_val` to each
-  frame. Frames are not checked against the volume's (§6's direct access). Another type: the error
-  `MRIsampleSeqVolume: unsupported type <t>` at the first frame (its value unchanged, the later ones
-  not written), `ERROR_UNSUPPORTED`. A volume of 64-bit integers is read as §18's samplers read it
+  itself) as a `float`: the eight terms `weight * (double) voxel` summed left to right, the sum starting
+  from the first term itself (`t0 + t1 + ...`, no 0 added first: a first term of -0 stays -0 when the
+  others are -0; the running sum the first operand where NaNs meet). In this order: a point unambiguously
+  outside gives `(float) outside_val` to each frame of the range, whatever the volume's type (no error);
+  then the type is checked inside the frame loop: another type gives the error `MRIsampleSeqVolume:
+  unsupported type <t>` at the first frame of the range (its value unchanged, the later ones not
+  written), `ERROR_UNSUPPORTED`, and no error at all for an empty range (`last < first`: `NO_ERROR`).
+  Frames are not checked against the volume's (§6's direct access). A volume of 64-bit integers is read as §18's samplers read it
   (FS-298).
 - `MRIsampleSeqVolumeType(..., type)`: `SAMPLE_TRILINEAR` (1) as `MRIsampleSeqVolume`; `SAMPLE_CUBIC` (3)
   and `SAMPLE_SINC` (2) print `Cubic interpolation is not implemented yet on multi-frame data. Going
@@ -1208,28 +1211,31 @@ out: the implementations' own tests, against §25's text). FS-319's guard is rea
   clamped to the volume, each frame's; a float voxel is copied unchanged (a signalling NaN stays
   signalling), bytes, shorts, unsigned shorts and ints converted to `float`, 64-bit integers read as
   FS-298 says; another volume type gives 0 at the first frame and the error `MRIsampleSeqVolumeType:
-  unsupported type <t>`, `ERROR_UNSUPPORTED`.
+  unsupported type <t>`, `ERROR_UNSUPPORTED` (the outside test first, as above, and nothing for an empty
+  range).
 - `MRIsampleVolumeFrame_xyzInt_nRange_floats(mri, x, y, z, begin, end, vals)` and
   `MRIsampleVolumeFrameType_xyzInt_nRange_SAMPLE_NEAREST_floats` (the same): the voxel at the whole point
   for frames `begin..end` (end excluded; none when `end <= begin`) into `vals[frame - begin]`: `(float)
   outside_val` when the point (as `double`s) is unambiguously outside, else the point clamped to the
   volume; bytes, shorts, unsigned shorts and ints converted to `float`, floats copied unchanged; another
-  type (64-bit integers included) gives 0 for every frame and the error `MRIsampleVolumeFrameType:
-  unsupported volume type <t>`, `ERROR_UNSUPPORTED`. Frames are not checked (§6's direct access).
+  type (64-bit integers included) gives 0 for every frame of the range first, then one error
+  `MRIsampleVolumeFrameType: unsupported volume type <t>`, `ERROR_UNSUPPORTED` (the error also for an
+  empty range). Frames are not checked (§6's direct access).
 
 ## 28. Directional derivatives, gradients and neighbour counts (3.1-36)
 - `MRIsampleVolumeDerivative(mri, x, y, z, dx, dy, dz, &mag)`: the point clamped to the volume (no
   outside test: `x >= width` gives `width - 1`, then `x < 0` gives 0, a NaN kept); for `d` = 0.5, 1,
   1.5, 2 in turn: `len += d`, then the sample at `(x + d dx, y + d dy, z + d dz)` (each coordinate `x +
   (d dx)` in `double`) added to `vp`, then the sample at `(x - d dx, ...)` added to `vm` (§18's
-  `MRIsampleVolume`; each sum the running sum the first operand); then `vm /= 4`, `vp /= 4`, `len /= 4`,
+  `MRIsampleVolume`; `len`, `vp` and `vm` start at +0, so the first addition is `0 + sample`: a -0 sample
+  gives +0, a signalling NaN becomes quiet; each sum the running sum the first operand); then `vm /= 4`, `vp /= 4`, `len /= 4`,
   `mag = ((vp - vm) / (2 len)) * MRIsampleVolumeDerivativeSign` (§16). Returns 0.
 - `MRIsampleVolumeDerivativeScale(..., &mag, sigma)`: the point clamped as above; `step = MAX(0.25,
   sigma / 5)` and the distances `d = step, 2 step, ...` (each the previous plus `step`) while `d <=
   MAX(2 sigma, step)` (`MAX(a, b)` is `a >= b ? a : b`: a NaN sigma gives no distance, a negative one the
   single distance 0.25); at each: weight `k = 1` when `|sigma| < FLT_EPSILON`, else `exp(-(d d) / (2
   sigma sigma))` (the C library's `exp`); `ktotal += k`, `len += d`, `vp += k sample(+)`, `vm += k
-  sample(-)` (the samples as above); a step below `FLT_EPSILON` stops after the first distance (no step
+  sample(-)` (the samples as above; `ktotal`, `len`, `vp`, `vm` start at +0, as above); a step below `FLT_EPSILON` stops after the first distance (no step
   is: it is at least 0.25). Then `vm /= ktotal`, `vp /= ktotal`, `len /= ktotal` (0 / 0 when there is no
   distance: NaN) and `mag` as above. **FS-324:** a sigma for which `2 sigma` is +infinity (sigma at
   least 2^1023, +infinity included) never returns in FreeSurfer (its distances reach +infinity, which
@@ -1267,9 +1273,10 @@ out: the implementations' own tests, against §25's text). FS-319's guard is rea
     to 1, every coordinate through its table, the voxel itself left out) whose value is `> (float)
     min`; `MRIneighbors3x3(..., val)`: those rounding to `val`; `MRIneighborsInWindow(..., wsize, val)`:
     the window of half-width `(wsize - 1) / 2` (C's integer division: 0 for `wsize` 0 to 2, nothing at
-    all for a negative half-width) without the voxel itself, values `== (float) val`.
-  - `MRIneighborsOff(mri, x0, y0, z0, min)`: the six face neighbours at the plain coordinates (no
-    tables), whose byte at the voxel's place (the volume read directly as bytes whatever its type, §6:
+    all for a negative half-width) without the voxel itself, values `== (float) val`, in the same order
+    (z outermost, then y, then x) and with every coordinate through its table, as the 3 x 3 counts.
+  - `MRIneighborsOff(mri, x0, y0, z0, min)`: the six face neighbours, in `MRIneighborsOn`'s order, at
+    the plain coordinates (no tables), whose byte at the voxel's place (the volume read directly as bytes whatever its type, §6:
     column `x` is byte `x` of the row) is `< min`; a neighbour outside the volume is read as §6's direct
     access places it (FS-289, FS-290: a row or slice past the extent is memory the program does not
     own; **(observed)**: such lines crash or differ between runs). `MRIneighborsOff3x3`: the 26 through
@@ -1279,9 +1286,10 @@ out: the implementations' own tests, against §25's text). FS-319's guard is rea
 - `MRIsetValues(mri, val)`: every voxel of every frame `MRIsetVoxVal(val)` (frames outermost, then x,
   y, z innermost; a volume without voxels: FS-58). Returns 0.
 - `MRIrasXformToVoxelXform(src, dst, m_ras, m_vox)`: `extract_r_to_i(dst) * (m_ras * extract_i_to_r(src))`
-  (`specs/freesurfer-mri.md` §3; the destination the source when NULL), with
-  `specs/freesurfer-maths.md` §8.1's products (the inner one first, into a new matrix; the outer one into
-  `m_vox`, a new matrix when NULL), their messages and ends of the program included: an absent `m_ras`,
+  (`specs/freesurfer-mri.md` §3, from the geometry fields, not the cached matrices; the destination the
+  source when NULL; both matrices are made silently, an inverse that fails giving none, so where they are
+  made among the products is not visible), with `specs/freesurfer-maths.md` §8.1's products (the inner
+  one first, into a new matrix; the outer one into `m_vox`, a new matrix when NULL), their messages and ends of the program included: an absent `m_ras`,
   a matrix of another size than 4 x 4, or no `extract_r_to_i` of a destination whose voxel-to-RAS matrix
   does not invert (**(observed)**: `vlinear`, `error: MatrixMultiply: m1 is null` + `\n` + FS-01's NUL +
   `\n`, status 252). Returns the product.
@@ -1328,7 +1336,8 @@ out: the implementations' own tests, against §25's text). FS-319's guard is rea
 - `MRIgetResampleMatrix(src, template)`: `inverse(extract_i_to_r(src)) * extract_i_to_r(template)`, in
   order: a source with `ras_good_flag` 0 whose slice direction (§14) is none of coronal, sagittal,
   horizontal: NULL and the error `MRIresample(): source volume orientation is unknown` (`errno` as it
-  is); then both matrices; a determinant 0 (`specs/freesurfer-maths.md` §8.8's, as a `float`) of the
+  is); with `ras_good_flag` 0 the slice direction is always unknown (§14), so every source without a
+  good RAS gets this error; then both matrices; a determinant 0 (`specs/freesurfer-maths.md` §8.8's, as a `float`) of the
   source's matrix, then of the template's: `errno` set to 0, the error `MRIresample(): source matrix has
   zero determinant; matrix is:` (resp. `destination`), the matrix printed on standard error
   (`specs/freesurfer-maths.md` §8.6's print, 5 decimals), NULL; an inversion of the source's matrix that
@@ -1437,7 +1446,8 @@ returns there): the implementations' own tests, against this text.
   frames past the destination's are `MRIsetVoxVal` writes past its voxels: `specs/freesurfer-mri.md`'s rules), column, row, slice:
   the label with the most votes over all source frames (the lowest on ties; 0 when none) is set with
   `MRIsetVoxVal`.
-- **Geometry** of the destination (after the sampling): `V = i_to_r(src) M`; `x_r, x_a, x_s` = `V`'s first
+- **Geometry** of the destination (after the sampling): `V = i_to_r(src) M` (`i_to_r(src)` is
+  `extract_i_to_r(src)`, made from the source's geometry fields, not its cached matrix); `x_r, x_a, x_s` = `V`'s first
   column divided by the destination's `xsize` (`float`), `y_*` the second by `ysize`, `z_*` the third by
   `zsize`; the centre `(c_r, c_a, c_s)` = the first three elements of `i_to_r(src) (M (width/2, height/2,
   depth/2, 1))` (the halves in `double`, stored as floats; single-precision products); `ras_good_flag` 1.

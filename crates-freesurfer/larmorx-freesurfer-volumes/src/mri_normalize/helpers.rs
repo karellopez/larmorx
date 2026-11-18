@@ -25,7 +25,7 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::histo::{
     Histogram, histo_copy, histo_find_highest_peak_in_region, histo_plot, histo_smooth,
 };
-use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal, NO_ERROR};
+use larmorx_freesurfer_core::log::{self, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::matrix::{Matrix, matrix_multiply};
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::sse::{add, div, div64, mul, mul64, sqrt};
@@ -623,9 +623,10 @@ pub fn build_outside_of_brain_mask(
 /// written to `c1.mgz`; then from each control point a walk in half-voxel steps along the
 /// distance's unit gradient (at most 10 mm, the distance grown by half the column size first):
 /// the walk stops on a zero gradient, at an edge (the point removed), where the direction turns
-/// against the start's gradient, or on the distance's ridge; `c2.mgz` at the end. FS-1015: a
-/// distance volume whose column size is not above 0 (or NaN) never ends a walk that meets
-/// nothing (FreeSurfer hangs): both modes end with an error (rule B).
+/// against the start's gradient, or on the distance's ridge; `c2.mgz` at the end. FS-1015: with
+/// a column size of 0 or NaN (or one so small that 10 mm take more than [`MAX_WALK_STEPS`] steps)
+/// a walk that meets nothing never ends in FreeSurfer: both modes end with an error at that many
+/// steps (rule B).
 pub fn remove_surface_outliers_t2(
     g: &mut Globals,
     r: &mut Run,
@@ -635,24 +636,6 @@ pub fn remove_surface_outliers_t2(
 ) -> Result<(), Fatal> {
     let step_size: f32 = 0.5;
     let step_mm = mul(step_size, dist.vg.xsize);
-    if !(step_mm > 0.0) {
-        g.notices.add(
-            &FS_1015,
-            format!(
-                "remove_surface_outliers_T2: a distance volume of column size {} (FreeSurfer's \
-                 walk from a control point may never end)",
-                dist.vg.xsize
-            ),
-        );
-        log::error_exit(
-            g,
-            r.err,
-            ERROR_BADPARM,
-            "remove_surface_outliers_T2: the volume's voxel size must be above 0 (FreeSurfer's \
-             walk along the distance gradient never ends)",
-        )?;
-        return Ok(());
-    }
     let mut mag = mri_clone_different_type(g, r.out, r.err, src, MRI_FLOAT)?;
     let mut grad = mri_sobel(g, r.out, r.err, src, None, Some(&mut mag))?.unwrap_new();
     let mut dist_grad = mri_sobel(g, r.out, r.err, dist, None, None)?.unwrap_new();
@@ -708,7 +691,12 @@ pub fn remove_surface_outliers_t2(
                     nint(g, f64::from(zf)),
                 );
                 let mut done;
+                let mut steps: u64 = 0;
                 loop {
+                    steps += 1;
+                    if steps > MAX_WALK_STEPS {
+                        return walk_never_ends(g, r, dist, [x, y, z]);
+                    }
                     walked = add(walked, step_mm);
                     let mut ddx = get_frame(g, r.err, &dist_grad, xv, yv, zv, 0)?;
                     let mut ddy = get_frame(g, r.err, &dist_grad, xv, yv, zv, 1)?;
@@ -751,6 +739,31 @@ pub fn remove_surface_outliers_t2(
     }
     write(g, r, ctrl, "c2.mgz")?;
     Ok(())
+}
+
+/// The steps after which a walk of [`remove_surface_outliers_t2`] is taken never to end (one of
+/// 10 mm in steps of half a voxel ends within 20 steps per millimetre of voxel size).
+const MAX_WALK_STEPS: u64 = 10_000_000;
+
+/// FS-1015: a walk past [`MAX_WALK_STEPS`] (FreeSurfer runs for hours or never ends): both modes
+/// end with an error (rule B).
+fn walk_never_ends(g: &mut Globals, r: &mut Run, dist: &Mri, v: [i32; 3]) -> Result<(), Fatal> {
+    g.notices.add(
+        &FS_1015,
+        format!(
+            "remove_surface_outliers_T2: the walk from control point ({}, {}, {}) has not ended              after {MAX_WALK_STEPS} steps (column size {}): FreeSurfer runs for hours or never ends",
+            v[0], v[1], v[2], dist.vg.xsize
+        ),
+    );
+    log::error_exit(
+        g,
+        r.err,
+        1,
+        &format!(
+            "remove_surface_outliers_T2: the walk from control point ({}, {}, {}) along the              distance gradient does not end (voxel size {})",
+            v[0], v[1], v[2], dist.vg.xsize
+        ),
+    )
 }
 
 /// `threshold_control_points(mri_ctrl, mri_intensity, thresh)`: each control point (a value other

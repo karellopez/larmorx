@@ -17,3 +17,7 @@ larmorx-freesurfer-mri.workspace = true
 larmorx-freesurfer-robust.workspace = true
 larmorx-freesurfer-surf.workspace = true
 larmorx-freesurfer-volume.workspace = true
+
+[dev-dependencies]
+sha2.workspace = true
+tempfile.workspace = true

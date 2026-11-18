@@ -431,9 +431,14 @@ accumulation) and inverses `MatrixInverse`'s (none when an element of the result
 
 ## 15. Centre of mass, principal components
 
-- `MRIindexNotInVolume(mri, c, r, s)`: 0 when every coordinate is in `[0, extent - 1]`; else -1 when
-  each coordinate rounded to nearest (ties to even) as a `float` is in `[0, extent)`; else 1 (NaN
-  coordinates give 1).
+- `MRIindexNotInVolume(mri, c, r, s)`: 0 when every coordinate (a `double`) is in `[0, extent - 1]`;
+  else -1 when each coordinate, the `double` rounded to the nearest integer (ties to even) and that
+  integer converted to `float`, is in `[0, extent)` (compared as `float`s); else 1 (NaN coordinates
+  give 1). The rounding is of the `double`, not of the coordinate first converted to `float`: a row of
+  2.500000119 in a volume 3 rows high rounds to 3 and gives 1, a row of -0.500000119 rounds to -1 and
+  gives 1 (as floats both would be 2.5 and -0.5, which round to 2 and -0: -1); 2.5 gives -1, -0.5
+  gives -1 (its rounding -0 is not below 0) (**(observed)**: §69's `vrules7`; `vderiv`, a derivative's
+  sample at a row of 2.500000119 of a volume 3 rows high, which is outside and gives `outside_val`).
 - `MRIsampleVolumeType(..., SAMPLE_NEAREST)`, in this order: 1 above gives the sample `outside_val`
   and returns 0, whatever the volume's type (with voxels or without). Otherwise the coordinates
   are rounded by `nint` (half away from zero; FS-12 for numbers outside `int`), each clamped to

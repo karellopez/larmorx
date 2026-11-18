@@ -1334,9 +1334,10 @@ class Gen6(Gen5):
             L.append(f"dns2 {self.rvol(r, shape=s)} {d}")
         for _ in range(80):
             s = self.vshape(r, ext=(1, 5), frames=(1, 2), hdr=0.05)
-            f = [f32(r.choice([1.0, 2.0, 2.0, 3.0, 1.5, 0.5, 4.0, -1.0, 0.0])) for _ in range(3)]
-            if r.random() < 0.05:
+            f = [f32(r.choice([1.0, 2.0, 2.0, 3.0, 1.5, 0.5, 4.0, -1.0, 2.5])) for _ in range(3)]
+            if r.random() < 0.05:  # NaN: FS-317's 0 by default, an extent the allocation refuses
                 f[r.randrange(3)] = "7fc00000"
+            # no factor 0: its quotient, infinity, becomes an extent of 2^31 - 1 by default (§26)
             fs = [struct.unpack(">f", bytes.fromhex(x))[0] for x in f]
             ext = None
             if all(x > 0 for x in fs):

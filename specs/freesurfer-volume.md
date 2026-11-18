@@ -8,9 +8,10 @@ official programs and of the open probe (§69), `specs/freesurfer-mri.md` (the s
 functions work on), `specs/freesurfer-maths.md`, `specs/freesurfer-core.md` and the cited standards.
 Made ready for the clean room part by part by the spec finisher (FreeSurfer's foundations, track E):
 **parts 1 to 3 (§1-17) by its relay 6 (2026-11-16), part 4 (§18-22) by its relay 7
-(2026-11-17), part 5 (§23-24) by its relay 8 (2026-11-17, with part 4's measured corrections)**: the
+(2026-11-17), part 5 (§23-24) by its relay 8 (2026-11-17, with part 4's measured corrections), part 6a
+(§25-26) by its relay 9 (2026-11-18, with the clean room's questions on parts 4 and 5)**: the
 black-box validation plan (§69) with its open probe, a read-through as a clean-room reader, the
-defects' texts in `larmorx_core::defects` checked. The sections after §24 are not yet read through
+defects' texts in `larmorx_core::defects` checked. The sections after §26 are not yet read through
 that way: their validation plans still name the replica's closed probe, which the implementer does
 not open (§69 says what to do meanwhile). What black-box runs confirmed is marked **(observed)**.
 
@@ -35,7 +36,8 @@ it), `fs_mri_probe`, `fs_maths_probe`, the official FreeSurfer 8.2.0 programs an
 Status: parts 1 to 3 (§1-17): part 1 (§1-5) the volume-geometry text block of linear transform and
 surface files, the geometry's copies, matrices, comparison and printer; part 2 (§6-12) the voxel
 arithmetic; part 3 (§13-17) coordinates and geometry; part 4 (§18-22) the samplers, moves, the head
-box and the transform reader; part 5 (§23-24) the CMA labels. Then the rest of the module (§25-68).
+box and the transform reader; part 5 (§23-24) the CMA labels; part 6a (§25-26) resolution, planes,
+fills, resampling by whole factors and changes of type. Then the rest of the module (§27-68).
 
 ## 1. Conventions
 
@@ -1005,7 +1007,11 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   frame 0's first byte of each voxel position (bytes whatever the type: a float volume's row is read as
   bytes, `x` the byte offset). Without `dst`, a clone of `src` (zero voxels, the header). The seed is
   clamped into the volume; a row or slice at or past the height or depth is clamped to `width - 1` by
-  FreeSurfer (FS-316; by default to `height - 1`, `depth - 1`). Every byte of `dst` equal to `fill_val`
+  FreeSurfer (FS-316, noted in both modes; by default to `height - 1`, `depth - 1`; under `reproduce`
+  the seed and its box then lie at that row or slice, read and written as §6's direct access places
+  a row or slice past the extent: another voxel of the buffer, FS-289, or outside it, FS-290; a byte
+  written at a place that holds no voxel of `dst` is not stored but is read back at the same
+  coordinates for the rest of the fill, so the fill ends). Every byte of `dst` equal to `fill_val`
   becomes `fill_val - 1` (mod 256), the seed becomes `fill_val` (mod 256); then sweeps of a box (first
   the seed's 3 x 3 x 3 neighbourhood, clamped) set every voxel whose source byte is at least `threshold`,
   whose `dst` byte is not `fill_val` and that has a face neighbour (within the volume) whose `dst` byte
@@ -1032,7 +1038,9 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
 - **`MRIupsampleNConserve(src, dst, N)`**: a source that is not float is first changed to floats
   (`MRISeqchangeType(src, MRI_FLOAT, 0, 0, 0)`); upsampled; every voxel of the result is then divided
   by `N * N * N` (a 32-bit product, in `double`, stored as `float`). A change of type that fails leaves
-  FreeSurfer with no volume: it crashes (FS-319: an error here).
+  FreeSurfer with no volume: it crashes (FS-319). In both modes, after the change of type's own error,
+  the program ends, code -4 (§6), `MRIupsampleNConserve(): no volume to upsample (FreeSurfer crashes
+  here)` + `\n`.
 - **`MRIdownsample2(src, dst)`**: a given `dst` of another type: `MRIdownsample2: source and dst must be
   same type` (`ERROR_UNSUPPORTED`), `NULL`. The extent is half the source's (rounded down); without
   `dst`, a new one of the source's type with its header. `dst` is cleared; each 2 x 2 x 2 block of frame
@@ -1042,6 +1050,10 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   the source's, `imnr1 = imnr0 + depth - 1`, the voxel sizes, `thick` and `ps` doubled, the centre the
   source's vox2ras applied to `(w / 2 + 0.5, h / 2 + 0.5, d / 2 + 0.5, 1)` (integer halves), the cached
   matrices recomputed.
+- **FS-317** (here and in `MRIchangeType` below): a number converted to an `int` that is NaN or beyond
+  the `int` range gives -2147483648 in FreeSurfer (x86-64's conversion; `reproduce`); by default NaN
+  gives 0 and a number beyond the range the range's nearer end (2147483647 or -2147483648); noted in
+  both modes.
 - **`MRIdownsampleN(src, dst, Fc, Fr, Fs, KeepType)`**: the extent `(int) ceilf(width / Fc)` (and the
   rows', slices'; a quotient beyond the `int` range or NaN: FS-317). Without `dst`: a new one of floats
   (or the source's type with `KeepType`), the source's frames and header, `imnr0` the source's, `imnr1 =
@@ -1055,7 +1067,7 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   the source's end (`MRIgetVoxVal`'s FS-52, FS-53).
 - **`MRImeanFrameThresh(mri, frame, thresh)`**: `frame >= nframes`: `MRImeanFrame: frame <f> out of
   bounds (<n>)` (`ERROR_BADPARM`), 0. Else the nearest-voxel samples at every whole position of frame 0
-  (FS-318; by default of `frame`) that are not below `thresh` (NaN included) are summed in `double`
+  (FS-318, `reproduce`, noted when `frame` is not 0; by default of `frame`) that are not below `thresh` (NaN included) are summed in `double`
   (the sample the first operand) and divided by their count (none: `0 / 0`, x86's default NaN).
 - **`MRIlimits(mri, &min, &max)`**: a volume without voxels leaves both as they were; else both start at
   voxel (0, 0, 0) of frame 0 and every voxel smaller (larger) replaces them (C's comparisons: a NaN
@@ -1086,18 +1098,15 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   slices (its extent restored afterwards), the result given back the depth and frames (and new frame
   records); a failure: `ERROR: MRISeqchangeType: MRIchangeType` on standard error, `NULL`.
 
-## 26. Validation plan (3.1-36's resolution, planes, fills, resampling and changes of type)
-The probe's commands `setres` (voxel sizes with NaNs, infinities, 0 and negatives), `vfill` (values from
-the float table: NaNs, signalling NaNs, 1e10), `fillfg` (byte volumes mostly, other types too; no, a
-given or the same destination; seeds from -1 to the extent; thresholds and fill values outside 0..255),
-`explane` and `fillplane` (every orientation and unknown ones, planes from -1 to 4, destinations of other
-extents), `ups` (`MRIupsampleN`, `MRIupsample2`, `MRIupsampleNConserve` of every type, N from -1 to 3,
-given destinations of the right and wrong extents), `dns2` and `dnsn` (extents the factors divide and
-not, factors 0.5 to 4 and -1, given destinations), `mft`, `lim`, `chtype` (`MRIchangeType` and
-`MRISeqchangeType` of every type to every type, `f_low`, `f_high` and `no_scale` values,
-`FS_FORCE_BIN_CHECK` set or not). Expected: identical with `reproduce` but where FreeSurfer reads memory
-it does not own or crashes (FS-53, FS-58, FS-290 of the voxel access), counted and not compared; the
-default differs only with a notice.
+## 26. Validation plan (resolution, planes, fills, resampling and changes of type)
+§69's group `vres` (the open probe's commands `setres`, `vfill`, `fillfg`, `explane`, `fillplane`, `ups`,
+`dns2`, `dnsn`, `mft`, `lim` and `chtype`; §69.2 says what it covers and gives its hash): identical with
+`reproduce` but where FreeSurfer reads memory it does not own or crashes (FS-52, FS-53, FS-58, FS-252,
+FS-289, FS-290 of the voxel access, FS-316's seeds past the extent, FS-319), lines the loop allows; the
+default differs only where it notes a defect. Not in the probe's cases: a factor of 0 in
+`MRIdownsampleN` (its quotient, infinity, is FS-317's: FreeSurfer's -2147483648 is refused by the
+allocation, but the default's 2,147,483,647 would ask for a volume of that width, so the cases leave it
+out) and FS-319's end of the program: the implementations' own tests, against §25's text.
 
 ## 27. Frame-range samplers, the trilinear kernel and trilinear splatting (3.1-36)
 - **Trilinear corners** (shared by this section): a point unambiguously outside (§18's

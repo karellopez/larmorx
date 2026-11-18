@@ -17,7 +17,7 @@ is `specs/mri_normalize.md`). Track D of FreeSurfer's programs, wave 3.2, queue 
   outermost); `MRIremoveWMOutliers` (1474) uses a binarised copy made before the loop. Both read
   `hsmooth->bins[HISTOfindHighestPeakInRegion(...)]`, bin -1 when the histogram has no count: the
   `float` before `bins`, which on glibc's heap is the upper half of the allocation's size field (0
-  for any histogram); FS-1014, 0 in both modes, compared and identical in 36 of the probe's cases.
+  for any histogram); FS-1014, 0 in both modes, noted in 36 of the probe's cases of seeds 7 and 1, each identical where no other defect skipped it.
 - `intensity_below` is a `float` static passed to these functions' `int` parameter (`-b 12.7` is
   12; `intensity_below/2` for `-l`): the conversion is the caller's (relay 47: through
   `float_to_int`, FS-17, for values outside the `int` range).

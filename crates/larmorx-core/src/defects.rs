@@ -2911,6 +2911,8 @@ defects! {
         "starting a strip or tile divides by a count of 0 (the strips per image, from a strip count that overflows 32 bits; the tiles across or down, from a tile width or length near 2^32 whose rounding overflows): the program ends with SIGFPE; corrected: row, column and sample 0";
     FS_960 = "FS-960", "FreeSurfer", true,
         "the volume operations that walk a volume's rows directly (MRIinvertContrast and MRIscaleAndMultiply on another type than bytes, MRItranslate and MRIrotate_I into another type, mri_framepower, the byte walks of the set and label operations) find every row of a tensor volume, of every slice and frame, at the volume's first voxel: each row reads the same first values, and each row written replaces them, the rest of the volume unchanged; corrected: each row at its own place";
+    FS_961 = "FS-961", "FreeSurfer", true,
+        "downsampling a volume by a negative or infinite factor goes on with extents of 0 or below: the new volume's allocation then fails with memory errors, an infinite factor makes a volume 0 voxels wide, and a given destination is refused as a dimension mismatch; refused with a clear error by default";
 }
 
 /// The register entry with ID `id`.

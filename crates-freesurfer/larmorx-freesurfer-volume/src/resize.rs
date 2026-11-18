@@ -16,7 +16,10 @@
 //!   depth to the volume's width minus one. The default clamps it to the height or depth minus one.
 //! - **FS-317** (D13): `MRIdownsampleN`'s extent and windows and `MRIchangeType`'s histogram bins and
 //!   counts convert floats beyond the `int` range (or NaN) to `int`: undefined, x86-64 gives
-//!   `INT_MIN`. The default clamps (NaN to 0); `reproduce` gives `INT_MIN`. Noted.
+//!   `INT_MIN`. The default clamps (NaN to 0); `reproduce` gives `INT_MIN`. Noted. A factor of 0
+//!   or NaN, or one that puts an extent beyond the range, is refused by default (rule B).
+//! - **FS-961** (rule B): `MRIdownsampleN` by a negative or infinite factor goes on with extents of
+//!   0 or below. Refused by default with FS-317's message; `reproduce` goes on.
 //! - **FS-318** (rule A): `MRImeanFrameThresh` samples frame 0 whatever its frame. The default
 //!   samples the frame.
 //! - **FS-319** (crash): `MRIupsampleNConserve` of a volume `MRIchangeType` refuses to convert to
@@ -25,7 +28,7 @@
 use std::io::Write;
 
 use larmorx_core::cfmt;
-use larmorx_core::defects::{FS_316, FS_317, FS_318, FS_319};
+use larmorx_core::defects::{FS_316, FS_317, FS_318, FS_319, FS_961};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc, matrix_multiply};
@@ -849,6 +852,13 @@ pub fn mri_downsample2(
 /// `ps` times `Fc`, and its first voxel's centre at the source's voxel `(-0.5 + Fc / 2, -0.5 + Fr /
 /// 2, -0.5 + Fs / 2)` (`MRIp0ToCRAS`, the cached matrices recomputed). A destination whose extent
 /// or frames differ: `ERROR: MRIdownsampleN: dimension mismatch` on standard output and `NULL`.
+///
+/// Rule B (FS-317, FS-961): a factor that is NaN, 0, negative or infinite, or so small that an
+/// extent passes the `int` range, is refused by default before anything is made (`MRIdownsampleN: the
+/// downsampling factors must be positive and leave every extent within the int range (Fc <fc>, Fr
+/// <fr>, Fs <fs>)`, `ERROR_BADPARM`, the end of the program); `reproduce` goes on as FreeSurfer
+/// does (FS-317's extent of -2147483648, a negative extent: the allocation's errors, or a given
+/// destination's mismatch), noted.
 #[allow(clippy::too_many_arguments)]
 pub fn mri_downsample_n(
     g: &mut Globals,
@@ -861,13 +871,44 @@ pub fn mri_downsample_n(
     fs: f32,
     keep_type: i32,
 ) -> Result<Ret<Mri>, Fatal> {
-    let ext = |g: &mut Globals, n: i32, f: f32| {
-        to_int(
-            g,
-            f64::from(div(n as f32, f).ceil()),
-            "MRIdownsampleN's extent",
-        )
-    };
+    let quotient = |n: i32, f: f32| f64::from(div(n as f32, f).ceil());
+    let dims = [(src.vg.width, fc), (src.vg.height, fr), (src.vg.depth, fs)];
+    if !g.notices.reproduce() {
+        let negative = [fc, fr, fs].iter().any(|&f| f < 0.0 || f == f32::INFINITY);
+        let beyond = dims.iter().any(|&(n, f)| {
+            let q = quotient(n, f);
+            q.is_nan() || q >= 2147483648.0 || q <= -2147483649.0
+        });
+        if negative || beyond || [fc, fr, fs].iter().any(|&f| f.is_nan() || f <= 0.0) {
+            if negative {
+                g.notices.add(
+                    &FS_961,
+                    format!(
+                        "MRIdownsampleN by a negative or infinite factor ({fc}, {fr}, {fs}): refused"
+                    ),
+                );
+            }
+            if beyond {
+                g.notices.add(
+                    &FS_317,
+                    format!(
+                        "MRIdownsampleN by ({fc}, {fr}, {fs}): an extent beyond the int range, refused"
+                    ),
+                );
+            }
+            log::error_exit(
+                g,
+                err,
+                ERROR_BADPARM,
+                &format!(
+                    "MRIdownsampleN: the downsampling factors must be positive and leave every extent within the int range (Fc {fc}, Fr {fr}, Fs {fs})"
+                ),
+            )?;
+            return Ok(Ret::Null);
+        }
+    }
+    let ext =
+        |g: &mut Globals, n: i32, f: f32| to_int(g, quotient(n, f), "MRIdownsampleN's extent");
     let width = ext(g, src.vg.width, fc);
     let height = ext(g, src.vg.height, fr);
     let depth = ext(g, src.vg.depth, fs);

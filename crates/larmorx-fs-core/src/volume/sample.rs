@@ -24,11 +24,11 @@ pub mod sample_type {
 }
 
 /// `FLT_EPSILON` as a double.
-const FLT_EPSILON: f64 = 1.192_092_895_507_812_5e-7;
+pub(crate) const FLT_EPSILON: f64 = 1.192_092_895_507_812_5e-7;
 
 /// C's `(int) c` on x86-64 (`cvttsd2si`): truncation; NaN and values outside `int` give
 /// -2147483648.
-fn cvtt(c: f64) -> i32 {
+pub(crate) fn cvtt(c: f64) -> i32 {
     if c > -2_147_483_649.0 && c < 2_147_483_648.0 {
         c.trunc() as i32
     } else {
@@ -43,13 +43,13 @@ fn whole(c: f64) -> bool {
 }
 
 /// Whether a point is whole on all three axes.
-fn whole3(x: f64, y: f64, z: f64) -> bool {
+pub(crate) fn whole3(x: f64, y: f64, z: f64) -> bool {
     whole(x) && whole(y) && whole(z)
 }
 
 /// The types the trilinear and cubic samplers read (§18): bytes, shorts, unsigned shorts, ints,
 /// 64-bit integers (FS-298) and floats.
-fn interpolated(kind: i32) -> bool {
+pub(crate) fn interpolated(kind: i32) -> bool {
     matches!(
         kind,
         types::UCHAR | types::SHORT | types::USHRT | types::INT | types::LONG | types::FLOAT
@@ -130,7 +130,7 @@ impl Process {
     /// and sinc samplers), of a type [`interpolated`] says they read. A 64-bit volume: its value
     /// by default; FreeSurfer's 32-bit integer at the voxel's place with `reproduce` (FS-298).
     #[allow(clippy::too_many_arguments)]
-    fn sampler_read(
+    pub(crate) fn sampler_read(
         &mut self,
         m: &Mri,
         x: i32,
@@ -332,6 +332,46 @@ impl Process {
         s = sse::add64(s, t[7]);
         *pval = s;
         Ok(codes::NONE)
+    }
+
+    /// §18's trilinear sample (`MRIsampleVolume`, or `MRIsampleVolumeFrame` with a frame) into
+    /// `pval`, and whether the sampler wrote it: a refused sample (a type it does not read, at a
+    /// point that is not whole) leaves `pval` as it was (§28, §29).
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn sample_kept(
+        &mut self,
+        m: &Mri,
+        x: f64,
+        y: f64,
+        z: f64,
+        frame: Option<i32>,
+        pval: &mut f64,
+    ) -> Result<bool, Stop> {
+        let r = self.trilinear(m, x, y, z, frame, pval)?;
+        Ok(whole3(x, y, z) || r == codes::NONE)
+    }
+
+    /// §18's `MRIsampleVolumeFrameType` into `pval`, and whether the sampler wrote it (§29: the
+    /// sinc and cubic B-spline codes at a point that is not whole, and a type the trilinear sampler
+    /// does not read, leave it).
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn frame_type_kept(
+        &mut self,
+        m: &Mri,
+        x: f64,
+        y: f64,
+        z: f64,
+        frame: i32,
+        kind: i32,
+        pval: &mut f64,
+    ) -> Result<bool, Stop> {
+        let r = self.mri_sample_volume_frame_type(m, x, y, z, frame, kind, pval)?;
+        Ok(whole3(x, y, z)
+            || match kind {
+                sample_type::TRILINEAR => r == codes::NONE,
+                sample_type::CUBIC_BSPLINE | sample_type::SINC => false,
+                _ => true,
+            })
     }
 
     /// `MRIsampleVolumeType(mri, x, y, z, &val, type)` (§18): 1 trilinear, 3 cubic, 2 sinc with

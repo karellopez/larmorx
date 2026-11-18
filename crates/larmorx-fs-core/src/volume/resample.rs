@@ -415,11 +415,13 @@ impl Process {
         }
         dw.write(self, v.d_mut(), s, fv);
         let clampb = |c: i32, k: usize| c.max(0).min(e[k] - 1);
+        // the seed's box clamped to the extent on each axis: empty when the seed lies more than
+        // one past the extent (FS-316's reproduce), the last row or slice when one past it
         let mut lo = [0i32; 3];
         let mut hi = [0i32; 3];
         for k in 0..3 {
-            lo[k] = clampb(s[k] - 1, k);
-            hi[k] = clampb(s[k] + 1, k);
+            lo[k] = (s[k] - 1).max(0);
+            hi[k] = (s[k] + 1).min(e[k] - 1);
         }
         let mut total = 0i32;
         loop {
@@ -1067,8 +1069,9 @@ impl Process {
             )),
             "MRIchangeType",
         );
+        // the low end: bins 0, 1, ... while below the target, up to all 1000 of them
         let (mut bin, mut total) = (0i32, 0i64);
-        while total < i64::from(target) && bin < 999 {
+        while total < i64::from(target) && bin < 1000 {
             total += hist[bin as usize];
             bin += 1;
         }
@@ -1077,6 +1080,7 @@ impl Process {
             sse::mul64(f64::from(nonzero), sse::sub64(1.0, sse::widen(f_high))),
             "MRIchangeType",
         );
+        // the high end: bins 999, 998, ... while below the target, bin 0 never added
         let (mut bin, mut total) = (999i32, 0i64);
         while total < i64::from(target) && bin > 0 {
             total += hist[bin as usize];

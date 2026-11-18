@@ -12,7 +12,8 @@ use crate::sse;
 
 impl Process {
     /// `MRIindexNotInVolume(mri, c, r, s)` (§15): 0 inside, -1 when the coordinates rounded to
-    /// the nearest integers (ties to even) are inside, else 1.
+    /// the nearest integers (ties to even), as floats, are inside, else 1. The double is rounded
+    /// (observed: `vderiv`'s sample at row 2.500000119 of a volume 3 high is outside).
     pub fn mri_index_not_in_volume(&mut self, m: &Mri, c: f64, r: f64, s: f64) -> i32 {
         let e = [m.geom.width, m.geom.height, m.geom.depth];
         let p = [c, r, s];
@@ -20,7 +21,7 @@ impl Process {
             return 0;
         }
         let near = (0..3).all(|k| {
-            let q = (p[k] as f32).round_ties_even();
+            let q = p[k].round_ties_even() as f32;
             q >= 0.0 && q < e[k] as f32
         });
         if near { -1 } else { 1 }

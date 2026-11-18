@@ -1939,6 +1939,12 @@ defects! {
         "the sampled spring and parallel energies of the surface deformation (mris_expand, mris_register, mris_sphere, mris_place_surface) sample a face whose number is outside the surface's faces when no face is found within 1,000 mm, or when a vertex's assigned face is unset (-1) or beyond the faces; the walks through a face table's buckets (the ray along a vertex's normal: mris_expand, mris_sphere; the faces overlapping a face: mris_fix_topology, mris_topo_fixer) given a table of vertices read its vertex numbers as faces: they read memory outside the faces (memory contents or a crash)";
     FS_1013 = "FS-1013", "FreeSurfer", true,
         "finding the faces that overlap a face (mris_fix_topology, mris_topo_fixer) walks the face's bounding box in half-millimetre steps: a face kilometres across, or with a coordinate that is infinite, runs for hours or never ends";
+    FS_1014 = "FS-1014", "FreeSurfer", true,
+        "mri_normalize's removal of white-matter outliers (with -aseg, and with -L's longitudinal control points) reads the white-matter intensity peak from memory outside its histogram when the control volume holds no control point: the threshold is memory contents (0 with the C library's usual heap)";
+    FS_1015 = "FS-1015", "FreeSurfer", true,
+        "mri_normalize -T2 with -surface walks from each control point along the distance map's gradient in steps of half a voxel's size: an input volume whose voxel size is 0 or not a number never ends that walk when it meets no edge";
+    FS_1016 = "FS-1016", "FreeSurfer", true,
+        "mri_normalize given an option with fewer arguments than it takes (the option last on the command line) crashes when the missing argument is a number or a file it opens (-sigma, -seed, -atlas, -label, ...), and for an option of two or three arguments given none takes the missing ones after the first from the process's environment (printed, or read as numbers)";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

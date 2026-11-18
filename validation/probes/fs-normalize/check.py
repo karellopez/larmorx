@@ -1,0 +1,224 @@
+# SPDX-License-Identifier: Apache-2.0
+"""mri_normalize's own functions and options against FreeSurfer 8.2.0's official code, case by case.
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (it names FreeSurfer's functions; running fsnormalize
+is a black-box run of FreeSurfer's code).
+
+Generates seeded cases with larmorx-freesurfer-volumes' example ``fs_normalize_probe``, runs them
+through ``fsnormalize`` (``build.sh``: mri_normalize.cpp with its main renamed, linked with the unit
+oracle's build as the official program is) by the oracle-output cache at one thread, runs the port
+on the same cases with ``--upstream-defects`` ``reproduce`` and ``fix``, and compares the lines:
+``reproduce`` must give FreeSurfer's on every case but those where FreeSurfer reads memory it does
+not own or crashes (``SKIP``), which are counted, not compared; ``fix`` may differ only where a
+defect it corrects changed the result (its notices). Prints the counts and the hash the port's
+recorded test checks (``tests/fs_normalize_official.rs``).
+
+    python -P validation/probes/fs-normalize/check.py --seed 1 --n 450 [--json out.json]
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+from collections import Counter
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[2]
+sys.path.insert(0, str(REPO / "validation" / "src"))
+
+from larmorx_validation import oracle_cache  # noqa: E402
+from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
+
+# memory FreeSurfer does not own: FS-540 (a neighbour read outside the volume's memory: memory
+# contents or a crash), FS-541 (a masked voxel set from the limit before it is set, read through
+# FS-539), FS-58 (a volume without voxels), FS-53 (a mask smaller than the volume read past its
+# memory). FS-539's reads of the next row are compared: they are
+# deterministic, and reproduce follows them
+# FS-546 (a convolution's access outside the volumes' memory), FS-548 (a kernel volume read as
+# floats past its memory), FS-549 (a kernel longer than the index tables), FS-550 (a crash), FS-551
+# (a matrix written past its end), FS-552 (a crash), FS-555 (a Sobel filter writing outside its
+# destination), FS-163 (a copy into a volume of fewer frames: FreeSurfer writes past it), FS-559
+# (border labels written outside the destination), FS-560 (a histogram bin before its start), FS-561
+# (a region growing that never ends: the official run's alarm), FS-562 (a covariance or AR(1)
+# map written directly into a destination that is not float or is smaller), FS-564 (a covariance
+# read after it could not be computed: a crash), FS-567 (a matrix too small for the volume written
+# past its end), FS-568 (a division by zero), FS-569 (a frame loop without end: a crash); FS-579 (a
+# segment number outside the segment table), FS-581 (16-bit voxel coordinates wrapping: writes outside
+# the label map), FS-582 (a segment voxel read outside the index tables), FS-583 (a crash), FS-586
+# (a destination or control volume smaller than the source, or of another type, written outside)
+# FS-588 (a control volume smaller than the source: memory outside), FS-589 (windows past the
+# index tables), FS-591 (windows past the MNI's arrays), FS-593 (a threshold never written),
+# FS-487 (a Talairach point through a matrix FreeSurfer could not make: a crash), FS-597 (tissue
+# levels from bins outside a histogram), FS-598 (a control-point search that never ends), FS-600
+# (peaks never written), FS-601 (a segment read before the segment table: memory, or a crash),
+# FS-615 and FS-618 (the T2 mask without an aparc+aseg or without a destination: a crash), FS-290
+# (a face neighbour read outside the volume's memory: the T2 mask's MRIneighborsOff)
+# FS-53 (a volume read or written past its memory), FS-58 (a volume without voxels), FS-540 and
+# FS-541 (the distance transform's neighbours outside the volume's memory: memory contents or a
+# crash), FS-1016 (an option short of its arguments: FreeSurfer crashes or reads the environment),
+# FS-04 (random numbers seeded from the clock), PE (fs.io's LabelRead does not model the C library's first perror on a write-only standard
+# error, whose errno FreeSurfer then prints: relay 45 of track D)
+SKIP = ("FS-04", "FS-53", "FS-58", "FS-540", "FS-541", "FS-1016", "PE")
+
+# MRImaxsegment prints the process's heap usage (its VmData): the port's probe prints 1000
+HEAP = re.compile(r"heap usage = -?[0-9]+ Kbytes")
+# FS-596: the number in MRInormAddFileControlPoints' message on rejected points is whatever a
+# register holds (not given to the message); where the port cannot know it, both sides' number is
+# masked and the rest of the line compared
+REJECTED = re.compile(r"!!!!! -?[0-9]+ control points rejected")
+MASKED = ("FS-596",)
+
+
+def normalise(line: str) -> str:
+    return HEAP.sub("heap usage = 1000 Kbytes", line)
+
+
+def mask(line: str, ids: list[str]) -> str:
+    if any(x in ids for x in MASKED):
+        return REJECTED.sub("!!!!! ? control points rejected", line)
+    return line
+
+
+def probe_binary(ws: Path) -> Path:
+    exe = ws / "oracles" / "freesurfer-8.2.0-probes" / "fs-normalize" / "fsnormalize"
+    if not exe.is_file():
+        raise SystemExit(f"no {exe}: run validation/probes/fs-normalize/build.sh first")
+    return exe
+
+
+def port_binary(jobs: int) -> Path:
+    manifest = REPO / "crates-freesurfer" / "Cargo.toml"
+    env = {k: v for k, v in os.environ.items() if k != "FSLDIR"}
+    subprocess.run(
+        [
+            "cargo",
+            "build",
+            "--release",
+            "--example",
+            "fs_normalize_probe",
+            "-p",
+            "larmorx-freesurfer-volumes",
+            "--manifest-path",
+            str(manifest),
+            "-j",
+            str(jobs),
+        ],
+        check=True,
+        env=env,
+    )
+    return REPO / "crates-freesurfer" / "target" / "release" / "examples" / "fs_normalize_probe"
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--n", type=int, default=400)
+    ap.add_argument("--jobs", type=int, default=6)
+    ap.add_argument("--json", type=Path)
+    ap.add_argument("--show", type=int, default=5, help="differing cases to print")
+    ap.add_argument(
+        "--only", help="comma-separated commands to keep (a check while porting; no official hash)"
+    )
+    a = ap.parse_args(argv)
+    ws = workspace()
+    if ws is None:
+        raise SystemExit("no workspace with oracles/")
+    exe = probe_binary(ws)
+    port = port_binary(a.jobs)
+    inputs = ws / "oracles" / "inputs" / "fs-normalize"
+    inputs.mkdir(parents=True, exist_ok=True)
+    tag = f"-{a.only.replace(',', '_')}" if a.only else ""
+    cases_path = inputs / f"cases-{a.seed}-{a.n}{tag}.txt"
+    text = subprocess.run(
+        [str(port), "cases", str(a.seed), str(a.n)], check=True, capture_output=True, text=True
+    ).stdout
+    if a.only:
+        keep = set(a.only.split(","))
+        text = "".join(line for line in text.splitlines(True) if line.split()[0] in keep)
+    cases_path.write_text(text, encoding="utf-8")
+    cases = text.splitlines()
+    env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C", "OMP_NUM_THREADS": "1"}
+    done = oracle_cache.run(
+        [exe, cases_path],
+        env=env,
+        policy=oracle_cache.Policy(threads=1, family="freesurfer"),
+        timeout=7200,
+        runner="fs-normalize-probe",
+    )
+    if done.returncode != 0:
+        raise SystemExit(f"fsnormalize failed ({done.returncode}): {done.stderr[-2000:]}")
+    official = [normalise(line) for line in done.stdout.splitlines()]
+
+    def port_lines(mode: str) -> list[tuple[str, list[str]]]:
+        out = subprocess.run(
+            [str(port), "run", str(cases_path), mode], check=True, capture_output=True, text=True
+        ).stdout
+        rows = []
+        for line in out.splitlines():
+            body, _, ids = line.partition("\t")
+            rows.append((body, [x for x in ids.split(",") if x]))
+        return rows
+
+    rep, fix = port_lines("reproduce"), port_lines("fix")
+    assert len(official) == len(rep) == len(fix) == len(cases)
+    equal, differ, skipped, skipped_same = Counter(), Counter(), Counter(), Counter()
+    fix_differ, fix_unexplained, fix_ids, rep_ids = Counter(), Counter(), Counter(), Counter()
+    hashed = hashlib.sha256()
+    first_differ = []
+    for case, c, (r, ids), (f, fids) in zip(cases, official, rep, fix, strict=True):
+        cmd = case.split()[0]
+        c, r, f = mask(c, ids), mask(r, ids), mask(f, fids)
+        for x in ids:
+            rep_ids[x] += 1
+        if any(x in ids for x in SKIP):
+            skipped[cmd] += 1
+            if c == r:
+                skipped_same[cmd] += 1
+            hashed.update(b"SKIP\n")
+            continue
+        hashed.update(c.encode() + b"\n")
+        if c == r:
+            equal[cmd] += 1
+        else:
+            differ[cmd] += 1
+            if len(first_differ) < a.show:
+                first_differ.append({"case": case[:400], "official": c[:600], "port": r[:600]})
+        if f != c:
+            fix_differ[cmd] += 1
+            if not fids:
+                fix_unexplained[cmd] += 1
+                if len(first_differ) < a.show:
+                    first_differ.append({"case": case[:400], "official": c[:600], "fix": f[:600]})
+            for x in fids:
+                fix_ids[x] += 1
+    summary = {
+        "seed": a.seed,
+        "cases": len(cases),
+        "served": done.cached,
+        "reproduce_equal": sum(equal.values()),
+        "reproduce_equal_per_command": dict(equal),
+        "reproduce_differ": dict(differ),
+        "skipped": dict(skipped),
+        "skipped_but_identical": dict(skipped_same),
+        "reproduce_notices": dict(rep_ids),
+        "fix_differ": dict(fix_differ),
+        "fix_differ_without_notice": dict(fix_unexplained),
+        "fix_notices": dict(fix_ids),
+        "official_sha256_skip": hashed.hexdigest(),
+        "skipped_total": sum(skipped.values()),
+        "first_differ": first_differ,
+    }
+    print(json.dumps(summary, indent=1))
+    if a.json:
+        a.json.write_text(json.dumps(summary, indent=1) + "\n", encoding="utf-8")
+    return 1 if differ or fix_unexplained else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

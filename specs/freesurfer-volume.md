@@ -1030,7 +1030,8 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   (**(observed)**: `vres`).
 - **`MRIfillPlane(mask, dst, orientation, where, fillval)`**: over `dst`'s extent, every voxel of the
   mask's slice 0 that is not 0 (NaN counts as not 0) sets `dst`'s voxel in plane `where` of frame 0 to
-  `fillval` (as a float, stored by `MRIsetVoxVal`): coronal (x, y, where) from the mask's (x, y),
+  `fillval` (as a float, stored by `MRIsetVoxVal`): coronal (0, and any value but 1 and 2, as
+  `MRIextractPlane`; **(observed)** with orientation 3: `vres`) (x, y, where) from the mask's (x, y),
   horizontal (x, where, z) from (x, z), sagittal (where, y, z) from (z, y), in the same order (the
   plane's x outermost: coronal x then y, horizontal x then z, sagittal z then y; each mask voxel read
   just before its write, which shows when the mask is `dst` itself). Returns `dst`.

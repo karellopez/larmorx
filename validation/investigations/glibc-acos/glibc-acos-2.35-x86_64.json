@@ -1,0 +1,14 @@
+{
+  "what": "glibc's double acos as a black box against larmorx_core::math::acos (CORE-MATH's cr_acos)",
+  "glibc": "2.35",
+  "tunables": "",
+  "log2n": 32,
+  "families": [
+    {"family": 1, "name": "uniform on [-1, 1)", "arguments": 4294967296, "differ": 3027356, "nan_bits_differ": 0, "hash": "5ee135e0539257af"},
+    {"family": 2, "name": "every binade of |x| < 1", "arguments": 4294967296, "differ": 9611, "nan_bits_differ": 0, "hash": "622e4bb38b4c5e0b"},
+    {"family": 3, "name": "subnormals", "arguments": 268435456, "differ": 0, "nan_bits_differ": 0, "hash": "88b22598b0887065"},
+    {"family": 4, "name": "neighbourhoods of 0, 0.5, 1 and the limits", "arguments": 738197504, "differ": 1309999, "nan_bits_differ": 0, "hash": "ce6dc1f8d5abe71f"},
+    {"family": 5, "name": "CORE-MATH's worst cases and their neighbours", "arguments": 8402784, "differ": 17176, "nan_bits_differ": 0, "hash": "cc5c1ab89eb85828"},
+    {"family": 6, "name": "special arguments", "arguments": 36, "differ": 0, "nan_bits_differ": 0, "hash": "f1f1f90779734ce8"}
+  ]
+}

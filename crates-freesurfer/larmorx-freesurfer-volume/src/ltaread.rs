@@ -17,7 +17,8 @@
 //! - **FS-306** (memory): `TransformFileNameType` copies the name into 500 bytes: a longer name
 //!   writes past them. Both modes classify the whole name, noted.
 //! - **FS-307** (a hang): `ltaMNIreadEx` skips the lines starting with `%` after its second line
-//!   until another one; a file whose last line starts with `%` keeps it and loops forever. An
+//!   until another one; a file whose last line read there starts with `%` keeps it and loops
+//!   forever (a comment or blank line read at the end ends the loop: the rows then fail). An
 //!   error here in both modes.
 //! - **FS-308** (memory): `ltaReadFileEx` takes the type and the number of transforms from its first
 //!   two lines without a value when they do not match `type = <n>` and `nxforms = <n>`: memory
@@ -339,7 +340,10 @@ pub fn lta_mni_read_ex(
         if first(&line) == Some(b'%') {
             info2 = line.clone();
             while first(&line) == Some(b'%') {
-                if fgetl_buf(&mut fp, 900, &mut line).is_none() {
+                // At the end of the file `fgetl` leaves the buffer as its last `fgets` read it:
+                // a comment or blank line read there ends this loop (the rows then fail with that
+                // raw line in the message); only a buffer still starting with `%` loops forever.
+                if fgetl_buf(&mut fp, 900, &mut line).is_none() && first(&line) == Some(b'%') {
                     g.notices.add(
                         &FS_307,
                         "ltMNIreadEx of a file whose last line starts with %",

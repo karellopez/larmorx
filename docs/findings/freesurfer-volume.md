@@ -195,7 +195,11 @@ waits for `MRIsampleVolumeFrameType` (9434, 3.1-36).
   that buffer.
 - **FS-306**: `char buf[500]; strcpy(buf, fname)` in `TransformFileNameType`.
 - **FS-307**: `while (line[0] == '%') fgetl(line, 900, fp);` with `fgetl` at the end of the file
-  leaving `line` as it was.
+  leaving `line` as it was. Only a buffer that still starts with `%` there loops: a `#` comment or a
+  blank (or white-space) line read at the end replaces the buffer with that raw line, the loop ends and
+  the rows fail with `could not read row 1 from <f> (<the raw line with its newline>)` (relay 38, from
+  track E's open probe group `vrules4`; until then the port raised FS-307 at every end of the file
+  inside the loop; the probe's `lta_hand_cases.txt`).
 - **FS-308**, **FS-309**: `int type, nxforms;` without values and `sscanf(cp, ...)` with `cp` from
   `fgetl` (`NULL` at the end); the official build's garbage happened to give the port's 0 in 31 of the
   probe's cases (skipped all the same).
@@ -228,10 +232,21 @@ waits for `MRIsampleVolumeFrameType` (9434, 3.1-36).
   fails and leaves `word` empty, and `pop_back()` of an empty `std::string` sets its length to
   `npos`; `std::stringstream(word)` then throws `std::length_error` (`basic_string::_M_create`):
   `terminate`, SIGABRT (the probe sees CRASH 6). Reached only for a line holding a measure's names
-  with no number word before its end.
+  with no number word before its end. Which exception: `std::length_error` (`  what():
+  basic_string::_M_create`) when a word of the line is longer than 15 bytes (the string then lives on
+  the heap), else `std::bad_alloc` (`  what():  std::bad_alloc`), deterministic in plain runs (track
+  E's relay 9; the probe's `bvr_hand_cases.txt`: 11 aborts at words of 14, 15, 16, 20, 100 bytes, an
+  earlier word of 30 bytes, a tab or CR at the end). Relay 38: `reproduce` writes those two lines and
+  ends with 134 (before: an error, status 1); the default unchanged (no number from the line, then
+  the missing stat's error). 13 of 13 hand cases identical with `reproduce` (`CRASH 6` = `EXIT 134`).
 - **FS-315**: `MRIlrswapSeg` reads `lh->rptr[1][n]`, `rh->rptr[1][n]` for `n` up to `lh->rows`: the
   callers' `n x 1` matrices make that the n-th number; with fewer numbers than rows it reads past the
   matrix's numbers (the probe's `n x 0` lists: official results that depend on the allocation's slack).
+  Relay 38 (track E's relay 9 decision, D13 and rule B): the default ends the program (`ERROR_BADPARM`,
+  status 252, `MRIlrswapSeg(): the label lists hold fewer numbers than rows (FreeSurfer reads past
+  them)`); `reproduce` reads NaN past a list's end (equal to no label; a voxel equal to the other list's
+  number there takes FS-311's conversion of NaN, -2147483648), noted: the official runs' lines whose
+  four runs agree (`nswaps 0`). Unit test `lists_read_past_their_end_give_nan_under_reproduce`.
 - `MRIlrswapSeg`'s `#pragma omp parallel for reduction(+ : nswaps)`: voxels independent, an integer
   sum: no thread dependence. It deep-copies the colour table twice (`MRIclone` already does): one
   copy kept, the same result.
@@ -288,7 +303,20 @@ Defects (rules of the porting guide; register rows in the handoff):
 - **FS-317** (D13): `MRIdownsampleN`'s extent and window starts and `MRIchangeType`'s bins, the
   `FS_FORCE_BIN_CHECK` mean bin and the two counts convert out-of-range floats to `int` (undefined; x86's
   `INT_MIN`). Default: clamped (NaN to 0); `reproduce`: `INT_MIN`. A huge positive bin is thus bin 999 by
-  default and bin 0 in FreeSurfer.
+  default and bin 0 in FreeSurfer. **Factors** (relay 38, the orchestrator's rule-B decision): a factor
+  of 0, -0 or NaN (or one so small that an extent passes the `int` range, as 1e-30 or a subnormal)
+  makes FreeSurfer's extent -2147483648; a negative factor a negative extent, an infinite one an extent
+  of 0 (FS-961). FreeSurfer then goes on: with a new volume its allocation fails (`MRI::Shape::Shape():
+  volume size must be greater than 0 in every dimension`, then `error: Cannot allocate memory` and
+  `could not allocate -2147482648 elt index array`, status 254, or `could not allocate memory for slice
+  1 out of <n>` / `for <n> slices`, status 1, by which extent and type), except an infinite factor,
+  which returns a volume 0 voxels wide; with a destination, `ERROR: MRIdownsampleN: dimension mismatch`
+  and `NULL`. All deterministic: `reproduce` gives them (64 of 64 hand cases identical,
+  `dns_hand_cases.txt`: 16 factor triples on two cases without and two with a destination). The default
+  refuses every such factor before anything is made: `MRIdownsampleN: the downsampling factors must be
+  positive and leave every extent within the int range (Fc <fc>, Fr <fr>, Fs <fs>)`, `ERROR_BADPARM`
+  (status 252), noted FS-317 or FS-961. The seeded generator draws them now (1 in 30 factors: -1, 0, -0,
+  NaN, infinity, -3, 1e-30).
 - **FS-318** (rule A): `MRImeanFrameThresh` calls `MRIsampleVolumeType`, which has no frame: frame 0
   always. Its callers in the reached code pass frame 0 (`MRIchangeType`), so recon-all is not affected.
 - **FS-319** (crash): `MRIupsampleNConserve` passes `MRISeqchangeType`'s `NULL` to `MRIupsampleN`.
@@ -306,6 +334,7 @@ Defects (rules of the porting guide; register rows in the handoff):
   size must be greater than 0 in every dimension`, `error: Cannot allocate memory`, `error: could not
   allocate -2147482648 elt index array` (status 254); the port reports `could not allocate memory for
   slice 1 out of 4` (status 1). The probe draws no NaN factor until fs.mri models the 32-bit product.
+  (Done since by track A: relay 38's hand cases give FreeSurfer's lines for every such extent.)
 
 ## 10. Frame-range samplers, splatting, derivatives, neighbour counts, linear transforms (3.1-36; relay 17)
 Source: `utils/mri.cpp` 9147-9156 and 9505-9571 (`FASTER_MRI_EM_REGISTER` is defined by
@@ -768,7 +797,10 @@ Source: `utils/mrihisto.cpp` (the ten reached functions: `MRIhistogramRegion` 10
 (7264), `MRIshiftDim` (7338), `MRIcropToFoV` (7480), `MRIcropAroundCRS` (7641), `MRIcropAroundRAS` (7763), `MRIsegBorder`
 (8072).
 - `MRIsegStatsRobust` repeats `MRIsegStats`' arithmetic (§18's operand orders: `sum2 = val * val + sum2`, `2 * mean` as
-  `mean + mean`); `compare_floats` (utils.cpp 1197) returns 0 for NaNs.
+  `mean + mean`); `compare_floats` (utils.cpp 1197) returns 0 for NaNs. Its `*min = val; *max = val;` of the `double`
+  `val = vlist[k]` store the float itself (GCC drops the two conversions): a signalling NaN in the kept values stays one
+  in `min` and `max` (relay 38's seed-7 run met it, `ssrob`: official `7fa12345` where the port, widening and narrowing
+  with SSE's quieting, gave `7fe12345`; fixed: the port stores the float).
 - `MRIzconcat`, `MRIapplyEdits`, `MRIshiftDim`, `MRIcropAroundCRS` pass voxels through `double v = MRIgetVoxVal(..);
   MRIsetVoxVal(.., v)`: GCC drops the conversions (a signalling NaN keeps its bits; the brief's "a float stored through a
   double"): the port passes the `float`.

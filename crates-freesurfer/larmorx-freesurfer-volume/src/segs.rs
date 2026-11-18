@@ -303,15 +303,17 @@ pub fn mri_seg_stats_robust(
             continue;
         }
         let val = widen(v);
+        // `*min = val` of a `double` that holds the float `vlist[k]`: the official build stores
+        // the float itself (no conversion: a signalling NaN stays one, observed)
         if m == 0 {
-            st.min = narrow(val);
-            st.max = narrow(val);
+            st.min = v;
+            st.max = v;
         }
         if f64::from(st.min) > val {
-            st.min = narrow(val);
+            st.min = v;
         }
         if f64::from(st.max) < val {
-            st.max = narrow(val);
+            st.max = v;
         }
         sum = add64(sum, val);
         sum2 = add64(mul64(val, val), sum2);

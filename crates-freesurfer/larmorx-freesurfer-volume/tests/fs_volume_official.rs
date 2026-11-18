@@ -40,13 +40,15 @@ use sha2::{Digest, Sha256};
 /// LTAvoxelToRasXform, LTArasToVoxelXform, LTAcompose; relay 37 (2026-11-17): tensor volumes among
 /// the random types and as the destinations of the byte-only functions and the moves (FS-960: a
 /// tensor volume's rows), MatrixAdd's NaN order, the equalisations' volumes of short instead of int
-/// or long): 5,580 cases, 5,190 lines identical, 390 hashed as `SKIP`, 26 hashed as `HEAVY`
+/// or long); relay 38 (2026-11-18): FS-307 only where the `.xfm` loop really hangs, FS-314's and
+/// FS-315's `reproduce`, the downsampling factors 0, -0, NaN, infinity, -3 and 1e-30 drawn (FS-317,
+/// FS-961): 5,580 cases, 5,145 lines identical, 435 hashed as `SKIP`, 24 hashed as `HEAVY`
 /// (identical too).
 const N: usize = 5580;
-const OFFICIAL_SHA256: &str = "04bbf7500f1221f31acac11580a834c5fa87936f592c4670a29f9562400c69f2";
-const SKIPPED: usize = 390;
+const OFFICIAL_SHA256: &str = "ae9084ceb1f8c1428a5499df49ca822bd1682966625bf5204174d5f816ec5d43";
+const SKIPPED: usize = 435;
 /// The cases hashed as `HEAVY`.
-const HEAVY: usize = 26;
+const HEAVY: usize = 24;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 65] = [

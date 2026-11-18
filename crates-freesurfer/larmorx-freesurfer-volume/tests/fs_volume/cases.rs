@@ -1209,12 +1209,13 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 if !g.chance(6) {
                     s.hdr = false;
                 }
-                // a NaN factor makes FreeSurfer's extent -2147483648 with reproduce (FS-317), whose
-                // allocation error fs.mri does not model yet (told track A): not drawn
+                // factors that are not positive (FS-317, FS-961: refused by default; with
+                // reproduce FreeSurfer's extent of -2147483648 or below 1 and its allocation's
+                // errors, or a volume without width for an infinite factor)
                 let fs: [f32; 3] = if cmd == "dnsn" {
                     let f = |g: &mut Gen| -> f32 {
                         if g.chance(30) {
-                            -1.0
+                            g.pick(&[-1.0, 0.0, -0.0, f32::NAN, f32::INFINITY, -3.0, 1e-30])
                         } else {
                             g.pick(&[1.0, 2.0, 2.0, 3.0, 0.5, 1.5, 2.5, 4.0])
                         }
@@ -1240,7 +1241,9 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     t.push("1".into());
                     let mut o = like(&mut g, s);
                     if g.chance(2) {
-                        let e = |n: i64, f: f32| ((n as f32 / f).ceil() as i64).max(0);
+                        // the factors' extents (a factor of 0 or 1e-30 makes one beyond any
+                        // destination: 64 then)
+                        let e = |n: i64, f: f32| ((n as f32 / f).ceil() as i64).clamp(0, 64);
                         o.w = e(s.w, fs[0]);
                         o.h = e(s.h, fs[1]);
                         o.d = e(s.d, fs[2]);

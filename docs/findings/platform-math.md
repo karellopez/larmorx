@@ -271,7 +271,13 @@ parts that differ changed no result on 1.9 × 10^10 arguments per function (spec
 `asin`, `acos` and `atan` stay correctly rounded in `reproduce` too (the same decision): their
 tables in glibc are searched points and fitted polynomials, about 4,000 numbers no definition
 reproduces, and they differ from glibc only in the last bit, on 0.05 to 0.25 % of arguments (spec
-§9, §10.3). The replicas' verification tools that keep earlier translations of glibc's LGPL code,
+§9, §10.3). For `acos` a wider black-box measurement (2026-11-18, `validation/investigations/glibc-acos/`:
+9.6 × 10^9 arguments, uniform on [-1, 1), every binade, the subnormals, the neighbourhoods of 0, 0.5, 1
+and glibc's path limits, CORE-MATH's 264,099 worst cases with their neighbours, special arguments)
+found 4,364,142 results one unit in the last place from the correctly rounded value (0.0454 %; random
+arguments only from `|x|` about 2^-9 up, hard cases at every scale down to 2^-55; none near 0 or 1
+within 2^24 units; special arguments and NaN bits equal), and glibc's build without FMA differing from
+its FMA build: so the correctly rounded `acos` cannot stand in for glibc's in `reproduce`. The replicas' verification tools that keep earlier translations of glibc's LGPL code,
 and the spec writer's model (`glibc-dbl-model`), stay in `crates-gpl/tools/`.
 
 **The replicas' `reproduce` (2026-11-04, BET's `-S`/`-B`/`-A`/`-A2` part, relay 1).** Every place

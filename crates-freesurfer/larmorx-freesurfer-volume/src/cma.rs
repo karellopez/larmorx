@@ -25,9 +25,13 @@
 //! - **FS-314** (crash): `ReadCachedBrainVolumeStats` of a line that names a measure, has no number
 //!   and ends in white space takes the last character off an empty word (`std::string::pop_back`):
 //!   the program aborts. By default that line gives no number (the stat is then missing, as
-//!   for a line without one); an error under `reproduce`.
+//!   for a line without one); `reproduce` gives the official build's abort (deterministic in its
+//!   plain runs): libstdc++'s two lines for `std::length_error` (`basic_string::_M_create`) when a
+//!   word of the line is longer than 15 bytes, else for `std::bad_alloc`, and status 134.
 //! - **FS-315** (memory): `MRIlrswapSeg` reads the label lists' first row as far as their row
-//!   count: lists with fewer numbers than rows are read past their end. An error in both modes.
+//!   count: lists with fewer numbers than rows are read past their end. By default the program
+//!   ends with an error (rule B); `reproduce` reads NaN past a list's end (D13's deterministic
+//!   fill), noted.
 #![allow(non_upper_case_globals)]
 
 use std::io::Write;
@@ -1234,7 +1238,9 @@ pub fn mri_lrswap_aseg(
     Ok(Some(swap))
 }
 
-/// `lh->rptr[1][n]` (FS-315: beyond the matrix, an error in both modes).
+/// `lh->rptr[1][n]`. FS-315, beyond the matrix: memory FreeSurfer does not own. By default the
+/// program ends (`ERROR_BADPARM`); `reproduce` reads NaN there (D13's deterministic fill: equal to
+/// no label, and a swap onto it gives FS-311's conversion of NaN), noted.
 fn list_entry(g: &mut Globals, err: &mut dyn Write, m: &Matrix, n: i32) -> Result<f32, Fatal> {
     match m.relt_index(1, n) {
         Some(_) => Ok(m.relt(1, n)),
@@ -1246,6 +1252,9 @@ fn list_entry(g: &mut Globals, err: &mut dyn Write, m: &Matrix, n: i32) -> Resul
                     m.rows * m.cols
                 ),
             );
+            if g.notices.reproduce() {
+                return Ok(f32::NAN);
+            }
             log::error_exit(
                 g,
                 err,
@@ -1623,12 +1632,22 @@ pub fn read_cached_brain_volume_stats(
                         "ReadCachedBrainVolumeStats: a measure's line without a number ends in white space",
                     );
                     if g.notices.reproduce() {
-                        log::fatal(
-                            g,
+                        // FreeSurfer's abort, by the longest word the line held (observed)
+                        let longest = line
+                            .split(|&b| is_c_space(b))
+                            .map(<[u8]>::len)
+                            .max()
+                            .unwrap_or(0);
+                        let (class, what) = if longest > 15 {
+                            ("std::length_error", "basic_string::_M_create")
+                        } else {
+                            ("std::bad_alloc", "std::bad_alloc")
+                        };
+                        let _ = write!(
                             err,
-                            1,
-                            "ReadCachedBrainVolumeStats: a line without a number ends in white space (FreeSurfer aborts here)",
-                        )?;
+                            "terminate called after throwing an instance of '{class}'\n  what():  {what}\n"
+                        );
+                        return Err(Fatal::Exit(134));
                     }
                     break;
                 }
@@ -1729,6 +1748,102 @@ mod tests {
         .unwrap();
         assert_eq!(again, want);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// FS-314: a measure's line with no number ending in white space. By default no number (the
+    /// stat then missing: the program's own error); `reproduce` FreeSurfer's abort, whose exception
+    /// depends on the line's longest word (15 bytes: `std::bad_alloc`; 16: `std::length_error`).
+    #[test]
+    fn a_line_without_a_number_aborts_as_freesurfer_under_reproduce() {
+        let dir = std::env::temp_dir().join(format!("larmorx-cma-fs314-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("s/stats")).unwrap();
+        for (word, class) in [
+            (
+                "x".repeat(14),
+                "std::bad_alloc'\n  what():  std::bad_alloc\n",
+            ),
+            (
+                "x".repeat(15),
+                "std::bad_alloc'\n  what():  std::bad_alloc\n",
+            ),
+            (
+                "x".repeat(16),
+                "std::length_error'\n  what():  basic_string::_M_create\n",
+            ),
+        ] {
+            std::fs::write(
+                dir.join("s/stats/brainvol.stats"),
+                format!("# Measure BrainSeg, BrainSegVol, {word} \n"),
+            )
+            .unwrap();
+            for mode in [UpstreamDefects::Reproduce, UpstreamDefects::Fix] {
+                let mut g = Globals::new(mode);
+                let (mut out, mut err) = (Vec::new(), Vec::new());
+                let mut never = |_: &mut Globals, _: &mut dyn Write, _: &mut dyn Write| {
+                    panic!("the cache exists")
+                };
+                let r = read_cached_brain_volume_stats(
+                    &mut g,
+                    &mut out,
+                    &mut err,
+                    Some(&dir),
+                    "s",
+                    ".",
+                    &mut never,
+                );
+                assert!(g.notices.contains(&FS_314));
+                let err = String::from_utf8(err).unwrap();
+                if mode == UpstreamDefects::Reproduce {
+                    assert_eq!(r, Err(Fatal::Exit(134)));
+                    assert_eq!(
+                        err,
+                        format!("terminate called after throwing an instance of '{class}")
+                    );
+                } else {
+                    assert_eq!(r, Err(Fatal::Exit(1)));
+                    assert!(err.contains("could not find stat for BrainSeg, BrainSegVol"));
+                }
+            }
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// FS-315: a label list with fewer numbers than rows (no columns). By default the program
+    /// ends (`ERROR_BADPARM`); `reproduce` reads NaN past the list's end: no voxel equals it, and a
+    /// voxel equal to the other list's number takes FS-311's conversion of NaN.
+    #[test]
+    fn lists_read_past_their_end_give_nan_under_reproduce() {
+        use larmorx_freesurfer_core::matrix::{MATRIX_REAL, matrix_alloc};
+        use larmorx_freesurfer_mri::mri::MRI_INT;
+        for mode in [UpstreamDefects::Reproduce, UpstreamDefects::Fix] {
+            let mut g = Globals::new(mode);
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let mut seg = Mri::new(&mut g, &mut out, &mut err, &[2, 1, 1], MRI_INT, true).unwrap();
+            mri_set_vox_val(&mut g, &mut err, &mut seg, 0, 0, 0, 0, 5.0, 0).unwrap();
+            mri_set_vox_val(&mut g, &mut err, &mut seg, 1, 0, 0, 0, 7.0, 0).unwrap();
+            let lh = matrix_alloc(&mut g, &mut out, &mut err, 1, 0, MATRIX_REAL)
+                .unwrap()
+                .unwrap();
+            let mut rh = matrix_alloc(&mut g, &mut out, &mut err, 1, 1, MATRIX_REAL)
+                .unwrap()
+                .unwrap();
+            rh.set_relt(1, 1, 7.0);
+            out.clear();
+            let r = mri_lrswap_seg(&mut g, &mut out, &mut err, &seg, &lh, &rh);
+            assert!(g.notices.contains(&FS_315));
+            if mode == UpstreamDefects::Reproduce {
+                let swap = r.unwrap().unwrap();
+                let mut v = |c| mri_get_vox_val(&mut g, &mut err, &swap, c, 0, 0, 0, 0).unwrap();
+                assert_eq!((v(0), v(1)), (5.0, i32::MIN as f32));
+                assert!(g.notices.contains(&FS_311));
+                assert_eq!(out, b"MRIlrswapSeg(): nswaps 1\n");
+            } else {
+                assert_eq!(r.unwrap_err(), Fatal::Exit(log::ERROR_BADPARM));
+                assert!(String::from_utf8(err).unwrap().contains(
+                    "MRIlrswapSeg(): the label lists hold fewer numbers than rows (FreeSurfer reads past them)"
+                ));
+            }
+        }
     }
 
     /// FS-312 and FS-313: a thalamus voxel outside the ribbon counts twice under `reproduce`, once

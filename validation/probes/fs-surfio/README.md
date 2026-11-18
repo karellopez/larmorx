@@ -592,6 +592,27 @@ beyond the surface), FS-06; 2 to 4 per seed past the official build's 5-second a
 volume at 0.5 mm): 54 of 60 identical in both modes; the other 6, hole fillings, overflow the official
 build's stack (FS-901: it crashes, the port completes). Official 471 s, port 501-510 s.
 
+Relay 45 of track D, 66 commands: `ptc` (`MRISreadPatchNoRemove` and `MRISreadPatch`; the port's side
+in `tests/fs_surfio/ptc.rs`: an empty work folder with `d`, a surface read from `d/lh.s0`, `Gdiag`'s
+show bit, `Gdiag_no`, `FS_POSIX`; 0 to 3 input files at their read names: ASCII patches with comments,
+blank lines, long lines, missing numbers and odd numbers, binary patches of both forms (cut, vertex
+numbers outside the surface), labels, MGH volumes of one voxel per vertex, GIFTI surfaces, random bytes;
+then 1 to 4 of: a vertex ripped or made a border, the positions moved, `MRISwritePatch`, a patch read by
+either reader with or without the conversion; after each the surface's counts, flags, status, area, box,
+each vertex's position, normal, area, flags and counts, each face's flag and area) and `smp`
+(`MRISsampleFaceCoordsCanonical`, `mrisSampleMinimizationEnergy`, `mrisSampleNormalEnergy`,
+`mrisSampleSpringEnergy`, `mrisSampleParallelEnergyAtVertex`, `mrisSampleParallelEnergy`,
+`mrisDirectionTriangleIntersection`, `MRISdistanceToSurface`, `mrisFindAllOverlappingFaces`; the port's
+side in `tests/fs_surfio/smp.rs`: icosahedra (crumpled a third of the time), grids and small meshes, the
+radius and mean vertex distance; the canonical, pial and white positions and normals saved around fixed
+moves, a face table (now and then of vertices) of the canonical or current positions, the vertices'
+faces by a pattern, MRISread's 0 or `mrisAssignFaces`; then 1 to 6 measurements or set-up changes; at the
+end each vertex's position and face). Seeds 7, 13 and 17, 500 cases of each command: `ptc` 0 different in both modes (80, 83 and 71 counted, not compared: binary patches that end before their numbers, FS-49 and FS-167; ASCII patches' first numbers, FS-1010; labels that cannot be opened, `PE`; the metric properties' FS-121; one case past the probe's 5-second alarm at seed 13); `smp` 0 different in both modes (30, 23 and 22 counted, not compared; 8, 5 and 10 past the 5-second alarm).
+`PE` (the runner's mark): a label that cannot be opened; glibc's first `perror` on a standard error
+nothing has written to yet (the probe's children: a file, write-only) leaves `EINVAL`, which fs.io's
+`LabelRead` does not model, so FreeSurfer's next message prints `Invalid argument` (track A's, reported).
+`flr smr` (`real.py --smr`: three heads, both hemispheres: the sampled energies on each sphere, the distance along the white surface's normals, the overlapping faces of `qsphere.nofix`): 6 of 6 identical in both modes. Official 22 s, port 20 s.
+
 `stack.py` (relay 38 of track D) measures FS-901, the depth at which the official cluster growth
 overflows its 8 MiB stack, with `flr sgd` (every value 1, one `sclustMapSurfClusters`; the port also
 prints its deepest path): on flat grids (strips of 2 x 20,000 to 2 x 80,000, squares of 100 x 1,000

@@ -1923,6 +1923,22 @@ defects! {
         "flattening a patch (MRISflattenPatch: mris_flatten) whose vertex normals sum to zero turns every unripped vertex's position into NaN";
     FS_1005 = "FS-1005", "FreeSurfer", true,
         "flattening a patch (MRISflattenPatch: mris_flatten) with DIAG_SHOW and a diagnostic vertex (Gdiag_no) that has neighbours crashes the program when the surface holds no vertex distances";
+    FS_1006 = "FS-1006", "FreeSurfer", true,
+        "reading a patch from a GIFTI file name (MRISreadPatch, MRISreadPatchNoRemove: mris_convert, mri_surf2surf, mris_curvature and other programs given a patch) reads the file as a new surface that it never returns: the program's surface is left whole (not a patch) and the read reports success; a GIFTI file that cannot be read crashes the program";
+    FS_1007 = "FS-1007", "FreeSurfer", true,
+        "reading an ASCII patch file (MRISreadPatch, MRISreadPatchNoRemove) that holds no line but comments and blank lines crashes the program";
+    FS_1008 = "FS-1008", "FreeSurfer", true,
+        "reading an ASCII patch file (MRISreadPatch, MRISreadPatchNoRemove) whose point line holds no vertex number, or whose coordinate line holds fewer than three numbers, silently takes the previous point's vertex number or coordinates for the missing values";
+    FS_1009 = "FS-1009", "FreeSurfer", false,
+        "the patch readers' messages (MRISreadPatch, MRISreadPatchNoRemove) print a bad vertex number of a patch file one below the file's (zero-based), and a label or volume vertex number equal to the surface's vertex count as greater than it; the messages are kept";
+    FS_1010 = "FS-1010", "FreeSurfer", true,
+        "reading an ASCII patch file (MRISreadPatch, MRISreadPatchNoRemove) whose first line holds no vertex count, or whose first point holds no vertex number or fewer than three coordinates, uses memory the program never wrote for the missing values";
+    FS_1011 = "FS-1011", "FreeSurfer", true,
+        "sampling a surface's coordinates at a point through its canonical (spherical) positions (MRISsampleFaceCoordsCanonical and the sampled energies of the surface deformation: mris_expand, mris_inflate, mris_place_surface, mris_register, mris_sphere) crashes the program when the point has no face within 1,000 mm (a point that is not finite, a face table without faces)";
+    FS_1012 = "FS-1012", "FreeSurfer", true,
+        "the sampled spring and parallel energies of the surface deformation (mris_expand, mris_register, mris_sphere, mris_place_surface) sample a face whose number is outside the surface's faces when no face is found within 1,000 mm, or when a vertex's assigned face is unset (-1) or beyond the faces; the walks through a face table's buckets (the ray along a vertex's normal: mris_expand, mris_sphere; the faces overlapping a face: mris_fix_topology, mris_topo_fixer) given a table of vertices read its vertex numbers as faces: they read memory outside the faces (memory contents or a crash)";
+    FS_1013 = "FS-1013", "FreeSurfer", true,
+        "finding the faces that overlap a face (mris_fix_topology, mris_topo_fixer) walks the face's bounding box in half-millimetre steps: a face kilometres across, or with a coordinate that is infinite, runs for hours or never ends";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

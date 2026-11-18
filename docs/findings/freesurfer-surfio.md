@@ -2325,3 +2325,79 @@ CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrisurf_de
   `nx / d0` is 0/0 and every unripped position NaN; by default the patch is left unrotated, as
   FreeSurfer's own `FZERO(d)` branch does), FS-1005 (the report's `v->dist[n]` with `dist` `NULL`: a
   crash; by default the report stops).
+
+## 44. The patch readers, the sampled energies, the ray and the overlapping faces (relay 45 of track D)
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived). `utils/mrisurf_io.cpp` 959-1236
+(`MRISreadPatchNoRemove`, `MRISreadPatch`) into fs.surf's `patchread.rs`;
+`utils/mrisurf_metricProperties_slow.h` 734-1008 (`mrisSampleMinimizationEnergy`,
+`mrisSampleNormalEnergy`, `mrisSampleSpringEnergy`, `mrisSampleParallelEnergyAtVertex`,
+`mrisSampleParallelEnergy`, `MRISsampleFaceCoordsCanonical`; compiled in
+`mrisurf_metricProperties.cpp.o`) into `sampled.rs`; `utils/mrisurf_base.cpp` 1433-1488
+(`mrisDirectionTriangleIntersection`), `utils/mrisurf_metricProperties.cpp` 4899-5012
+(`mrisFindAllOverlappingFaces`) and 5112-5129 (`MRISdistanceToSurface`, reached by no default-path
+program, ported beside its callee) into `overlap.rs`; `utils/mrishash.cpp` 655-669 and 712-715
+(`MHTacqBucket` of `float` coordinates) as `Mht::acq_bucket`. `mrisSampleAshburnerTriangleEnergy`, listed
+READY by relay 44's inventory, was already ported in relay 37 (`props11.rs`, `real.py --mpx`): the
+inventory's row was wrong. The object code decides:
+
+- `MRISreadPatchNoRemove`'s GIFTI branch assigns `MRISread`'s result to its own parameter `mris`: the
+  caller's pointer is unchanged, so the caller's surface keeps its vertices (its distances freed before
+  the branch), and the rest of the function (`fclose` of a `NULL` stream skipped, the rip loop,
+  `MRISremoveRipped`, the dimensions, `patch`, `status`, `MRISupdateSurface`) runs on the new surface,
+  which leaks. A `NULL` read dereferences `mris->nvertices` (FS-1006). `MRISwritePatch` has no GIFTI
+  branch: a `.gii` name gets the binary patch, which the reader then sends to `MRISread` (GIFTI's XML
+  parser fails, `NULL`, the crash).
+- The ASCII branch: `fgetl` returns `NULL` at the end of the file, and `sscanf(NULL, ...)` faults in
+  glibc (FS-1007). `npts`, `i`, `rx`, `ry`, `rz` are uninitialised locals; a failed `sscanf` leaves
+  them (FS-1008 after the first point, FS-1010 before). The message for an unreadable point line passes
+  `ERROR_BADPARM` to `ErrorReturn` and `ERROR_BAD_PARM` to `ErrorPrintf` (the same value, -4). Neither
+  error path closes the stream. `k = -i - 1` for `INT_MIN` is signed overflow; GCC's code gives
+  `INT_MAX` (wrapping), which the port reproduces.
+- The binary branch's `fread2(&ix, fp)` widens a `short` with its sign; `ix / 100.0` is a `double`
+  division rounded to `float` by `MRISsetXYZ`'s parameter. At the end of the file `freadInt` returns its
+  local's stale bytes (fs.io's FS-49), which share a stack slot with `fread2`'s frames: memory contents.
+- The label branch prints its messages with `printf` and ends with `exit(1)` (not `ErrorExit`); `LabelRead`'s
+  `perror(NULL)` on a standard error nothing has written to yet (a file, opened write-only, as the probe's
+  children have it) makes glibc try `fdopen(dup(2), "w+")`, which fails with `EINVAL`: `LabelRead`'s
+  next message prints `Invalid argument`, not the open's `No such file or directory`. fs.io's `label_read`
+  prints the open's own `errno` (the probe marks these cases `PE`, counted, not compared; for track A:
+  fs.io would need the stream's orientation, as larmorx-io's DICOM condition stack keeps it).
+- `mrisComputeBoundaryNormals` (`mrisurf_metricProperties.cpp` 10338) returns at once; `mrisSmoothBoundaryNormals`
+  is `#if 0`. `MRISreadPatchNoRemove` calls `MRISremoveRipped` despite its name; `MRISreadPatch` removes
+  them again and only then rips the vertices left without faces (so a second removal is needed for
+  those: FreeSurfer's order, kept).
+- The minimization and normal energies inline `project_point_onto_sphere` with the sum `z² + (x² + y²)`;
+  the spring and parallel energies and `MRISsampleFaceCoordsCanonical` with `(x² + y²) + z²` (the latter
+  reusing its own `norm` for the projection). All `sqrt` calls of `float` arguments take libstdc++'s
+  `float` overload (`sqrtss`; `sqrtf` only for a negative argument, never met). `devFinite` is called on
+  the energies' `float` result and only reaches `DiagBreak`.
+- The normal energy's products: `wnx * dx` (the normal in the destination register), then `dx * pnx`,
+  `dy * pny` summed `dy pny + dx pnx`, and `pnz * dz` added first: `pnz dz + (dy pny + dx pnx)`. Its two
+  roots are `float`, summed in `double` (`sse` is a `double`) and returned rounded.
+- The parallel energy at a vertex: the dead `#if 0` branches and the totals `dxn_total` are eliminated;
+  `sse += sqrt(len * len)` is `root + sse` (`addsd` with the memory operand second). The sampled parallel
+  energy saves and restores `x`, `y` as one 8-byte move and `z`, `fno` separately; with an empty neighbour
+  list it returns `mrisSampleParallelEnergyAtVertex`'s `float` directly (the division by 1 skipped).
+- The spring energy reads `vn->fno` and the second search's `fno` without checking: `-1` indexes
+  `faces[-1]` (FS-1012). Its mean divides by `(float) num`.
+- `MRISsampleFaceCoordsCanonical`: when the first search fails, the second search's face is used with a
+  third each even if `face_barycentric_coords` would succeed on it; `face` is `NULL` exactly when the
+  second fails (`MHTfindClosestFaceGeneric` sets it from `fno`): the crash at `face->v[0]` (FS-1011).
+- `mrisDirectionTriangleIntersection`: `x = x0 + nx * dist` is `(double) nx * dist + (double) x0`
+  rounded; `dot` is a `double` declared but computed in `float` (`mulss`), then compared with 0 (`jb`:
+  a NaN dot is not taken); `dist < min_dist` is `comisd` (a NaN distance is not taken). `static MHBT
+  *prev_bucket` is written and never read. The `fno == 1287 || fno == 5038` test only reaches `DiagBreak`.
+- `mrisFindAllOverlappingFaces`: `all_faces[1000000]` lives on the stack (4 MB, probed page by page:
+  `orq $0x0,(%rsp)`). The first corner's bounds are compared in `float` (`comiss` against 100000.0f
+  and -100000.0f), the others with `minsd`/`cmplesd` (equal values differ only in a zero's sign, which
+  the walk does not see). `prev_bucket` is per call. The face's own rip flag is cleared at the end
+  whatever it was (its callers skip ripped faces). `all_faces[i] < 0` is never true.
+- Defects (texts in `larmorx_core::defects`): FS-1006 (the GIFTI branch: refused by default),
+  FS-1007 (an ASCII patch of no line: an error by default, status 139 with `reproduce`), FS-1008 (a
+  missing number after the first point: an error by default, the previous point's with `reproduce`),
+  FS-1009 (the messages' zero-based vertex number and `>` for an equal one: kept), FS-1010 (a missing
+  first number: memory; an error by default, 0 noted as memory with `reproduce`), FS-1011
+  (`MRISsampleFaceCoordsCanonical` with no face: an error by default, status 139 with `reproduce`),
+  FS-1012 (a face number outside the faces sampled, or a table of vertices walked: an error in both
+  modes), FS-1013 (the overlapping faces' walk of a huge or infinite box: refused in both modes).

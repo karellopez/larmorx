@@ -79,7 +79,10 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # FS-991, a link removal's copy over the memory around a list, FS-992, the ordered neighbours'
 # reads outside a vertex's faces, FS-993, and the soap bubble's diagnostic vertex beyond the
 # surface, FS-996; relay 43 of track D, a closest search of the other kind of table reading a number
-# beyond the surface's vertices or faces, FS-576): counted, never compared
+# beyond the surface's vertices or faces, FS-576; relay 45 of track D, an ASCII patch's first
+# numbers FreeSurfer never read, FS-1010, a face number outside the faces sampled, FS-1012, and a
+# label that cannot be opened after glibc's first perror, PE, the runner's mark): counted, never
+# compared
 SKIP: tuple[str, ...] = (
     "FS-121",
     "FS-123",
@@ -139,6 +142,9 @@ SKIP: tuple[str, ...] = (
     "FS-996",
     "FS-576",
     "FS-1002",
+    "FS-1010",
+    "FS-1012",
+    "PE",
 )
 # gifticlib's messages that print pointers (`** UPB: bad params (<buf>,<blen>,<n>)`, `** A2D: bad
 # setup (<da>,...`): the port

@@ -9,10 +9,10 @@
 //! sort comparisons (1792-1842).
 //!
 //! Not here: `vlst_alloc`, `vlst_free`, `vlst_enough_data` and `vlst_add_to_list` (they take
-//! `VOXEL_LIST`, `utils/voxlist.cpp`: fs.volume's), `mrisDirectionTriangleIntersection` and
-//! `mrisAllNormalDirectionCurrentTriangleIntersections` (they take the surface hash, fs.surf's
-//! `MRIS_HASH_TABLE`), and `slprints` (no caller in FreeSurfer 8.2.0; it prints the clock and the
-//! host's name). The edge intersection test is [`crate::edges`].
+//! `VOXEL_LIST`, `utils/voxlist.cpp`: fs.volume's), `mrisDirectionTriangleIntersection` (in
+//! [`crate::overlap`] since relay 45 of track D), `mrisAllNormalDirectionCurrentTriangleIntersections`
+//! (no FreeSurfer 8.2.0 program reaches it: not ported), and `slprints` (no caller in FreeSurfer
+//! 8.2.0; it prints the clock and the host's name). The edge intersection test is [`crate::edges`].
 
 use std::io::Write;
 

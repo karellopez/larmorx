@@ -46,8 +46,13 @@ head's ``orig.nofix``, ``orig``, ``white``, ``pial`` and ``inflated`` surfaces. 
 (relay 41 of track D): mris_ca_label's mode filter (``MRISmodeFilterAnnotations``, 10 passes, the
 table set from the annotation's colour table first) on each head's recorded annotations, and
 mri_binarize's ``--dilate-vertex`` disks (``MRISdilateVertexToSum`` with the areas, pi r^2 for r of
-5, 20 and 50 mm) around vertices 0, 1000 and 50000 of each white surface. Prints the
-counts;
+5, 20 and 50 mm) around vertices 0, 1000 and 50000 of each white surface. With ``--smr`` (relay
+45 of track D): each head's sphere with its white and pial positions and normals, a face table of
+its canonical positions and its vertices' faces assigned: ``MRISsampleFaceCoordsCanonical`` and the
+minimization, normal, spring and parallel energies at 64 vertices (mris_register's, mris_expand's
+and mris_sphere's samples), ``MRISdistanceToSurface`` along 64 white vertices' normals both ways,
+and ``mrisFindAllOverlappingFaces`` of 200 faces of ``?h.qsphere.nofix`` (mris_fix_topology's).
+Prints the counts;
 the lines name machine paths, so no hash is recorded from them.
 
     python -P validation/probes/fs-surfio/real.py [--json out.json]
@@ -153,6 +158,14 @@ def main(argv: list[str] | None = None) -> int:
         "white surface",
     )
     ap.add_argument(
+        "--smr",
+        action="store_true",
+        help="relay 45 of track D: the sampled energies (flr smr) on each head's sphere with its "
+        "white and pial positions and normals (MRISsampleFaceCoordsCanonical, the minimization, "
+        "normal, spring and parallel energies at 64 vertices), MRISdistanceToSurface along 64 "
+        "white vertices' normals, mrisFindAllOverlappingFaces of 200 faces of qsphere.nofix",
+    )
+    ap.add_argument(
         "--prj",
         action="store_true",
         help="relay 43 of track D: mrisurf_project.cpp (flr prj) on each head's qsphere.nofix "
@@ -218,6 +231,13 @@ def main(argv: list[str] | None = None) -> int:
                         lines.append(f"flr rmi {sd / f'{hemi}.{surf}'} {fill}")
                 lines.append(f"flr cds {sd / f'{hemi}.white'} {s / 'mri' / 'aseg.presurf.mgz'}")
                 lines.append(f"flr cdn {sd / f'{hemi}.white'} {struct.pack('>f', 0.5).hex()}")
+                continue
+            if a.smr:
+                sd = s / "surf"
+                lines.append(
+                    f"flr smr {sd / f'{hemi}.sphere'} {sd / f'{hemi}.white'} "
+                    f"{sd / f'{hemi}.pial'} {sd / f'{hemi}.qsphere.nofix'}"
+                )
                 continue
             if a.prj:
                 sd = s / "surf"
@@ -321,7 +341,9 @@ def main(argv: list[str] | None = None) -> int:
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
     kind = (
-        "rmi"
+        "smr"
+        if a.smr
+        else "rmi"
         if a.rmi
         else "prj"
         if a.prj

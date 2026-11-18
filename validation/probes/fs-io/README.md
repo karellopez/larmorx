@@ -462,3 +462,13 @@ Run (inside a memory box; the port and FreeSurfer run on generated inputs):
 The light run's hash (`official_sha256_skip` with `--light`: the portable cases without the six that
 take seconds in a debug build, `cases::HEAVY_SEED1`, measured by `tests/fs_io_heavy.rs`) is
 `tests/fs_io_official.rs`'s, checked on every platform; the portable run keeps the six. Results (2026-11-13): `docs/findings/freesurfer-io.md`.
+- Piece 34 (track A relay 45): `gro` (`MRIreadGeRoi(name, n_slices)`, `mri_convert --roi`) of a series made in the
+  fixture's folder `w` by `tests/fs_io/piece34.rs`: names in seven forms, the named file a slice, a file of its own
+  (cut before its width or height now and then: FS-944), a name whose digits run on, a missing file, a folder, a name
+  without three digits; extents 0 to 5, 0, -1, long rows, 65,536 x 65,536 (FS-947); 0 to 5 slices, 12, or 1,002 (the
+  slices 1,000 and 1,001: four-digit names); slices present or not, offsets in the header, 0, past the end,
+  negative, rows whole or cut, files cut before or inside their offset (FS-945, FS-946). `SKIP` for FS-944, FS-945,
+  FS-947 and for volumes (or, with a negative extent, slice buffers) past `fsio`'s 1 GiB (not run on the port's side).
+  `fsio` REBUILT (old binary `<scratch>/A/rl45/fsio.before-rl45`). Seeds 7, 13 and 21 (389 `gro` cases each,
+  `subset.py ... gro`): `reproduce` identical on every compared case (296, 302, 294), 0 different; `fix` differs only
+  with notices (FS-01's byte, FS-946).

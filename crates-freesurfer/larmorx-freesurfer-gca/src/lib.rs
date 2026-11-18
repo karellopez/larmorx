@@ -12,7 +12,7 @@
 //! (`readGCA`, track A's relay 35 of FreeSurfer's foundations) and a morph as a volume (`GCAMread`
 //! and `mri_read`'s branch of type `MGH_MORPH`, relay 38), `TRANSFORM` and the morph writer
 //! (`MRIwriteType`'s branch of type `MGH_MORPH`, relay 39), the autoencoder as a volume (`SAEread`,
-//! `SAElayerWeightsToMRI` and `mri_read`'s branch of type `MGH_AUTOENCODER`, relay 41); `PROVENANCE.md` lists what each piece
+//! `SAElayerWeightsToMRI` and `mri_read`'s branch of type `MGH_AUTOENCODER`, relay 41), `MRIStransform` (a surface through a `TRANSFORM`, relay 45); `PROVENANCE.md` lists what each piece
 //! translates.
 #![forbid(unsafe_code)]
 
@@ -25,6 +25,7 @@ pub mod gcam_write;
 pub mod likely;
 pub mod morph;
 pub mod read;
+pub mod surftransform;
 pub mod transform;
 
 /// Registers this crate's readers and writer with fs.io's `mri_read` and `MRIwriteType` (the atlas,

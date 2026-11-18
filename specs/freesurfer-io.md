@@ -30,7 +30,13 @@ files and annotations read as volumes, the NRRD writer's refusal, `mri_read`'s f
 read; **part 27** (§128-129): MINC 1 volumes read; **part 28** (§130-131): MINC 1 volumes written; **part
 29** (§132-133): GCA atlases read as volumes; **part 30** (§134-135): volumes read whole with their non-finite
 voxels removed; **part 31** (§136-137): the conformed-size checks and the command lines; **part 32** (§138-141): a
-volume's axes reordered, the selective-average headers, a label's overlap with another removed.
+volume's axes reordered, the selective-average headers, a label's overlap with another removed; **part 33**
+(§142-143): GCA morphs read as volumes; **part 34** (§144-147): transforms, morphs written, JPEG images; **part 35**
+(§148-149): TIFF images; **part 36** (§150-151): transforms written, copied and applied; **part 37** (§152-153):
+stacked autoencoders; **part 38** (§154-155): transforms applied backwards, converted and composed; **part 39**
+(§156-159): warp volumes without their geometries, volumes resampled through morphs, transforms composed and
+inverted in place; **part 40** (§160-161): a volume's four dimensions reordered; **part 41** (§162-163): a surface
+moved through a transform; **part 42** (§164-165): GE ROI series read.
 
 ## 1. Conventions
 
@@ -5374,3 +5380,157 @@ A morph (§142) maps atlas voxels to image voxels. These functions resample a vo
   on every compared case (362 and 370 `ro4` cases), 0 different; `fix` differs only with notices (FS-938).
 - Black box: FreeSurfer 8.2.0's `mri_convert <in>.mgz <out>.mgz --reorder4 4 1 2 3` (and with `1 1 3 4`, `1 2 5 4`)
   against the port's program; the output volumes compared byte for byte (`mri_info` of the result for the extents).
+
+## 162. A surface moved through a transform (`MRIStransform`: `mri_normalize -surface <surface> <transform>`, `mris_sphere -xform <lta> <volume>`)
+
+`MRIStransform(surface, source, transform, destination)`: the source and destination volumes are each given or not,
+or one volume is given as both (`mris_sphere` passes its `-V` volume twice); `mri_normalize` gives neither and skips
+the call for a transform named `identity.nofile`. Only the vertices that are not ripped move; then the surface's
+extent and centre are recomputed over every vertex, ripped ones included (`specs/freesurfer-surfio.md` §16's bounding
+box), and the surface's volume geometry becomes the destination's (`getVolGeom`, `specs/freesurfer-volume.md` §4:
+valid 1, extent, voxel sizes, direction cosines, centre, name). The distances and other vertex data are not touched.
+Returns 0; every failure ends the program (`ErrorExit`, code `ERROR_BADPARM`, the message on standard error after
+`error: `, FS-01's byte).
+
+1. **A GCA morph** (the transform's type 11). A missing destination is a volume of the morph's image geometry, a
+   missing source one of its atlas geometry: each one frame of bytes of that extent, its voxels allocated (a failed
+   allocation is `MRIallocSequence`'s, `specs/freesurfer-mri.md` §4), its geometry the morph's (`useVolGeomToMRI`:
+   ras-good 1, extent, sizes, cosines, centre, name, the cached matrices recomputed). A morph of type RAS (1) is then
+   taken to voxels on the destination (§142 item 8's conversion with a volume: the transform's own morph changes:
+   its type becomes voxels, its image geometry the destination's). Then, for every vertex in order:
+   - `(x, y, z)` (single precision) times the source's tkregister RAS-to-voxel matrix (`specs/freesurfer-volume.md`
+     §13; computed once, before the loop; a geometry it cannot invert ends the program at the first vertex not
+     ripped with `MatrixMultiplyD(): m1 is null` and the file and line of FreeSurfer's matrix code) by FreeSurfer's
+     matrix product (each element a `float`, sums in `double`, stored as `float`): the voxel;
+   - the voxel through the morph as §144 item 7's `GCAMsampleMorph` (divided by the spacing in `float`, outside
+     `[0, extent)` on an axis or an invalid-position corner: not sampled; else the trilinear sum, `float`);
+   - the sample (each coordinate widened) through the destination's tkregister vox2ras (`MRIvoxelToSurfaceRAS`,
+     §13: the matrix recomputed for every vertex, its diagnostic line too when `Gdiag_no > 0` and `DIAG_VERBOSE`), the
+     point loaded as `float`s, the product's first three elements: the vertex's new position (stored as `float`).
+   A vertex the morph cannot sample: FreeSurfer gives it the last sample made in this call (FS-939), and before any
+   sample memory contents (FS-940). **larmorx by default** ends the program (rule B: as FreeSurfer's own surface
+   morph refuses such a vertex): `MRIStransform: vertex <n> (voxel (<x>, <y>, <z>)) is outside the morph or next to
+   an invalid node: the morph does not move it` (the voxel as larmorx prints numbers). **`reproduce`**: the last
+   sample (FS-939), or the voxel `(0, 0, 0)` before any (FS-940, noted).
+2. **A linear transform array** (any other type). In this order:
+   - more than one transform: `we cannot handle multiple transforms` (then a blank line); none: `transform does not
+     have transform ;-) ` (trailing blank kept). A negative count: as FS-859, the program ends in both modes.
+   - a RAS-to-RAS array (1) with a source volume given: FreeSurfer's two checks of the volume's centre, one against
+     the transform's source geometry when it is valid (`WARNING:` + 52 `*`; `WARNING: c_(ras) values are not equal for
+     the input volume and the transform src.`; `WARNING: The transformed surface position may be shifted.`; `WARNING:`
+     + 51 `*`), one against the surface's geometry when it is valid (57 and 57 stars, `... the input volume and the
+     surface stored volume.`, the same second line). FreeSurfer compares each centre with itself (a `float`
+     difference whose absolute value is below `FLT_EPSILON`, for c_r, then c_a, then c_s), so a warning appears only
+     when one of the three is not a finite number. The first: kept so in both modes (FS-943, rule C: a RAS-to-RAS
+     transform does not depend on its source's centre; the comparison FreeSurfer meant would warn on every recorded
+     head's `rawavg2orig.lta` with `orig.mgz`, whose result is right). The second (FS-941): **larmorx by default**
+     compares the volume's centre with the surface's geometry's the same way (a warning when they differ by
+     `FLT_EPSILON` or more on an axis, or one is not finite: the surface's tkregister coordinates are taken to
+     scanner RAS with the volume's centre, so a different centre shifts it), noted where the two outcomes differ;
+     `reproduce`: FreeSurfer's.
+   - no source volume: the transform's source geometry when valid (`INFO:try to get src info from transform.`), else
+     the surface's geometry when valid (`INFO:try to get src info from the surface.`), else `When mri == NULL, the
+     transform must have the valid src info.` and the end. The volume made is a header of one frame of bytes
+     (`MRIallocHeader`, no voxels: extents of 0 or less print `MRI::Shape`'s lines, `specs/freesurfer-mri.md` §4)
+     with that geometry's sizes, cosines and centre, ras-good 1, the cached matrices recomputed.
+   - no destination volume: the transform's destination geometry when valid (a header as above, cache not yet
+     recomputed; `INFO: Get dst info from transform.` when `Gdiag` has `DIAG_SHOW` and `DIAG_VERBOSE`), else
+     `WARNING:` + 57 `*`, `WARNING: transform does not have valid destination volume.       ` (seven blanks),
+     `WARNING: The standard CORONAL volume with c_(ras) = 0 is assumed.`, `WARNING:` + 57 `*` and a header of the
+     destination geometry's extent, coronal cosines, centre 0, sizes 1, ras-good 1. Then (no destination given, in
+     both cases) the destination takes the source's extent and voxel sizes and the coronal cosines (only its centre
+     is kept).
+   - the destination's cached matrices recomputed (`MRIreInitCache`; a given volume's too).
+   - the matrix from the surface's coordinates to the destination's: RAS-to-RAS: for a surface in scanner RAS
+     (`useRealRAS` not 0) a copy of the transform's matrix; else `surfaceRASFromRAS(destination) x (M x
+     RASFromSurfaceRAS(source))` (`specs/freesurfer-mri.md` §9, `specs/freesurfer-volume.md` §13; FreeSurfer's
+     products). Voxel-to-voxel (0): when the source's and destination's extents differ, `WARNING:` + 56 `*`,
+     `WARNING:voxel-to-voxel transform must have the same volume sizes.`, `WARNING:You gave src (<w>, <h>m, <d>) vs.
+     dst (<w>, <h>, <d>).` (the `m` after the second number is FreeSurfer's), `WARNING:The result of this transform
+     is most likely wrong.`, `WARNING:` + 56 `*`; then `tkregister vox2ras(destination) x (M x tkregister
+     ras2vox(source))` (a source it cannot invert ends the program in the first product, `m2 is null`).
+   - each vertex not ripped: the matrix applied as `TransformWithMatrix` (`specs/freesurfer-volume.md` §46: the
+     coordinates as `float`s through the first three rows in `float`), stored as `float`.
+   - FS-942: any other type (physical voxels 2, coronal RAS 21, a register.dat's 14, ...) gives no matrix, and
+     FreeSurfer crashes at the first vertex not ripped. Both modes end the program there: `MRIStransform: a linear
+     transform of type <t> (only voxel-to-voxel and RAS-to-RAS are applied; FreeSurfer crashes here)`. A surface whose
+     vertices are all ripped is not touched and the call completes (extent, geometry) as FreeSurfer's does.
+   - FS-858: a linear array given with the morph's type 11 (a caller that sets the transform's type from the array,
+     as `mris_sphere` does) is read by FreeSurfer as a morph (memory contents or a crash): both modes end the program
+     (`MRIStransform: a linear transform with the morph's type 11 (FreeSurfer reads it as a morph here)`).
+3. Standard output and error are one stream in the order written (the probe joins them); all of this function's own
+   lines go to standard error.
+
+## 163. Validation plan (part 41)
+
+- Closed probe `validation/probes/fs-gcam/` (`fsgcam`, built against the unit oracle by `build.sh`): `mst` cases made
+  by the port's example (`crates-freesurfer/larmorx-freesurfer-gca/examples/fs_gca_probe.rs`, cases in `tests/fs_gca/`):
+  surfaces of 0 to 8 vertices (ripped now and then, in scanner RAS now and then, special numbers), their geometries;
+  linear arrays of 0, 1 or 2 transforms of every type, matrices near identities, shifts, scales, rotations and odd
+  ones, valid and invalid geometries of extents 0 to 256, odd sizes and cosines; morphs of 1 to 4 nodes a side,
+  spacings 1 to 3 (0 and -1 now and then), types voxels, RAS and 0, image and atlas geometries covering the grid or
+  not, nodes displaced, invalid now and then, special values; the volumes given in each of the five ways, `Gdiag`
+  and `Gdiag_no` set now and then. The result: the return, every vertex, the extent and centre, the surface's
+  geometry; for a morph its type, a hash of its nodes and its image geometry; the text. `SKIP` for FS-858, FS-940 and
+  FS-942. `check.py --seed <s> --n <n>` inside `boxed.sh`.
+- Measured (relay 45): seeds 1 (600 cases), 7 and 13 (3,000 each): `reproduce` identical on every compared case
+  (475, 2,393, 2,356), 0 different (125, 607 and 644 `SKIP`); `fix` differs only with notices (FS-939, FS-941 and
+  FS-01's byte).
+- Measured on the recorded heads (relay 45, `real.py`, 108 cases: the six heads' two streams, both hemispheres;
+  `talairach.m3z` only in the classic stream): identical in both modes on every case; no vertex outside its head's
+  morph (FS-939, FS-940 never met), no surface whose volume's centre differs from `orig.mgz`'s (FS-941 never met);
+  `rawavg2orig.lta`'s 24 cases are the ones FS-943's meant comparison would have warned on.
+- `msf` cases on real files: `real.py` takes every recorded head's white surfaces through `mri_normalize`'s call
+  (`TransformRead`, `TransformInvert` without a volume, no volumes: the classic stream's `talairach.m3z`,
+  `talairach.xfm`, `cc_up.lta`) and `mris_sphere`'s (`LTAread`, the array's type, `orig.mgz` as both volumes:
+  `talairach.lta`, voxel to voxel; `rawavg2orig.lta`, RAS to RAS). No recorded step of recon-all reaches this function
+  (its `mri_normalize` passes `identity.nofile`, its `mris_sphere` no transform).
+- Black box: FreeSurfer 8.2.0's `mris_transform <surface> <transform> <out>` (the call without volumes) and `mri_normalize
+  ... -surface <surface> <transform>` (the distance map it builds from the moved surface).
+
+## 164. GE ROI series read (`MRIreadGeRoi(name, n_slices)`: `mri_convert --roi`, the slice count from `--in_like`'s depth or `--in_k_count`)
+
+1. **The named file.** A file that cannot be opened for reading: `MRIreadGeRoi(): error opening file <name>`
+   (`ERROR_BADFILE`, `errno` cleared first), no volume (a folder opens; its reads fail with `EISDIR`). From byte 8:
+   the width, then the height, each a big-endian 32-bit `int`; a read that falls short prints `MRIreadGeRoi(): could
+   not read file` (`ERROR_BADFILE`, after the `errno` text when `errno` is set: `Is a directory` for a folder) and goes
+   on (FS-944: the missing bytes are memory contents in FreeSurfer; 0 here in both modes, noted).
+2. **The series' name.** In the name's base (after its last folder separator: `/`; on Windows `\` too) the first run of
+   three consecutive ASCII digits (a run of more digits: its first three) splits the name: `<prefix>` is everything
+   before those three digits (the folder included), `<postfix>` everything after them. No such run: `MRIreadGeRoi():
+   bad GE file name (couldn't find three consecutive digits in the base file name)` (`ERROR_BADPARM`), no volume.
+   Then `<prefix>---<postfix>` and a newline on standard output. A name of 1,024 bytes or more passes FreeSurfer's
+   buffers (FS-249): used whole.
+3. **The volume**: `MRIalloc(width, height, n_slices, MRI_SHORT)` (`specs/freesurfer-mri.md` §4: extents of 0 or
+   less print `MRI::Shape`'s lines; the allocation's geometry is kept; every voxel 0). FS-947: a volume of more
+   than 16 GiB (all three extents positive) is cleared whole by FreeSurfer before any slice is read, so it goes on or
+   exhausts the machine's memory depending on the machine: refused in both modes with `MRIreadGeRoi(): couldn't
+   allocate MRI structure` (`ERROR_NOMEMORY`, `errno` cleared), noted.
+4. **The slices**, `i` from 0 to `n_slices - 1`: the name `<prefix><i><postfix>` with `i` at least three digits
+   (zero-filled; 1000 and above four). A file that cannot be opened is skipped (`errno` keeps the open's error, which a
+   later `could not read file` prints). From byte 4 the pixel offset (a big-endian `int`; a short read: `could not
+   read file`, and the offset's missing bytes are: before any offset was read, memory contents, FS-945, 0 here in both
+   modes; after, the earlier slice's offset as FreeSurfer holds it, its bytes in the machine's (little-endian) order,
+   so that the value comes out byte-reversed, FS-946: `reproduce` that, the default 0). Then the file is positioned at
+   the offset (a negative offset fails with `EINVAL`, set in `errno`, and the position stays where the offset's read
+   left it); for each of the volume's rows (`height`), `width` shorts are read (a row the file cuts: `MRIreadGeRoi():
+   error reading from file file <name>` (`file` twice), `errno` cleared, no volume), each short's two bytes
+   exchanged (big-endian to the machine's), into row `y` of slice `i`.
+5. No slice file read: `MRIreadGeRoi(): didn't read any ROI files` (`ERROR_BADFILE`), no volume. Else the volume.
+
+## 165. Validation plan (part 42)
+
+- Closed probe: piece 34's `gro` (relay 45; `fsio` REBUILT): `MRIreadGeRoi` of a series made in the fixture's folder
+  `w`: names in seven forms (a folder in the prefix, digits before the three, a postfix of digits), the named file a
+  slice, a file of the series' name of its own (cut before its width or height now and then: FS-944), a name whose
+  digits run on, a missing file, a folder, a name without three digits; widths and heights 0 to 5, 0, -1, long rows,
+  65,536 x 65,536 (FS-947, or past `fsio`'s 1 GiB: `SKIP`, not run); 0 to 5 slices, 12, or 1,002 with the slices 1,000
+  and 1,001; each slice present or not, its offset in the header, 0, past the end, negative, its rows whole or cut;
+  slice files cut before or inside their offset (FS-945: `SKIP`; FS-946 compared). The volume (piece 6's print) and
+  `errno`. `SKIP` for FS-944, FS-945, FS-947.
+- Measured (relay 45): seeds 7, 13 and 21 (389 `gro` cases each): `reproduce` identical on every compared case (296,
+  302, 294), 0 different (93, 87, 95 `SKIP`); `fix` differs only with notices (FS-01's byte, FS-946). Every path met:
+  volumes read (178 of seed 7's cases), each message of items 1 to 5, `EISDIR` and `EINVAL` before `could not read
+  file`, four-digit slice names.
+- Black box: FreeSurfer 8.2.0's `mri_convert --roi --in_k_count <n> <first slice> <out>.mgz` on such series, the
+  outputs compared byte for byte.

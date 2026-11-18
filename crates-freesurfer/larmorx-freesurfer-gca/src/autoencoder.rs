@@ -133,10 +133,10 @@ fn int_size(
     g: &mut Globals,
     err: &mut dyn Write,
     what: &str,
-    exact: i64,
+    exact: i128,
     wrapped: i32,
 ) -> Option<i32> {
-    if exact == i64::from(wrapped) {
+    if exact == i128::from(wrapped) {
         return Some(wrapped);
     }
     g.notices.add(
@@ -380,7 +380,7 @@ fn sae_alloc(
     stype: i32,
     scale: f64,
 ) -> Result<Option<()>, Fatal> {
-    let exact_w = 2 * i64::from(whalf) + 1;
+    let exact_w = 2 * i128::from(whalf) + 1;
     let Some(wsize) = int_size(
         g,
         err,
@@ -390,9 +390,10 @@ fn sae_alloc(
     ) else {
         return Ok(None);
     };
-    let w = i64::from(wsize);
+    // in 128 bits: a window of 2^31 - 1 a side has a cube past 64 bits (relay 45: debug's overflow)
+    let w = i128::from(wsize);
     let (mut exact, mut ninputs) = (
-        w * w * i64::from(nlevels),
+        w * w * i128::from(nlevels),
         wsize.wrapping_mul(wsize).wrapping_mul(nlevels),
     );
     if stype & AUTOENCODER_2D == 0 {
@@ -706,7 +707,7 @@ fn sae_input_weights_to_mri(
     let first = &sae.layers[0];
     let wsize = sae.whalf.wrapping_mul(2).wrapping_add(1);
     let nhidden = first.v_hidden.rows;
-    let exact = i64::from(nhidden) * i64::from(sae.nlevels);
+    let exact = i128::from(nhidden) * i128::from(sae.nlevels);
     let Some(nframes) = int_size(
         g,
         err,
@@ -796,7 +797,7 @@ pub fn sae_layer_weights_to_mri(
         return Ok(None);
     };
     let whalf_prev = (mri_prev.vg.width - 1) / 2;
-    let exact = i64::from(ae.ksize) + 2 * i64::from(whalf_prev);
+    let exact = i128::from(ae.ksize) + 2 * i128::from(whalf_prev);
     let Some(width) = int_size(
         g,
         err,

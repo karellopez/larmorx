@@ -2441,6 +2441,24 @@ defects! {
         "reordering all four dimensions of a volume (mri_convert --reorder4) with an order value outside 1 to 4: FreeSurfer reads memory outside its arrays for the result's extents and the voxels' places (undefined behaviour: memory contents or a crash)";
     FS_938 = "FS-938", "FreeSurfer", true,
         "reordering all four dimensions of a volume (mri_convert --reorder4) with an order that repeats a dimension: FreeSurfer silently makes a volume with that dimension twice, each voxel at the place its repeated index gives (a place reached several times keeps the last value, the others stay 0)";
+    FS_939 = "FS-939", "FreeSurfer", true,
+        "moving a surface through a GCA morph (mri_normalize -surface with a morph): a vertex outside the morph's grid, or next to a node of invalid position, silently gets the position of the last vertex the morph moved";
+    FS_940 = "FS-940", "FreeSurfer", true,
+        "moving a surface through a GCA morph: a vertex outside the morph's grid, or next to a node of invalid position, before any vertex the morph could move gets a position from memory contents";
+    FS_941 = "FS-941", "FreeSurfer", true,
+        "moving a surface through a RAS-to-RAS linear transform with a volume given (mris_sphere's transform option): the warning that the volume's centre differs from the centre of the volume the surface was made on never appears for different centres (only for a centre that is not a finite number), though the surface is then shifted";
+    FS_942 = "FS-942", "FreeSurfer", true,
+        "moving a surface through a linear transform of a type other than voxel-to-voxel or RAS-to-RAS (a physical-voxel or coronal transform file): the program crashes at the first vertex that is not ripped";
+    FS_943 = "FS-943", "FreeSurfer", false,
+        "moving a surface through a RAS-to-RAS linear transform with a volume given: the warning that the volume's centre differs from the transform's source volume never appears for different centres (only for a centre that is not a finite number); kept, as a RAS-to-RAS transform does not depend on its source's centre (the warning would be wrong for the usual transform from the raw volume to the conformed one)";
+    FS_944 = "FS-944", "FreeSurfer", true,
+        "reading a GE ROI series (mri_convert --roi): a named file that ends before the image's width or height (shorter than 16 bytes) gives a width or height from memory contents";
+    FS_945 = "FS-945", "FreeSurfer", true,
+        "reading a GE ROI series: the first slice file read that ends before its pixel data offset (shorter than 8 bytes) reads its pixels from an offset made of memory contents";
+    FS_946 = "FS-946", "FreeSurfer", true,
+        "reading a GE ROI series: a slice file that ends before its pixel data offset after another slice was read takes the offset's missing bytes from the earlier slice's offset, in reversed byte order: its pixels are read from an unrelated place";
+    FS_947 = "FS-947", "FreeSurfer", true,
+        "reading a GE ROI series whose named file asks for a volume of more than 16 GiB: FreeSurfer clears the whole volume before reading a slice, so it goes on or exhausts the machine's memory depending on the machine";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

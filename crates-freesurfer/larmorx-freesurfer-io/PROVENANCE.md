@@ -306,6 +306,7 @@ after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `g
 | `utils/mriio.cpp` 12134-12143 | `MRIaddCommandLine` (FS-842; relay 36) | `mriio.rs` (`mri_add_command_line`) |
 | `utils/mriio.cpp` 11570-11842; `include/mri.h` 937-939 (`XDIM`, `YDIM`, `ZDIM`); `include/macros.h` 94 (`ISIGN`) | `MRIreorderVox2RAS`, `MRIreorder` (FS-843, FS-844, FS-845, FS-58; relay 37) | `reorder.rs` |
 | `utils/mriio.cpp` 437-462, 11520-11568 | `mriio_command_line` (no effect: its buffer is read nowhere; `mriio.rs`), `MRIreorder4` (FS-937, FS-938; relay 44, `mri_convert`'s item 3.2-07 taken early) | `mriio.rs`, `reorder.rs` |
+| `utils/mriio.cpp` 10445-10560 | `MRIreadGeRoi` (FS-944 to FS-947, FS-249; relay 45, `mri_convert --roi`'s item taken early) | `mriio_ge.rs` |
 | `utils/selxavgio.cpp`; `include/selxavgio.h` | `sv_sxadat_by_stem`, `ld_sxadat_from_stem`, `sxa_framepower`, `is_sxa_volume`, `ld_sxadat`, `sv_sxadat` (FS-846 to FS-849; relay 37) | `selxavgio.rs` |
 | `utils/label.cpp` 722-736 | `LabelRemoveOverlap` (FS-850; relay 37) | `label.rs` (`label_remove_overlap`) |
 | (larmorx's own) | a failed read's `errno` given to the C library's `scanf` (`cscan::Stream::read_error`; relay 37) | `cfile.rs` |

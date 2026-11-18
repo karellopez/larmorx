@@ -2911,3 +2911,93 @@ Object code: the unit oracle's `mriio.cpp.o` (objdump of `MRIreorder4`).
 6. **The 3.1 inventory** (track A's items 3.1-21..30, 3.1-33/34, 3.1-55): every owned function ported or folded;
    `validation/investigations/freesurfer-inventory/ready.py` lists what each program's own item still has in track A's
    files (the table: the track's NOTES, relay 44).
+
+## Part 41: MRIStransform (relay 45 of track A)
+
+Sources: `utils/mrisurf_metricProperties.cpp` 2150-2549 (`MRIStransform`); `utils/gcamorph.cpp` 5236-5330
+(`boundsCheckf`, `GCAMsampleMorph`), 5567-5610 (`GCAMmorphSurf`, for the rule); `utils/mri.cpp` 3515-3719 (the
+tkregister matrices, `MRIvoxelToSurfaceRAS`); `utils/talairachex.cpp` 207 (`TransformWithMatrix`, an external call);
+`mri_normalize/mri_normalize.cpp` 311-362, 1109-1122 (`-surface`); `mris_sphere/mris_sphere.cpp` 254-279, 755-758 (`-T
+<lta> <volume>`); `scripts/recon-all` 4660 (`-surface <hemi>.white identity.nofile`). Object code: the unit oracle's
+`mrisurf_metricProperties.cpp.o` (objdump of `MRIStransform`).
+
+1. **Placement.** `MRIStransform` is in fs.surfio's file but needs `TRANSFORM` (fs.gca) and fs.gca builds on fs.surf:
+   it lives in `larmorx-freesurfer-gca` (`surftransform.rs`; the orchestrator's decision of 2026-11-17 on track D's
+   inventory).
+2. **Reach.** recon-all never reaches it: its `mri_normalize -surface` passes `identity.nofile`, which the program
+   tests by name before the call (line 349), and its `mris_sphere` calls give no `-T`. Reached by `mri_normalize
+   -surface <s> <transform>` with a real transform (`TransformRead`, then `TransformInvert(transform, NULL)`: an
+   array's inverse filled, a morph untouched; `MRIStransform(mris, NULL, transform, NULL)`), `mris_sphere -T <lta>
+   <volume>` (`LTAread`, `transform.type = lta->type`, `MRIStransform(mris, mri, &transform, mri)`: one volume as
+   both), and `mris_transform`, `mris_thickness_diff`, `mris_deform` (not on the default paths).
+3. **FS-939, FS-940.** The morph branch's `float xv2, yv2, zv2` are declared once before the loop and their addresses
+   passed to `GCAMsampleMorph`, which returns `ERROR_BADPARM` without writing them when the point is outside
+   `[0, extent)` (after the division by the spacing) or a corner node is `GCAM_POSITION_INVALID`; the return value is
+   ignored. So such a vertex takes the last sample (FS-939, deterministic) or, before any sample, the stack slots'
+   earlier contents (FS-940: objdump: `0x3c`, `0x40`, `0x44(%rsp)` of `MRIStransform`'s frame, never written before
+   the loop). Rule B for both by default (an input that makes no sense: a vertex outside the morph's domain; FreeSurfer
+   silently gives an arbitrary position; its own `GCAMmorphSurf` refuses such a vertex with an error); `reproduce`
+   the last sample, `(0, 0, 0)` for FS-940 (noted). The six recorded heads' white surfaces through their own
+   `talairach.m3z` (12 cases): no vertex outside, so the default changes nothing there.
+4. **FS-941, FS-943.** The two RAS-to-RAS checks are `FZERO(lt->src.c_r - lt->src.c_r) && ...` and
+   `FZERO(mris->vg.c_r - mris->vg.c_r) && ...` (each value minus itself): a warning only for a non-finite centre. The
+   messages say what was meant (the input volume against the transform's source, against the surface's volume).
+   Measured on the recorded heads (`mris_sphere`'s call with `rawavg2orig.lta` and `orig.mgz`, 24 cases): the meant
+   source check would warn on every one, and those results are right (a RAS-to-RAS matrix maps scanner RAS; the
+   source's centre does not enter the surface's mapping, which uses the given volume's): rule C, kept (FS-943). The
+   surface check (FS-941) matters: the surface's tkregister coordinates are taken to scanner RAS with the given
+   volume's centre (`RASFromSurfaceRAS_(mri)`), so a surface made on a volume of another centre is shifted by the
+   difference: rule A (warn); on the heads the surface's volume is `orig.mgz`, no warning either way.
+5. **FS-942.** `surfaceRASFromSurfaceRAS` stays `NULL` for a type other than `LINEAR_RAS_TO_RAS` and
+   `LINEAR_VOX_TO_VOX` (`lta->type`, not `transform->type`), and `TransformWithMatrix(NULL, ...)` reads through it: a
+   crash at the first vertex not ripped. Every LTA type a file can name reaches it through `mris_sphere -T` (and
+   through `mri_normalize`'s `TransformRead`, which keeps the array's type). Both modes end the program there.
+6. **FS-858 here.** `mris_sphere` sets the transform's type from the array: an `.lta` of type 11 makes
+   `MRIStransform` take the `LTA *` as a `GCA_MORPH *` (memory contents or a crash): both modes end the program
+   (the read itself, `LTAread`, accepts the file).
+7. **Leaks, no effect.** The source made from the surface's geometry (`srcPresent` stays 1) and the destination of
+   the warning branch (`dstPresent` stays 1) are never freed; the morph branch frees its own volumes. A given
+   destination's cache is recomputed (`MRIreInitCache`) from its unchanged geometry: no effect on later calls.
+8. **Messages.** The voxel-to-voxel warning prints `(%d, %dm, %d)` (an `m` after the source's height): kept as text
+   (FreeSurfer's output). `INFO: Get dst info from transform.` needs `Gdiag & DIAG_SHOW` and `DIAG_VERBOSE`.
+   `MatrixMultiply` here is `MatrixMultiply_wkr` with the call site, whose null messages name `matrix.cpp:725` and
+   `:729` (fs.core's, unchanged).
+9. **Arithmetic.** The morph branch's source matrix is computed once; `MRIvoxelToSurfaceRAS` recomputes the
+   destination's tkregister vox2ras for every vertex (its diagnostic too); the sample is widened with `cvtss2sd`
+   (a signalling NaN quieted, as Rust's `f64::from` does in both builds) and the result narrowed with `cvtsd2ss`.
+
+## Part 42: MRIreadGeRoi (relay 45 of track A)
+
+Sources: `utils/mriio.cpp` 10445-10560 (`MRIreadGeRoi`); `mri_convert/mri_convert.cpp` 1377-1380 (`--roi`), 2057-2090
+(the call, its slice count `mri_in_like->depth` or `in_n_k`); `utils/mri.cpp` 264-310 (`MRI::initSlices`: a slice's
+own buffer `calloc(width * height * bytes_per_vox, 1)`, the extents' product in `int`).
+
+1. **Reach.** Only `mri_convert --roi` (with `--in_like` or `--in_k_count`; a GE Genesis input type) calls it; no
+   recorded step does.
+2. **FS-944.** `int width, height` are locals; `fread(&width, 4, 1, fp)` of a file that ends inside them copies the
+   bytes it has (glibc's partial `fread`) and leaves the rest as the stack held them; the result is then swapped
+   (`orderIntBytes`) and used as the volume's extent. Memory contents: 0 here in both modes, the probe's `SKIP`.
+3. **FS-945, FS-946.** `int pixel_data_offset` is declared once before the slice loop. Each slice's read goes into it
+   and the swapped value is stored back, so a slice file that ends inside its offset keeps, in the bytes it did not
+   give, the earlier slice's offset as the machine holds it (little-endian), and the swap then reverses them: an
+   offset unrelated to the file (FS-946, deterministic: `reproduce` reproduces it; by default the missing bytes are
+   0, as the port's other cut headers). Before any slice the bytes are the stack's (FS-945: 0 in both modes, `SKIP`).
+4. **FS-947.** `MRIalloc` then `MRIclear` writes every byte of the volume before any slice is read: a header asking
+   for more than the machine's memory exhausts it (or the allocation fails, depending on the machine's overcommit).
+   Both modes refuse volumes past 16 GiB (the port's `MACHINE_BYTES`, as FS-760) with FreeSurfer's own message for a
+   failed allocation, `MRIreadGeRoi(): couldn't allocate MRI structure`. The port does not write the zeros again
+   (`MRIclear` of a fresh allocation): no visible effect, less memory touched.
+5. **errno.** A slice that cannot be opened leaves its `fopen` error in `errno`, and a negative offset's `fseek` sets
+   `EINVAL`; the next `could not read file` prints that text first. `ErrorReturn`'s exits clear `errno` first.
+6. **The probe's limits.** `fsio` runs each case with 1 GiB of address space: a volume over 256 MiB within 16 GiB, or
+   (a negative extent: no chunk, one buffer per slice of the 32-bit product times 2) a slice buffer over 256 MiB, is not
+   run on the port's side (`SKIP`): FreeSurfer's allocation there depends on that limit (seed 7's first run: a width
+   of -2,080,923,885 and a height of 1,035,852,531 make 0.8 GiB slices, refused under `fsio`'s limit, given on a real
+   machine; the port then fails at the index tables, as FreeSurfer would).
+7. **A generator's memory.** The port's case generator first filled the slices of a 65,536 x 65,536 header (8 GiB per
+   slice): its 20 GiB memory box ended it. Slices over 64 KiB are now the header alone (the reader fails at their first
+   row, or refuses them first: FS-947).
+8. **The recorded test's shifted cases.** Piece 34's kind moves every later case of `fs_io_official`'s list: two of
+   the port's own size checks then overflowed 64 bits in a debug build (an autoencoder window's cube, fs.gca's
+   `SAEalloc`; the GE ROI volume's size): both now in 128 bits (release builds wrapped, the outcomes the same: the
+   sizes were refused either way). The debug-heavy cases moved too (`HEAVY_SEED1`: 1824, 2793, 3076).

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The comparison loop of ``specs/freesurfer-volume.md`` §69 (parts 1 to 5): seeded cases of every
+"""The comparison loop of ``specs/freesurfer-volume.md`` §69 (parts 1 to 6c): seeded cases of every
 group, run on the probe ``fs_volume_probe`` (FreeSurfer 8.2.0's volume functions, a black box) and on
 a candidate program that takes the same commands (README.md beside this file), compared line by
 line.

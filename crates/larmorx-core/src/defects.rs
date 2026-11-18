@@ -2475,6 +2475,26 @@ defects! {
         "reading a GE ROI series: a slice file that ends before its pixel data offset after another slice was read takes the offset's missing bytes from the earlier slice's offset, in reversed byte order: its pixels are read from an unrelated place";
     FS_947 = "FS-947", "FreeSurfer", true,
         "reading a GE ROI series whose named file asks for a volume of more than 16 GiB: FreeSurfer clears the whole volume before reading a slice, so it goes on or exhausts the machine's memory depending on the machine";
+    FS_948 = "FS-948", "FreeSurfer", false,
+        "counting the items of a stats table's first line reads past the end of the line, through memory the program does not use, up to the next blank or tab: the count is the same";
+    FS_949 = "FS-949", "FreeSurfer", true,
+        "mri_convert --in_stats_table reads a .csv table twice, as CSV and then in FreeSurfer's own table format, and keeps the second: a CSV table fails to load or gives another table";
+    FS_950 = "FS-950", "FreeSurfer", true,
+        "mri_convert --in_stats_table of a .tsv or .tac table writes the table's volume to junk.mgz in the working directory (replacing a file of that name)";
+    FS_1031 = "FS-1031", "FreeSurfer", true,
+        "mri_convert --in_stats_table of a file name without an extension crashes";
+    FS_1032 = "FS-1032", "FreeSurfer", true,
+        "a stats table in FreeSurfer's format, or the template of --out_stats_table, that is empty (or cannot be read) has its columns counted from memory contents";
+    FS_1033 = "FS-1033", "FreeSurfer", true,
+        "the stats tables in FreeSurfer's format, and the template of --out_stats_table, count as rows the pieces of at most 99,999 bytes their lines are read in: a blank line counts as a row (a table with a trailing blank line fails to load), a longer line counts as several, and the columns are counted from the first line's first 99,999 bytes only";
+    FS_1034 = "FS-1034", "FreeSurfer", true,
+        "a word of more than 99,999 bytes in a stats table in FreeSurfer's format, or in the template of --out_stats_table, is written past the reader's buffer (a crash or corrupted memory)";
+    FS_1035 = "FS-1035", "FreeSurfer", true,
+        "mri_convert --in_stats_table of an empty .csv table (no line) crashes";
+    FS_1036 = "FS-1036", "FreeSurfer", true,
+        "mri_convert --in_stats_table of a .csv table with a row of fewer fields than its first line reads past the row (a crash or memory contents read as numbers)";
+    FS_1037 = "FS-1037", "FreeSurfer", true,
+        "mri_convert --in_stats_table of a .tac table of one column reads a second column's name from memory contents (a crash or a comparison of memory)";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

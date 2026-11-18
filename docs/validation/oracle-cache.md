@@ -57,6 +57,23 @@ of an ANTs run's key), and in `HOME` the files AFNI writes and never reads (`.af
 agent's runs; the replica suites of 3dTshift, 3dAutomask and 3dUnifize find the original
 suites' runs of AFNI.
 
+**A case file is the input, not the files it names.** A run that reads its calls from a file
+(`probe cases.txt`, `probe batch cases.txt`: every FreeSurfer probe's entry of 2026-11-17 holds
+one input, its case file) is keyed by that file's content: its lines, and the files they name
+by their paths as written there. `key.prepare` makes inputs only of what the arguments name
+(with the files read beside them and the files of a printf pattern) and of the suite's
+`inputs=`; it does not read a file's lines for paths, so a file a case file names counts by its
+name alone. A suite that rewrites such a file under the same name is served the result of its
+old content: it changes the name (a parameter or the content's SHA-256 in it), and the case
+file's text and the key change with it, or it passes the file in `inputs=`, which puts its
+content into the key (2026-11-17: a FreeSurfer probe rewrote its grids under the same names and
+got one stale result; the spacing put into the names fixed it). A file the arguments name
+counts by its content, so rewriting it under the same name changes the key. The one exception
+is the hash memo (`hashing._stat_id`: path, device, inode, size and modification time in
+nanoseconds; in the process, and across processes in `hashes/` for files of 8 MiB or more): a
+rewrite that leaves the size and modification time as they were (a copy that keeps the times,
+`shutil.copy2`, `cp -p`, `os.utime`) is read with the old SHA-256.
+
 ## Keyed since 2026-10-28: what the move's proof found the key missed
 
 The move to the new main machine re-ran every entry (`oracle-cache verify`,

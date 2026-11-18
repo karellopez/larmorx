@@ -2947,6 +2947,14 @@ defects! {
         "the volume operations that walk a volume's rows directly (MRIinvertContrast and MRIscaleAndMultiply on another type than bytes, MRItranslate and MRIrotate_I into another type, mri_framepower, the byte walks of the set and label operations) find every row of a tensor volume, of every slice and frame, at the volume's first voxel: each row reads the same first values, and each row written replaces them, the rest of the volume unchanged; corrected: each row at its own place";
     FS_961 = "FS-961", "FreeSurfer", true,
         "downsampling a volume by a negative or infinite factor goes on with extents of 0 or below: the new volume's allocation then fails with memory errors, an infinite factor makes a volume 0 voxels wide, and a given destination is refused as a dimension mismatch; refused with a clear error by default";
+    FS_962 = "FS-962", "FreeSurfer", true,
+        "doubling a volume's resolution with cubic B-splines (MRIupsample2BSpline) on a volume one row high or one slice deep copies the source's own voxels over the rows (slices) the earlier steps doubled: each output row (slice) gets the source's voxels at the doubled columns, read past the source's extent (other voxels of the source or memory it does not own); corrected: the doubled rows (slices) are kept";
+    FS_963 = "FS-963", "FreeSurfer", false,
+        "halving or doubling a volume's resolution with cubic B-splines (MRIdownsample2BSpline, MRIupsample2BSpline) changes the voxel size of an axis of one voxel, which neither resamples: halving doubles it and moves the voxel's centre by half a source voxel, doubling halves it; kept until measured with the two-dimensional registration that reaches it (rule D)";
+    FS_964 = "FS-964", "FreeSurfer", true,
+        "sampling a B-spline whose degree is not 2 to 9 (one allocated and never computed, as the computation refuses other degrees) on a volume of one voxel, or with a degree above 9, reads interpolation indices never set or writes them past their arrays: memory contents or a crash; refused with a clear error";
+    FS_965 = "FS-965", "FreeSurfer", true,
+        "a histogram whose bin count is taken from the values' range (one bin per unit, asked for with 0 bins or fewer) of values spanning more than 67,108,864 asks for that many bins: gigabytes of memory allocated and filled, the program slow or killed; refused with a clear error";
 }
 
 /// The register entry with ID `id`.

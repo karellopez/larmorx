@@ -54,6 +54,20 @@ http://www.csit.fsu.edu/~burkardt/cpp_src/spline/spline.html, as FreeSurfer 8.2.
   Vilaret; FreeSurfer's acceptance of a NaN knot (FS-103) is an error by default and reproduced
   on request.
 
+EPFL's B-splines and spline pyramids (Biomedical Imaging Group, Ecole polytechnique federale de
+Lausanne), as FreeSurfer 8.2.0's utils/mriBSpline.cpp (Martin Reuter, MGH's notice) follows them
+  The file is based on P. Thevenaz, T. Blu and M. Unser, "Interpolation Revisited", IEEE
+  Transactions on Medical Imaging 19(7), 739-758, 2000, and on EPFL's example code for 2-D images
+  (http://bigwww.epfl.ch/thevenaz/interpolation/: the recursive filter's causal and anticausal
+  initialisations, the poles and weights of the B-splines of degrees 2 to 9); its pyramid filters
+  are Michael Unser's (NIH, BEIP, 1992 and 1994), Patrick Brigger's (NIH, BEIP, 1996) and Daniel
+  Sage's (EPFL, 1999), http://bigwww.epfl.ch/sage/pyramids/. EPFL's example code states no
+  licence; FreeSurfer distributes the file under its own licence.
+  Translated: the file's B-spline coefficients, samplers, transforms and factor-of-two pyramids
+  (crate larmorx-freesurfer-volume, module bspline; its PROVENANCE.md). Modified: translated from
+  C++ to Rust in 2026 by Karel Lopez Vilaret; FreeSurfer's upsampling of a volume one row high
+  or one slice deep (FS-962) is corrected by default and reproduced on request.
+
 Included works
 ==============
 

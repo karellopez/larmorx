@@ -14,6 +14,7 @@
 
 pub mod arith;
 pub mod aseg2vol;
+pub mod bspline;
 pub mod cma;
 pub mod combine;
 pub mod conform;

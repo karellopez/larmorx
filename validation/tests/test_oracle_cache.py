@@ -1337,6 +1337,9 @@ def test_a_shells_report_of_a_signal_masks_its_process_id():
     line = b"/home/u/fsl/bin/bet: line %d: %d Segmentation fault      ${FSLDIR}/bin/bet2 $IN\n"
     a, b, c = line % (399, 1915072), line % (399, 2186484), line % (400, 2186484)
     assert compare.mask(a) == compare.mask(b) != compare.mask(c)
+    # the ID is right-aligned in five columns: a 4- or 5-digit one brings spaces before it
+    padded = b"/home/u/fsl/bin/bet: line 229: %5d Aborted                 (core dumped) flirt\n"
+    assert len({compare.mask(padded % pid) for pid in (4321, 12345, 1915072)}) == 1
 
 
 def test_verify_named_entries_disputed_ones_too(cache, fake, workdir, capsys):

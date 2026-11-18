@@ -18,7 +18,9 @@ def text(p: pathlib.Path, ours: bool) -> str:
         f"{FSL}/bin/standard_space_roi", "standard_space_roi"
     )
     t = re.sub(
-        r"(: line \d+: +)\d+( (?:Aborted|Segmentation fault) +)(?:\(core dumped\) )?", r"\1PID\2", t
+        r"(: line \d+:) +\d+( (?:Aborted|Segmentation fault) +)(?:\(core dumped\) )?",
+        r"\1 PID\2",
+        t,
     )
     if ours:
         t = "".join(ln for ln in t.splitlines(keepends=True) if not ln.startswith("larmorx-nc: "))

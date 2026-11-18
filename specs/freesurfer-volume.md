@@ -1008,13 +1008,20 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   frame 0's first byte of each voxel position (bytes whatever the type: a float volume's row is read as
   bytes, `x` the byte offset; a tensor volume's rows as §6 places them, FS-960). Without `dst`, a clone of `src` (zero voxels, the header). The seed is
   clamped into the volume; a row or slice at or past the height or depth is clamped to `width - 1` by
-  FreeSurfer (FS-316, noted in both modes; by default to `height - 1`, `depth - 1`; under `reproduce`
-  the seed and its box then lie at that row or slice, read and written as §6's direct access places
-  a row or slice past the extent: another voxel of the buffer, FS-289, or outside it, FS-290; a byte
-  written at a place that holds no voxel of `dst` is not stored but is read back at the same
-  coordinates for the rest of the fill, so the fill ends). Every byte of `dst` equal to `fill_val`
+  FreeSurfer (FS-316, noted in both modes; by default to `height - 1`, `depth - 1`). Under `reproduce`
+  the seed then lies at that row or slice: where `width - 1` is inside the extent it is an ordinary
+  seed there; where it is past the extent, the seed's byte is written where §6's direct access places
+  that row or slice (another voxel of the buffer, a later frame's: FS-289; outside the buffer: FS-290,
+  nothing stored, where FreeSurfer crashes, **(observed)** with a row past the height), and nothing is
+  filled from it: the sweeps' box is clamped to the extent on every axis (below), so it holds the last
+  row or slice when the seed is one past it and nothing when it is further, and a voxel's face
+  neighbours are looked at only within the volume, so the seed is never one of them; `npix` is 1
+  (**(observed)** `vrules6`: a 4 x 4 x 2 byte volume of 2 frames from the seed (1, 1, 5) or (1, 1, 2)
+  gives `npix` 1 and frame 1's voxel (1, 1, 1) set; a 2 x 4 x 4 one from (1, 1, 9) has its seed at slice
+  1 and fills all of frame 0). Every byte of `dst` equal to `fill_val`
   becomes `fill_val - 1` (mod 256), the seed becomes `fill_val` (mod 256); then sweeps of a box (first
-  the seed's 3 x 3 x 3 neighbourhood, clamped) set every voxel whose source byte is at least `threshold`,
+  the seed's 3 x 3 x 3 neighbourhood clamped to the extent on each axis: from `max(seed - 1, 0)` to
+  `min(seed + 1, extent - 1)`, empty when the first passes the second) set every voxel whose source byte is at least `threshold`,
   whose `dst` byte is not `fill_val` and that has a face neighbour (within the volume) whose `dst` byte
   is `fill_val`; the box grows by one voxel past each newly filled voxel on its edge (clamped); sweeps
   stop when one fills nothing. `npix` is 1 plus the number filled. `fill_val` outside 0..255 never

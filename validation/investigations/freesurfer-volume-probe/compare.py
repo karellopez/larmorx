@@ -93,7 +93,9 @@ class Batch:
     env: dict[str, str] = field(default_factory=dict)
     never: str = ""  # why the probe's runs are never cached
     guards: bool = True  # False: the plain runs only
-    both: str = ""  # a defect whose correction holds in both modes: a line noting it may differ
+    # the defects (comma-separated) whose correction holds in both modes because FreeSurfer's value
+    # there is memory it never wrote: a line noting one of them may differ in both modes
+    both: str = ""
 
 
 def block(fields: dict[str, str], order: list[str] | None = None) -> list[str]:
@@ -1554,7 +1556,9 @@ class Gen7(Gen6):
                 pts.append(f"{k} {' '.join(map(str, xyz))} {p} {q} {lohi}")
             a = self.wvol(r, shape=s, special=0.05, ct=0.0)
             L.append(f"nbrs {a} {len(pts)} {' '.join(pts)}")
-        return [Batch("vderiv", "vderiv", L)]
+        # FS-322: a gradient's sample the trilinear sampler refuses is a value never written (the
+        # probe's four runs may agree on it by accident of its own stack): a line noting it may differ
+        return [Batch("vderiv", "vderiv", L, both="FS-322")]
 
     def xmat(self, r: random.Random) -> str:
         """A voxel-to-voxel or RAS matrix of the linear transforms: the identity, a scaling, a
@@ -1626,7 +1630,9 @@ class Gen7(Gen6):
             b = self.rvol(r, special=0.1)
             gd = "+gdiag=10000040 " if r.random() < 0.15 else ""
             L.append(f"{gd}rsmat {a} {b}")
-        return [Batch("vlinear", "vlinear", L)]
+        # FS-325: a linear transform's sample before the first that succeeds is a value never written
+        # (the probe's four runs agree on it by accident of its own stack): a line noting it may differ
+        return [Batch("vlinear", "vlinear", L, both="FS-325")]
 
     # -- part 6c (§31) ---------------------------------------------------------------------------
 
@@ -1983,7 +1989,7 @@ def main() -> int:
                 t["defect corrected"] += 1
                 noted.update(ids)
                 continue
-            if b.both and b.both in ids:
+            if b.both and any(d in ids for d in b.both.split(",")):
                 t["defect corrected"] += 1
                 noted.update(ids)
                 continue

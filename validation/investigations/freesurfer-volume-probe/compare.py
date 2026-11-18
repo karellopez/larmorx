@@ -1177,7 +1177,8 @@ class Gen5(Gen4b):
 
 
 class Gen6(Gen5):
-    """Relay 9: fixed cases of the fs.volume clean room's items 22 to 26 (`vrules5`)."""
+    """Relay 9: fixed cases of the fs.volume clean room's items 22 to 26 (`vrules5`) and part 6
+    (§25-32)."""
 
     @staticmethod
     def vrules5() -> list[Batch]:
@@ -1244,6 +1245,123 @@ class Gen6(Gen5):
             L.append(f"bvr 1 {xs(''.join(text))}")
         return [Batch("vrules5", "vrules5", L)]
 
+    # -- part 6 (§25): resolution, planes, fills, resampling by whole factors, changes of type --
+
+    #: float values for fills and thresholds: zeros, halves, the edges of the integer types, 1e10,
+    #: the largest floats, infinities, NaNs (a payload, a signalling one)
+    FILLS = (0.0, -0.0, 0.5, -0.5, 1.0, 2.5, 127.5, 255.0, 255.5, 256.0, -1.0, 32767.5, 65535.0)
+    FILLS += (1e10, -1e10, 2147483520.0, 3.4028234663852886e38)
+
+    def fillv(self, r: random.Random) -> str:
+        if r.random() < 0.25:
+            return f"{r.choice(SPECIAL):08x}"
+        if r.random() < 0.5:
+            return f32(r.choice(self.FILLS))
+        return self.fv(r)
+
+    def rvol(self, r: random.Random, shape: str | None = None, **kw) -> str:
+        """W with its cached matrices recomputed but in a few (a volume without them makes
+        FreeSurfer's header copy crash, FS-252: those lines would hide the rest)."""
+        t = self.wvol(r, shape=shape, **kw).split(" ")
+        t[44] = "2" if r.random() < 0.05 else "1"  # the cache field (README.md, W)
+        return " ".join(t)
+
+    def rdst(self, r: random.Random, shape: str) -> str:
+        k = r.random()
+        if k < 0.4:
+            return "new"
+        if k < 0.55:
+            return "self"
+        return self.rvol(r, shape=shape if k < 0.9 else None, ct=0.0)
+
+    def sdst(self, r: random.Random, s: str, ext: tuple[int, int, int] | None) -> str:
+        """A destination of a resampling: none mostly, else one of the result's extent (when it
+        has one), the source's shape, another type, or the source itself."""
+        k = r.random()
+        v = s.split()
+        if k < 0.55 or (ext is None and k < 0.85):
+            return "new"
+        if ext is not None and k < 0.8:
+            return self.rvol(r, shape=" ".join([*map(str, ext), *v[3:]]), ct=0.0)
+        if ext is not None and k < 0.85:
+            t = r.choice([t for t in SIZED if str(t) != v[3]])
+            return self.rvol(r, shape=" ".join([*map(str, ext), str(t), v[4], "0"]), ct=0.0)
+        if k < 0.95:
+            return self.rvol(r, shape=s, ct=0.0)
+        return "self"
+
+    def vres(self) -> list[Batch]:
+        """§25: MRIsetResolution, MRIvalueFill, MRIfillFG, MRIextractPlane, MRIfillPlane, the
+        up- and downsamplers, MRImeanFrameThresh, MRIlimits, MRIchangeType and MRISeqchangeType."""
+        r = self.rng("vres")
+        L = []
+        for _ in range(60):
+            sizes = " ".join(self.fv(r, 0.3, 4.0) for _ in range(3))
+            L.append(f"setres {self.rvol(r, special=0.1, hdr=0.05)} {sizes}")
+        for _ in range(60):
+            L.append(f"vfill {self.rvol(r, hdr=0.05)} {self.fillv(r)}")
+        for _ in range(120):
+            s = self.vshape(r, types=[0, 0, 0, 0, 1, 3, 4, 10], ext=(1, 5), frames=(1, 2))
+            w, h, d = (int(x) for x in s.split()[:3])
+            seed = [str(r.randint(-1, e)) for e in (w, h, d)]
+            th = r.choice([0, 1, 64, 128, 200, 255, 256, -1, r.randint(0, 255)])
+            fv = r.choice([1, 128, 255, 0, 256, 300, -1, r.randint(0, 255)])
+            L.append(f"fillfg {self.rvol(r, shape=s)} {self.rdst(r, s)} {' '.join(seed)} {th} {fv}")
+        for _ in range(80):
+            s = self.vshape(r, ext=(1, 5), hdr=0.05)
+            o = r.choice([0, 1, 2, 3, -1])
+            w = r.randint(-1, 5)
+            L.append(f"explane {self.rvol(r, shape=s)} {self.rdst(r, s)} {o} {w}")
+        for _ in range(60):
+            s = self.vshape(r, ext=(1, 5))
+            m = self.vshape(r, ext=(1, 5))
+            o = r.choice([0, 1, 2, 3])
+            L.append(
+                f"fillplane {self.rvol(r, shape=m)} {self.rvol(r, shape=s, ct=0.0)} {o} "
+                f"{r.randint(-1, 5)} {r.choice([0, 1, 7, 255, 256, -3, 70000])}"
+            )
+        for _ in range(80):
+            s = self.vshape(r, ext=(1, 4), frames=(1, 2), hdr=0.05)
+            k = r.choice([0, 1, 2])
+            n = r.choice([1, 2, 2, 3, 0, -1])
+            m = 2 if k == 1 else n
+            ext = tuple(m * int(x) for x in s.split()[:3]) if m > 0 else None
+            L.append(f"ups {k} {self.rvol(r, shape=s)} {self.sdst(r, s, ext)} {n}")
+        for _ in range(50):
+            s = self.vshape(r, ext=(1, 5), frames=(1, 2), hdr=0.05)
+            ext = tuple(int(x) // 2 for x in s.split()[:3])
+            d = self.sdst(r, s, ext if min(ext) > 0 else None)
+            L.append(f"dns2 {self.rvol(r, shape=s)} {d}")
+        for _ in range(80):
+            s = self.vshape(r, ext=(1, 5), frames=(1, 2), hdr=0.05)
+            f = [f32(r.choice([1.0, 2.0, 2.0, 3.0, 1.5, 0.5, 4.0, -1.0, 0.0])) for _ in range(3)]
+            if r.random() < 0.05:
+                f[r.randrange(3)] = "7fc00000"
+            fs = [struct.unpack(">f", bytes.fromhex(x))[0] for x in f]
+            ext = None
+            if all(x > 0 for x in fs):
+                ext = tuple(math.ceil(int(e) / x) for e, x in zip(s.split()[:3], fs, strict=True))
+            keep = r.randint(0, 1)
+            # without KeepType the result is of floats
+            s2 = s if keep or r.random() < 0.3 else " ".join([*s.split()[:3], "3", *s.split()[4:]])
+            L.append(f"dnsn {self.rvol(r, shape=s)} {self.sdst(r, s2, ext)} {' '.join(f)} {keep}")
+        for _ in range(50):
+            th = self.fillv(r) if r.random() < 0.6 else f32(r.uniform(-50, 50))
+            L.append(f"mft {self.rvol(r, hdr=0.05)} {r.randint(-1, 3)} {th}")
+        for _ in range(30):
+            L.append(f"lim {self.rvol(r, hdr=0.05)}")
+        types = [0, 1, 2, 3, 4, 10, 0, 1, 3, 4, 7, 9, 6, 8, 5]
+        fl = [0.0, 0.0, 0.01, 0.1, 0.5, 0.999, 1.0, -0.5]
+        for _ in range(160):
+            s = self.vshape(r, ext=(1, 4), frames=(1, 3), hdr=0.03)
+            lo = f32(r.choice(fl)) if r.random() < 0.95 else "7fc00000"
+            hi = f32(r.choice(fl)) if r.random() < 0.95 else "7fc00000"
+            L.append(
+                f"chtype {r.randint(0, 1)} {self.rvol(r, shape=s)} {r.choice(types)} {lo} {hi} "
+                f"{r.choice([0, 0, 1, 2])} {r.randint(0, 1)}"
+            )
+        return [Batch("vres", "vres", L)]
+
 
 GROUPS = [
     "vgblock",
@@ -1264,6 +1382,7 @@ GROUPS = [
     "vrules4",
     "vcma",
     "vrules5",
+    "vres",
 ]
 
 # ---- running ------------------------------------------------------------------------------------

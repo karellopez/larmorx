@@ -3,7 +3,8 @@
 // the volume-geometry text block and its copies, matrices, comparison and printer; the voxel
 // arithmetic; coordinates, orientation, centre of mass, principal components, the running average,
 // the header comparison and dump; the samplers, moves, the head's box and the transform reader; the
-// CMA label tests and segmentation functions), linked against the unit oracle's libutils.a (GCC 8.4.0,
+// CMA label tests and segmentation functions; part 6a: resolution, planes, fills, resampling by whole
+// factors, changes of type), linked against the unit oracle's libutils.a (GCC 8.4.0,
 // FreeSurfer's flags). It holds only calls of FreeSurfer's functions (and of the C library's) by name
 // and the reading and printing of their arguments, results and the structures' fields: no FreeSurfer
 // code. The commands and encodings are in README.md beside this file (the volume, geometry and header
@@ -1246,6 +1247,79 @@ static void call(const std::string &c)
     puti((long long)stats.size());
     for (double v : stats) putd(v);
     subject_folder(false);
+  }
+  // part 6: resolution, planes, fills, resampling by whole factors, changes of type
+  else if (c == "setres") {
+    MRI *a = getw();
+    float x = getf(), y = getf(), z = getf();
+    puti(MRIsetResolution(a, x, y, z));
+    putv(a);
+  }
+  else if (c == "vfill") {
+    MRI *a = getw();
+    puti(MRIvalueFill(a, getf()));
+    putv(a);
+  }
+  else if (c == "fillfg") {
+    MRI *a = getw(), *d = getdst(a);
+    int sx = geti(), sy = geti(), sz = geti(), th = geti(), fv = geti();
+    int npix = -7;
+    MRI *r = MRIfillFG(a, d, sx, sy, sz, th, fv, &npix);
+    puti(npix);
+    putres(r, a, NULL, d);
+  }
+  else if (c == "explane") {
+    MRI *a = getw(), *d = getdst(a);
+    int o = geti(), w = geti();
+    putres(MRIextractPlane(a, d, o, w), a, NULL, d);
+  }
+  else if (c == "fillplane") {
+    MRI *mask = getw(), *d = getw();
+    int o = geti(), w = geti(), fv = geti();
+    putres(MRIfillPlane(mask, d, o, w, fv), mask, NULL, d);
+  }
+  else if (c == "ups") {
+    int k = geti();  // 0 MRIupsampleN, 1 MRIupsample2, 2 MRIupsampleNConserve
+    MRI *a = getw(), *d = getdst(a);
+    int n = geti();
+    MRI *r = k == 0 ? MRIupsampleN(a, d, n) : k == 1 ? MRIupsample2(a, d) : MRIupsampleNConserve(a, d, n);
+    putres(r, a, NULL, d);
+  }
+  else if (c == "dns2") {
+    MRI *a = getw(), *d = getdst(a);
+    putres(MRIdownsample2(a, d), a, NULL, d);
+  }
+  else if (c == "dnsn") {
+    MRI *a = getw(), *d = getdst(a);
+    float fc = getf(), fr = getf(), fs = getf();
+    int keep = geti();
+    putres(MRIdownsampleN(a, d, fc, fr, fs, keep), a, NULL, d);
+  }
+  else if (c == "mft") {
+    MRI *a = getw();
+    int f = geti();
+    putd(MRImeanFrameThresh(a, f, getf()));
+  }
+  else if (c == "lim") {
+    MRI *a = getw();
+    float lo = UNSET, hi = UNSET;
+    puti(MRIlimits(a, &lo, &hi));
+    putf(lo);
+    putf(hi);
+  }
+  else if (c == "chtype") {
+    int seq = geti();  // 0 MRIchangeType, 1 MRISeqchangeType
+    MRI *a = getw();
+    int t = geti();
+    float lo = getf(), hi = getf();
+    int ns = geti();
+    if (geti())
+      setenv("FS_FORCE_BIN_CHECK", "1", 1);
+    else
+      unsetenv("FS_FORCE_BIN_CHECK");
+    MRI *r = seq ? MRISeqchangeType(a, t, lo, hi, ns) : MRIchangeType(a, t, lo, hi, ns);
+    putres(r, a, NULL, NULL);
+    if (r != a) putv(a);
   }
   else
     bad("unknown command");

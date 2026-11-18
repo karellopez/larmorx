@@ -630,6 +630,10 @@ fn prelude() -> Vec<String> {
         with(&["-f", "0", "1", "2", "-nt"]),
         with(&["-T", "x.lta", "--like", "lk.mgz", "-ini", "4", "--slice-reverse", "--scale", "2"]),
         with(&["-iid", "3", "4", "0", "-ojd", "0", "0", "0"]),
+        // the NaNs of the direction's length: two NaN squares, a NaN from infinities
+        with(&["-iid", "nan", "-nan", "1", "-ijd", "-nan", "nan", "2", "-ikd", "inf", "0", "0"]),
+        with(&["-oid", "1", "nan", "-nan", "-ojd", "0", "-inf", "inf", "-okd", "-nan", "-nan", "3"]),
+        with(&["--fwhm", "-nan", "-ut", "nan"]),
         with(&["-io", "lia", "-oo", "LLA"]),
         with(&["--out_matrix", "-ti", "-onk", "7", "--in_like", "x.mgz", "-rl", "y.mgz"]),
     ];

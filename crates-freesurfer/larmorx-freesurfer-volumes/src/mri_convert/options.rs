@@ -45,6 +45,7 @@ use larmorx_freesurfer_core::matrix::Matrix;
 use larmorx_freesurfer_core::matrix_io::matrix_read_txt;
 use larmorx_freesurfer_core::matrix_ops::matrix_print;
 use larmorx_freesurfer_core::run::Environment;
+use larmorx_freesurfer_core::sse;
 use larmorx_freesurfer_core::utils::{file_exists, str_lower};
 use larmorx_freesurfer_core::version::{get_all_info, handle_version_option};
 use larmorx_freesurfer_io::cfile::CFile;
@@ -696,9 +697,9 @@ fn fits(g: &mut Globals, what: &str, s: &str, cap: usize) {
     }
 }
 
-/// `--in_i_direction` and its kin: three floats, normalised when their length is not 1 (in
-/// `float`, the square root of the sum of the squares in `double`); a zero length ends the
-/// program.
+/// `--in_i_direction` and its kin: three floats, normalised when their length is not 1 (the
+/// square root of the sum of the squares, all in `float`, with the official build's NaNs); a zero
+/// length ends the program.
 fn direction(
     g: &Globals,
     r: &mut Run,
@@ -708,7 +709,9 @@ fn direction(
     stderr_name: &str,
 ) -> Result<[f32; 3], Fatal> {
     let mut d = args.three(g, r, i)?;
-    let magnitude = (f64::from(d[0] * d[0] + d[1] * d[1] + d[2] * d[2])).sqrt() as f32;
+    // `sqrt` of the `float` sum is C++'s `float` overload; the NaNs as the official build makes them
+    let sum = sse::add(sse::add(sse::mul(d[0], d[0]), sse::mul(d[1], d[1])), sse::mul(d[2], d[2]));
+    let magnitude = sse::sqrt(sum);
     if magnitude == 0.0 {
         return Err(fail_usage(
             g,
@@ -731,7 +734,7 @@ fn direction(
             gf(d[2])
         );
         for x in &mut d {
-            *x /= magnitude;
+            *x = sse::div(*x, magnitude);
         }
         let _ = writeln!(r.out, "({}, {}, {})", gf(d[0]), gf(d[1]), gf(d[2]));
     }
@@ -1093,7 +1096,7 @@ pub fn parse_options(g: &mut Globals, r: &mut Run, argv: &[String]) -> Result<Op
             }
             "--fwhm" => {
                 o.fwhm = args.float(g, r, &mut i)?;
-                o.gstd = (f64::from(o.fwhm) / sqrt_log_256()) as f32;
+                o.gstd = sse::div64(f64::from(o.fwhm), sqrt_log_256()) as f32;
                 let _ = writeln!(r.out, "fwhm = {}, gstd = {}", gf(o.fwhm), gf(o.gstd));
             }
             "--reduce" => {

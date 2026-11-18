@@ -797,7 +797,10 @@ Source: `utils/mrihisto.cpp` (the ten reached functions: `MRIhistogramRegion` 10
 (7264), `MRIshiftDim` (7338), `MRIcropToFoV` (7480), `MRIcropAroundCRS` (7641), `MRIcropAroundRAS` (7763), `MRIsegBorder`
 (8072).
 - `MRIsegStatsRobust` repeats `MRIsegStats`' arithmetic (§18's operand orders: `sum2 = val * val + sum2`, `2 * mean` as
-  `mean + mean`); `compare_floats` (utils.cpp 1197) returns 0 for NaNs.
+  `mean + mean`); `compare_floats` (utils.cpp 1197) returns 0 for NaNs. Its `*min = val; *max = val;` of the `double`
+  `val = vlist[k]` store the float itself (GCC drops the two conversions): a signalling NaN in the kept values stays one
+  in `min` and `max` (relay 38's seed-7 run met it, `ssrob`: official `7fa12345` where the port, widening and narrowing
+  with SSE's quieting, gave `7fe12345`; fixed: the port stores the float).
 - `MRIzconcat`, `MRIapplyEdits`, `MRIshiftDim`, `MRIcropAroundCRS` pass voxels through `double v = MRIgetVoxVal(..);
   MRIsetVoxVal(.., v)`: GCC drops the conversions (a signalling NaN keeps its bits; the brief's "a float stored through a
   double"): the port passes the `float`.

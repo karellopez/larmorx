@@ -1241,7 +1241,9 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     t.push("1".into());
                     let mut o = like(&mut g, s);
                     if g.chance(2) {
-                        let e = |n: i64, f: f32| ((n as f32 / f).ceil() as i64).max(0);
+                        // the factors' extents (a factor of 0 or 1e-30 makes one beyond any
+                        // destination: 64 then)
+                        let e = |n: i64, f: f32| ((n as f32 / f).ceil() as i64).clamp(0, 64);
                         o.w = e(s.w, fs[0]);
                         o.h = e(s.h, fs[1]);
                         o.d = e(s.d, fs[2]);

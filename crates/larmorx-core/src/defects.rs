@@ -2594,9 +2594,9 @@ defects! {
     FS_318 = "FS-318", "FreeSurfer", true,
         "the mean of a frame's voxels not below a threshold is the mean of frame 0's whatever the frame asked for";
     FS_319 = "FS-319", "FreeSurfer", true,
-        "upsampling with the sum conserved of a volume whose change to floats fails (a robust range that is empty after the histogram) goes on with no volume and crashes";
+        "upsampling with the sum conserved goes on with no volume when its change to floats fails, and would crash; no input makes that change fail (its clipping fractions are 0), so both implementations keep only a guard";
     FS_320 = "FS-320", "FreeSurfer", true,
-        "trilinear splatting of a value into an integer volume (MRIinterpolateIntoVolume) adds each corner's rounded share to the voxel in the voxel's type: a sum beyond the type's range wraps around (bytes, shorts, 32-bit integers)";
+        "trilinear splatting of a value into an integer volume (MRIinterpolateIntoVolume) adds each corner's rounded share to the voxel in the voxel's type: a sum beyond the type's range wraps around (bytes, shorts, unsigned shorts, 32-bit integers)";
     FS_321 = "FS-321", "FreeSurfer", true,
         "trilinear splatting of a value into a volume of 64-bit integers (long) adds into 32-bit integers at the voxel's index: it changes halves of other voxels";
     FS_322 = "FS-322", "FreeSurfer", true,
@@ -2604,7 +2604,7 @@ defects! {
     FS_323 = "FS-323", "FreeSurfer", true,
         "the neighbour counts of a voxel more than 500 voxels outside the volume read its boundary index tables past their ends: memory contents";
     FS_324 = "FS-324", "FreeSurfer", true,
-        "the directional derivative at a scale (MRIsampleVolumeDerivativeScale) with an infinite scale, or one whose double overflows, never returns";
+        "the directional derivative at a scale (MRIsampleVolumeDerivativeScale) with an infinite scale, or one so large that twice it overflows (2^1023 or more), never returns";
     FS_325 = "FS-325", "FreeSurfer", true,
         "the linear transform of a volume (MRIlinearTransformInterp) stores, where a sample fails (sinc sampling, a type the trilinear sampler refuses), the last sample that succeeded, and before the first a value never written: memory contents";
     FS_326 = "FS-326", "FreeSurfer", true,

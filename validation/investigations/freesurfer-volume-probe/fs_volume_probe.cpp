@@ -4,7 +4,9 @@
 // arithmetic; coordinates, orientation, centre of mass, principal components, the running average,
 // the header comparison and dump; the samplers, moves, the head's box and the transform reader; the
 // CMA label tests and segmentation functions; part 6a: resolution, planes, fills, resampling by whole
-// factors, changes of type), linked against the unit oracle's libutils.a (GCC 8.4.0,
+// factors, changes of type; part 6b: frame-range samplers, the trilinear kernel and splatting,
+// derivatives, gradients, neighbour counts, linear transforms; part 6c: resampling onto a template,
+// replacing a value), linked against the unit oracle's libutils.a (GCC 8.4.0,
 // FreeSurfer's flags). It holds only calls of FreeSurfer's functions (and of the C library's) by name
 // and the reading and printing of their arguments, results and the structures' fields: no FreeSurfer
 // code. The commands and encodings are in README.md beside this file (the volume, geometry and header
@@ -1320,6 +1322,172 @@ static void call(const std::string &c)
     MRI *r = seq ? MRISeqchangeType(a, t, lo, hi, ns) : MRIchangeType(a, t, lo, hi, ns);
     putres(r, a, NULL, NULL);
     if (r != a) putv(a);
+  }
+  // part 6b: frame-range samplers, the trilinear kernel and splatting; derivatives, gradients and
+  // neighbour counts; linear transforms of a volume; part 6c: resampling onto a template, replacing
+  // a value
+  else if (c == "splat") {
+    MRI *a = getw();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int k = geti();
+      double x = getd(), y = getd(), z = getd();
+      int f = geti();
+      double v = getd();
+      puti(k ? MRIinterpolateIntoVolumeFrame(a, x, y, z, f, v) : MRIinterpolateIntoVolume(a, x, y, z, v));
+    }
+    putv(a);
+  }
+  else if (c == "sseq" || c == "sxyz") {
+    MRI *a = getw();
+    a->outside_val = getd();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      // the values' array has SLACK unset slots before index 0 and after the last index printed
+      const int SLACK = 8;
+      int r, lo, cnt;
+      std::vector<float> buf;
+      if (c == "sseq") {
+        double x = getd(), y = getd(), z = getd();
+        int first = geti(), last = geti(), type = geti();
+        lo = first;
+        cnt = last >= first ? last - first + 1 : 0;
+        buf.assign((size_t)(SLACK + (last > 0 ? last : 0) + 1 + SLACK), UNSET);
+        float *v = buf.data() + SLACK;
+        r = type == -1 ? MRIsampleSeqVolume(a, x, y, z, v, first, last)
+                       : MRIsampleSeqVolumeType(a, x, y, z, v, first, last, type);
+        fflush(stdout);
+        puti(r);
+        for (int f = 0; f < cnt; f++) putf(v[lo + f]);
+      }
+      else {
+        int x = geti(), y = geti(), z = geti(), begin = geti(), end = geti(), k = geti();
+        cnt = end > begin ? end - begin : 0;
+        buf.assign((size_t)(2 * SLACK + cnt), UNSET);
+        float *v = buf.data() + SLACK;
+        r = k ? MRIsampleVolumeFrame_xyzInt_nRange_floats(a, x, y, z, begin, end, v)
+              : MRIsampleVolumeFrameType_xyzInt_nRange_SAMPLE_NEAREST_floats(a, x, y, z, begin, end, v);
+        puti(r);
+        for (int f = 0; f < cnt; f++) putf(v[f]);
+      }
+    }
+  }
+  else if (c == "tkern") {
+    MRI *a = getw();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd(), y = getd(), z = getd();
+      bool given = geti() == 0;
+      double k[8];
+      for (double &w : k) w = UNSETD;
+      double *r = MRItrilinKernel(a, x, y, z, given ? k : NULL);
+      out(r == k ? "given" : "new");
+      for (int j = 0; j < 8; j++) putd(r[j]);
+    }
+  }
+  else if (c == "deriv") {
+    MRI *a = getw();
+    MRIsetSampleVolumeDerivativeSign(getd());
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int k = geti();
+      double x = getd(), y = getd(), z = getd(), dx = getd(), dy = getd(), dz = getd(), sigma = getd();
+      double mag = UNSETD;
+      puti(k ? MRIsampleVolumeDerivativeScale(a, x, y, z, dx, dy, dz, &mag, sigma)
+             : MRIsampleVolumeDerivative(a, x, y, z, dx, dy, dz, &mag));
+      putd(mag);
+    }
+  }
+  else if (c == "grad") {
+    MRI *a = getw();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int k = geti();
+      double x = getd(), y = getd(), z = getd();
+      int f = geti();
+      double gx = UNSETD, gy = UNSETD, gz = UNSETD;
+      puti(k ? MRIsampleVolumeGradientFrame(a, x, y, z, &gx, &gy, &gz, f)
+             : MRIsampleVolumeGradient(a, x, y, z, &gx, &gy, &gz));
+      putd(gx);
+      putd(gy);
+      putd(gz);
+    }
+  }
+  else if (c == "nbrs") {
+    MRI *a = getw();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int k = geti(), x = geti(), y = geti(), z = geti(), p = geti(), q = geti();
+      float lo = getf(), hi = getf();
+      int r;
+      if (k == 0) r = MRIneighborsOn(a, x, y, z, p);
+      else if (k == 1) r = MRIneighborsOn3x3(a, x, y, z, p);
+      else if (k == 2) r = MRIneighborsInWindow(a, x, y, z, p, q);
+      else if (k == 3) r = MRIneighbors(a, x, y, z, p);
+      else if (k == 4) r = MRIneighborsInRange(a, x, y, z, p, lo, hi);
+      else if (k == 5) r = MRIneighbors3x3(a, x, y, z, p);
+      else if (k == 6) r = MRIneighborsOff(a, x, y, z, p);
+      else if (k == 7) r = MRIneighborsOff3x3(a, x, y, z, p);
+      else bad("unknown neighbour count");
+      puti(r);
+    }
+  }
+  else if (c == "setvals") {
+    MRI *a = getw();
+    puti(MRIsetValues(a, getf()));
+    putv(a);
+  }
+  else if (c == "rasvox") {
+    MRI *a = getw();
+    MRI *b = take("null") ? NULL : getw();
+    MATRIX *m = getm();
+    putm(MRIrasXformToVoxelXform(a, b, m, NULL));
+  }
+  else if (c == "lxf") {
+    int k = geti();
+    MRI *a = getw();
+    a->outside_val = getd();
+    MRI *d = getdst(a);
+    MATRIX *m = getm();
+    int interp = geti();
+    MRI *r;
+    if (k == 0) r = MRIlinearTransformInterp(a, d, m, interp);
+    else if (k == 1) r = MRIlinearTransform(a, d, m);
+    else if (k == 2) r = MRIinverseLinearTransform(a, d, m);
+    else if (k == 3) r = MRIapplyRASlinearTransformInterp(a, d, m, interp);
+    else if (k == 4) r = MRIapplyRASlinearTransform(a, d, m);
+    else if (k == 5) r = MRIapplyRASinverseLinearTransform(a, d, m);
+    else bad("unknown transform function");
+    fflush(stdout);
+    putres(r, a, NULL, d);
+  }
+  else if (c == "rsmat") {
+    MRI *a = getw(), *b = getw();
+    MATRIX *m = MRIgetResampleMatrix(a, b);
+    fflush(stdout);
+    putm(m);
+  }
+  else if (c == "rsfill") {
+    MRI *a = getw(), *b = getw();
+    int t = geti();
+    float fv = getf();
+    bool plain = geti() != 0;
+    MRI *r = plain ? MRIresample(a, b, t) : MRIresampleFill(a, b, t, fv);
+    fflush(stdout);
+    putres(r, a, b, NULL);
+  }
+  else if (c == "repval") {
+    MRI *a = getw(), *d = getdst(a);
+    MRI *r;
+    if (geti()) {
+      int from = geti(), to = geti();
+      r = MRIreplaceValuesUchar(a, d, (BUFTYPE)from, (BUFTYPE)to);
+    }
+    else {
+      float from = getf(), to = getf();
+      r = MRIreplaceValues(a, d, from, to);
+    }
+    putres(r, a, NULL, d);
   }
   else
     bad("unknown command");

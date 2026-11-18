@@ -1364,6 +1364,346 @@ class Gen6(Gen5):
         return [Batch("vres", "vres", L)]
 
 
+class Gen7(Gen6):
+    """Relay 10: fixed cases of the fs.volume clean room's items 30 to 37 (`vrules6`), part 6b
+    (§27-29: `vframes`, `vderiv`, `vlinear`) and part 6c (§31: `vresamp`)."""
+
+    @staticmethod
+    def vrules6() -> list[Batch]:
+        """§25's fixed cases: MRIchangeType's histogram ends (a float volume 254.5, 1.4e-45, 3.25,
+        2^32 to bytes with f_low 1, 2, 0.75 and 0, and with two frames), MRIdownsample2 into the
+        source, a new and a given destination, MRIfillFG from seeds past the depth (FS-316: a later
+        frame's voxel, the seed inside, the end of the slices) and past the height, MRIextractPlane
+        into the source in every orientation."""
+        L = []
+        for lo in (1.0, 2.0, 0.75, 0.0):
+            L.append(f"chtype 0 {fixed_w(4, 1, 1, 3, fill='t8')} 0 {f32(lo)} {f32(0.0)} 0 0")
+        L.append(f"chtype 0 {fixed_w(4, 1, 1, 3, f=2, fill='t8')} 0 {f32(1.0)} {f32(0.0)} 0 0")
+        src = fixed_w(4, 2, 2, 0, fill=60)
+        L += [f"dns2 {src} self", f"dns2 {src} new", f"dns2 {src} {fixed_w(2, 1, 1, 0, fill=9)}"]
+        L.append(f"fillfg {fixed_w(4, 4, 2, 0, f=2, fill=60)} new 1 1 5 0 255")
+        L.append(f"fillfg {fixed_w(4, 4, 2, 0, f=2, fill=60)} new 1 1 2 0 255")
+        L.append(f"fillfg {fixed_w(2, 4, 4, 0, f=2, fill=60)} new 1 1 9 0 255")
+        L.append(f"fillfg {fixed_w(4, 2, 2, 0, fill=60)} new 1 5 0 0 255")
+        for o in (0, 1, 2, 3):
+            L.append(f"explane {fixed_w(3, 3, 3, 0, fill=17)} self {o} 1")
+        return [Batch("vrules6", "vrules6", L)]
+
+    # -- part 6b (§27-29) --------------------------------------------------------------------------
+
+    #: values splatted: NaNs (a payload, a signalling one), infinities, 1e10, 70000, ordinary ones
+    SPLAT = (0.0, -0.0, 1.0, -1.0, 2.5, 100.0, 255.0, 70000.0, -70000.0, 1e10, 3e9)
+
+    def splatv(self, r: random.Random) -> str:
+        if r.random() < 0.15:
+            return f"{r.choice(DSPECIAL):016x}"
+        if r.random() < 0.6:
+            return f64(r.choice(self.SPLAT))
+        return self.dv(r)
+
+    def vframes(self) -> list[Batch]:
+        """§27: splatting (every type, frames 0 to one past the volume's), the frame-range
+        samplers (MRIsampleSeqVolume, MRIsampleSeqVolumeType with codes -1 to 7, frame ranges
+        empty, inside and past the volume's), the whole-point frame-range samplers, the trilinear
+        kernel (a given array and none)."""
+        r = self.rng("vframes")
+        L = []
+        outs = [f64(x) for x in (0.0, -5.5, 1e300)] + [f"{DSPECIAL[4]:016x}", f"{DSPECIAL[6]:016x}"]
+        for _ in range(140):
+            types = [*NUMERIC, 6, 7, 9, 5] if r.random() < 0.15 else NUMERIC
+            s = self.vshape(r, types=types, ext=(1, 4), frames=(1, 2), hdr=0.02)
+            ext = min(int(x) for x in s.split()[:3])
+            nf = int(s.split()[4])
+            # a frame past the volume's reads and writes memory the program does not own (it may
+            # crash): such a point has a line of its own
+            past = r.random() < 0.1
+            pts = []
+            for _ in range(1 if past else r.randint(1, 4)):
+                xyz = " ".join(self.coord(r, max(ext, 1)) for _ in range(3))
+                f = nf if past else r.choice([0, 0, nf - 1])
+                pts.append(f"{r.randint(0, 1)} {xyz} {f} {self.splatv(r)}")
+            L.append(
+                f"splat {self.wvol(r, shape=s, special=0.1, ct=0.0)} {len(pts)} {' '.join(pts)}"
+            )
+        for _ in range(120):
+            types = [*NUMERIC, 6, 7, 9] if r.random() < 0.15 else NUMERIC
+            s = self.vshape(r, types=types, ext=(1, 4), frames=(1, 3), hdr=0.02)
+            ext = min(int(x) for x in s.split()[:3])
+            nf = int(s.split()[4])
+            past = r.random() < 0.15
+            pts = []
+            for _ in range(1 if past else r.randint(1, 3)):
+                xyz = " ".join(self.coord(r, max(ext, 1)) for _ in range(3))
+                if past:
+                    first = r.choice([-1, -2, 0, nf - 1, nf])
+                    last = r.choice([nf, first]) if first >= 0 else r.choice([first, 0])
+                else:
+                    first = r.randint(0, nf - 1)
+                    last = r.choice([first, first, nf - 1, first - 1])
+                ty = r.choice([-1, -1, 0, 1, 1, 2, 3, 4, 6, 7])
+                pts.append(f"{xyz} {first} {last} {ty}")
+            a = self.wvol(r, shape=s, special=0.1, ct=0.0)
+            L.append(f"sseq {a} {r.choice(outs)} {len(pts)} {' '.join(pts)}")
+        # the cubic B-spline code ends the program: a few lines of one point
+        for _ in range(4):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 3), frames=(1, 2))
+            a = self.wvol(r, shape=s, ct=0.0)
+            L.append(f"sseq {a} {f64(0.0)} 1 {f64(0.5)} {f64(0.5)} {f64(0.5)} 0 0 5")
+        for _ in range(100):
+            types = [*NUMERIC, 6, 7, 9] if r.random() < 0.15 else NUMERIC
+            s = self.vshape(r, types=types, ext=(1, 4), frames=(1, 3), hdr=0.02)
+            w, h, d = (int(x) for x in s.split()[:3])
+            nf = int(s.split()[4])
+            past = r.random() < 0.15
+            pts = []
+            for _ in range(1 if past else r.randint(1, 4)):
+                xyz = [r.randint(-2, e + 1) for e in (w, h, d)]
+                if past:
+                    b, e = r.choice([(-1, nf), (0, nf + 1), (-1, 0), (nf, nf + 1)])
+                else:
+                    b = r.randint(0, nf)
+                    e = r.choice([nf, nf, b, b + 1, b - 1]) if b < nf else r.choice([nf, b - 1])
+                pts.append(f"{' '.join(map(str, xyz))} {b} {e} {r.randint(0, 1)}")
+            a = self.wvol(r, shape=s, special=0.1, ct=0.0)
+            L.append(f"sxyz {a} {r.choice(outs)} {len(pts)} {' '.join(pts)}")
+        for _ in range(40):
+            s = self.vshape(r, ext=(1, 4), frames=(1, 2), hdr=0.1)
+            ext = min(int(x) for x in s.split()[:3])
+            pts = [
+                f"{' '.join(self.coord(r, max(ext, 1)) for _ in range(3))} {r.randint(0, 1)}"
+                for _ in range(r.randint(1, 4))
+            ]
+            L.append(f"tkern {self.wvol(r, shape=s, ct=0.0)} {len(pts)} {' '.join(pts)}")
+        return [Batch("vframes", "vframes", L)]
+
+    def vderiv(self) -> list[Batch]:
+        """§28: the directional derivatives (sigma 0, tiny, NaN, negative, ordinary, 1e300;
+        directions with NaN and infinities; the derivative sign 1, -1, 0.5, NaN), the gradients
+        (frames past the volume's), the eight neighbour counts (coordinates inside and up to three
+        outside, windows of -3 to 7)."""
+        r = self.rng("vderiv")
+        L = []
+        signs = [f64(x) for x in (1.0, 1.0, -1.0, 0.5)] + [f"{DSPECIAL[4]:016x}"]
+        sigmas = [0.0, 1e-9, -1.0, 0.5, 1.0, 2.0, 3.7, 0.25, 1.2, 1e300, -1e300]
+        for _ in range(140):
+            types = [*NUMERIC, 6, 7, 9] if r.random() < 0.1 else NUMERIC
+            s = self.vshape(r, types=types, ext=(1, 5), frames=(1, 2), hdr=0.02)
+            ext = min(int(x) for x in s.split()[:3])
+            pts = []
+            for _ in range(r.randint(1, 3)):
+                xyz = " ".join(self.coord(r, max(ext, 1)) for _ in range(3))
+                if r.random() < 0.1:
+                    dirs = " ".join(f"{r.choice(DSPECIAL):016x}" for _ in range(3))
+                else:
+                    dirs = " ".join(
+                        f64(r.choice([0.0, 1.0, -1.0, r.uniform(-1, 1)])) for _ in range(3)
+                    )
+                if r.random() < 0.08:
+                    sg = f"{r.choice(DSPECIAL[:2] + DSPECIAL[3:6]):016x}"
+                else:
+                    sg = f64(r.choice(sigmas))
+                pts.append(f"{r.randint(0, 1)} {xyz} {dirs} {sg}")
+            a = self.wvol(r, shape=s, special=0.05, ct=0.0)
+            L.append(f"deriv {a} {r.choice(signs)} {len(pts)} {' '.join(pts)}")
+        # FS-324: a sigma whose doubling is +infinity (FreeSurfer never returns): two lines alone
+        for sg in (f64(1e308), "7ff0000000000000"):
+            a = fixed_w(3, 3, 3, 3, fill="t5")
+            pts = f"1 {f64(1.5)} {f64(1.5)} {f64(1.5)} {f64(1.0)} {f64(0.0)} {f64(0.0)} {sg}"
+            L.append(f"@3 deriv {a} {f64(1.0)} 1 {pts}")
+        for _ in range(100):
+            types = [*NUMERIC, 6, 7, 9] if r.random() < 0.1 else NUMERIC
+            s = self.vshape(r, types=types, ext=(1, 5), frames=(1, 2), hdr=0.02)
+            ext = min(int(x) for x in s.split()[:3])
+            nf = int(s.split()[4])
+            pts = [
+                f"{r.randint(0, 1)} {' '.join(self.coord(r, max(ext, 1)) for _ in range(3))} "
+                f"{r.choice([0, 0, nf - 1, nf])}"
+                for _ in range(r.randint(1, 3))
+            ]
+            a = self.wvol(r, shape=s, special=0.1, ct=0.0)
+            L.append(f"grad {a} {len(pts)} {' '.join(pts)}")
+        for _ in range(140):
+            types = [0, 0, 0, 1, 3, 4, 10] if r.random() < 0.9 else [2, 6, 9]
+            s = self.vshape(r, types=types, ext=(1, 5), frames=(1, 2), hdr=0.02)
+            w, h, d = (int(x) for x in s.split()[:3])
+            nf = int(s.split()[4])
+            # MRIneighborsOff reads at the plain coordinates: a row or slice outside the volume
+            # reads memory the program does not own (it may crash), so such a point has a line of
+            # its own
+            off_edge = r.random() < 0.12
+            pts = []
+            for _ in range(1 if off_edge else r.randint(1, 4)):
+                k = 6 if off_edge else r.choice([0, 1, 2, 3, 4, 5, 6, 7])
+                if k == 6 and not off_edge:
+                    xyz = [r.randint(1, e - 2) if e > 2 else r.randint(0, e - 1) for e in (w, h, d)]
+                    if (w, h, d) != (w, max(h, 3), max(d, 3)):
+                        k = 7
+                else:
+                    xyz = [
+                        r.randint(-1, e) if r.random() < 0.85 else r.randint(-3, e + 2)
+                        for e in (w, h, d)
+                    ]
+                if k == 2:
+                    p, q = r.choice([1, 3, 3, 5, 7, 0, -3, 2]), r.choice([0, 1, 5, 200, -1])
+                elif k == 4:
+                    p, q = r.choice([0, 0, nf - 1, nf]), 0
+                else:
+                    p, q = r.choice([0, 1, 5, 50, 128, 200, 255, 256, -1]), 0
+                lo, hi = sorted([r.uniform(-50, 260), r.uniform(-50, 260)])
+                lohi = f"{f32(lo)} {f32(hi)}" if r.random() < 0.9 else f"{QNAN} {f32(hi)}"
+                pts.append(f"{k} {' '.join(map(str, xyz))} {p} {q} {lohi}")
+            a = self.wvol(r, shape=s, special=0.05, ct=0.0)
+            L.append(f"nbrs {a} {len(pts)} {' '.join(pts)}")
+        return [Batch("vderiv", "vderiv", L)]
+
+    def xmat(self, r: random.Random) -> str:
+        """A voxel-to-voxel or RAS matrix of the linear transforms: the identity, a scaling, a
+        shift, a rotation, a general affine, a singular one, one with a NaN, another size, none."""
+        k = r.random()
+        one, zero = f32(1.0), f32(0.0)
+        if k < 0.12:
+            return "4 4 " + " ".join(one if i % 5 == 0 else zero for i in range(16))
+        if k < 0.24:
+            sc = [r.choice([0.5, 2.0, 1.5, -1.0, 1.0]) for _ in range(3)]
+            v = [zero] * 16
+            for i in range(3):
+                v[5 * i] = f32(sc[i])
+                v[4 * i + 3] = f32(r.choice([0.0, 0.5, -1.0, 1.25]))
+            v[15] = one
+            return "4 4 " + " ".join(v)
+        if k < 0.34:
+            v = [zero] * 16
+            v[0], v[1], v[4], v[5] = one, f32(-1.0), one, one
+            v[10], v[15] = one, one
+            v[3] = f32(0.5)
+            return "4 4 " + " ".join(v)
+        if k < 0.78:
+            return self.affine(r, special=0.05)
+        if k < 0.86:
+            v = [zero] * 16
+            v[0], v[5], v[15] = one, one, one
+            return "4 4 " + " ".join(v)
+        if k < 0.92:
+            return self.mat(r, 4, 4, special=0.3)
+        if k < 0.96:
+            return self.mat(r, r.choice([3, 4]), r.choice([3, 4, 1]))
+        return "null"
+
+    def vlinear(self) -> list[Batch]:
+        """§29: MRIsetValues, MRIrasXformToVoxelXform, the six linear transform functions (no, a
+        given, another-shaped or the source as destination; methods 0 to 4 and 7; the outside
+        value 0, 5, 1e-9 or NaN), MRIgetResampleMatrix (with and without the diagnostic bits)."""
+        r = self.rng("vlinear")
+        L = []
+        for _ in range(40):
+            L.append(f"setvals {self.rvol(r, hdr=0.05)} {self.fillv(r)}")
+        for _ in range(60):
+            a = self.rvol(r, special=0.1)
+            b = "null" if r.random() < 0.3 else self.rvol(r, special=0.1)
+            m = self.xmat(r) if r.random() < 0.95 else self.mat(r, 3, 3)
+            L.append(f"rasvox {a} {b} {m}")
+        outs = [f64(0.0)] * 6 + [f64(5.0), f64(1e-9), f"{DSPECIAL[4]:016x}", f64(-2.5)]
+        for _ in range(200):
+            k = r.choice([0, 0, 1, 2, 3, 3, 4, 5])
+            types = [*NUMERIC, 6, 7] if r.random() < 0.1 else NUMERIC
+            s = self.vshape(r, types=types, ext=(1, 4), frames=(1, 2), hdr=0.02)
+            q = r.random()
+            if q < 0.5:
+                d = "new"
+            elif q < 0.75:
+                d = self.rvol(r, shape=s, ct=0.0)
+            elif q < 0.9:
+                d = self.rvol(
+                    r, shape=self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 2)), ct=0.0
+                )
+            else:
+                d = "self"
+            interp = r.choice([0, 1, 1, 2, 3, 4, 7])
+            a = self.rvol(r, shape=s, special=0.05)
+            L.append(f"lxf {k} {a} {r.choice(outs)} {d} {self.xmat(r)} {interp}")
+        for _ in range(60):
+            a = self.rvol(r, special=0.1)
+            b = self.rvol(r, special=0.1)
+            gd = "+gdiag=10000040 " if r.random() < 0.15 else ""
+            L.append(f"{gd}rsmat {a} {b}")
+        return [Batch("vlinear", "vlinear", L)]
+
+    # -- part 6c (§31) ---------------------------------------------------------------------------
+
+    def tmpl(self, r: random.Random, src: str) -> str:
+        """A template on the source's grid: its voxels scaled by 1, 2, 0.5 or 1.5 (the extent
+        divided to keep the field of view), its centre moved, mostly a good RAS."""
+        t = src.split(" ")
+        sc = r.choice([1.0, 1.0, 2.0, 0.5, 1.5])
+        for i in range(3):
+            n = max(1, round(int(t[i]) / sc))
+            t[i] = str(min(n, 8))
+            size = struct.unpack(">f", bytes.fromhex(t[7 + i]))[0]
+            if size == size and abs(size) < 1e30:
+                t[7 + i] = f32(size * sc)
+        for i in range(3):
+            c = struct.unpack(">f", bytes.fromhex(t[20 + i]))[0]
+            if c == c and abs(c) < 1e30:
+                t[20 + i] = f32(c + r.choice([0.0, 0.0, 0.5, -1.0, 2.25]))
+        t[3] = str(r.choice([0, 0, 3, 4, 1, int(t[3])]))
+        t[10] = "1" if r.random() < 0.85 else "0"
+        t[4] = str(r.randint(1, 2))
+        t[5] = "0"
+        t[6] = str(r.randint(0, 255))
+        return " ".join(t)
+
+    def vresamp(self) -> list[Batch]:
+        """§31: MRIresample and MRIresampleFill (types 0 to 4, 6 and 7; fills with NaNs and special
+        floats; the diagnostic bits; an 8 x 8 x 8 source voting into one template voxel, so that
+        counts pass 255), MRIreplaceValues and MRIreplaceValuesUchar (a new, a given or the same
+        destination, destinations of another extent, the source's first byte or table floats)."""
+        r = self.rng("vresamp")
+        L = []
+        for _ in range(160):
+            types = [0, 0, 1, 3, 3, 4, 10] if r.random() < 0.9 else [2, 6, 9]
+            s = self.vshape(r, types=types, ext=(1, 4), frames=(1, 2))
+            a = self.rvol(r, shape=s, special=0.05, ct=0.0)
+            if r.random() < 0.66:
+                b = self.tmpl(r, a)
+            else:
+                b = self.rvol(
+                    r, shape=self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 2)), ct=0.0
+                )
+            ty = r.choice([0, 1, 1, 2, 3, 4, 6, 6, 7])
+            gd = "+gdiag=10000040 " if r.random() < 1 / 12 else ""
+            plain = 1 if r.random() < 0.2 else 0
+            L.append(f"{gd}rsfill {a} {b} {ty} {self.fillv(r)} {plain}")
+        for _ in range(12):
+            # one template voxel holding the whole source: counts past 255 (FS-326)
+            a = fixed_w(8, 8, 8, 0, fill=r.choice([0, 7, 60]))
+            t = fixed_w(1, 1, 1, 0, fill=0).split(" ")
+            for i in range(3):
+                t[7 + i] = f32(8.0)
+            L.append(f"rsfill {a} {' '.join(t)} 6 {f32(0.0)} 0")
+        for _ in range(100):
+            s = self.vshape(r, types=[0, 0, 0, 1, 3, 4, 10], ext=(1, 4), frames=(1, 2))
+            a = self.rvol(r, shape=s, ct=0.0)
+            q = r.random()
+            if q < 0.4:
+                d = "new"
+            elif q < 0.6:
+                d = "self"
+            elif q < 0.85:
+                d = self.rvol(
+                    r, shape=self.vshape(r, types=[0, 0, 3, 4], ext=(1, 4), frames=(1, 2)), ct=0.0
+                )
+            else:
+                d = self.rvol(r, shape=s, ct=0.0)
+            if r.random() < 0.5:
+                f0 = a.split(" ")[6]
+                fill = int(f0) if f0.lstrip("-").isdigit() else -1
+                frm = fill if fill >= 0 and r.random() < 0.6 else r.randint(0, 255)
+                L.append(f"repval {a} {d} 1 {frm} {r.randint(0, 255)}")
+            else:
+                L.append(f"repval {a} {d} 0 {self.fillv(r)} {self.fillv(r)}")
+        return [Batch("vresamp", "vresamp", L)]
+
+
 GROUPS = [
     "vgblock",
     "vgcopy",
@@ -1384,6 +1724,11 @@ GROUPS = [
     "vcma",
     "vrules5",
     "vres",
+    "vrules6",
+    "vframes",
+    "vderiv",
+    "vlinear",
+    "vresamp",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -1491,7 +1836,7 @@ def mask(b: Batch, line: bytes) -> bytes:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen6) else Gen6(gen.seed)
+    gen = gen if isinstance(gen, Gen7) else Gen7(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

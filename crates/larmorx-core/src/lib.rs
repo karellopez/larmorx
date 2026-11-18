@@ -72,6 +72,7 @@ mod vnl_digests;
 pub mod vnl_eigen;
 pub mod vnl_fixed;
 pub mod vnl_lbfgs;
+pub mod vnl_matrix;
 pub mod vnl_minimize;
 pub mod vnl_qr;
 pub mod vnl_random;

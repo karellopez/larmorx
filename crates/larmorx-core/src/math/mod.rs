@@ -294,7 +294,13 @@ dispatch!(
 );
 dispatch!(
     /// The arccosine of `x`, correctly rounded (CORE-MATH's `cr_acos`). ITK's `std::acos`
-    /// (glibc's `acos`), as in `Rigid2DTransform::ComputeMatrixParameters`.
+    /// (glibc's `acos`), as in `Rigid2DTransform::ComputeMatrixParameters`. glibc 2.35's `acos`
+    /// is not correctly rounded: one unit in the last place on 0.045 % of 9.6 × 10^9 arguments
+    /// (0.07 % of uniform ones in [-1, 1)), special arguments and NaN bits equal, and its build
+    /// without FMA differs from its FMA build (measured as a black box:
+    /// `validation/investigations/glibc-acos/`). This function serves `reproduce` too (the user's
+    /// decision of 2026-11-04, `specs/glibc-dbl.md` §9), so there it differs from glibc's bits on
+    /// those arguments.
     acos
 );
 dispatch!(

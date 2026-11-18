@@ -1,0 +1,17 @@
+[package]
+name = "glibc-acos-blackbox"
+description = "glibc 2.35's double acos as a black box against larmorx_core::math::acos (CORE-MATH's correctly rounded cr_acos): random and targeted arguments, the arguments where they differ"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a measuring tool, never part of larmorx's build (it calls the C library's
+# acos through dlopen, as a black box).
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../crates/larmorx-core" }
+
+[profile.release]
+debug = false

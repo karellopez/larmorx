@@ -1,12 +1,14 @@
-# FreeSurfer 8.2.0's volume functions, as a black box (parts 1 to 6a)
+# FreeSurfer 8.2.0's volume functions, as a black box (parts 1 to 6c)
 
 The probe behind the **(observed)** marks and the validation plan (§69) of
-[`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 6a (§1 to §26:
+[`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 6c (§1 to §32:
 the volume-geometry text block, its copies, matrices, comparison and printer; the voxel
 arithmetic; coordinates, orientation, the Talairach point, centre of mass, principal components,
 the running average, the header comparison, determinant and dump; the samplers, the moves, the
 head's box and the transform reader; the CMA label tests and the segmentation functions; resolution,
-planes, fills, resampling by whole factors and changes of type). **Open to the clean-room
+planes, fills, resampling by whole factors and changes of type; the frame-range samplers, the trilinear
+kernel and splatting, derivatives, gradients, neighbour counts, linear transforms; resampling onto a
+template and replacing a value). **Open to the clean-room
 implementer of that spec**: the files here hold only calls of FreeSurfer's functions (and of the C
 library's) by name, the reading and printing of their arguments, results and the structures'
 fields, and a comparison loop; no FreeSurfer code, nothing written from its source. The implementer
@@ -17,7 +19,7 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 |---|---|
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the spec's §69: 16 groups of seeded cases and three of fixed cases (`vrules`, `vrules4`, `vrules5`; 10,836 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the spec's §69: 20 groups of seeded cases and four of fixed cases (`vrules`, `vrules4`, `vrules5`, `vrules6`; 12,270 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 | `models.py` | statements of the spec checked as models of the probe's printed results: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
@@ -132,6 +134,19 @@ The spec's sections in brackets.
 | `mft W i f` | `MRImeanFrameThresh` (the frame, the threshold) | the double |
 | `lim W` | `MRIlimits` into min and max set to 7.0 | its value, the two floats |
 | `chtype k W i f f i i` | k 0 `MRIchangeType`, 1 `MRISeqchangeType` (the type, `f_low`, `f_high`, `no_scale`), the environment's `FS_FORCE_BIN_CHECK` set to `1` (last integer 1) or unset (0) | the result (`self` when it is the source), then the source when it is not |
+| `splat W n (k d d d i d)×n` | per point (x y z, the frame, the value): k 0 `MRIinterpolateIntoVolume` (the frame unused), 1 `MRIinterpolateIntoVolumeFrame` [§27] | per point its value, then the volume |
+| `sseq W d n (d d d i i i)×n` | with the volume's `outside_val` set to the double, per point x y z, the first and last frame and the code: -1 `MRIsampleSeqVolume`, else `MRIsampleSeqVolumeType` with that code, into an array of floats set to 7.0 (8 unset slots before index 0 and after the last frame) | per point its value and the floats at the frames first to last |
+| `sxyz W d n (i i i i i i)×n` | with `outside_val` set, per point x y z, the frames begin and end (excluded) and k: 0 `MRIsampleVolumeFrameType_xyzInt_nRange_SAMPLE_NEAREST_floats`, 1 `MRIsampleVolumeFrame_xyzInt_nRange_floats` (the array as above) | per point its value and the `end - begin` floats |
+| `tkern W n (d d d i)×n` | `MRItrilinKernel` at each point, into an array of 8 doubles set to 7.0 (last integer 0) or none (1) | `given` or `new`, then the 8 doubles |
+| `deriv W d n (i d d d d d d d)×n` | `MRIsetSampleVolumeDerivativeSign` of the first double, then per point k 0 `MRIsampleVolumeDerivative`, 1 `MRIsampleVolumeDerivativeScale` (x y z, dx dy dz, sigma) into a magnitude set to 7.0 [§28] | per point its value and the magnitude |
+| `grad W n (i d d d i)×n` | k 0 `MRIsampleVolumeGradient`, 1 `MRIsampleVolumeGradientFrame` (x y z, the frame) into three doubles set to 7.0 | per point its value and the three doubles |
+| `nbrs W n (i i i i i i f f)×n` | per point the count k (0 `MRIneighborsOn`, 1 `MRIneighborsOn3x3`, 2 `MRIneighborsInWindow`, 3 `MRIneighbors`, 4 `MRIneighborsInRange`, 5 `MRIneighbors3x3`, 6 `MRIneighborsOff`, 7 `MRIneighborsOff3x3`), x y z, then p and q (the minimum or value p; for 2 the window size p and the value q; for 4 the frame p) and the floats low and high (4 only) | the counts |
+| `setvals W f` | `MRIsetValues` [§29] | its value, the volume |
+| `rasvox W W\|null M` | `MRIrasXformToVoxelXform` (the source, the destination, the RAS matrix or `null`, no voxel matrix given) | M |
+| `lxf k W d D M i` | with the source's `outside_val` set to the double, k 0 `MRIlinearTransformInterp`, 1 `MRIlinearTransform`, 2 `MRIinverseLinearTransform`, 3 `MRIapplyRASlinearTransformInterp`, 4 `MRIapplyRASlinearTransform`, 5 `MRIapplyRASinverseLinearTransform` (the destination, the matrix or `null`, the method for 0 and 3) | the result |
+| `rsmat W W` | `MRIgetResampleMatrix` (the source, the template; the diagnostic bits through `+gdiag=`) | M |
+| `rsfill W W i f i` | `MRIresampleFill` (the source, the template, the type, the fill), or `MRIresample` when the last integer is 1 [§31] | the result |
+| `repval W D k ...` | k 1: `MRIreplaceValuesUchar` with two integers (as bytes); k 0: `MRIreplaceValues` with two floats | the result |
 
 ## The models
 
@@ -209,7 +224,17 @@ orientation, unknown ones, planes -1 to 5; up- and downsampling of every type by
 0.5 to 4, -1 and NaN (no factor 0: §26), into no destination, one of the result's extent, of the
 source's shape, of another type, or the source; the frame mean with frames -1 to 3; the limits; changes
 of every type to every type with `f_low`, `f_high` 0 to 1, -0.5 and NaN, `no_scale` 0 to 2, with and
-without `FS_FORCE_BIN_CHECK`): volumes of up to 4 x 4 x 4 voxels (5 for
+without `FS_FORCE_BIN_CHECK`), the fixed cases of `vrules6` (relay 10, §25: the clean room's questions
+on part 6a: `MRIchangeType`'s histogram ends, `MRIdownsample2` into the source, `MRIfillFG` from seeds
+past the depth and the height, `MRIextractPlane` into the source), part 6b's `vframes` (§27: splatting
+into every type with values with NaNs, infinities, 1e10, 70000, frames past the volume's on lines of
+their own; the frame-range samplers with codes -1 to 7, frame ranges empty, inside and past; the
+trilinear kernel), `vderiv` (§28: the derivatives with sigmas 0, tiny, negative, ±1e300, NaN, FS-324's
+two on lines of their own; the gradients; the eight neighbour counts up to three voxels outside) and
+`vlinear` (§29: `MRIsetValues`, `MRIrasXformToVoxelXform`, the six linear transform functions with
+methods 0 to 4 and 7, `MRIgetResampleMatrix`), and part 6c's `vresamp` (§31: resampling onto templates
+on the source's grid scaled and moved, or random ones, types 0 to 4, 6, 7, the vote with counts past
+255; `MRIreplaceValues` and `MRIreplaceValuesUchar`): volumes of up to 4 x 4 x 4 voxels (5 for
 `vextract` and `vres`, 6 for `vcoords`) and 0 to 3 frames of every type (the types without a voxel size
 header-only), headers only too, destinations new, of the same shape, of another shape or a source,
 cached matrices as allocated, recomputed or dropped.
@@ -256,3 +281,14 @@ cached matrices as allocated, recomputed or dropped.
   negative or NaN factor makes FreeSurfer allocate index arrays of a size whose failure differs between
   processes (the hash would not be stable), and a factor of 0 would make the default ask for a volume
   2^31 - 1 voxels wide (spec §26).
+- Relay 10 (2026-11-18): the prebuilt probe rebuilt from commit `20578b55` (part 6b's and 6c's commands;
+  its build in `BUILD_INFO.txt`, the same bytes twice; the 53b6d7dc build kept in
+  `<workspace>/archive/2026-11-18-fs-volume-probe-53b6d7dc/`): every earlier group's hash unchanged; the
+  new groups `vrules6` (16 calls), `vframes` (404), `vderiv` (382), `vlinear` (360) and `vresamp` (272) the
+  same cold, warm and twice without the cache; the probe as its own candidate: no unexplained
+  difference in either mode; `models.py fs291` 127, `skull` 160, `cma` 95 lines as their models (logs
+  `oracles/logs/fs-volume-probe-r10-final-2026-11-18.log` and, for `vresamp` once its sources mostly had a
+  good RAS (an oblique source without one is refused before any sampling),
+  `fs-volume-probe-r10-vresamp-2026-11-18.log`). Points that read memory the program does not
+  own (frames past the volume's, `MRIneighborsOff` at a row or slice outside) and FS-324's two sigmas
+  are on lines of their own: a crash or a time-out hides every point of its line.

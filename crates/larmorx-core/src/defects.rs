@@ -2592,7 +2592,7 @@ defects! {
     FS_317 = "FS-317", "FreeSurfer", true,
         "downsampling by factors and the change of a volume's type with rescaling convert a number beyond the 32-bit integer range, or NaN, to the integer -2147483648 (the extent, the windows, the histogram's bins and counts)";
     FS_318 = "FS-318", "FreeSurfer", true,
-        "the mean of a frame's voxels above a threshold is the mean of frame 0's whatever the frame asked for";
+        "the mean of a frame's voxels not below a threshold is the mean of frame 0's whatever the frame asked for";
     FS_319 = "FS-319", "FreeSurfer", true,
         "upsampling with the sum conserved of a volume whose change to floats fails (a robust range that is empty after the histogram) goes on with no volume and crashes";
     FS_320 = "FS-320", "FreeSurfer", true,

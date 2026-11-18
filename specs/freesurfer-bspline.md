@@ -401,8 +401,9 @@ of §5 is independent, so any thread count gives the same result.
   functions by name and a comparison loop; its README lists every command, its arguments, what it
   prints and the encodings). The implementer runs the prebuilt probe
   `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe` (FreeSurfer 8.2.0's library as the
-  official build compiles it: GCC 8.4.0 and FreeSurfer's flags; built from larmorx `d4b27c43`, its
-  `BUILD_INFO.txt` line) with `guard_malloc.so` beside it, and never builds them. Its commands for this
+  official build compiles it: GCC 8.4.0 and FreeSurfer's flags; its B-spline commands since larmorx
+  `d4b27c43`, the build in place from `5d35ae1f`, its `BUILD_INFO.txt` line) with `guard_malloc.so`
+  beside it, and never builds them. Its commands for this
   module: `bsp` (§3: `MRItoBSpline` with no, a fitting, another or a coefficient-less B-spline), `bsamp`
   (§4.1), `bsraw` (§4.1 on coefficients given as they are, any degree: FS-964), `bsseq` (§4.2), `bslxf`,
   `bsras`, `bslta` (§5.1 to §5.3, `USE_AVERAGE305` unset, `true` or empty), `bsdown`, `bsup` (§6.3,

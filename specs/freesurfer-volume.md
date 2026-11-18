@@ -10,9 +10,11 @@ Made ready for the clean room part by part by the spec finisher (FreeSurfer's fo
 **parts 1 to 3 (§1-17) by its relay 6 (2026-11-16), part 4 (§18-22) by its relay 7
 (2026-11-17), part 5 (§23-24) by its relay 8 (2026-11-17, with part 4's measured corrections), part 6a
 (§25-26) by its relay 9 (2026-11-18, with the clean room's questions on parts 4 and 5), parts 6b
-(§27-30) and 6c (§31-32) by its relay 10 (2026-11-18, with the clean room's questions on part 6a)**:
+(§27-30) and 6c (§31-32) by its relay 10 (2026-11-18, with the clean room's questions on part 6a), part
+7a (§33) by its relay 11 (2026-11-18, with the clean room's questions on parts 6b and 6c and the cubic
+B-spline paths of §29 and §31 now that `fs.bspline` exists)**:
 the black-box validation plan (§69) with its open probe, a read-through as a clean-room reader, the
-defects' texts in `larmorx_core::defects` checked. The sections after §32 are not yet read through
+defects' texts in `larmorx_core::defects` checked. The sections after §33 are not yet read through
 that way: their validation plans still name the replica's closed probe, which the implementer does
 not open (§69 says what to do meanwhile). What black-box runs confirmed is marked **(observed)**.
 
@@ -40,7 +42,8 @@ arithmetic; part 3 (§13-17) coordinates and geometry; part 4 (§18-22) the samp
 box and the transform reader; part 5 (§23-24) the CMA labels; part 6a (§25-26) resolution, planes,
 fills, resampling by whole factors and changes of type; part 6b (§27-30) the frame-range samplers, the
 trilinear kernel and splatting, derivatives, gradients, neighbour counts and linear transforms; part 6c
-(§31-32) resampling onto a template and replacing a value. Then the rest of the module (§33-68).
+(§31-32) resampling onto a template and replacing a value; part 7a (§33) statistics, orientation strings
+and voxel-to-RAS matrices. Then the rest of the module (§34-68).
 
 ## 1. Conventions
 
@@ -2838,7 +2841,7 @@ both or none, into a new array, another array of 0 to 2 transforms or the source
 `reproduce` but where the original reads memory it does not own or crashes (FS-504, FS-957, the shared voxel defects),
 counted and not compared; the default differs only with a notice (FS-954, FS-956, FS-957 and the shared ones).
 
-## 69. Validation plan (black box), parts 1 to 6c
+## 69. Validation plan (black box), parts 1 to 7a
 
 ### 69.1 The probe
 
@@ -2906,7 +2909,9 @@ for `vresamp` after its sources were given a good RAS in most cases, `fs-volume-
 | `vresamp` | 31 | 272 | 18 | 22 | 0 | `322f430825ee103718310af328377d0645b3bb7e2abc843e51597a4b813d5456` |
 | `vrules7` | 15, 31 | 12 | 0 | 0 | 0 | `c99ef3a5d80c981a0083f473853cc1bdf4e2efddea96830e303a7f6f25b3f6df` |
 | `vbsvol` | 29, 31 | 70 | 5 | 5 | 0 | `bbab7e7718d2891519afd6558e5cca024fa979809558257df9d49b2d9f00ba82` |
-| all | | 12,352 | 1,387 | 650 | 13 | |
+| `vstat7` | 33 | 481 | 7 | 14 | 0 | `e97ceceb5e0f8724c5e92be47e83df1bd71b3416b312c6e888e8b7f621b1f93f` |
+| `vrules8` | 33 | 32 | 3 | 0 | 0 | `b5d0b13605f046d1967c016311896674628a3b51037ea72dc2d3f679de4e8da4` |
+| all | | 12,865 | 1,397 | 664 | 13 | |
 
 The probe's groups `vbspline` and `vbsrules` are fs.bspline's (`specs/freesurfer-bspline.md` §9).
 
@@ -3011,6 +3016,26 @@ the matrices of `vlinear` and outside values 0, 5 and NaN; `rsfill` with type 5 
 source's grid), the same cold, warm and in two runs without the cache; its memory and crash lines are
 destinations with fewer frames than the source (written past) and sources without cached matrices
 (FS-252's crash in the B-spline's header copy).
+Part 7a's groups (the prebuilt probe rebuilt from commit 5d35ae1f: part 7a's commands; its build in
+`BUILD_INFO.txt`, the same bytes twice; the d4b27c43 build kept in
+`<workspace>/archive/2026-11-18-fs-volume-probe-d4b27c43/`; every earlier hash unchanged, log
+`oracles/logs/fs-volume-probe-r11-final2-2026-11-18.log`; each the same cold, warm and in two runs without
+the cache): `vstat7` (§33: `MRIstats` and `MRIprintStats` of volumes of every type, headers only, special
+floats, 1 to 3 frames; `MRItype2str` of -2 to 12; `MRIcropBoundingBox` with starts and extents from
+-2^31 to 2^31 - 1; `MRIcalcCRASforSampledVolume` of sources of up to 8 voxels a side onto volumes of up to
+4, with the diagnostic bits one in eight and sources without cached matrices; `MRIcheckOrientationString`
+(70) and `MRIorientationStringToDircos` (40) of strings of 2 to 5 characters, valid ones in both cases,
+invalid letters, digits, blanks, NUL and 0x80; `stuff_four_by_four` into none, 4 x 4, other sizes and a
+complex 4 x 4; `MRIvoxelXformToRasXform` with and without a destination and a given result, matrices of
+`vlinear`'s kinds; `MRIgetVoxelToVoxelXform`; `MRIsetVoxelToRasXform` with general, scaled (also by
+1.0005, inside and outside the threshold), 3 x 4 and NaN-laden matrices, the variable unset, `0.5`,
+`1e-9`, `abc`, empty, `10`) and `vrules8` (fixed cases of §33: the statistics of one voxel, a NaN first
+voxel, 64-bit integers (FS-329), 32-bit integers, a type not read and a volume without voxels, printed
+(FS-330); the orientation strings of 0 to 4 characters (FS-463's two on lines of their own), every case
+and letter, NUL and 0x80; strings to direction cosines; centres of sampled volumes with factors 2, 3, 0
+and one that does not divide). Their memory lines are FS-330's printed values (`MRIprintStats` of the
+complex, tensor and RGB types and of volumes without voxels) and FS-463's two strings; their exits the
+products of an absent or odd-sized matrix (status 252).
 
 `vrules` (relay 7, 2026-11-17: the prebuilt probe unchanged; log
 `oracles/logs/fs-volume-probe-r7-refs-2026-11-17.log`, the same hash from the cache and without it,
@@ -3083,9 +3108,12 @@ those 9 unexplained under `reproduce` and none with `fix`; with the prebuilt pro
 group identical in both modes but the memory lines whose contents changed from process to process
 (11 in `vmake`, 2 or 3 in `vtwo`, 57 in `vextract`, 22 in `vres`; one `vextract` line where FreeSurfer
 crashed in one process only); relay 10 (the prebuilt probe from 20578b55): the same, and every line of
-`vrules6`, `vframes`, `vderiv` and `vresamp` identical in both modes, `vlinear` all but one memory line.
+`vrules6`, `vframes`, `vderiv` and `vresamp` identical in both modes, `vlinear` all but one memory line;
+relay 11 (the prebuilt probes from d4b27c43 and 5d35ae1f): the same for every earlier group, and every
+line of `vrules7` and `vbsvol` identical in both modes, `vstat7` and `vrules8` all but their memory lines
+(7 and 3: FS-330's printed values, FS-463's strings); no unexplained difference in either mode.
 
-### 69.4 The defects of parts 1 to 6c (index)
+### 69.4 The defects of parts 1 to 7a (index)
 
 | Defect | § | Defect | § | Defect | § |
 |---|---|---|---|---|---|
@@ -3104,19 +3132,21 @@ crashed in one process only); relay 10 (the prebuilt probe from 20578b55): the s
 | FS-319 | 25 | FS-320 | 27 | FS-321 | 27 |
 | FS-322 | 28 | FS-323 | 28 | FS-324 | 28 |
 | FS-325 | 29 | FS-326 | 31 | FS-327 | 31 |
-| FS-328 | 31 | FS-461 | 31 | | |
+| FS-328 | 31 | FS-461 | 31 | FS-329 | 33 |
+| FS-330 | 33 | FS-462 | 33 | FS-463 | 33 |
+| FS-464 | 33 | | | | |
 
 Others' defects these parts meet: FS-12 (`nint`, `specs/freesurfer-core.md`), FS-53 and FS-58
 (`specs/freesurfer-mri.md`; FS-252, its header copy without cached matrices, in part 4), FS-47 and
 ITK-112 (`specs/freesurfer-maths.md` §17); FS-252 again in part 5 (segmentations copied without their
 cached matrices).
 
-### 69.5 Beyond the probe, and the sections after §32
+### 69.5 Beyond the probe, and the sections after §33
 
 - **The replays** of the programs that use these functions with `reproduce`, on the recorded heads,
   when they are ported.
 - **Every platform:** the clean room's own golden checks (its results on the other five platforms
   are its Linux results; a NaN's bits as x86-64 gives them).
-- **§33 to §68** are not yet in the open probe: until they are, their clean room checks them against
+- **§34 to §68** are not yet in the open probe: until they are, their clean room checks them against
   the official programs as black boxes and against the replays; their validation plans name the
   replica's probe, which the implementer does not open.

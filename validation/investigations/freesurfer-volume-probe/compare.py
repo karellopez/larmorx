@@ -1741,7 +1741,7 @@ class Gen7(Gen6):
 class Gen8(Gen7):
     """fs.bspline (specs/freesurfer-bspline.md) and fs.volume's cubic B-spline paths."""
 
-    DEGREES = [2, 3, 3, 3, 4, 5, 6, 7, 8, 9]
+    DEGREES = (2, 3, 3, 3, 4, 5, 6, 7, 8, 9)
 
     def bdeg(self, r: random.Random, odd: float = 0.05) -> int:
         return r.choice([0, 1, 10, -1]) if r.random() < odd else r.choice(self.DEGREES)
@@ -1843,7 +1843,9 @@ class Gen8(Gen7):
         for _ in range(30):
             a = self.bvol(r, ext=(1, 4))
             d = "new" if r.random() < 0.6 else self.rdst(r, " ".join(a.split(" ")[:6]))
-            L.append(f"bslta {r.choice([3, 3, 2])} {a} {d} {self.bslta(r)} {r.choice([0, 0, 1, 2])}")
+            L.append(
+                f"bslta {r.choice([3, 3, 2])} {a} {d} {self.bslta(r)} {r.choice([0, 0, 1, 2])}"
+            )
         for cmd in ("bsdown", "bsup"):
             for _ in range(30):
                 a = self.bvol(r, ext=(1, 6) if cmd == "bsdown" else (1, 4))
@@ -1991,7 +1993,9 @@ class Gen9(Gen8):
             mr = "null" if r.random() < 0.7 else self.affine(r)
             L.append(f"vx2rx {a} {b} {mv} {mr}")
         for _ in range(30):
-            L.append(f"v2v {self.rvol(r, special=0.05, ct=0.0)} {self.rvol(r, special=0.05, ct=0.0)}")
+            L.append(
+                f"v2v {self.rvol(r, special=0.05, ct=0.0)} {self.rvol(r, special=0.05, ct=0.0)}"
+            )
         envs = ["unset", "unset", "unset", xs("0.5"), xs("1e-9"), xs("abc"), xs(""), xs("10")]
         for _ in range(50):
             a = self.rvol(r, special=0.03, ct=0.0)
@@ -2027,13 +2031,33 @@ class Gen9(Gen8):
         L.append(f"pstats {fixed_w(2, 2, 1, 2, fill=9)}")
         L.append(f"pstats {fixed_w(2, 1, 1, 9, fill=9)}")
         L.append(f"stats {fixed_w(2, 1, 1, 6, hdr=1)}")
-        for t in (b"", b"L", b"LP", b"LPS", b"lps", b"RAS", b"LLS", b"XYZ", b"L\x00S", b"LPSX",
-                  b"\x80PS", b"SPL", b"IAR", b"aaa", b"LRA", b"rAs"):
+        for t in (
+            b"",
+            b"L",
+            b"LP",
+            b"LPS",
+            b"lps",
+            b"RAS",
+            b"LLS",
+            b"XYZ",
+            b"L\x00S",
+            b"LPSX",
+            b"\x80PS",
+            b"SPL",
+            b"IAR",
+            b"aaa",
+            b"LRA",
+            b"rAs",
+        ):
             L.append(f"chkostr {xs(t)}")
         for t in (b"LPS", b"RAS", b"lia", b"SRP", b"XPS"):
             L.append(f"o2dc {fixed_w(2, 2, 2, 0)} {xs(t)}")
-        for sa, sb in (((8, 8, 8), (3, 3, 3)), ((7, 5, 3), (2, 2, 2)), ((4, 4, 4), (8, 8, 8)),
-                       ((256, 1, 1), (3, 1, 1))):
+        for sa, sb in (
+            ((8, 8, 8), (3, 3, 3)),
+            ((7, 5, 3), (2, 2, 2)),
+            ((4, 4, 4), (8, 8, 8)),
+            ((256, 1, 1), (3, 1, 1)),
+        ):
             a = fixed_w(*sa, 0, fill=-1)
             L.append(f"crass {a} {fixed_w(*sb, 0, fill=-1)}")
         return [Batch("vrules8", "vrules8", L)]

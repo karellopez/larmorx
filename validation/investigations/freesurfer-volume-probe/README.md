@@ -329,3 +329,16 @@ cached matrices as allocated, recomputed or dropped.
   `fs-volume-probe-r10-vresamp-2026-11-18.log`). Points that read memory the program does not
   own (frames past the volume's, `MRIneighborsOff` at a row or slice outside) and FS-324's two sigmas
   are on lines of their own: a crash or a time-out hides every point of its line.
+- Relay 11 (2026-11-18): the fixed group `vrules7` (12 calls; the prebuilt probe from 20578b55) the same
+  cold, warm and twice without the cache (log `oracles/logs/fs-volume-probe-r11-vrules7-2026-11-18.log`);
+  then the prebuilt probe rebuilt from commit `d4b27c43` (fs.bspline's commands) and from `5d35ae1f` (part
+  7a's commands; each build in `BUILD_INFO.txt`, the same bytes twice; the 20578b55 and d4b27c43 builds
+  kept in `<workspace>/archive/2026-11-18-fs-volume-probe-20578b55/` and `-d4b27c43/`): every earlier
+  group's hash unchanged; the new groups `vbspline` (410 calls), `vbsrules` (71), `vbsvol` (70), `vstat7`
+  (481) and `vrules8` (32) the same cold, warm and twice without the cache; the probe as its own
+  candidate: no unexplained difference in either mode; `models.py fs291` 127, `skull` 160, `cma` 95 lines
+  as their models (logs `oracles/logs/fs-volume-probe-r11-final-2026-11-18.log`,
+  `fs-volume-probe-r11-final2-2026-11-18.log`). The loop's both-modes allowance now names FS-300 in
+  `vsample` and `vresamp`, FS-322 in `vderiv` and FS-325 in `vlinear`. A negative B-spline degree on a
+  volume of one voxel (FS-964) is left out: its indices are stack contents whose detection changed in one
+  of four reference runs.

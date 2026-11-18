@@ -83,7 +83,8 @@ FACTORS = [
 
 
 def dns(path: str) -> list[str]:
-    base = [ln.split() for ln in open(path, encoding="utf-8") if ln.startswith("dnsn ")]
+    with open(path, encoding="utf-8") as fh:
+        base = [ln.split() for ln in fh if ln.startswith("dnsn ")]
     # the destination flag follows the source volume (the command, then a volume's 47 tokens)
     short = [t for t in base if t[48] == "0" and len(t) == 53][:2]
     long_ = [t for t in base if t[48] == "1" and len(t) == 100][:2]
@@ -120,7 +121,8 @@ def compare(path: str) -> list[str]:
     import json
 
     out, same = [], 0
-    rows = [json.loads(x) for x in open(path, encoding="utf-8")]
+    with open(path, encoding="utf-8") as fh:
+        rows = [json.loads(x) for x in fh]
     for r in rows:
         a, b = r["official"], r["reproduce"]
         if a.startswith("CRASH 6 |") and b.startswith("EXIT 134 |"):

@@ -12,6 +12,7 @@ differing arguments per binade, and how many are CORE-MATH's listed arguments th
 from __future__ import annotations
 
 import collections
+import contextlib
 import struct
 import sys
 
@@ -70,10 +71,8 @@ def main() -> None:
         for line in fh:
             t = line.strip()
             if t and not t.startswith("#"):
-                try:
+                with contextlib.suppress(ValueError):
                     listed.add(abs(float.fromhex(t.lstrip("+"))))
-                except ValueError:
-                    pass
     per, exact, n = collections.Counter(), 0, 0
     for (f, _), (x, _, _) in a.items():
         if f != 5:

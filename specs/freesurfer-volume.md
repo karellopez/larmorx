@@ -2846,7 +2846,7 @@ counted and not compared; the default differs only with a notice (FS-954, FS-956
 ### 69.1 The probe
 
 The open probe folder `validation/investigations/freesurfer-volume-probe/` holds the probe's source
-(calls of the functions of §2 to §31 by name) and the comparison loop; its README lists every
+(calls of the functions of §2 to §33 by name, and of fs.bspline's) and the comparison loop; its README lists every
 command, its arguments and what it prints, and the encodings (every float and double as its bits;
 the volumes, geometries, matrices, colour tables and MINC transforms as the fs.mri probe encodes
 them, with the working volume W, the destination D and the region R added). The implementer runs

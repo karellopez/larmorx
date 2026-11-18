@@ -300,3 +300,22 @@ identical, 0 different. The lines where the port notes FS-960 and compares: seed
 command, seed 13 166 and 34, all identical with `reproduce`; with the rows stepped (the port before this part) 18, 9, 15
 and 7 of them were. `fix` differs only with notices. Seed 1, 5,580 cases: 5,190 identical, 390 not comparable, 26 hashed as
 `HEAVY`, hash `04bbf7500f1221f31acac11580a834c5fa87936f592c4670a29f9562400c69f2`.
+
+Measured 2026-11-18 (relay 38: no new command, `fsvolume` unchanged; logs `oracles/logs/fs-found-c-r38-*`). `check.py
+--cases <file>` runs a file of hand-written cases (`hand_cases.py`: `lta`, `dns`, `bvr`; no official hash) and
+`hand_cases.py compare <dump>` compares a `--dump` with `CRASH 6` (the official child's abort) and `EXIT 134` (the
+port's) as one. `lta_hand_cases.txt` (FS-307's bounds, track E's open-probe group `vrules4`): 18 `.xfm` texts whose
+comment loop meets the end of the file, 15 identical with `reproduce` (`could not read row 1 ... (<the raw line read
+last>)`: a `#` or blank line, white space, a NUL byte, the end of a long line), 3 FS-307 hangs (`CRASH 14`, the alarm:
+a `%` line read last). `dns_hand_cases.txt` (FS-317, FS-961): 16 factor triples (0, -0, NaNs, -1, -3, -0.5, plus and
+minus infinity, 1e-40, 1e-30) on two seeded `dnsn` cases without and two with a destination: 64 of 64 identical with
+`reproduce` (the allocation's errors, an infinite factor's volume 0 voxels wide, the destination's mismatch); `fix`
+refuses each, noted. `bvr_hand_cases.txt` (FS-314): 13 cache lines, 11 aborts (`std::bad_alloc` up to 15-byte words,
+`std::length_error` from 16, an earlier long word included): 13 of 13 identical with `reproduce`. The generator draws the
+downsampling factors -1, 0, -0, NaN, infinity, -3 and 1e-30 (1 in 30 factors), which shifts every later case. Seed 7,
+27,900 cases (every command): 25,912 identical with `reproduce`, 1,988 not comparable (478 identical all the same), 0
+different (a first run had one `ssrob` line different: `MRIsegStatsRobust`'s min and max keep a signalling NaN,
+`docs/findings/freesurfer-volume.md`, fixed); seed 13, 7,000 cases of `ssrob`, `sstat`, `sfavg`, `dnsn`, `ltaread`,
+`lrseg`, `bvr`: 5,777 identical, 1,223 not comparable, 0 different, and its 1,000 `bvr` lines (186 FS-314 aborts) 1,000
+of 1,000 identical by `hand_cases.py compare`; `fix` differs only with notices. Seed 1, 5,580 cases: 5,145 identical, 435
+not comparable, 24 hashed as `HEAVY`, hash `ae9084ceb1f8c1428a5499df49ca822bd1682966625bf5204174d5f816ec5d43`.

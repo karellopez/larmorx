@@ -244,8 +244,8 @@ fn small_float(g: &mut Gen) -> f32 {
 
 fn gxyz(t: &mut Vec<String>, g: &mut Gen, e: [i32; 3]) {
     if g.chance(3) {
-        for k in 0..3 {
-            t.push(g.int(0, i64::from(e[k]) - 1).to_string());
+        for n in e {
+            t.push(g.int(0, i64::from(n) - 1).to_string());
         }
     } else {
         t.extend(["-1", "-1", "-1"].map(str::to_owned));

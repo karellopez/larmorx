@@ -360,7 +360,10 @@ fn fs314_a_cache_line_without_a_number() {
     assert!(fix.starts_with("EXIT 1 |"), "{fix}");
     let (rep, _) = run(&line, UpstreamDefects::Reproduce);
     assert!(rep.starts_with("EXIT 134 |"), "{rep}");
-    assert!(rep.contains("'std::bad_alloc'\n  what():  std::bad_alloc\n"), "{rep}");
+    assert!(
+        rep.contains("'std::bad_alloc'\n  what():  std::bad_alloc\n"),
+        "{rep}"
+    );
     let line = bv("# Measure SupraTentorialNotVentVox, SupraTentorialVolNotVentVox, x, mm^3\t\n");
     let (rep, _) = run(&line, UpstreamDefects::Reproduce);
     assert!(
@@ -385,7 +388,10 @@ fn fs315_label_lists_without_numbers() {
         fix.contains("MRIlrswapSeg(): the label lists hold fewer numbers than rows (FreeSurfer reads past them)\n"),
         "{fix}"
     );
-    assert!(!rep.starts_with("null |") && !rep.starts_with("EXIT"), "{rep}");
+    assert!(
+        !rep.starts_with("null |") && !rep.starts_with("EXIT"),
+        "{rep}"
+    );
 }
 
 /// FS-960: a tensor volume's rows walked directly (FS-291's walk of `MRIinvertContrast`,
@@ -439,4 +445,3 @@ fn fs318_the_mean_of_another_frame() {
                 null 2 41e1e4da";
     check("FS-318", true, line);
 }
-

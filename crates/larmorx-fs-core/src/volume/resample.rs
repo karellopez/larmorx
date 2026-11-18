@@ -605,10 +605,7 @@ impl Process {
             dm.imnr0 = a.imnr0;
             dm.imnr1 = dm.imnr0.wrapping_add(dm.geom.depth).wrapping_sub(1);
         }
-        let c = sse::narrow(sse::add64(
-            -0.5,
-            sse::div64(1.0, 2.0 * f64::from(n)),
-        ));
+        let c = sse::narrow(sse::add64(-0.5, sse::div64(1.0, 2.0 * f64::from(n))));
         let p = self.vox2ras_point(v.a(), [c, c, c])?;
         self.p0_to_cras(
             &mut v.d_mut().geom,
@@ -800,10 +797,7 @@ impl Process {
     ) -> Result<VolOut, Stop> {
         let (w, h, d, nframes) = (src.geom.width, src.geom.height, src.geom.depth, src.nframes);
         let ext = |p: &mut Process, e: i32, f: f32| {
-            p.int_317(
-                f64::from(sse::div32(e as f32, f).ceil()),
-                "MRIdownsampleN",
-            )
+            p.int_317(f64::from(sse::div32(e as f32, f).ceil()), "MRIdownsampleN")
         };
         let (nc, nr, ns) = (ext(self, w, fc), ext(self, h, fr), ext(self, d, fs));
         let mut v = Vols::new(src, None, dst);
@@ -814,7 +808,11 @@ impl Process {
                 return Ok(VolOut::Nothing);
             }
         } else {
-            let kind = if keep_type != 0 { v.a().kind } else { types::FLOAT };
+            let kind = if keep_type != 0 {
+                v.a().kind
+            } else {
+                types::FLOAT
+            };
             let mut m = self.mri_alloc_sequence(nc, nr, ns, kind, nframes)?;
             self.copy_header_into(v.a(), &mut m)?;
             let a = v.a();
@@ -845,15 +843,11 @@ impl Process {
                         let r1 = sse::mul32((r + 1) as f32, fr);
                         let s1 = sse::mul32((s + 1) as f32, fs);
                         let mut sum = 0.0f64;
-                        let mut c0 = self.int_317(
-                            sse::widen(sse::mul32(c as f32, fc)),
-                            "MRIdownsampleN",
-                        );
+                        let mut c0 =
+                            self.int_317(sse::widen(sse::mul32(c as f32, fc)), "MRIdownsampleN");
                         while (c0 as f32) < c1 {
-                            let mut r0 = self.int_317(
-                                sse::widen(sse::mul32(r as f32, fr)),
-                                "MRIdownsampleN",
-                            );
+                            let mut r0 = self
+                                .int_317(sse::widen(sse::mul32(r as f32, fr)), "MRIdownsampleN");
                             while (r0 as f32) < r1 {
                                 let mut s0 = self.int_317(
                                     sse::widen(sse::mul32(s as f32, fs)),
@@ -879,12 +873,7 @@ impl Process {
 
     /// `MRImeanFrameThresh(mri, frame, thresh)` (§25): the mean of the nearest samples of a frame
     /// that are not below `thresh` (FS-318: FreeSurfer's of frame 0).
-    pub fn mri_mean_frame_thresh(
-        &mut self,
-        m: &Mri,
-        frame: i32,
-        thresh: f32,
-    ) -> Result<f64, Stop> {
+    pub fn mri_mean_frame_thresh(&mut self, m: &Mri, frame: i32, thresh: f32) -> Result<f64, Stop> {
         if frame >= m.nframes {
             self.error_printf(
                 codes::BAD_PARM,
@@ -922,7 +911,8 @@ impl Process {
                         "MRIsampleVolumeType",
                         &mut val,
                     )?;
-                    if !(val < t) {
+                    // not below the threshold (a NaN on either side included)
+                    if val >= t || val.is_nan() || t.is_nan() {
                         sum = sse::add64(val, sum);
                         n = n.wrapping_add(1);
                     }
@@ -1059,7 +1049,8 @@ impl Process {
                 for y in 0..h {
                     for z in 0..d {
                         let val = self.mri_get_vox_val(src, x, y, z, f, 0)?;
-                        if !(f64::from(val.abs()) < 1e-15) {
+                        // non-zero unless below 1e-15 in magnitude (NaN counts)
+                        if f64::from(val.abs()) >= 1e-15 || val.is_nan() {
                             nonzero = nonzero.wrapping_add(1);
                         }
                         let q = sse::div32(sse::sub32(val, min), size);

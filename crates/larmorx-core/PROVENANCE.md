@@ -818,3 +818,21 @@ Original code (Apache-2.0).
   digest of `cases.rs`'s 96 recipes, recorded from Ubuntu's `libz.so.1`) and the probe
   `validation/probes/zlib-deflate` (README there; `docs/findings/zlib-deflate.md`).
 
+
+## vnl's matrix arithmetic (`src/vnl_matrix.rs`; FreeSurfer's robust registration, queue item 3.2-02, 2026-11-18)
+
+**Ported** from VXL as bundled with ITK 4.13.2 (BSD-3-Clause; the file's SPDX header is
+`Apache-2.0 AND BSD-3-Clause`), SHA-256 prefixes under `Modules/ThirdParty/VNL/src/vxl/`:
+`core/vnl/vnl_matrix.hxx` (`79493f2b6315`: the product `vnl_tag_mul`, `operator_one_norm`),
+`core/vnl/vnl_c_vector.hxx` (`d11672bb86f0`: `two_norm_squared`, `two_norm`), `core/vnl/vnl_diag_matrix.h`
+(`4953ad568fb5`: a matrix times a diagonal matrix): `VnlMatrix` (row-major `double`), its product, difference,
+transpose, column scaling, Frobenius and one norms, every operation with x86-64's SSE NaN rules. Checked
+through FreeSurfer's robust-registration helpers against the official code (`validation/probes/fs-robust`:
+16,100 cases, 0 different).
+
+**`vnl_svd`'s double SVD stops where VNL never returns** (the same item): `vnl_svd_full` keeps LINPACK's
+`dsvdc` state (`s`, `e`, `m`, `iter`) and compares it at powers of two (Brent's cycle detection, as
+`vnl_svd_f32`'s `ssvdc`): a state seen again means VNL loops for ever (ITK-116; observed on matrices with
+an infinite entry, where the official code hangs); it returns the decomposition reached, `info` and the
+notice. `vnl_svd_info` is unchanged on every matrix where VNL returns (`algo/vnl_svd.hxx`,
+`378746d23eb0`).

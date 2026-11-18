@@ -1024,11 +1024,16 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   y, the source's z as the plane's x). Without `dst`, a new one-slice volume of the plane's extent and the
   source's type, the source's header, `zstart = where`, `zend = where + 1`, `imnr0 = 0`, `imnr1 = 1`.
   The source's frame 0 is copied voxel by voxel (`MRIgetVoxVal`, `MRIsetVoxVal`) over the source's
-  extent (outside a given `dst`: as those functions do).
+  extent (outside a given `dst`: as those functions do), the plane's x outermost and its y innermost
+  (coronal: x, then y; horizontal: x, then z; sagittal: z, then y), each voxel read and then written
+  before the next is read: the order shows where a smaller `dst` or the source itself is written
+  (**(observed)**: `vres`).
 - **`MRIfillPlane(mask, dst, orientation, where, fillval)`**: over `dst`'s extent, every voxel of the
   mask's slice 0 that is not 0 (NaN counts as not 0) sets `dst`'s voxel in plane `where` of frame 0 to
   `fillval` (as a float, stored by `MRIsetVoxVal`): coronal (x, y, where) from the mask's (x, y),
-  horizontal (x, where, z) from (x, z), sagittal (where, y, z) from (z, y). Returns `dst`.
+  horizontal (x, where, z) from (x, z), sagittal (where, y, z) from (z, y), in the same order (the
+  plane's x outermost: coronal x then y, horizontal x then z, sagittal z then y; each mask voxel read
+  just before its write, which shows when the mask is `dst` itself). Returns `dst`.
 - **`MRIupsampleN(src, dst, N)`** (`MRIupsample2` is N = 2): the extent is N times the source's (32-bit
   products); without `dst`, a new one of the source's type and frames with its header. The voxel sizes are
   the source's divided by N (in `float`), the direction cosines, starts, ends and `imnr0` the source's,

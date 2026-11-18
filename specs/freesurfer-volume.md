@@ -1053,10 +1053,15 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   `dst`, a new one of the source's type with its header. `dst` is cleared; each 2 x 2 x 2 block of frame
   0 is summed in `float` (z, then y, then x; the sum the first operand), times 1/8 (floats stored as
   they are; bytes, shorts and unsigned shorts `nint` and cast). A type other than those four:
-  `MRIdownsample2: unsupported input type <t>` and `NULL` when the first block is summed. Then `imnr0`
-  the source's, `imnr1 = imnr0 + depth - 1`, the voxel sizes, `thick` and `ps` doubled, the centre the
-  source's vox2ras applied to `(w / 2 + 0.5, h / 2 + 0.5, d / 2 + 0.5, 1)` (integer halves), the cached
-  matrices recomputed.
+  `MRIdownsample2: unsupported input type <t>` and `NULL` when the first block is summed. Then, in this
+  order: `imnr0` the source's, `imnr1 = imnr0 + depth - 1` (the destination's depth), the voxel sizes,
+  `thick` and `ps` the source's doubled, then the centre: the source's vox2ras, made from its fields as
+  they are at that moment, applied to `(w / 2 + 0.5, h / 2 + 0.5, d / 2 + 0.5, 1)` (the source's
+  extent's integer halves), then the cached matrices recomputed. **Into the source itself** (`dst` the
+  source): the clear comes first, so every block sums zeros and every voxel ends 0; `imnr1` uses the
+  source's own depth; and the sizes are already doubled when the source's vox2ras gives the centre
+  (**(observed)**: a 4 x 2 x 2 byte volume of voxel size 1 and centre 0 gets the centre (1, 1, 1), where a
+  new destination gets (0.5, 0.5, 0.5); `vres`, `vrules6`).
 - **FS-317** (here and in `MRIchangeType` below): a number converted to an `int` that is NaN or beyond
   the `int` range gives -2147483648 in FreeSurfer (x86-64's conversion; `reproduce`); by default NaN
   gives 0 and a number beyond the range the range's nearer end (2147483647 or -2147483648); noted in

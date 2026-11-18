@@ -19,5 +19,7 @@ pub mod mri_normalize;
 
 use larmorx_freesurfer_core::run::Program;
 
+pub mod mri_convert;
+
 /// The programs of this crate, by their original names.
 pub const PROGRAMS: &[Program] = &[];

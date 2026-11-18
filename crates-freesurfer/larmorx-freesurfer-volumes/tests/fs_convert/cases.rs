@@ -571,8 +571,96 @@ fn opt_case(g: &mut Gen, specs: &[(&'static str, Kind)]) -> String {
     t.join(" ")
 }
 
-/// `n` case lines of seed `seed`.
+/// An `opt` case of the given files and arguments.
+fn opt_line(files: &[(&str, &[u8])], args: &[&str]) -> String {
+    let mut t = vec!["opt".to_owned(), files.len().to_string()];
+    for (f, c) in files {
+        t.push((*f).to_owned());
+        t.push(hex(c));
+    }
+    t.push(args.len().to_string());
+    t.extend(args.iter().map(|a| hex(a.as_bytes())));
+    t.join(" ")
+}
+
+/// The cases every seed starts with: the help, the version options, the parse-only report, the
+/// names by option, the combinations the checks refuse, the files the options write.
+fn prelude() -> Vec<String> {
+    let io: &[&str] = &["in.mgz", "out.mgz"];
+    let with = |a: &[&str]| -> Vec<String> {
+        a.iter().chain(io.iter()).map(|s| (*s).to_owned()).collect()
+    };
+    let mut v: Vec<Vec<String>> = vec![
+        vec![],
+        vec!["-u".into()],
+        vec!["--usage".into()],
+        vec!["--help".into()],
+        vec!["-h".into(), "in.mgz".into()],
+        vec!["-version2".into()],
+        vec!["--version".into()],
+        with(&["--version"]),
+        with(&["-x"]),
+        with(&["-po"]),
+        with(&[
+            "--parse_only", "-it", "mgz", "-ot", "nii", "-sn", "bert", "--invert_contrast", "2",
+            "-r", "1", "2", "3", "-r4", "1", "2", "3", "4", "-nt",
+        ]),
+        vec!["-i".into(), "a.mgz".into(), "-o".into(), "b.mgz".into()],
+        vec!["--input_volume".into(), "a.mgz".into(), "--output_volume".into(), "b.nii".into()],
+        with(&["-dcm2niix", "-createBIDS", "-dcm2niix-outdir", "dir"]),
+        with(&["-no-dcm2niix", "--createBIDS", "--dcm2niix-outdir", "dir"]),
+        with(&["-dcm2niix-createBIDS"]),
+        with(&["--antialias", "-vs", "1", "1", "1"]),
+        with(&["--antialias"]),
+        with(&["--antialias", "-vs", "1", "1", "1", "--fwhm", "2"]),
+        vec!["--out_stats_table".into(), "--like".into(), "t.dat".into(), "in.dat".into(), "out.dat".into()],
+        vec!["--out_stats_table".into(), "in.dat".into(), "out.dat".into()],
+        vec!["--in_stats_table".into(), "in.dat".into(), "out.mgz".into()],
+        with(&["--force_ras_good", "-iid", "1", "0", "0"]),
+        with(&["-ds", "2", "2", "2", "-dsold", "2", "2", "2"]),
+        with(&["-ro", "-oi"]),
+        vec!["-ro".into(), "in.mgz".into()],
+        vec!["-nw".into(), "in.mgz".into()],
+        vec!["in.mgz".into(), "out".into()],
+        vec!["-it".into(), "spm".into(), "in.img".into(), "out.mgz".into()],
+        with(&["--nskip", "-1"]),
+        with(&["--ndrop", "2", "--nskip", "3"]),
+        with(&["--debug", "--debug"]),
+        with(&["--statusfile", "st.txt"]),
+        with(&["-f", "0", "1", "2", "-nt"]),
+        with(&["-T", "x.lta", "--like", "lk.mgz", "-ini", "4", "--slice-reverse", "--scale", "2"]),
+        with(&["-iid", "3", "4", "0", "-ojd", "0", "0", "0"]),
+        with(&["-io", "lia", "-oo", "LLA"]),
+        with(&["--out_matrix", "-ti", "-onk", "7", "--in_like", "x.mgz", "-rl", "y.mgz"]),
+    ];
+    let mut lines: Vec<String> = v
+        .drain(..)
+        .map(|a| {
+            let a: Vec<&str> = a.iter().map(String::as_str).collect();
+            opt_line(&[], &a)
+        })
+        .collect();
+    let m: &[u8] = b"1 0 0 4\n0 1 0 -2\n0 0 1 3.5\n0 0 0 1\n";
+    lines.push(opt_line(&[("in_m.txt", m)], &["--autoalign", "in_m.txt", "in.mgz", "out.mgz"]));
+    lines.push(opt_line(
+        &[("in_m.txt", m), ("in_n.txt", b"2 0\n0 2\n")],
+        &["--left-right-swap-label-table", "in_m.txt", "in_n.txt", "in.mgz", "out.mgz"],
+    ));
+    lines.push(opt_line(&[("in_t.lta", b"x")], &["-ait", "in_t.lta", "in.mgz", "out.mgz"]));
+    lines.push(opt_line(&[("in_l.txt", b"x")], &["--sdcmlist", "in_l.txt", "in.mgz", "out.mgz"]));
+    lines
+}
+
+/// `n` case lines of seed `seed`: the [`prelude`], then seeded ones.
 pub fn generate(seed: u64, n: usize) -> Vec<String> {
+    let mut v = prelude();
+    v.truncate(n);
+    v.extend(generate_seeded(seed, n - v.len()));
+    v
+}
+
+/// `n` seeded case lines.
+fn generate_seeded(seed: u64, n: usize) -> Vec<String> {
     let mut g = Gen::new(seed);
     // every option name drawn alike
     let specs: Vec<(&'static str, Kind)> = options()

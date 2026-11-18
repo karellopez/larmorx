@@ -13,10 +13,13 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded from a clean commit (see `check.py`'s summary in `validation/probes/fs-convert/`).
+/// Recorded 2026-11-18 from the clean commit 656b40f3 (`mri_convert`'s stats tables in its three
+/// formats, `csv.h`'s reader, its command line to the parse-only report and the checks before the
+/// input is read; 42 fixed cases, then seeded ones): 1,000 cases, 947 lines identical, 53 hashed as
+/// `SKIP`.
 const N: usize = 1000;
-const OFFICIAL_SHA256: &str = "pending";
-const SKIPPED: usize = 0;
+const OFFICIAL_SHA256: &str = "0e893e18082f4c0342317f2a5484934723cd75a0b8387876662b4198e127a848";
+const SKIPPED: usize = 53;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 13] = [

@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
-//! fs.volume's defects as D13 switches (`specs/freesurfer-volume.md` §69.4, parts 1 to 6a): each one noted in
+//! fs.volume's defects as D13 switches (`specs/freesurfer-volume.md` §69.4, parts 1 to 6c): each one noted in
 //! both modes on a case that meets it, and its two modes' results different where the correction
 //! changes them (memory reads and crashes give the same result in both modes; the end of the
 //! program that §22's modes table gives in both modes differs only by FS-01's NUL in its C-style
 //! message). The cases are lines
 //! of the comparison's own seeded batches (the shortest line on which the clean room notes the
 //! defect in both modes), run through the probe's commands (`tests/volume_cmd/`; the transform
-//! files in memory, `ltamem`); FS-292, FS-296, FS-297, FS-302, FS-305 and FS-258, which those
-//! batches do not meet in both modes, on lines written here. Also the
+//! files in memory, `ltamem`); FS-292, FS-296, FS-297, FS-302, FS-305, FS-258, FS-323, FS-324, FS-326 and FS-461,
+//! which those batches do not meet in both modes, on lines or volumes written here. Also the
 //! others' defects these parts meet (FS-12, FS-47, ITK-112, FS-52, FS-53, FS-58).
 
 mod volume_cmd;
 
 use larmorx_core::defects::UpstreamDefects;
-use larmorx_fs_core::Environment;
+use larmorx_fs_core::mri::{Mri, types};
+use larmorx_fs_core::volume::Dst;
+use larmorx_fs_core::{Environment, Process};
 
 /// (defect, the two modes' results differ, the line).
 const CASES: &[(&str, bool, &str)] = &[
@@ -157,6 +159,36 @@ const CASES: &[(&str, bool, &str)] = &[
         "FS-310",
         true,
         "ltamem x672e78666d x4d4e49205472616e73666f726d2046696c650a2547656e6572617465642062792078206473740a0a5472616e73666f726d5f54797065203d204c696e6561723b0a4c696e6561725f5472616e73666f726d203d0a312030203020300a302031203020300a302030203120303b0a 0 none",
+    ),
+    (
+        "FS-320",
+        true,
+        "splat 2 4 4 0 2 0 -1 40000000 00000001 40000000 0 00000000 3f800000 00000000 00000000 00000000 3f800000 3f800000 7fc12345 00000000 ce3f3aa3 c240839a 4230e995 00000000 00000000 00000000 5 6 42b6e0e4 40c00000 42540000 4ca36c99 4180a3c0 4295bd2f c225795c bccf5c9a 41100000 c0c00000 428194db 404d800000000000 8 42c80000 c271f285 2 2 null null 2 1 3fe316949f4e0cb8 0000000000000000 3feffffffaa19c47 0 c024000000000000 0 4202a05f20000000 be45798ee2308c3a bff0000000000000 0 406fe00000000000",
+    ),
+    (
+        "FS-321",
+        true,
+        "splat 4 3 1 2 1 0 74 3f000000 40400000 3fc00000 1 00000000 bf800000 00000000 3f800000 00000000 00000000 00000000 00000000 bf800000 c2c3d6a4 42700000 3982c335 00000000 00000000 00000000 1 0 4cba0681 00000001 42b47726 409b870b 42622542 4206f4e4 42000000 40400000 40883b46 c2856032 b7362f91 4054c00000000000 3 42b95ec0 41f00000 1 0 null null 1 1 3fce6ea49cb9c9b0 bfc3693443fbf388 3fafa9c7ab62dc60 0 4004000000000000",
+    ),
+    (
+        "FS-322",
+        true,
+        "deriv 3 5 4 9 1 0 211 40400000 3f000000 3fc00000 0 00000000 bf800000 00000000 3f800000 00000000 00000000 00000000 00000000 bf800000 42b45ed8 ffc00000 40a542e1 00000000 00000000 00000000 3 1 42480000 c1a00000 518186b6 42980000 c2c04fc0 c032d73a c245e1d6 c2c029ae 400d7042 41500000 427c0000 c030000000000000 2 419f36be 42a60000 1 2 null null 7ff8000000000000 1 1 3fff40a82c5ed548 40077d55a1fa02d2 4000000000000000 bfc2e517323b3ab8 bff0000000000000 0000000000000000 0000000000000000",
+    ),
+    (
+        "FS-325",
+        true,
+        "lxf 0 3 3 3 10 2 0 -1 3f800000 40000000 40000000 0 3de1f89f be9103b6 3e21e793 3edeff30 bf1029b1 3f70ca4b 3f3fe63f 3eda74c5 bf24f5c4 42a23295 c214f994 42820000 00000000 00000000 00000000 1 8 42c20000 417da752 41c00000 40800000 426cb493 4292a43e c26c8f84 41c8df6b 40800000 7fc00000 42b36744 c03e8dcd0dcb3f18 1 c2a43497 426c0000 2 1 null null 3e112e0be826d695 new 4 4 be96f6d0 3ef69821 bf2b5fef 42f5f497 bf258514 3ea87592 3eebdc2a 42d2242c 3da3f54b 3f177b24 3d388bf7 41fa4c7f 00000000 00000000 00000000 3f800000 2",
+    ),
+    (
+        "FS-327",
+        true,
+        "rsfill 1 3 3 3 2 0 194 3fc00000 3f000000 3f700000 1 00000000 bf800000 00000000 00000000 00000000 bf800000 3f800000 00000000 00000000 b877e51c d32920fc 4ad595a2 3e4ccccd bdcccccd 00000000 0 4 42300000 41880000 42b00000 425c0000 42c60000 dc9ea049 42740000 420ca03e c2863911 42820000 42080000 4030000000000000 7 c1800000 424c0000 1 1 null null 2 1 4 10 2 0 -1 3f800000 40000000 40400000 0 7fc00000 00000000 bf800000 00000000 bf800000 00000000 bf800000 00000000 00000000 42a60000 c2371b8f 42040000 00000000 00000000 00000000 -1 2 c24a8b58 c223980a c28eb612 42840000 41546106 c1ab95f4 4270c6f2 c18a3ae3 352b91cf 41200000 421f026f c03366129f41e868 2 c1000000 41b8b77c 2 1 null null 6 477fff00 0",
+    ),
+    (
+        "FS-328",
+        true,
+        "rsfill 4 2 3 2 1 0 -1 3fc00000 40000000 3f700000 1 bf7c5c92 bf5dd61d bf452a79 3f04658d bec1b426 3f3cf989 be0162a7 3d3cf185 bedd9868 42375964 c28dc579 42bf1dcf 00000000 00000000 00000000 4 7 42ad85ba 42a54271 42c604df 4294ed25 42480000 c0a770f7 c28d1b88 42131c60 41300000 c2b6da84 422f0624 401550004c8453d0 8 41f80000 c1980000 0 1 null null 4 2 2 3 1 0 225 40000000 3f000000 3f000000 1 00000000 00000000 bf800000 3f800000 00000000 00000000 00000000 bf800000 00000000 c2b40823 41e80000 a7c5641e 3e4ccccd bdcccccd 3e4ccccd 4 3 c76c0610 41b00000 c2c231d0 423535f3 c1db4519 c284adff 41880000 80000000 3a577d20 a609b8ed 429c0000 4050400000000000 6 c0e00000 c281f057 2 1 null null 4 437f8000 0",
     ),
 ];
 
@@ -445,3 +477,118 @@ fn fs318_the_mean_of_another_frame() {
                 null 2 41e1e4da";
     check("FS-318", true, line);
 }
+
+/// FS-323: a neighbour count of a voxel 600 columns away (past the boundary index tables, -500
+/// to the extent + 499) ends the program in both modes, before any voxel is read.
+#[test]
+fn fs323_an_index_past_the_tables() {
+    let line = format!("nbrs {} 1 0 600 0 0 1 0 00000000 00000000", w("2 1 1 0 1 0", "5"));
+    check("FS-323", true, &line);
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let (r, _) = run(&line, mode);
+        assert!(r.starts_with("EXIT 252 |"), "{r}");
+        assert!(
+            r.contains("MRIneighborsOn: the voxel index 599 lies past the volume's index tables (FreeSurfer reads memory it does not own)\n"),
+            "{r}"
+        );
+    }
+}
+
+/// FS-324: the derivative at an infinite scale, and at 1e308 (twice which overflows), ends the
+/// program in both modes, the scale as Rust writes it.
+#[test]
+fn fs324_a_scale_too_large() {
+    for (bits, text) in [
+        ("7ff0000000000000", "inf".to_owned()),
+        ("7fe1ccf385ebc8a0", format!("{}", 1e308f64)),
+    ] {
+        let line = format!(
+            "deriv {} 3ff0000000000000 1 1 3ff0000000000000 0 0 3ff0000000000000 0 0 {bits}",
+            w("3 1 1 3 1 0", "t2")
+        );
+        check("FS-324", true, &line);
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let (r, _) = run(&line, mode);
+            assert!(r.starts_with("EXIT 252 |"), "{r}");
+            let want = format!(
+                "MRIsampleVolumeDerivativeScale: the scale {text} is too large (FreeSurfer never returns)\n"
+            );
+            assert!(r.contains(&want), "{r}");
+        }
+    }
+}
+
+/// A one-voxel byte volume of `frames` frames, voxel f of frame f `value(f)`.
+fn bytes(p: &mut Process, frames: i32, value: impl Fn(i32) -> f32) -> Mri {
+    let mut m = p
+        .mri_alloc_sequence(1, 1, 1, types::UCHAR, frames)
+        .expect("a volume");
+    for f in 0..frames {
+        p.mri_set_vox_val(&mut m, 0, 0, 0, f, value(f), 0)
+            .expect("a voxel");
+    }
+    m
+}
+
+/// Whether the process noted `id`.
+fn noted(p: &mut Process, id: &str) -> bool {
+    p.take_notices()
+        .as_slice()
+        .iter()
+        .any(|n| n.defect.id == id)
+}
+
+/// FS-326: 280 votes for label 1 and 320 for label 2 in one voxel (a source of 600 frames on a
+/// template of its own grid): by default label 2; with `reproduce` both counts stop at 255 and the
+/// lower label, 1, wins.
+#[test]
+fn fs326_votes_past_255() {
+    for (mode, want) in [(UpstreamDefects::Fix, 2.0), (UpstreamDefects::Reproduce, 1.0)] {
+        let mut p = Process::silent(Environment::new(), mode);
+        let src = bytes(&mut p, 600, |f| if f < 280 { 1.0 } else { 2.0 });
+        let template = bytes(&mut p, 1, |_| 0.0);
+        let r = p
+            .mri_resample_fill(&src, &template, 6, 0.0)
+            .expect("no end")
+            .expect("a volume");
+        assert_eq!(p.mri_get_vox_val(&r, 0, 0, 0, 0, 0).expect("a voxel"), want);
+        assert!(noted(&mut p, "FS-326"));
+    }
+}
+
+/// FS-327: voting onto a template whose orientation is unknown (no good RAS): the error and no
+/// volume in both modes (FreeSurfer crashes).
+#[test]
+fn fs327_a_vote_without_a_matrix() {
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut p = Process::silent(Environment::new(), mode);
+        let src = bytes(&mut p, 1, |_| 3.0);
+        let mut template = bytes(&mut p, 1, |_| 0.0);
+        template.geom.ras_good_flag = 0;
+        let r = p
+            .mri_resample_fill(&src, &template, 6, 0.0)
+            .expect("no end");
+        assert!(r.is_none());
+        assert!(noted(&mut p, "FS-327"));
+    }
+}
+
+/// FS-461: a value replaced in a new destination of a two-frame byte volume: by default in both
+/// frames; with `reproduce` in frame 0 only (frame 1 of the new destination stays 0).
+#[test]
+fn fs461_both_frames_of_a_byte_volume() {
+    for (mode, want) in [(UpstreamDefects::Fix, 9.0), (UpstreamDefects::Reproduce, 0.0)] {
+        let mut p = Process::silent(Environment::new(), mode);
+        let mut src = bytes(&mut p, 2, |_| 5.0);
+        let r = p
+            .mri_replace_values_uchar(&mut src, Dst::New, 5, 9)
+            .expect("no end");
+        let larmorx_fs_core::volume::VolOut::New(d) = r else {
+            panic!("a new volume");
+        };
+        assert_eq!(p.mri_get_vox_val(&d, 0, 0, 0, 0, 0).expect("a voxel"), 9.0);
+        assert_eq!(p.mri_get_vox_val(&d, 0, 0, 0, 1, 0).expect("a voxel"), want);
+        assert!(noted(&mut p, "FS-461"));
+    }
+}
+

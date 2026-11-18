@@ -133,7 +133,8 @@ impl Process {
         let eps = FLT_EPSILON as f32;
         // two float volumes with every voxel inside: element by element (the voxel access reads and
         // writes a float as it is)
-        let n = (w.max(0) as usize) * (h.max(0) as usize) * (d.max(0) as usize) * (nf.max(0) as usize);
+        let n =
+            (w.max(0) as usize) * (h.max(0) as usize) * (d.max(0) as usize) * (nf.max(0) as usize);
         let floats = |m: &Mri| {
             m.kind == types::FLOAT
                 && m.nframes >= nf
@@ -142,19 +143,32 @@ impl Process {
         if floats(v.a()) && floats(v.d()) {
             let swap = |b: &[u8]| {
                 let x = f32::from_le_bytes([b[0], b[1], b[2], b[3]]);
-                if sse::sub32(x, in_val).abs() < eps { out_val } else { x }
+                if sse::sub32(x, in_val).abs() < eps {
+                    out_val
+                } else {
+                    x
+                }
             };
             if v.d_is_a() {
                 if let Some(x) = v.d_mut().voxels.as_deref_mut() {
-                    for c in x[..4 * n].chunks_exact_mut(4) {
+                    for c in x[..4 * n].as_chunks_mut::<4>().0 {
                         let y = swap(c);
                         c.copy_from_slice(&y.to_le_bytes());
                     }
                 }
             } else {
-                let src: Vec<u8> = v.a().voxels.as_deref().map_or(Vec::new(), |x| x[..4 * n].to_vec());
+                let src: Vec<u8> = v
+                    .a()
+                    .voxels
+                    .as_deref()
+                    .map_or(Vec::new(), |x| x[..4 * n].to_vec());
                 if let Some(x) = v.d_mut().voxels.as_deref_mut() {
-                    for (o, c) in x[..4 * n].chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+                    for (o, c) in x[..4 * n]
+                        .as_chunks_mut::<4>()
+                        .0
+                        .iter_mut()
+                        .zip(src.as_chunks::<4>().0)
+                    {
                         o.copy_from_slice(&swap(c).to_le_bytes());
                     }
                 }
@@ -205,9 +219,8 @@ impl Process {
         self.direct_needs_voxels(v.d(), "MRIreplaceValuesUchar")?;
         // every byte inside both volumes: one walk of the buffers (the same bytes)
         let n = (w as usize) * (h as usize) * (d as usize) * (frames.max(1) as usize);
-        let fits = |m: &Mri| {
-            m.nframes >= frames.max(1) && m.voxels.as_ref().is_some_and(|x| x.len() >= n)
-        };
+        let fits =
+            |m: &Mri| m.nframes >= frames.max(1) && m.voxels.as_ref().is_some_and(|x| x.len() >= n);
         if fits(v.a()) && fits(v.d()) {
             if v.d_is_a() {
                 if let Some(x) = v.d_mut().voxels.as_deref_mut() {
@@ -218,7 +231,11 @@ impl Process {
                     }
                 }
             } else {
-                let src: Vec<u8> = v.a().voxels.as_deref().map_or(Vec::new(), |x| x[..n].to_vec());
+                let src: Vec<u8> = v
+                    .a()
+                    .voxels
+                    .as_deref()
+                    .map_or(Vec::new(), |x| x[..n].to_vec());
                 if let Some(x) = v.d_mut().voxels.as_deref_mut() {
                     for (o, &c) in x[..n].iter_mut().zip(&src) {
                         *o = if c == a { b } else { c };
@@ -356,16 +373,17 @@ impl Process {
                                 }
                                 value = sse::narrow(sample);
                             }
-                            sample_type::NEAREST
-                            | sample_type::TRILINEAR
-                            | SAMPLE_WEIGHTED => {
+                            sample_type::NEAREST | sample_type::TRILINEAR | SAMPLE_WEIGHTED => {
                                 let mut base = [0i32; 3];
                                 let mut frac = [0f32; 3];
                                 for k in 0..3 {
                                     base[k] = cvtt(f64::from(sp[k]).floor());
                                     frac[k] = sse::sub32(sp[k], base[k] as f32);
                                 }
-                                let digit = |x: f32| i32::from(!(x < 0.5));
+                                let digit = |x: f32| {
+                                    let below = x < 0.5;
+                                    i32::from(!below)
+                                };
                                 if kind == sample_type::NEAREST && src.kind != types::LONG {
                                     let q = [
                                         base[0].wrapping_add(digit(frac[0])),
@@ -378,7 +396,9 @@ impl Process {
                                     value = match kind {
                                         sample_type::TRILINEAR => trilinear(frac, &c),
                                         sample_type::NEAREST => {
-                                            let i = digit(frac[0]) * 4 + digit(frac[1]) * 2 + digit(frac[2]);
+                                            let i = digit(frac[0]) * 4
+                                                + digit(frac[1]) * 2
+                                                + digit(frac[2]);
                                             c[i as usize]
                                         }
                                         _ => weighted(frac, &c),
@@ -560,7 +580,9 @@ impl Process {
         // map beside them
         let mut counts = vec![0u8; cells * 256];
         let mut more: std::collections::HashMap<usize, u32> = std::collections::HashMap::new();
-        let at = |x: i32, y: i32, z: i32| ((z as usize * th as usize + y as usize) * tw as usize + x as usize) * 256;
+        let at = |x: i32, y: i32, z: i32| {
+            ((z as usize * th as usize + y as usize) * tw as usize + x as usize) * 256
+        };
         let mut vx = Matrix::zeros(4, 1, MATRIX_REAL);
         let mut vy = Matrix::zeros(4, 1, MATRIX_REAL);
         vx.set(4, 1, 1.0);
@@ -570,14 +592,25 @@ impl Process {
             for si in 0..sg.width {
                 for sj in 0..sg.height {
                     for sk in 0..sg.depth {
-                        let t =
-                            apply(self, &a, [si as f32, sj as f32, sk as f32], &mut vx, &mut vy)?;
+                        let t = apply(
+                            self,
+                            &a,
+                            [si as f32, sj as f32, sk as f32],
+                            &mut vx,
+                            &mut vy,
+                        )?;
                         let q = [
                             cvtt(f64::from(t[0]).floor()),
                             cvtt(f64::from(t[1]).floor()),
                             cvtt(f64::from(t[2]).floor()),
                         ];
-                        if q[0] < 0 || q[0] >= tw || q[1] < 0 || q[1] >= th || q[2] < 0 || q[2] >= td {
+                        if q[0] < 0
+                            || q[0] >= tw
+                            || q[1] < 0
+                            || q[1] >= th
+                            || q[2] < 0
+                            || q[2] >= td
+                        {
                             continue;
                         }
                         let v = self.mri_get_vox_val(src, si, sj, sk, f, 0)?;
@@ -688,7 +721,9 @@ impl Process {
                     Returned::New(r) => r,
                     _ => Matrix::zeros(4, 1, MATRIX_REAL),
                 };
-                let f = |x: f32| String::from_utf8_lossy(&sprintf_f64(b"%2.0f", sse::widen(x))).into_owned();
+                let f = |x: f32| {
+                    String::from_utf8_lossy(&sprintf_f64(b"%2.0f", sse::widen(x))).into_owned()
+                };
                 self.put_out(
                     format!(
                         "{label} RAS (0,0,0) -> ({}, {}, {})\n",

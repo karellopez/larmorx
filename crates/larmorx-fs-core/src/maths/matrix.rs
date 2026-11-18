@@ -688,8 +688,8 @@ pub(crate) fn real_point_f(a: &Matrix, p: [f32; 4]) -> [f32; 4] {
     for (r, o) in out.iter_mut().enumerate() {
         let ra = 2 + r * 4;
         let mut v = 0.0f32;
-        for i in 0..4 {
-            v += p[i] * a.data[ra + i];
+        for (i, x) in p.iter().enumerate() {
+            v += x * a.data[ra + i];
         }
         if v.is_nan() {
             let q = |i: usize| sse::mul32(p[i], a.data[ra + i]);

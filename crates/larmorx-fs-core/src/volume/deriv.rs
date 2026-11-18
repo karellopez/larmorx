@@ -130,9 +130,23 @@ impl Process {
         let (mut vp, mut vm, mut len) = (0.0f64, 0.0f64, 0.0f64);
         for d in [0.5, 1.0, 1.5, 2.0] {
             len = sse::add64(len, d);
-            self.deriv_sample(m, along(p, d, dir, true), None, &mut val, &mut written, WHAT)?;
+            self.deriv_sample(
+                m,
+                along(p, d, dir, true),
+                None,
+                &mut val,
+                &mut written,
+                WHAT,
+            )?;
             vp = sse::add64(vp, val);
-            self.deriv_sample(m, along(p, d, dir, false), None, &mut val, &mut written, WHAT)?;
+            self.deriv_sample(
+                m,
+                along(p, d, dir, false),
+                None,
+                &mut val,
+                &mut written,
+                WHAT,
+            )?;
             vm = sse::add64(vm, val);
         }
         vm = sse::div64(vm, 4.0);
@@ -193,9 +207,23 @@ impl Process {
             };
             ktotal = sse::add64(ktotal, k);
             len = sse::add64(len, d);
-            self.deriv_sample(m, along(p, d, dir, true), None, &mut val, &mut written, WHAT)?;
+            self.deriv_sample(
+                m,
+                along(p, d, dir, true),
+                None,
+                &mut val,
+                &mut written,
+                WHAT,
+            )?;
             vp = sse::add64(vp, sse::mul64(k, val));
-            self.deriv_sample(m, along(p, d, dir, false), None, &mut val, &mut written, WHAT)?;
+            self.deriv_sample(
+                m,
+                along(p, d, dir, false),
+                None,
+                &mut val,
+                &mut written,
+                WHAT,
+            )?;
             vm = sse::add64(vm, sse::mul64(k, val));
             if step < FLT_EPSILON {
                 break;
@@ -353,14 +381,8 @@ impl Process {
         for q in at {
             let hit = match count {
                 Neighbours::Off(min) | Neighbours::Off3x3(min) => {
-                    let place = self.row_place(
-                        m,
-                        i64::from(q[0]),
-                        i64::from(q[1]),
-                        i64::from(q[2]),
-                        0,
-                        1,
-                    );
+                    let place =
+                        self.row_place(m, i64::from(q[0]), i64::from(q[1]), i64::from(q[2]), 0, 1);
                     let b = self.direct_read8(m, place, 1, name)[0];
                     i32::from(b) < min
                 }

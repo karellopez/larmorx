@@ -1423,7 +1423,9 @@ impl G {
         let one = "3f800000";
         let z = "00000000";
         match self.below(9) {
-            0 => format!("4 4 {one} {z} {z} {z} {z} {one} {z} {z} {z} {z} {one} {z} {z} {z} {z} {one}"),
+            0 => format!(
+                "4 4 {one} {z} {z} {z} {z} {one} {z} {z} {z} {z} {one} {z} {z} {z} {z} {one}"
+            ),
             1 => {
                 let d = [self.size(false), self.size(false), self.size(false)];
                 format!(
@@ -1455,7 +1457,9 @@ impl G {
                     .collect();
                 format!("4 4 {} {z} {z} {z} {one}", v.join(" "))
             }
-            6 => format!("4 4 {one} {z} {z} {z} {z} {z} {z} {z} {z} {z} {one} {z} {z} {z} {z} {one}"),
+            6 => {
+                format!("4 4 {one} {z} {z} {z} {z} {z} {z} {z} {z} {z} {one} {z} {z} {z} {z} {one}")
+            }
             7 => self.mat3(),
             _ => "null".to_owned(),
         }
@@ -1481,7 +1485,11 @@ fn frame_range(g: &mut G, seq: bool) -> String {
             } else {
                 g.pick(&["-1", "-1", "0", "1", "1", "2", "3", "4", "6", "7"])
             };
-            pts.push(format!("{x} {y} {z} {} {} {code}", g.int(-1, 2), g.int(-1, 3)));
+            pts.push(format!(
+                "{x} {y} {z} {} {} {code}",
+                g.int(-1, 2),
+                g.int(-1, 3)
+            ));
         } else {
             pts.push(format!(
                 "{} {} {} {} {} {}",
@@ -1504,10 +1512,19 @@ const FRAMES: &[(&str, Make)] = &[
         let v: Vec<String> = (0..n)
             .map(|_| {
                 let val = match g.below(4) {
-                    0 => g.pick(&["4202a05f20000000", "40f1170000000000", "c0f1170000000000"]).to_owned(),
+                    0 => g
+                        .pick(&["4202a05f20000000", "40f1170000000000", "c0f1170000000000"])
+                        .to_owned(),
                     _ => g.d(true),
                 };
-                format!("{} {} {} {} {} {val}", g.int(0, 1), g.coord(), g.coord(), g.coord(), g.int(0, 2))
+                format!(
+                    "{} {} {} {} {} {val}",
+                    g.int(0, 1),
+                    g.coord(),
+                    g.coord(),
+                    g.coord(),
+                    g.int(0, 2)
+                )
             })
             .collect();
         format!("{a} {n} {}", v.join(" "))
@@ -1545,7 +1562,12 @@ fn sigma(g: &mut G) -> String {
 const DERIV: &[(&str, Make)] = &[
     ("deriv", |g| {
         let a = g.ws();
-        let s = g.pick(&["3ff0000000000000", "bff0000000000000", "3fe0000000000000", "7ff8000000000000"]);
+        let s = g.pick(&[
+            "3ff0000000000000",
+            "bff0000000000000",
+            "3fe0000000000000",
+            "7ff8000000000000",
+        ]);
         let n = g.int(1, 3);
         let v: Vec<String> = (0..n)
             .map(|_| {
@@ -1568,7 +1590,16 @@ const DERIV: &[(&str, Make)] = &[
         let a = g.ws();
         let n = g.int(1, 3);
         let v: Vec<String> = (0..n)
-            .map(|_| format!("{} {} {} {} {}", g.int(0, 1), g.coord(), g.coord(), g.coord(), g.int(0, 2)))
+            .map(|_| {
+                format!(
+                    "{} {} {} {} {}",
+                    g.int(0, 1),
+                    g.coord(),
+                    g.coord(),
+                    g.coord(),
+                    g.int(0, 2)
+                )
+            })
             .collect();
         format!("{a} {n} {}", v.join(" "))
     }),
@@ -1604,7 +1635,11 @@ const LINEAR: &[(&str, Make)] = &[
     }),
     ("rasvox", |g| {
         let a = g.ws();
-        let b = if g.one_in(3) { "null".to_owned() } else { g.ws() };
+        let b = if g.one_in(3) {
+            "null".to_owned()
+        } else {
+            g.ws()
+        };
         format!("{a} {b} {}", g.mat4())
     }),
     ("lxf", |g| {

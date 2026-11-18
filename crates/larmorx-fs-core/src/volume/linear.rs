@@ -115,7 +115,9 @@ impl Process {
             v.set_dst(c);
         }
         let ov = v.a().outside_val;
-        if !(ov.abs() < FLT_EPSILON) {
+        // not within FLT_EPSILON of 0 (a NaN included)
+        let small = ov.abs() < FLT_EPSILON;
+        if !small {
             self.mri_set_values(v.d_mut(), sse::narrow(ov))?;
             v.d_mut().outside_val = ov;
         }

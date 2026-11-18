@@ -971,7 +971,11 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                 if c == "sseq" {
                     let (x, y, z) = (l.getd(), l.getd(), l.getd());
                     let (first, last, kind) = (l.geti(), l.geti(), l.geti());
-                    let cnt = if last >= first { i64::from(last) - i64::from(first) + 1 } else { 0 };
+                    let cnt = if last >= first {
+                        i64::from(last) - i64::from(first) + 1
+                    } else {
+                        0
+                    };
                     let len = SLACK + i64::from(last.max(0)) + 1 + SLACK;
                     let mut buf = vec![UNSET; len as usize];
                     let r = {
@@ -990,12 +994,20 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                     l.puti(i64::from(r));
                     for f in 0..cnt {
                         let i = SLACK + i64::from(first) + f;
-                        l.putf(if (0..len).contains(&i) { buf[i as usize] } else { UNSET });
+                        l.putf(if (0..len).contains(&i) {
+                            buf[i as usize]
+                        } else {
+                            UNSET
+                        });
                     }
                 } else {
                     let (x, y, z) = (l.geti(), l.geti(), l.geti());
                     let (begin, end, _k) = (l.geti(), l.geti(), l.geti());
-                    let cnt = if end > begin { i64::from(end) - i64::from(begin) } else { 0 };
+                    let cnt = if end > begin {
+                        i64::from(end) - i64::from(begin)
+                    } else {
+                        0
+                    };
                     let mut buf = vec![UNSET; cnt as usize];
                     let r = {
                         let mut put = |j: i32, v: f32| {
@@ -1098,7 +1110,11 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
         }
         "rasvox" => {
             let a = getw(p, l)?;
-            let b = if l.take("null") { None } else { Some(getw(p, l)?) };
+            let b = if l.take("null") {
+                None
+            } else {
+                Some(getw(p, l)?)
+            };
             let m = l.getm(p)?;
             let r = p.mri_ras_xform_to_voxel_xform(&a, b.as_ref(), m.as_ref())?;
             l.putm(r.as_ref());

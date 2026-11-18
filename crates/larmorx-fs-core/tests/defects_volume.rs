@@ -482,7 +482,10 @@ fn fs318_the_mean_of_another_frame() {
 /// to the extent + 499) ends the program in both modes, before any voxel is read.
 #[test]
 fn fs323_an_index_past_the_tables() {
-    let line = format!("nbrs {} 1 0 600 0 0 1 0 00000000 00000000", w("2 1 1 0 1 0", "5"));
+    let line = format!(
+        "nbrs {} 1 0 600 0 0 1 0 00000000 00000000",
+        w("2 1 1 0 1 0", "5")
+    );
     check("FS-323", true, &line);
     for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
         let (r, _) = run(&line, mode);
@@ -543,7 +546,10 @@ fn noted(p: &mut Process, id: &str) -> bool {
 /// lower label, 1, wins.
 #[test]
 fn fs326_votes_past_255() {
-    for (mode, want) in [(UpstreamDefects::Fix, 2.0), (UpstreamDefects::Reproduce, 1.0)] {
+    for (mode, want) in [
+        (UpstreamDefects::Fix, 2.0),
+        (UpstreamDefects::Reproduce, 1.0),
+    ] {
         let mut p = Process::silent(Environment::new(), mode);
         let src = bytes(&mut p, 600, |f| if f < 280 { 1.0 } else { 2.0 });
         let template = bytes(&mut p, 1, |_| 0.0);
@@ -577,7 +583,10 @@ fn fs327_a_vote_without_a_matrix() {
 /// frames; with `reproduce` in frame 0 only (frame 1 of the new destination stays 0).
 #[test]
 fn fs461_both_frames_of_a_byte_volume() {
-    for (mode, want) in [(UpstreamDefects::Fix, 9.0), (UpstreamDefects::Reproduce, 0.0)] {
+    for (mode, want) in [
+        (UpstreamDefects::Fix, 9.0),
+        (UpstreamDefects::Reproduce, 0.0),
+    ] {
         let mut p = Process::silent(Environment::new(), mode);
         let mut src = bytes(&mut p, 2, |_| 5.0);
         let r = p
@@ -591,4 +600,3 @@ fn fs461_both_frames_of_a_byte_volume() {
         assert!(noted(&mut p, "FS-461"));
     }
 }
-

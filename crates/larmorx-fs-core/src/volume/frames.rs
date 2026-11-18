@@ -197,7 +197,9 @@ impl Process {
                 if sum < i64::from(i32::MIN) || sum > i64::from(i32::MAX) {
                     self.note(
                         &FS_320,
-                        format!("{WHAT}: a 32-bit sum beyond the range wrapped around, as FreeSurfer's"),
+                        format!(
+                            "{WHAT}: a 32-bit sum beyond the range wrapped around, as FreeSurfer's"
+                        ),
                     );
                 }
                 self.direct_write(m, place, &(sum as i32).to_le_bytes(), WHAT);
@@ -226,7 +228,9 @@ impl Process {
             if reproduce {
                 self.note(
                     &FS_320,
-                    format!("{WHAT}: a sum beyond the type's range wrapped around, as FreeSurfer's"),
+                    format!(
+                        "{WHAT}: a sum beyond the type's range wrapped around, as FreeSurfer's"
+                    ),
                 );
             } else {
                 self.note(

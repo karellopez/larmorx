@@ -17,6 +17,7 @@ pub mod geomblock;
 pub mod geometry;
 pub mod ltaread;
 pub mod moves;
+pub mod resample;
 pub mod sample;
 pub mod skull;
 pub mod stats;
@@ -97,6 +98,11 @@ impl<'a> Vols<'a> {
 
     pub(crate) fn b(&self) -> &Mri {
         self.b.as_deref().expect("a second volume")
+    }
+
+    /// Whether the destination is the first source itself.
+    pub(crate) fn d_is_a(&self) -> bool {
+        matches!(self.d, Slot::A)
     }
 
     pub(crate) fn has_dst(&self) -> bool {

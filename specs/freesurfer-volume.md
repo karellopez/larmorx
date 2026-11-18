@@ -1043,10 +1043,12 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   plane's x outermost: coronal x then y, horizontal x then z, sagittal z then y; each mask voxel read
   just before its write, which shows when the mask is `dst` itself). Returns `dst`.
 - **`MRIupsampleN(src, dst, N)`** (`MRIupsample2` is N = 2): the extent is N times the source's (32-bit
-  products); without `dst`, a new one of the source's type and frames with its header. The voxel sizes are
+  products); without `dst`, a new one of the source's type and frames with its header (a given `dst`
+  gets no header copy: only the fields that follow). The voxel sizes are
   the source's divided by N (in `float`), the direction cosines, starts, ends and `imnr0` the source's,
-  `imnr1 = imnr0 + depth - 1` (`dst`'s depth); the centre is placed (`MRIp0ToCRAS`) at the source's
-  vox2ras applied to `(c, c, c, 1)`, `c = -0.5 + 1 / (2N)` (`double`, stored as `float`). Voxel (x, y,
+  `imnr1 = imnr0 + depth - 1` (`dst`'s depth); then the centre is placed (`MRIp0ToCRAS`) at the source's
+  vox2ras (from its fields as they are then: into the source itself, with the sizes already divided)
+  applied to `(c, c, c, 1)`, `c = -0.5 + 1 / (2N)` (`double`, stored as `float`). Voxel (x, y,
   z) of each source frame is the source's (x / N, y / N, z / N) (integer division), copied by
   `MRIgetVoxVal`/`MRIsetVoxVal` over N times the source's extent. The cached matrices are recomputed.
 - **`MRIupsampleNConserve(src, dst, N)`**: a source that is not float is first changed to floats
@@ -1064,7 +1066,8 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   source).
 - **`MRIdownsample2(src, dst)`**: a given `dst` of another type: `MRIdownsample2: source and dst must be
   same type` (`ERROR_UNSUPPORTED`), `NULL`. The extent is half the source's (rounded down); without
-  `dst`, a new one of the source's type with its header. `dst` is cleared; each 2 x 2 x 2 block of frame
+  `dst`, a new one of the source's type with one frame and the source's header (a given `dst` gets no
+  header copy: only the fields below). `dst` is cleared; each 2 x 2 x 2 block of frame
   0 is summed in `float` (z, then y, then x; the sum the first operand), times 1/8 (floats stored as
   they are; bytes, shorts and unsigned shorts `nint` and cast). A type other than those four:
   `MRIdownsample2: unsupported input type <t>` and `NULL` when the first block is summed. Then, in this
@@ -1085,7 +1088,8 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   (or the source's type with `KeepType`), the source's frames and header, `imnr0` the source's, `imnr1 =
   imnr0 + depth - 1`, voxel sizes `xsize * Fc`, `Fr * ysize` (the NaN kept as written), `zsize * Fs`,
   `thick * Fs`, `ps * Fc`, the centre placed at the source's vox2ras applied to `(Fc / 2 - 0.5, Fr / 2 -
-  0.5, Fs / 2 - 0.5, 1)`, the cached matrices recomputed. A `dst` whose extent or frames differ:
+  0.5, Fs / 2 - 0.5, 1)`, the cached matrices recomputed; a given `dst` keeps its header as it is (none
+  of these fields set). A `dst` whose extent or frames differ:
   `ERROR: MRIdownsampleN: dimension mismatch` (standard output), `NULL`. Voxel (c, r, s) of frame f:
   the `double` sum of the source's voxels at columns from `(int)(c * Fc)` while `(float) c0 < (c + 1) *
   Fc` (in `float`), likewise rows and slices (slices innermost; each new voxel the first operand of the
@@ -1093,11 +1097,16 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   the source's end (`MRIgetVoxVal`'s FS-52, FS-53).
 - **`MRImeanFrameThresh(mri, frame, thresh)`**: `frame >= nframes`: `MRImeanFrame: frame <f> out of
   bounds (<n>)` (`ERROR_BADPARM`), 0. Else the nearest-voxel samples at every whole position of frame 0
-  (FS-318, `reproduce`, noted when `frame` is not 0; by default of `frame`) that are not below `thresh` (NaN included) are summed in `double`
-  (the sample the first operand) and divided by their count (none: `0 / 0`, x86's default NaN).
+  (FS-318, `reproduce`, noted when `frame` is not 0; by default of `frame`), taken by §18's
+  `MRIsampleVolumeType` with `SAMPLE_NEAREST` (its messages, which name `MRIsampleVolumeType`, for the
+  types it refuses), slices outermost, then rows, columns innermost, that are not below `thresh` (NaN
+  included) are summed in `double` in that order (the sample the first operand) and divided by their
+  count (none: `0 / 0`, x86's default NaN).
 - **`MRIlimits(mri, &min, &max)`**: a volume without voxels leaves both as they were; else both start at
-  voxel (0, 0, 0) of frame 0 and every voxel smaller (larger) replaces them (C's comparisons: a NaN
-  start stays). Returns 0.
+  voxel (0, 0, 0) of frame 0 and every voxel of every frame (frames outermost, then columns, rows,
+  slices innermost) that is smaller (larger) replaces them (C's comparisons: a NaN start stays; of
+  equal values, -0 and +0 among them, the first met stays; **(observed)**: `vres`, whose lines of
+  several frames differ when only frame 0 is walked). Returns 0.
 - **`MRIchangeType(src, type, f_low, f_high, no_scale)`**: the same type: a copy. Bytes to shorts, ints,
   longs or floats; shorts and unsigned shorts to ints, longs or floats; longs to ints or floats; ints to
   longs or floats: the values as `MRIgetVoxVal`/`MRIsetVoxVal` convert them. Otherwise `MRIlimits`;
@@ -1110,7 +1119,9 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   environment variable `FS_FORCE_BIN_CHECK` set, the mean of frame 0's voxels not below 1e-7 (as
   `MRImeanFrameThresh`) gives `bin = (int)((mean - min) / size)` in `double`, and when `(float) bin <
   200` the size becomes `(mean - min) / 200` (`double`, stored as `float`) after `MRIchangeType: original
-  bin size <%2.2f> (max <%2.1f>) too big for mean/min <%2.2f>/<%2.2f>, scaling down to <%2.2f>`. Every
+  bin size <old> (max <max>) too big for mean/min <mean>/<min>, scaling down to <new>` + `\n` on standard
+  output (no brackets in the line: `<old>` the old size `%2.2f`, `<max>` `%2.1f`, `<mean>`, `<min>` and
+  `<new>` the new size `%2.2f`). Every
   voxel (frames, x, y, z) counts as non-zero unless `fabs(v) < 1e-15` (NaN counts), and goes to bin
   `(int)((v - min) / size)` (`float`; FS-317 beyond the `int` range or NaN) clamped to [0, 999]. The low
   end: bins 0, 1, 2, ... are added while their total is below `(int)(((w * f_low) * h) * d)` (`float`;
@@ -1128,8 +1139,9 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   their limits as `float`s, floats [0, 0]; `scale = (dmax - dmin) / (max - min)` (1 when equal); each
   voxel `((v - min) * scale) + dmin` in `float`, stored by `MRIsetVoxVal`.
 - **`MRISeqchangeType(vol, ...)`**: `MRIchangeType` of the volume seen as one frame of `depth x nframes`
-  slices (its extent restored afterwards), the result given back the depth and frames (and new frame
-  records); a failure: `ERROR: MRISeqchangeType: MRIchangeType` on standard error, `NULL`.
+  slices (its extent restored afterwards), the result given back the depth and frames, its voxel counts
+  per volume and in total for them, and new frame records (each with a zero 4 x 4 `m_ras2vox`); a
+  failure: `ERROR: MRISeqchangeType: MRIchangeType` on standard error, `NULL`.
 
 ## 26. Validation plan (resolution, planes, fills, resampling and changes of type)
 §69's group `vres` (the open probe's commands `setres`, `vfill`, `fillfg`, `explane`, `fillplane`, `ups`,

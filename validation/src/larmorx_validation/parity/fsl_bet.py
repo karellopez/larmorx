@@ -415,14 +415,17 @@ def larmorx_own(line: str) -> bool:
     return s.startswith(("larmorx: ", "larmorx-nc: ")) or s.endswith("(larmorx)")
 
 
-#: bash's report of a crashed command: the process ID (and a core dump's note) left out.
+#: bash's report of a crashed command: the process ID (and a core dump's note) left out. bash
+#: prints the ID right-aligned in five columns, so the spaces before it depend on its number of
+#: digits: they go too, one space then ``PID`` in their place ("line 229:  4321 Aborted" and
+#: "line 229: 1915072 Aborted" both read "line 229: PID Aborted").
 _BASH_PID = re.compile(
-    r"(: line \d+: +)\d+( (?:Aborted|Segmentation fault) +)(?:\(core dumped\) )?"
+    r"(: line \d+:) +\d+( (?:Aborted|Segmentation fault) +)(?:\(core dumped\) )?"
 )
 
 
 def _mask_pids(text: str) -> str:
-    return _BASH_PID.sub(r"\1PID\2", text)
+    return _BASH_PID.sub(r"\1 PID\2", text)
 
 
 def fsl_text(text: str) -> str:
@@ -2313,7 +2316,7 @@ def _fsl_step(
             )
     # bash's report of a crashed program names its process ID: masked
     msgs = tuple(
-        re.sub(r"(line \d+: +)\d+ ", r"\1<pid> ", fsl_text(r.out + r.err).replace(str(d), "<dir>"))
+        re.sub(r"(line \d+:) +\d+ ", r"\1 <pid> ", fsl_text(r.out + r.err).replace(str(d), "<dir>"))
         for r, d in ((prev, p_dir), (fsl, f_dir))
     )
     why = sorted({*fsl_versions.reasons(args, env), *s.step})

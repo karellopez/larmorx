@@ -36,11 +36,12 @@ VOLATILE = (
     # (ITERATION_TIME_INDEX, SINCE_LAST), which the registration suite masks too
     (r"(DIAGNOSTIC,(?:[^,\n]*,){3})[^,\n]*,[^,\n]*,", r"\1…,…,"),
     # a shell's report of a command a script ran that ended by a signal names its process ID
-    # ("bet: line 399: 1915072 Segmentation fault ${FSLDIR}/bin/bet2 ...": FSL's bet script)
+    # ("bet: line 399: 1915072 Segmentation fault ${FSLDIR}/bin/bet2 ...": FSL's bet script),
+    # right-aligned in five columns: the spaces before it go too ("line 399:  4321 Aborted")
     (
-        r"(: line \d+: +)\d+( +(?:Segmentation fault|Aborted|Killed|Bus error|Floating point "
+        r"(: line \d+:) +\d+( +(?:Segmentation fault|Aborted|Killed|Bus error|Floating point "
         r"exception|Illegal instruction|Terminated|Trace/breakpoint trap))",
-        r"\1…\2",
+        r"\1 …\2",
     ),
 )
 

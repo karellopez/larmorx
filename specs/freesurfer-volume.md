@@ -775,7 +775,9 @@ probe: an `.xfm` that names a volume that exists (its geometry comes from the he
 **The defects' modes in §18 to §21** (the same in both implementations; each case notes its ID;
 where larmorx ends the program, its message is given exactly so that the two implementations are
 interchangeable; "ends the program" is §6's C-style exit with the code given, a message with its own
-`\n`):
+`\n`; like every C-style exit its line carries FS-01's NUL before the last new line under `reproduce`
+and none by default, so where the table gives "the same" (FS-302, FS-304, FS-305, FS-307, FS-309,
+FS-310) the two modes' lines differ by that byte only):
 
 | Defect | Default | `reproduce` |
 |---|---|---|

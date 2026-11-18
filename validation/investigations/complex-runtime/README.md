@@ -1,9 +1,8 @@
 # The C runtime's complex functions behind FreeSurfer's matrix square root, as black boxes
 
-FreeSurfer 8.2.0's `MyMatrix::MatrixSqrt` (the robust registration's half-way transforms) runs LAPACK's
-complex Schur decomposition and C++'s `std::complex<double>`; the official `mri_robust_register`
-imports `cabs` and `csqrt` from glibc 2.35 and `__divdc3`, `__muldc3` from the system's
-`libgcc_s.so.1` (its dynamic symbols). This folder measures those four functions **as black boxes**:
+The official FreeSurfer 8.2.0 `mri_robust_register` imports `cabs` and `csqrt` from glibc 2.35 and
+`__divdc3`, `__muldc3` from the system's `libgcc_s.so.1` (its dynamic symbols, `nm -D`): the complex
+absolute value, square root, division and multiplication its matrix square root needs. This folder measures those four functions **as black boxes**:
 their code (glibc's LGPL, libgcc's GPL) is never read; each is compared bit for bit with a candidate
 written from a published algorithm (Kahan, "Branch Cuts for Complex Elementary Functions", 1987, for
 the square root; Smith, "Algorithm 116: Complex division", CACM 1962, and C11's Annex G for division
@@ -30,4 +29,5 @@ sqrt(0.5 (hypot(x, y) + |x|))`, `(t, 0.5 (y / t))` for `x >= 0`, else `(0.5 (|y|
   product (it is reached only when a product's parts are both NaN).
 - glibc's `hypot` (and so `cabs` and `csqrt`) is not correctly rounded on about 0.5 % of arguments
   (`validation/probes/coremath-hypot`); the project decided the correctly rounded `hypot` in both modes
-  (D4). How the port's `MatrixSqrt` takes these functions: `docs/findings/freesurfer-robust.md` §4.
+  (D4). How FreeSurfer's replica takes these functions: the replica's findings (closed to its clean-room
+  implementers).

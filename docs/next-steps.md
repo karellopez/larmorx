@@ -72,6 +72,22 @@ reset on, **one agent at a time**, to save usage:
   (track E) and its clean room (the clean-room chain) follow, so the clean rooms trail by about one module. From
   wave 3.2 on the same rhythm: the next wave's replicas and the previous wave's clean rooms, about two replica
   relays per clean-room relay, the clean rooms catching up whenever a replica chain is blocked.
+- **Wave 3.1's replicas: complete (2026-11-18)** but what waits for later waves (3.2-01's B-splines, 3.4's realm
+  trees, `mrisp.cpp` and fs.deform's integration parameters, 3.7-14's DICOM series); glibc's double `acos` stays
+  correctly rounded in `reproduce` too, as the user decided for FSL on 2026-11-04 (GLIBC-07: one unit in the last
+  place on 0.05 % of arguments, no LGPL data in larmorx). Its clean rooms trail: fs.core, fs.maths, fs.mri and
+  fs.volume's parts 1 to 5 done; fs.volume's rest, then fs.io, fs.labels, fs.filter and fs.surfio, each when track E
+  has made its spec ready.
+- **Wave 3.2 (the volume programs, `docs/freesurfer/queue.md` 3.2-01 to 3.2-41), by track** (the orchestrator,
+  2026-11-18): **A** `mri_convert` (3.2-04 to 07), `mri_info`, `lta_convert`, `mri_add_xform_to_header`,
+  `fs_temp_file`, `mri_vol2vol`, `mri_concat`, `mri_label2vol`, the tcsh scripts (`getfullpath`,
+  `mri_nu_correct.mni`, `seg2cc`, `mergeseg`) and the main package's side (3.2-41); **C** fs.bspline (3.2-01),
+  fs.robust (3.2-02, 03), `mri_robust_register`, `mri_robust_template` (3.2-14 to 16), `mri_coreg`,
+  `AntsN4BiasFieldCorrectionFs`, `AntsDenoiseImageFs`; **D** `mri_normalize` (3.2-24, 25), `mri_binarize`,
+  `mri_segstats`, `mris_calc`, `mri_make_uchar`, `mri_mask`, `mri_cc`, `mri_segment`, `mri_edit_wm_with_aseg`,
+  `mri_pretess`, `mri_fill` (3.2-34 to 37). Each program complete (every option, message, exit status), validated
+  against its recorded steps and the unit oracle; track E and the clean-room chain keep finishing wave 3.1's clean
+  rooms on the same rhythm.
 - **Merges:** a batch every two or three relays (or once a day), verified while the next relay works (machine
   time, not usage); main CI-green before a relay that depends on the batch starts.
 - **Usage:** the pace line again (30 % at the weekly reset plus 10 % a day; `usage.py check` before every

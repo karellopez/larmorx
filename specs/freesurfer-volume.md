@@ -209,8 +209,11 @@ Part 2 (§6-12): the voxel arithmetic, with `MRIcopyFrame` and `MRIcalcCRASforEx
   (every row at the first voxel). FS-960 is noted in both modes where a direct walk reaches a row of a
   tensor volume other than slice 0's row 0. The volume's other accesses (`MRIgetVoxVal`,
   `MRIsetVoxVal`) are not affected: for a tensor they read -1e10 and write nothing
-  (`specs/freesurfer-mri.md` §5). In parts 1 to 4 FS-291's `reproduce` (§9, §10) and FS-301's
-  (§19: a tensor destination of the moves) walk a tensor volume directly.
+  (`specs/freesurfer-mri.md` §5). In parts 1 to 5 only `reproduce` walks a tensor volume directly:
+  FS-291's (§9, §10) and FS-301's (§19: a tensor destination of the moves). By default FS-291's walks
+  are refused, FS-301's writes go through `MRIsetVoxVal` and `MRIextractInto` refuses a tensor source
+  (§11, step 6), so in parts 1 to 5 FS-960 is met only under `reproduce` (its rows' places are then
+  FreeSurfer's).
 - **Arithmetic** in `float` (single precision, x86-64's NaN rules, `specs/freesurfer-maths.md` §1)
   unless said otherwise; `nint(x)` is `(int)(x + 0.5)` (`x - 0.5` below 0) in double with FS-12's
   rule outside `int`. Storing an integer into a narrower integer type keeps its low bits.

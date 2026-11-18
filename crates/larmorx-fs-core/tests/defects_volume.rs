@@ -341,23 +341,36 @@ fn fs313_the_right_vessel() {
     check("FS-313", true, &line);
 }
 
-/// FS-314: a cache line naming a measure without a number and ending in a blank gives no number
-/// in both modes (FreeSurfer aborts); the measure then missing ends the program.
+/// FS-314: a cache line naming a measure without a number and ending in white space: by default it
+/// gives no number (the measure then missing: status 1); `reproduce` aborts with the C++ runtime's
+/// two lines (status 134), `std::bad_alloc` for words of at most 15 bytes, `std::length_error`
+/// past that.
 #[test]
 fn fs314_a_cache_line_without_a_number() {
-    let text = "# Measure BrainSeg, BrainSegVol, Brain Segmentation Volume, x, mm^3 \n";
-    let mut hex = "x".to_owned();
-    for c in text.bytes() {
-        hex.push_str(&format!("{c:02x}"));
-    }
-    let line = format!("bvparse {hex}");
-    check("FS-314", false, &line);
+    let bv = |text: &str| {
+        let mut hex = "x".to_owned();
+        for c in text.bytes() {
+            hex.push_str(&format!("{c:02x}"));
+        }
+        format!("bvparse {hex}")
+    };
+    let line = bv("# Measure BrainSeg, BrainSegVol, Brain Segmentation Volume, x, mm^3 \n");
+    check("FS-314", true, &line);
     let (fix, _) = run(&line, UpstreamDefects::Fix);
     assert!(fix.starts_with("EXIT 1 |"), "{fix}");
+    let (rep, _) = run(&line, UpstreamDefects::Reproduce);
+    assert!(rep.starts_with("EXIT 134 |"), "{rep}");
+    assert!(rep.contains("'std::bad_alloc'\n  what():  std::bad_alloc\n"), "{rep}");
+    let line = bv("# Measure SupraTentorialNotVentVox, SupraTentorialVolNotVentVox, x, mm^3\t\n");
+    let (rep, _) = run(&line, UpstreamDefects::Reproduce);
+    assert!(
+        rep.contains("'std::length_error'\n  what():  basic_string::_M_create\n"),
+        "{rep}"
+    );
 }
 
-/// FS-315: label lists of 2 x 0: an error by default; `reproduce` reads their numbers as NaN
-/// (no swap).
+/// FS-315: label lists of 2 x 0: the default ends the program (code -4, before any voxel is
+/// written); `reproduce` reads their numbers as NaN (no swap).
 #[test]
 fn fs315_label_lists_without_numbers() {
     let line = format!(
@@ -367,8 +380,12 @@ fn fs315_label_lists_without_numbers() {
     check("FS-315", true, &line);
     let (fix, _) = run(&line, UpstreamDefects::Fix);
     let (rep, _) = run(&line, UpstreamDefects::Reproduce);
-    assert!(fix.starts_with("null |"), "{fix}");
-    assert!(!rep.starts_with("null |"), "{rep}");
+    assert!(fix.starts_with("EXIT 252 |"), "{fix}");
+    assert!(
+        fix.contains("MRIlrswapSeg(): the label lists hold fewer numbers than rows (FreeSurfer reads past them)\n"),
+        "{fix}"
+    );
+    assert!(!rep.starts_with("null |") && !rep.starts_with("EXIT"), "{rep}");
 }
 
 /// FS-960: a tensor volume's rows walked directly (FS-291's walk of `MRIinvertContrast`,

@@ -30,7 +30,7 @@ const GOLDEN: &[(&str, &str)] = &[
     ),
     (
         "cma.fix",
-        "174351e4f7a0c1fd4c04513da7572202cf3625927daecc68edfeb5bfebc15d71",
+        "8b10060df6129811291bb4b3e9bcab672ed671239ee000504bb2de2d1304daa2",
     ),
     (
         "cma.reproduce",

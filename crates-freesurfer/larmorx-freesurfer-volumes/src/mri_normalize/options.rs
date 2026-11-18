@@ -435,7 +435,10 @@ pub fn get_option(
         );
     } else if is(g, "MGH_MPRAGE") || is(g, "MPRAGE") {
         o.scan_type = MRI_MGH_MPRAGE;
-        let _ = writeln!(r.out, "assuming input volume is MGH (Van der Kouwe) MP-RAGE");
+        let _ = writeln!(
+            r.out,
+            "assuming input volume is MGH (Van der Kouwe) MP-RAGE"
+        );
         o.intensity_below = 15.0;
     } else if is(g, "WASHU_MPRAGE") {
         o.scan_type = MRI_WASHU_MPRAGE;
@@ -472,11 +475,17 @@ pub fn get_option(
         let _ = writeln!(r.out, "interpolating and embedding volume to be 256^3...");
     } else if is(g, "noconform") {
         o.conform = 0;
-        let _ = writeln!(r.out, "not interpolating and embedding volume to be 256^3...");
+        let _ = writeln!(
+            r.out,
+            "not interpolating and embedding volume to be 256^3..."
+        );
     } else if is(g, "aseg") || is(g, "segmentation") {
         o.aseg_fname = a.name(g, 1);
         nargs = 1;
-        let _ = writeln!(r.out, "using segmentation for initial intensity normalization");
+        let _ = writeln!(
+            r.out,
+            "using segmentation for initial intensity normalization"
+        );
     } else if is(g, "gentle") {
         o.gentle_flag = 1;
         let _ = writeln!(r.out, "performing kinder gentler normalization...");

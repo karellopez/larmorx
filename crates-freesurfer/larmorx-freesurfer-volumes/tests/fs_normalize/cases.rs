@@ -17,12 +17,19 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::random::random_number;
 use larmorx_freesurfer_core::run::Environment;
+use larmorx_freesurfer_gca::read::gca_read;
+use larmorx_freesurfer_gca::transform::transform_read;
 use larmorx_freesurfer_io::mriio::mri_read_volume;
-use larmorx_freesurfer_mri::mri::{MRI_FLOAT, MRI_INT, MRI_SHORT, MRI_UCHAR, Mri, mri_alloc_sequence};
+use larmorx_freesurfer_mri::mri::{
+    MRI_FLOAT, MRI_INT, MRI_SHORT, MRI_UCHAR, Mri, mri_alloc_sequence,
+};
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
 use larmorx_freesurfer_surf::aaa::SurfGlobals;
-use larmorx_freesurfer_surf::readwrite;
 use larmorx_freesurfer_surf::coords::Io;
+use larmorx_freesurfer_surf::readwrite;
+use larmorx_freesurfer_volume::arith::mri_clone;
+use larmorx_freesurfer_volume::mriset::mri_copy_label;
+use larmorx_freesurfer_volume::resize::mri_change_type;
 use larmorx_freesurfer_volumes::mri_normalize::helpers::{self as h, Run};
 use larmorx_freesurfer_volumes::mri_normalize::options::{Options, parse_options, usage_exit};
 
@@ -338,7 +345,15 @@ const NO_ARG: [&str; 20] = [
     "-",
     "-1",
 ];
-const INT_ARG: [&str; 7] = ["-nonmax_suppress", "-erode", "-n", "-p", "-seed", "-N", "-prune"];
+const INT_ARG: [&str; 7] = [
+    "-nonmax_suppress",
+    "-erode",
+    "-n",
+    "-p",
+    "-seed",
+    "-N",
+    "-prune",
+];
 const FLOAT_ARG: [&str; 7] = ["-GRAD", "-min_dist", "-sigma", "-a", "-b", "-g", "-B"];
 const NAME_ARG: [&str; 9] = [
     "-renorm",
@@ -353,7 +368,9 @@ const NAME_ARG: [&str; 9] = [
 ];
 const TWO_NAMES: [&str; 5] = ["-INTERIOR", "-r", "-l", "-w", "-W"];
 const INTS: [&str; 7] = ["3", "0", "-1", "12abc", "2147483648", "1", "7"];
-const FLOATS: [&str; 9] = ["0.5", "2.5", "1e3", "-4", "nan", "inf", "abc", "12.75", "110"];
+const FLOATS: [&str; 9] = [
+    "0.5", "2.5", "1e3", "-4", "nan", "inf", "abc", "12.75", "110",
+];
 
 fn opt_tokens(t: &mut Vec<String>, g: &mut Gen) {
     let with_label = g.chance(4);
@@ -401,8 +418,18 @@ fn opt_tokens(t: &mut Vec<String>, g: &mut Gen) {
                 }
             }
             12 => {
-                a.push(g.pick(&["-label", "-lonly", "-label_only", "-labelonly"]).to_owned());
-                a.push(if with_label { "in.l.label" } else { "missing.label" }.to_owned());
+                a.push(
+                    g.pick(&["-label", "-lonly", "-label_only", "-labelonly"])
+                        .to_owned(),
+                );
+                a.push(
+                    if with_label {
+                        "in.l.label"
+                    } else {
+                        "missing.label"
+                    }
+                    .to_owned(),
+                );
             }
             _ => {
                 if g.chance(2) {
@@ -410,7 +437,10 @@ fn opt_tokens(t: &mut Vec<String>, g: &mut Gen) {
                     a.push("lh.white".to_owned());
                     a.push(g.pick(&["identity.nofile", "missing.lta"]).to_owned());
                 } else {
-                    a.push(g.pick(&["-u", "-h", "-?", "--help", "--usage", "-help"]).to_owned());
+                    a.push(
+                        g.pick(&["-u", "-h", "-?", "--help", "--usage", "-help"])
+                            .to_owned(),
+                    );
                 }
             }
         }
@@ -528,7 +558,11 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 }
                 "aip" => {
                     let e = if g.chance(3) {
-                        [g.int(10, 16) as i32, g.int(10, 16) as i32, g.int(10, 16) as i32]
+                        [
+                            g.int(10, 16) as i32,
+                            g.int(10, 16) as i32,
+                            g.int(10, 16) as i32,
+                        ]
                     } else {
                         extent(&mut g)
                     };
@@ -958,9 +992,72 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut String, dir: &Path) -> Result<(), Fa
                 *o += &format!("{:016x} ", v.to_bits());
             }
         }
+        "bobmf" => {
+            let (vf, af, tf, whalf) = (t.next(), t.next(), t.next(), t.i());
+            let src = read(cx, vf)?;
+            let atlas = gca_read(&mut cx.g, &mut so, &mut se, None, af)?;
+            let xf = transform_read(&mut cx.g, &mut so, &mut se, &env, None, tf)?;
+            let (Some(src), Some(atlas), Some(mut xf)) = (src, atlas, xf) else {
+                *o += "NOFILE ";
+                return Ok(());
+            };
+            let m = h::build_outside_of_brain_mask(
+                &mut cx.g, &mut so, &mut se, &env, &src, &atlas, &mut xf, whalf,
+            )?;
+            put_digest(o, &m);
+        }
+        "wmomf" => {
+            let (vf, sf, ib) = (t.next(), t.next(), t.i());
+            let (Some(src), Some(aseg)) = (read(cx, vf)?, read(cx, sf)?) else {
+                *o += "NOFILE ";
+                return Ok(());
+            };
+            let src = if src.mtype == MRI_FLOAT {
+                src
+            } else {
+                mri_change_type(
+                    &mut cx.g, &mut so, &mut se, &env, &src, MRI_FLOAT, 0.0, 255.0, 1,
+                )?
+                .expect("a float volume")
+            };
+            let mut ctrl = mri_clone(&mut cx.g, &mut so, &mut se, &aseg, None)?.unwrap_new();
+            for label in [2, 41] {
+                mri_copy_label(&mut cx.g, &mut se, &aseg, &mut ctrl, label)?;
+            }
+            let mut r = Run {
+                out: &mut so,
+                err: &mut se,
+                env: &env,
+                dir: Some(dir),
+            };
+            h::mri_remove_wm_outliers_and_retain_medial_surface(
+                &mut cx.g, &mut r, &src, &mut ctrl, ib,
+            )?;
+            put_digest(o, &ctrl);
+        }
         c => panic!("unknown command {c}"),
     }
     Ok(())
+}
+
+fn read(cx: &mut Ctx, f: &str) -> Result<Option<Mri>, Fatal> {
+    let (mut a, mut b) = (cx.a.clone(), cx.b.clone());
+    mri_read_volume(&mut cx.g, &mut a, &mut b, &Environment::default(), None, f)
+}
+
+/// `put_digest`: the extent, type, count of voxels above 0 and FNV-1a of the voxels.
+fn put_digest(o: &mut String, m: &Mri) {
+    let c = m.chunk.as_ref().expect("voxels");
+    let bpv = m.bytes_per_vox;
+    let nz = c.chunks(bpv).filter(|v| v.iter().any(|&b| b != 0)).count();
+    *o += &format!(
+        "{} {} {} {} {nz} {:016x} ",
+        m.vg.width,
+        m.vg.height,
+        m.vg.depth,
+        m.mtype,
+        fnv(c)
+    );
 }
 
 fn escape(b: &[u8]) -> String {

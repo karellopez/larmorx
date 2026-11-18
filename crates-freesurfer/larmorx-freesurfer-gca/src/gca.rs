@@ -598,7 +598,14 @@ pub fn gca_source_voxel_to_prior(
         }
     } else {
         let (_, p) = crate::transform::transform_sample(
-            g, out, err, env, transform, v[0] as f32, v[1] as f32, v[2] as f32,
+            g,
+            out,
+            err,
+            env,
+            transform,
+            v[0] as f32,
+            v[1] as f32,
+            v[2] as f32,
         )?;
         (p[0], p[1], p[2])
     };

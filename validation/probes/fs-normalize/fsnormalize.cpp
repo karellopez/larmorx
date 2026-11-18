@@ -190,6 +190,26 @@ std::string slurp(const std::string &path)
   return r;
 }
 
+// a volume's extent, type, count of voxels above 0 and FNV-1a of its voxels
+void put_digest(const MRI *m)
+{
+  oi(m->width); oi(m->height); oi(m->depth); oi(m->type);
+  size_t n = (size_t)m->width * m->height * m->depth * m->nframes, nz = 0;
+  size_t bpv = m->type == MRI_UCHAR ? 1 : m->type == MRI_SHORT ? 2 : 4;
+  const unsigned char *b = (const unsigned char *)m->chunk;
+  uint64_t h = 0xcbf29ce484222325ULL;
+  for (size_t i = 0; i < n * bpv; i++) h = (h ^ b[i]) * 0x100000001b3ULL;
+  for (size_t i = 0; i < n; i++) {
+    bool any = false;
+    for (size_t k = 0; k < bpv; k++) any = any || b[i * bpv + k];
+    nz += any;
+  }
+  oi((long long)nz);
+  char t[24];
+  snprintf(t, sizeof t, "%016" PRIx64 " ", h);
+  out += t;
+}
+
 // the files the case wrote (not the ones it was given: names starting with `in.`), sorted: a
 // volume read back and printed, any other file's FNV-1a
 void put_written()
@@ -337,6 +357,32 @@ void run_case()
     bool seeded = false;
     for (size_t i = 1; i < keep.size(); i++) seeded = seeded || strcasecmp(keep[i].c_str(), "-seed") == 0;
     if (seeded) od(randomNumber(0.0, 1.0));
+  } else if (cmd == "bobmf") {
+    // bobmf <volume> <atlas> <transform> <whalf>: build_outside_of_brain_mask on files (real.py):
+    // the mask's voxel count of 1s and FNV-1a
+    MRI *src = MRIread(next());
+    GCA *a = GCAread(next());
+    TRANSFORM *t = TransformRead(next());
+    int whalf = geti();
+    if (!src || !a || !t) { out += "NOFILE "; return; }
+    MRI *m = build_outside_of_brain_mask(src, a, t, 0, whalf);
+    put_digest(m);
+  } else if (cmd == "wmomf") {
+    // wmomf <volume> <aseg> <intensity_below>: main's -aseg control points (labels 2 and 41 of
+    // the segmentation, the volume as float) through MRIremoveWMOutliersAndRetainMedialSurface
+    MRI *src = MRIread(next());
+    MRI *aseg = MRIread(next());
+    int ib = geti();
+    if (!src || !aseg) { out += "NOFILE "; return; }
+    if (src->type != MRI_FLOAT) {
+      MRI *t = MRIchangeType(src, MRI_FLOAT, 0, 255, 1);
+      MRIfree(&src);
+      src = t;
+    }
+    MRI *ctrl = MRIclone(aseg, NULL);
+    for (size_t i = 0; i < NWM_LABELS; i++) MRIcopyLabel(aseg, ctrl, aseg_wm_labels[i]);
+    MRIremoveWMOutliersAndRetainMedialSurface(src, ctrl, ctrl, ib);
+    put_digest(ctrl);
   } else {
     fail("unknown command");
   }
@@ -379,7 +425,8 @@ int main(int argc, char *argv[])
       close(fd);
       setvbuf(stdout, NULL, _IONBF, 0);
       if (chdir(workdir.c_str()) != 0) _exit(4);
-      alarm(60);
+      // the recorded heads' cases (bobmf, wmomf) run for minutes
+      alarm(line.compare(0, 6, "bobmf ") == 0 || line.compare(0, 6, "wmomf ") == 0 ? 3600 : 60);
       memcpy(buf, line.c_str(), line.size() + 1);
       toks.clear();
       pos = 0;

@@ -58,7 +58,14 @@ const FLT_EPSILON: f32 = f32::EPSILON;
 /// `remove_surface_outliers_T2`'s `nonmax_thresh` (a file static no option changes).
 const NONMAX_THRESH: f32 = 2.5;
 
-fn get(g: &mut Globals, err: &mut dyn Write, m: &Mri, x: i32, y: i32, z: i32) -> Result<f32, Fatal> {
+fn get(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    m: &Mri,
+    x: i32,
+    y: i32,
+    z: i32,
+) -> Result<f32, Fatal> {
     mri_get_vox_val(g, err, m, x, y, z, 0, 0)
 }
 
@@ -275,13 +282,7 @@ pub fn mri_remove_wm_outliers_and_retain_medial_surface(
     mri_scalar_mul(g, r.out, r.err, Pair::Same(&mut dist), -1.0)?;
     let sup = mri_non_max_suppress(g, r.out, r.err, &dist, None, 0.0, 1)?.unwrap_new();
     mri_binarize(g, r.out, r.err, Pair::Given(&sup, ctrl), 1.0, 0.0, 1.0)?;
-    let peak = wm_peak(
-        g,
-        r,
-        src,
-        ctrl,
-        "MRIremoveWMOutliersAndRetainMedialSurface",
-    )?;
+    let peak = wm_peak(g, r, src, ctrl, "MRIremoveWMOutliersAndRetainMedialSurface")?;
     let thresh = peak.wrapping_sub(intensity_below) as f32;
     let mut outliers = if diag_write(g) {
         Some(mri_clone(g, r.out, r.err, ctrl, None)?.unwrap_new())
@@ -553,10 +554,19 @@ pub fn remove_nonwm_voxels(
                     removed += 1;
                     set(g, err, ctrl, x, y, z, CONTROL_NONE as f32)?;
                 } else {
-                    let near = mri_labels_in_nbhd(g, err, aseg, xa, ya, za, 1, Left_Lateral_Ventricle)?
-                        > 0
-                        || mri_labels_in_nbhd(g, err, aseg, xa, ya, za, 1, Right_Lateral_Ventricle)?
-                            > 0;
+                    let near =
+                        mri_labels_in_nbhd(g, err, aseg, xa, ya, za, 1, Left_Lateral_Ventricle)?
+                            > 0
+                            || mri_labels_in_nbhd(
+                                g,
+                                err,
+                                aseg,
+                                xa,
+                                ya,
+                                za,
+                                1,
+                                Right_Lateral_Ventricle,
+                            )? > 0;
                     let v = if near { CONTROL_NONE } else { CONTROL_MARKED };
                     set(g, err, ctrl, x, y, z, v as f32)?;
                 }

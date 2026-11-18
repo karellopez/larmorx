@@ -28,7 +28,7 @@ use larmorx_core::defects::{FS_930, FS_931, FS_932};
 use larmorx_freesurfer_core::cstd::fmt_f;
 use larmorx_freesurfer_core::diag::{DIAG_WRITE, verbose_on};
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal, NO_ERROR};
+use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::sse;
@@ -39,6 +39,7 @@ use larmorx_freesurfer_mri::mri::{
 };
 use larmorx_freesurfer_mri::vol_geom::{reinit_cache, shearless_components};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
+use larmorx_freesurfer_volume::bspline::{mri_sample_bspline, mri_to_bspline};
 use larmorx_freesurfer_volume::coords::index_not_in_volume;
 use larmorx_freesurfer_volume::resize::mri_set_resolution;
 use larmorx_freesurfer_volume::sample::{sample_volume, sample_volume_frame_type};
@@ -106,16 +107,6 @@ impl Chain {
     }
 }
 
-/// The port error for cubic B-spline sampling (`MRItoBSpline`: `fs.bspline`, wave 3.2).
-fn no_bspline(g: &mut Globals, err: &mut dyn Write, what: &str) -> Result<(), Fatal> {
-    log::error_exit(
-        g,
-        err,
-        ERROR_UNSUPPORTED,
-        &format!("{what}: cubic B-spline sampling needs fs.bspline (not yet ported)\n"),
-    )
-}
-
 /// `GCAMmorphToAtlas(mri_src, gcam, mri_morphed, frame, sample_type)`: `mri_src` (an image volume)
 /// onto the morph's atlas grid. Frames: `frame` alone when it is one of the source's, else all of
 /// them. The output: `mri_morphed` (whose extent must be the atlas's: `invalid input MRI size for
@@ -130,7 +121,8 @@ fn no_bspline(g: &mut Globals, err: &mut dyn Write, what: &str) -> Result<(), Fa
 /// (`MRIsampleVolumeFrameType` with `sample_type`; FS-930, FS-931 when it fails), else 0, written
 /// as a `float`. `USE_AVERAGE305` set: `INFO: Environmental variable USE_AVERAGE305 set` and `INFO:
 /// Modifying dst c_(r,a,s), using average_305 values` on standard error and the centre (-0.0950,
-/// -16.5100, 9.7500). Cubic B-spline sampling needs `fs.bspline` (not yet ported: a port error).
+/// -16.5100, 9.7500). Cubic B-spline sampling samples the source's cubic B-spline coefficients
+/// (`MRItoBSpline` of degree 3, fs.bspline).
 #[allow(clippy::too_many_arguments)]
 pub fn gcam_morph_to_atlas(
     g: &mut Globals,
@@ -186,9 +178,11 @@ pub fn gcam_morph_to_atlas(
     } else {
         (0.0, 0.0, 0.0)
     };
-    if sample_type == SAMPLE_CUBIC_BSPLINE {
-        no_bspline(g, err, "GCAMmorphToAtlas")?;
-    }
+    let bspline = if sample_type == SAMPLE_CUBIC_BSPLINE {
+        Some(mri_to_bspline(g, out, err, src, None, 3)?)
+    } else {
+        None
+    };
     let (sw, sh, sd) = (src.vg.width, src.vg.height, src.vg.depth);
     let mut chain = Chain::new("GCAMmorphToAtlas");
     for x in 0..width.max(0) {
@@ -222,17 +216,25 @@ pub fn gcam_morph_to_atlas(
                     }
                     let val = if inside {
                         let mut v = f64::from_bits(UNWRITTEN);
-                        sample_volume_frame_type(
-                            g,
-                            err,
-                            src,
-                            f64::from(xd),
-                            f64::from(yd),
-                            f64::from(zd),
-                            f,
-                            sample_type,
-                            &mut v,
-                        );
+                        let (px, py, pz) = (f64::from(xd), f64::from(yd), f64::from(zd));
+                        match &bspline {
+                            Some(b) => {
+                                mri_sample_bspline(g, out, err, b, px, py, pz, f, &mut v)?;
+                            }
+                            None => {
+                                sample_volume_frame_type(
+                                    g,
+                                    err,
+                                    src,
+                                    px,
+                                    py,
+                                    pz,
+                                    f,
+                                    sample_type,
+                                    &mut v,
+                                );
+                            }
+                        }
                         chain.take(g, v)
                     } else {
                         chain.set(0.0)

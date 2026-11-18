@@ -34,8 +34,8 @@
 //! sampling, which then writes every voxel of the six sampled types: it shows only in a volume of
 //! another type (and is never non-zero on recon-all's paths).
 //!
-//! Cubic B-spline sampling (`SAMPLE_CUBIC_BSPLINE`) needs `fs.bspline` (wave 3.2): a port error
-//! until it is ported.
+//! Cubic B-spline sampling (`SAMPLE_CUBIC_BSPLINE`) samples the source's cubic B-spline
+//! coefficients ([`crate::bspline`], `MRItoBSpline` of degree 3 before the vote or the sampling).
 
 // C's comparisons, as written (`if (v < 0) v = 0; if (v > 255) v = 255;`: the same values as
 // `clamp`, NaN kept)
@@ -47,7 +47,7 @@ use std::io::Write;
 use larmorx_core::defects::{FS_298, FS_326, FS_327, FS_328};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal};
+use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc, matrix_multiply};
 use larmorx_freesurfer_core::matrix_ops::matrix_print;
 use larmorx_freesurfer_core::sse::{add64, div, mul, mul64, sub, sub64};
@@ -59,6 +59,7 @@ use larmorx_freesurfer_mri::mri::{
 use larmorx_freesurfer_mri::vol_geom::{extract_i_to_r, extract_r_to_i};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
+use crate::bspline::{MriBspline, mri_sample_bspline, mri_to_bspline};
 use crate::arith::{Pair, mri_replace_values};
 use crate::rows::{self, Num};
 use crate::sample::{
@@ -132,15 +133,11 @@ pub fn mri_resample_fill(
     let mut dp = matrix_alloc(g, out, err, 4, 1, MATRIX_REAL)?.expect("a 4 x 1 vector");
     dp.set_relt(4, 1, 1.0);
     sp.set_relt(4, 1, 1.0);
-    if resample_type == SAMPLE_CUBIC_BSPLINE {
-        log::error_exit(
-            g,
-            err,
-            ERROR_UNSUPPORTED,
-            "MRIresampleFill: cubic B-spline sampling needs fs.bspline (not yet ported)\n",
-        )?;
-        return Ok(None);
-    }
+    let bspline = if resample_type == SAMPLE_CUBIC_BSPLINE {
+        Some(mri_to_bspline(g, out, err, src, None, 3)?)
+    } else {
+        None
+    };
     if resample_type == SAMPLE_VOTE {
         if !vote(g, out, err, src, template, &mut dest, &mut sp, &mut dp)? {
             return Ok(None);
@@ -157,6 +154,7 @@ pub fn mri_resample_fill(
             &mut dp,
             nframes_target,
             resample_type,
+            bspline.as_ref(),
         )?;
     }
     header(g, out, err, src, &mut dest, &m, diag)?;
@@ -206,6 +204,7 @@ fn sample_all(
     dp: &mut Matrix,
     nframes_target: i32,
     resample_type: i32,
+    bspline: Option<&MriBspline>,
 ) -> Result<(), Fatal> {
     let (tw, th, td) = (dest.vg.width, dest.vg.height, dest.vg.depth);
     let (sw, sh, sd) = (src.vg.width, src.vg.height, src.vg.depth);
@@ -239,6 +238,9 @@ fn sample_all(
                         val = pval as f32;
                     } else if resample_type == SAMPLE_CUBIC {
                         cubic_sample_volume_frame(g, err, src, x, y, z, nframe, &mut pval);
+                        val = pval as f32;
+                    } else if let (SAMPLE_CUBIC_BSPLINE, Some(b)) = (resample_type, bspline) {
+                        mri_sample_bspline(g, out, err, b, x, y, z, nframe, &mut pval)?;
                         val = pval as f32;
                     } else {
                         if sampled {

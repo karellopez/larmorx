@@ -1536,7 +1536,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 let ty = if special {
                     6
                 } else {
-                    g.pick(&[0, 1, 1, 1, 2, 3, 4, 6, 6, 7])
+                    g.pick(&[0, 1, 1, 1, 2, 3, 4, 6, 6, 7, 5, 5])
                 };
                 t.push(ty.to_string());
                 t.push(fx(fval(&mut g)));
@@ -1935,7 +1935,8 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     t.push("0".into());
                 }
                 t.push(g.int(0, 5).to_string());
-                t.push(g.pick(&[0, 0, 1, 1, 1, 2, 3, 4]).to_string());
+                // relay 39: SAMPLE_CUBIC_BSPLINE (5) too
+                t.push(g.pick(&[0, 0, 1, 1, 1, 2, 3, 4, 5, 5]).to_string());
                 if g.chance(30) {
                     t.push("0".into());
                 } else {
@@ -2390,7 +2391,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                         vol_of(&mut g, &mut t, o);
                         fill_paint(&mut g, &mut t, o, &[&[0.0, 9.0]], &[vals]);
                         m44(&mut g, &mut t);
-                        t.push(g.pick(&[0, 0, 1, 1, 1, 2, 3, 7]).to_string());
+                        t.push(g.pick(&[0, 0, 1, 1, 1, 2, 3, 7, 5, 5]).to_string());
                         t.push(fx(g.pick(&[0.0f32, 3.0, 1.0, 2.5, -1.0])));
                         t.push(i64::from(g.chance(8)).to_string());
                         t.push(i64::from(g.chance(8)).to_string());
@@ -2565,6 +2566,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             c if R29.contains(&c) => r29_gen(&mut g, &mut t, c),
             c if R34.contains(&c) => r34_gen(&mut g, &mut t, c),
             c if R35.contains(&c) => r35_gen(&mut g, &mut t, c),
+            c if R39.contains(&c) => r39_gen(&mut g, &mut t, c),
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -2630,8 +2632,8 @@ fn r22_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
         t.push(i64::from(g.chance(6)).to_string());
         t.push(i64::from(g.chance(4)).to_string());
         if cmd == "talvol" && kind == 0 {
-            // not SAMPLE_CUBIC_BSPLINE (5): fs.bspline is not ported yet
-            t.push(g.pick(&[0i64, 1, 1, 2, 3, 4]).to_string());
+            // relay 39: SAMPLE_CUBIC_BSPLINE (5) too
+            t.push(g.pick(&[0i64, 1, 1, 2, 3, 4, 5]).to_string());
         }
     }
     if cmd == "talpt" {
@@ -3030,7 +3032,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 279] = [
+pub const COMMANDS: [&str; 286] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -3310,6 +3312,13 @@ pub const COMMANDS: [&str; 279] = [
     "ltav2r",
     "ltar2v",
     "ltacmp",
+    "bsp",
+    "bsps",
+    "bspseq",
+    "bsplx",
+    "bsplta",
+    "bspdn",
+    "bspup",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -5650,6 +5659,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         c if R34[..13].contains(&c) => r34_lta_cmds(cx, t, o, cmd)?,
         c if R34.contains(&c) => r34_vl_cmds(cx, t, o, cmd)?,
         c if R35.contains(&c) => r35_cmds(cx, t, o, cmd)?,
+        c if R39.contains(&c) => r39_cmds(cx, t, o, cmd)?,
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -9390,7 +9400,7 @@ fn r34_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
             };
             let ty = g.pick(&[1i64, 1, 0, 0, 0, 2, 14, 21, 10]);
             r34_lta(g, t, &pool, n, ty);
-            t.push(g.pick(&[0i64, 1, 1, 1, 2, 3]).to_string());
+            t.push(g.pick(&[0i64, 1, 1, 1, 2, 3, 5]).to_string());
             t.push(g.pick(&[0i64, 0, 1, 2]).to_string());
             t.push(g.pick(&[1i64, 1, 0, 2]).to_string());
             t.push(g.pick(&[0u64, 0, 0, 0x1000_0000, 0x4000]).to_string());
@@ -10191,7 +10201,7 @@ fn r35_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
             };
             let ty = g.pick(&[1i64, 1, 0, 0, 0, 2, 14, 21, 10]);
             r34_lta(g, t, &pool, n, ty);
-            t.push(g.pick(&[0i64, 1, 1, 1, 2, 3]).to_string());
+            t.push(g.pick(&[0i64, 1, 1, 1, 2, 3, 5]).to_string());
             t.push(g.pick(&[0i64, 0, 1, 2]).to_string());
             t.push(g.pick(&[1i64, 1, 0, 2]).to_string());
             t.push(g.pick(&[0u64, 0, 0, 0x1000_0000, 0x4000]).to_string());
@@ -10351,6 +10361,416 @@ fn r35_cmds(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fa
                     o.lta_full(Some(&l));
                 }
             }
+        }
+    }
+    Ok(())
+}
+
+// ------------------------------------------------------------------------------------------------
+// Relay 39 (fs.bspline, 3.2-01: mriBSpline.cpp): MRItoBSpline and its samplers, the transforms of
+// a B-spline, and the factor-of-two pyramids.
+
+const R39: [&str; 7] = ["bsp", "bsps", "bspseq", "bsplx", "bsplta", "bspdn", "bspup"];
+
+/// An extent of the B-spline cases: mostly small, now and then past the causal initialisation's
+/// horizons (21 for degree 2, 28 for degree 3, 73 for degree 9's first pole).
+fn r39_len(g: &mut Gen) -> i64 {
+    g.pick(&[7, 17, 21, 22, 23, 28, 29, 30, 41, 73, 74, 75, 90])
+}
+
+/// A source of the B-spline cases: one long axis now and then, axes of one voxel often.
+fn r39_shape(g: &mut Gen, long: bool) -> Shape {
+    let ty = if g.chance(12) {
+        g.pick(&[9, 7, 2, 6])
+    } else {
+        g.pick(&[3, 3, 3, 3, 0, 0, 4, 1, 10])
+    };
+    let mut e = [g.int(1, 5), g.int(1, 5), g.int(1, 4)];
+    if long && g.chance(3) {
+        let k = g.below(3) as usize;
+        e[k] = r39_len(g);
+        for (j, v) in e.iter_mut().enumerate() {
+            if j != k {
+                *v = (*v).min(3);
+            }
+        }
+    }
+    if g.chance(4) {
+        e[g.below(3) as usize] = 1;
+    }
+    Shape {
+        w: e[0],
+        h: e[1],
+        d: e[2],
+        ty,
+        nf: if g.chance(6) {
+            g.pick(&[2, 3, 0])
+        } else {
+            1
+        },
+        hdr: g.chance(60),
+        drop: false,
+    }
+}
+
+/// The source's tokens: the volume, its pattern (none for a volume without voxels) and its
+/// paint (special values now and then).
+fn r39_src(g: &mut Gen, t: &mut Vec<String>, s: Shape) {
+    vol_of(g, t, s);
+    if s.hdr {
+        t.push("0".into());
+    } else {
+        r29_pat(g, t, &[10, 100, 0, -5, 1000], &[0, 1, -2, 50], &[0, 2, 5]);
+    }
+    let vals = r39_vals(g);
+    fill_paint(g, t, s, &[R39_VALS, R39_VALS], &[vals]);
+}
+
+/// The values the B-spline cases paint: plain ones, or (one case in four) NaNs of four payloads,
+/// a signalling one among them, and infinities, so that two NaNs meet in the filters.
+const R39_VALS: &[f32] = &[0.0, 1.0, 2.5, -3.0, 100.0, 7.0, -0.0];
+const R39_NANS: &[f32] = &[
+    f32::from_bits(0x7fc0_0000),
+    f32::from_bits(0x7fa1_2345),
+    f32::from_bits(0xffc0_0001),
+    f32::from_bits(0x7fc0_beef),
+    f32::INFINITY,
+    f32::NEG_INFINITY,
+    1.0,
+    -2.0,
+];
+
+fn r39_vals(g: &mut Gen) -> &'static [f32] {
+    if g.chance(4) { R39_NANS } else { R39_VALS }
+}
+
+/// A coordinate along an axis of `n` voxels: inside, at the half-voxel edges, outside, special.
+fn r39_coord(g: &mut Gen, n: i64) -> f64 {
+    let n = n as f64;
+    match g.below(12) {
+        0 => g.pick(&[-0.5, -0.5000001, n - 0.5, n - 0.5000001, n - 1.0, 0.0, -0.25]),
+        1 => g.pick(&[-1.0, n, 1e10, -1e10, n + 3.5]),
+        2 if g.chance(3) => g.pick(&[f64::NAN, f64::INFINITY, -f64::INFINITY, -0.0]),
+        3 => g.int(0, (n as i64 - 1).max(0)) as f64,
+        _ => g.int(-600, (n as i64) * 1000 - 400) as f64 / 1000.0,
+    }
+}
+
+fn r39_gen(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
+    if cmd == "bspdn" || cmd == "bspup" {
+        let mut s = r39_shape(g, false);
+        if g.chance(3) {
+            s.w = g.int(1, 9);
+            s.h = g.int(1, 9);
+            s.d = g.int(1, 5);
+        }
+        r39_src(g, t, s);
+        let given = g.chance(4);
+        t.push(i64::from(given).to_string());
+        if given {
+            let half = |n: i64| (n / 2).max(1);
+            let dbl = |n: i64| if n <= 1 { 1 } else { 2 * n };
+            let mut o = Shape {
+                ty: g.pick(&[3, 0, 4, 1, 3]),
+                hdr: false,
+                ..s
+            };
+            if cmd == "bspdn" {
+                (o.w, o.h, o.d) = (half(s.w), half(s.h), half(s.d));
+            } else {
+                (o.w, o.h, o.d) = (dbl(s.w), dbl(s.h), dbl(s.d));
+            }
+            if g.chance(5) {
+                o.w += 1;
+            }
+            vol_of(g, t, o);
+        }
+        return;
+    }
+    let lta = cmd == "bsplta";
+    // the transforms: the pool's geometries (their voxel-to-RAS matrices invert)
+    let pool = if lta || cmd == "bsplx" {
+        r25_pool(g)
+    } else {
+        Vec::new()
+    };
+    let s = if lta {
+        let nf = if g.chance(4) { 2 } else { 1 };
+        let s = r25_shape(g, &[0, 0, 3, 3, 1, 4], nf, 4);
+        let gi = g.below(pool.len() as u64) as usize;
+        r25_vol_geo(g, t, s, &pool[gi]);
+        r29_pat(g, t, &[10, 100, 3], &[0, 1, -2], &[0, 2, 5]);
+        let vals: &[f32] = &[0.0, 1.0, 2.5, -3.0, 100.0, 7.0];
+        fill_paint(g, t, s, &[vals, vals], &[vals]);
+        s
+    } else if cmd == "bsplx" {
+        let s = Shape {
+            hdr: false,
+            ..r39_shape(g, true)
+        };
+        let gi = g.below(pool.len() as u64) as usize;
+        r25_vol_geo(g, t, s, &pool[gi]);
+        r29_pat(g, t, &[10, 100, 0, -5, 1000], &[0, 1, -2, 50], &[0, 2, 5]);
+        let vals = r39_vals(g);
+        fill_paint(g, t, s, &[R39_VALS, R39_VALS], &[vals]);
+        s
+    } else {
+        let s = r39_shape(g, true);
+        r39_src(g, t, s);
+        s
+    };
+    t.push(dx(g.pick(&[0.0, 0.0, 0.0, 5.0, -1.0, f64::NAN])));
+    let mode = if cmd == "bsp" {
+        g.pick(&[0i64, 0, 0, 1, 1, 2, 3])
+    } else {
+        g.pick(&[0i64, 0, 0, 0, 0, 0, 1])
+    };
+    t.push(mode.to_string());
+    if mode >= 1 {
+        let mut e = [s.w, s.h, s.d, s.nf];
+        if g.chance(6) {
+            let k = g.below(4) as usize;
+            e[k] += 1;
+        }
+        for v in e {
+            t.push(v.to_string());
+        }
+        if mode == 3 {
+            let o = Shape {
+                ty: g.pick(&[3, 3, 0, 4]),
+                hdr: false,
+                ..s
+            };
+            vol_of(g, t, o);
+        }
+    }
+    let degree = if g.chance(25) {
+        g.pick(&[0i64, 1, 10, -1])
+    } else if g.chance(2) {
+        3
+    } else {
+        g.int(2, 9)
+    };
+    t.push(degree.to_string());
+    let over = if cmd != "bsp" && cmd != "bsplta" && g.chance(20) {
+        g.pick(&[0i64, 1, 10, -1, 2])
+    } else {
+        -99
+    };
+    t.push(over.to_string());
+    let (w, h, d, nf) = (s.w, s.h, s.d, s.nf);
+    match cmd {
+        "bsp" => t.push(g.pick(&[0i64, 0, 1, 2]).to_string()),
+        "bsps" => {
+            let n = g.int(1, 6);
+            t.push(n.to_string());
+            for _ in 0..n {
+                for e in [w, h, d] {
+                    t.push(dx(r39_coord(g, e)));
+                }
+                let f = if g.chance(10) {
+                    g.pick(&[-1, nf])
+                } else {
+                    g.int(0, (nf - 1).max(0))
+                };
+                t.push(f.to_string());
+            }
+        }
+        "bspseq" => {
+            let n = g.int(1, 4);
+            t.push(n.to_string());
+            for _ in 0..n {
+                for e in [w, h, d] {
+                    t.push(dx(r39_coord(g, e)));
+                }
+                let first = if g.chance(5) { g.int(0, nf.max(1)) } else { 0 };
+                let last = if g.chance(8) {
+                    nf
+                } else if g.chance(6) {
+                    first - 1
+                } else {
+                    (nf - 1).max(first)
+                };
+                t.push(first.to_string());
+                t.push(last.to_string());
+            }
+        }
+        "bsplx" => {
+            t.push(g.int(0, 1).to_string());
+            let given = g.chance(3);
+            t.push(i64::from(given).to_string());
+            if given {
+                let o = if g.chance(3) {
+                    Shape {
+                        w: g.int(1, 5),
+                        h: g.int(1, 5),
+                        d: g.int(1, 4),
+                        ty: g.pick(&[3, 0, 4]),
+                        nf: s.nf,
+                        hdr: false,
+                        drop: false,
+                    }
+                } else {
+                    Shape {
+                        ty: g.pick(&[3, 0, 4, 1]),
+                        hdr: false,
+                        ..s
+                    }
+                };
+                let gj = g.below(pool.len() as u64) as usize;
+                r25_vol_geo(g, t, o, &pool[gj]);
+            }
+            if g.chance(8) {
+                t.push("0".into());
+            } else {
+                t.push("1".into());
+                m44_elems(g, t);
+            }
+        }
+        _ => {
+            let given = g.chance(3);
+            t.push(i64::from(given).to_string());
+            if given {
+                let o = Shape {
+                    w: g.int(1, 4),
+                    h: g.int(1, 4),
+                    d: g.int(1, 3),
+                    ty: g.pick(&[0, 3, 3, 1]),
+                    nf: if g.chance(5) { g.int(1, 3) } else { s.nf },
+                    hdr: false,
+                    drop: false,
+                };
+                let gj = g.below(pool.len() as u64) as usize;
+                r25_vol_geo(g, t, o, &pool[gj]);
+            }
+            let n = if g.chance(6) {
+                g.pick(&[0usize, 2])
+            } else {
+                1
+            };
+            let ty = g.pick(&[1i64, 1, 0, 0, 0, 2, 14, 21, 10]);
+            r34_lta(g, t, &pool, n, ty);
+            t.push(g.pick(&[0i64, 0, 1, 2]).to_string());
+        }
+    }
+}
+
+fn r39_cmds(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    use larmorx_freesurfer_volume::bspline as bs;
+    let mut src = get_vol(cx, t)?;
+    r24_fill_pat(cx, t, &mut src)?;
+    fill_painted(cx, t, &mut src)?;
+    if cmd == "bspdn" || cmd == "bspup" {
+        let mut dst = if t.i() != 0 {
+            Some(get_vol(cx, t)?)
+        } else {
+            None
+        };
+        let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+        let r = if cmd == "bspdn" {
+            bs::mri_downsample2_bspline(g, a, b, &src, dst.as_mut())?
+        } else {
+            bs::mri_upsample2_bspline(g, a, b, &src, dst.as_mut())?
+        };
+        o.ret(&r, dst.as_ref());
+        return Ok(());
+    }
+    src.outside_val = t.d();
+    let mode = t.i();
+    let mut given = None;
+    if mode >= 1 {
+        let (w, h, d, nf) = (t.i(), t.i(), t.i(), t.i());
+        let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+        let mut bb = bs::mri_alloc_bspline(g, a, b, w, h, d, nf)?;
+        if mode >= 2 {
+            mm::mri_free(g, b, &mut bb.coeff);
+        }
+        if mode == 3 {
+            bb.coeff = Some(get_vol(cx, t)?);
+        }
+        given = Some(bb);
+    }
+    let degree = t.i();
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let mut bsp = bs::mri_to_bspline(g, a, b, &src, given, degree)?;
+    let over = t.i();
+    if over != -99 {
+        bsp.degree = over;
+    }
+    match cmd {
+        "bsp" => {
+            o.i(i64::from(bsp.degree));
+            o.i(i64::from(bsp.srctype));
+            o.i(i64::from(bsp.srcneg));
+            o.vol(bsp.coeff.as_ref());
+            let fr = t.i();
+            let mut ob = Some(bsp);
+            if fr >= 1 {
+                o.i(i64::from(bs::mri_free_bspline(&mut cx.g, &mut cx.b, &mut ob)));
+                o.i(i64::from(ob.is_none()));
+            }
+            if fr >= 2 {
+                o.i(i64::from(bs::mri_free_bspline(&mut cx.g, &mut cx.b, &mut ob)));
+            }
+        }
+        "bsps" => {
+            let n = t.i();
+            for _ in 0..n {
+                let (x, y, z) = (t.d(), t.d(), t.d());
+                let f = t.i();
+                let mut v = -7.0f64;
+                let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                let r = bs::mri_sample_bspline(g, a, b, &bsp, x, y, z, f, &mut v)?;
+                o.i(i64::from(r));
+                o.d(v);
+            }
+        }
+        "bspseq" => {
+            let n = t.i();
+            for _ in 0..n {
+                let (x, y, z) = (t.d(), t.d(), t.d());
+                let (first, last) = (t.i(), t.i());
+                let mut vv = vec![-7.0f32; (last + 1).max(1) as usize];
+                let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                let r = bs::mri_sample_seq_bspline(g, a, b, &bsp, x, y, z, &mut vv, first, last)?;
+                o.i(i64::from(r));
+                for v in vv {
+                    o.f(v);
+                }
+            }
+        }
+        "bsplx" => {
+            let kind = t.i();
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let m = get_m44(t);
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = if kind != 0 {
+                bs::mri_apply_ras_linear_transform_bspline(g, a, b, &bsp, dst.as_mut(), m.as_ref())?
+            } else {
+                bs::mri_linear_transform_bspline(g, a, b, &bsp, dst.as_mut(), m.as_ref())?
+            };
+            o.ret(&r, dst.as_ref());
+        }
+        _ => {
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let mut l = r25_get_lta(cx, t)?;
+            let env = match t.i() {
+                0 => Environment::default(),
+                1 => Environment::from_pairs([("USE_AVERAGE305", "true")]),
+                _ => Environment::from_pairs([("USE_AVERAGE305", "")]),
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = bs::lta_transform_bspline(g, a, b, &env, &bsp, dst.as_mut(), &mut l)?;
+            o.ret(&r, dst.as_ref());
+            o.lta_full(Some(&l));
         }
     }
     Ok(())

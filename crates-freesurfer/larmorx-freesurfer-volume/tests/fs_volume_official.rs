@@ -51,7 +51,7 @@ const SKIPPED: usize = 435;
 const HEAVY: usize = 24;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 65] = [
+const SKIP: [&str; 66] = [
     "FS-288", "FS-53", "FS-58", "FS-290", "FS-294", "FS-47", "FS-48", "ITK-112", "ITK-115",
     "ITK-116", "FS-300", "FS-302", "FS-303", "FS-304", "FS-305", "FS-306", "FS-307", "FS-308",
     "FS-309", "FS-310", "FS-314", "FS-315", "FS-322", "FS-323", "FS-324", "FS-325", "FS-327",
@@ -59,7 +59,7 @@ const SKIP: [&str; 65] = [
     "FS-475", "FS-479", "FS-482", "FS-484", "FS-485", "FS-486", "FS-487", "FS-488", "FS-490",
     "FS-491", "FS-493", "FS-496", "FS-497", "FS-498", "FS-499", "FS-501", "FS-502", "FS-504",
     "FS-508", "FS-509", "FS-511", "FS-515", "FS-517", "FS-167", "FS-886", "FS-887", "FS-889",
-    "FS-890", "FS-957",
+    "FS-890", "FS-957", "FS-964",
 ];
 
 /// `check.py`'s `heavy`: `MRIconform` resampling onto its 256^3 grid and

@@ -8,9 +8,10 @@ official programs and of the open probe (§69), `specs/freesurfer-mri.md` (the s
 functions work on), `specs/freesurfer-maths.md`, `specs/freesurfer-core.md` and the cited standards.
 Made ready for the clean room part by part by the spec finisher (FreeSurfer's foundations, track E):
 **parts 1 to 3 (§1-17) by its relay 6 (2026-11-16), part 4 (§18-22) by its relay 7
-(2026-11-17), part 5 (§23-24) by its relay 8 (2026-11-17, with part 4's measured corrections)**: the
+(2026-11-17), part 5 (§23-24) by its relay 8 (2026-11-17, with part 4's measured corrections), part 6a
+(§25-26) by its relay 9 (2026-11-18, with the clean room's questions on parts 4 and 5)**: the
 black-box validation plan (§69) with its open probe, a read-through as a clean-room reader, the
-defects' texts in `larmorx_core::defects` checked. The sections after §24 are not yet read through
+defects' texts in `larmorx_core::defects` checked. The sections after §26 are not yet read through
 that way: their validation plans still name the replica's closed probe, which the implementer does
 not open (§69 says what to do meanwhile). What black-box runs confirmed is marked **(observed)**.
 
@@ -35,7 +36,8 @@ it), `fs_mri_probe`, `fs_maths_probe`, the official FreeSurfer 8.2.0 programs an
 Status: parts 1 to 3 (§1-17): part 1 (§1-5) the volume-geometry text block of linear transform and
 surface files, the geometry's copies, matrices, comparison and printer; part 2 (§6-12) the voxel
 arithmetic; part 3 (§13-17) coordinates and geometry; part 4 (§18-22) the samplers, moves, the head
-box and the transform reader; part 5 (§23-24) the CMA labels. Then the rest of the module (§25-68).
+box and the transform reader; part 5 (§23-24) the CMA labels; part 6a (§25-26) resolution, planes,
+fills, resampling by whole factors and changes of type. Then the rest of the module (§27-68).
 
 ## 1. Conventions
 
@@ -209,8 +211,11 @@ Part 2 (§6-12): the voxel arithmetic, with `MRIcopyFrame` and `MRIcalcCRASforEx
   (every row at the first voxel). FS-960 is noted in both modes where a direct walk reaches a row of a
   tensor volume other than slice 0's row 0. The volume's other accesses (`MRIgetVoxVal`,
   `MRIsetVoxVal`) are not affected: for a tensor they read -1e10 and write nothing
-  (`specs/freesurfer-mri.md` §5). In parts 1 to 4 FS-291's `reproduce` (§9, §10) and FS-301's
-  (§19: a tensor destination of the moves) walk a tensor volume directly.
+  (`specs/freesurfer-mri.md` §5). In parts 1 to 5 only `reproduce` walks a tensor volume directly:
+  FS-291's (§9, §10) and FS-301's (§19: a tensor destination of the moves). By default FS-291's walks
+  are refused, FS-301's writes go through `MRIsetVoxVal` and `MRIextractInto` refuses a tensor source
+  (§11, step 6), so in parts 1 to 5 FS-960 is met only under `reproduce` (its rows' places are then
+  FreeSurfer's).
 - **Arithmetic** in `float` (single precision, x86-64's NaN rules, `specs/freesurfer-maths.md` §1)
   unless said otherwise; `nint(x)` is `(int)(x + 0.5)` (`x - 0.5` below 0) in double with FS-12's
   rule outside `int`. Storing an integer into a narrower integer type keeps its low bits.
@@ -679,14 +684,20 @@ Returns `NO_ERROR` (0). A centre of mass that is not a number: FS-305.
      does not start as 'MNI Transform File'` (`ERROR_NOFILE`) and `NULL` (an empty file included).
   2. Line 2: a buffer starting with `%` is the first information line, `I1`. Otherwise there is no
      volume information (step 5 is skipped), and a buffer starting with the 14 bytes `Transform_Type`
-     has one more line read, then the matrix (step 4).
-  3. Line 3 (unless step 2 went to the matrix): a buffer starting with `%` is the second information
-     line, `I2`; then lines are read as long as the buffer starts with `%` (the end of the file with
-     the buffer still starting with `%`, the file's last piece a `%` line: FS-307; a `#` line or a
-     blank line read at the end changes the buffer and ends this loop), so the first line that does
-     not start with `%` is passed over; then one more line is read, and when its buffer starts with
-     `Transform_Type` one more. A line 3 that does not start with `%`: when it starts with
-     `Transform_Type`, one more line is read.
+     has one more line read, then the matrix (step 4); a line 2 that starts with neither goes on to
+     step 3 like a `%` line 2.
+  3. Line 3 is read whenever step 2 did not go to the matrix: after a `%` line 2 and after a line 2
+     that starts with neither `%` nor `Transform_Type` (so such a line 2 is followed by at least one
+     more line passed over before the rows: a file of `MNI Transform File`, `Linear_Transform =` and
+     three rows gives `could not read row 3 ... (0 0 1 7)`, its first row taken as line 3,
+     **(observed)**). A buffer starting with `%` is then the second information line, `I2` (unused
+     after a line 2 that was not one); then lines are read as long as the buffer starts with `%` (the
+     end of the file with the buffer still starting with `%`, the file's last piece a `%` line:
+     FS-307; a `#` line or a blank line read at the end changes the buffer and ends this loop), so the
+     first line that does not start with `%` is passed over; then one more line is read, and when its
+     buffer starts with `Transform_Type` one more. A line 3 that does not start with `%`: when it
+     starts with `Transform_Type`, one more line is read. Every line read in steps 2 and 3 is passed
+     over: the rows come from the lines after the last of them (**(observed)**: §22's `vrules5`).
   4. The matrix: three rows, r = 1 to 3, each from the next line, its returned text (without its
      leading white space) scanned with `%f %f %f %f` into row r of the transform's matrix, the numbers
      not matched keeping their values (the identity's). No line for row r: `ltMNIreadEx: could not
@@ -699,7 +710,9 @@ Returns `NO_ERROR` (0). A centre of mass that is not a number: FS-305.
      - `I1` containing `%Generated by` (anywhere): its words in order; a word containing `src` makes
        the next word the source, a word containing `dst` makes the next word the destination and ends
        the search (the word taken is not tested itself; a `src` or `dst` word with no word after it:
-       FS-310). `I2` is not used.
+       FS-310). A word is tested for `src` first, so one containing both (`srcdst`, `dstsrc`) is a
+       `src` word; a later `src` word replaces the source; a `dst` word before any `src` word ends
+       the search with no source (**(observed)**: §22's `vrules5`). `I2` is not used.
      - Else `I1` containing `minctracc`: its words containing `.mnc`, in order, each by a count kept
        for the whole program run (0 at its start, the program's state like its environment): at 0 the
        word is the source and the count becomes 1; at 1 it is the destination, the count goes back to
@@ -751,7 +764,7 @@ Returns `NO_ERROR` (0). A centre of mass that is not a number: FS-305.
   missing `register.dat` lines).
 
 ## 22. Validation plan (3.1-36's samplers, the moves, the head box, reading transforms)
-§69's groups `vsample`, `vmove`, `vskull`, `vltaread` and `vrules4` (the open probe's commands `samp`,
+§69's groups `vsample`, `vmove`, `vskull`, `vltaread`, `vrules4` and `vrules5` (the open probe's commands `samp`,
 `coef`, `hsinc`, `trans`, `rot`, `rotx`, `roty`, `rotz`, `skull`, `tftype`, `ltaread` and `ltareads`; §69.2 says what
 each covers and gives its reference hash): identical with `reproduce` but where FreeSurfer reads
 memory it does not own, crashes or never returns (frames past the volume's, FS-290; header copies
@@ -764,7 +777,9 @@ probe: an `.xfm` that names a volume that exists (its geometry comes from the he
 **The defects' modes in §18 to §21** (the same in both implementations; each case notes its ID;
 where larmorx ends the program, its message is given exactly so that the two implementations are
 interchangeable; "ends the program" is §6's C-style exit with the code given, a message with its own
-`\n`):
+`\n`; like every C-style exit its line carries FS-01's NUL before the last new line under `reproduce`
+and none by default, so where the table gives "the same" (FS-302, FS-304, FS-305, FS-307, FS-309,
+FS-310) the two modes' lines differ by that byte only):
 
 | Defect | Default | `reproduce` |
 |---|---|---|
@@ -884,9 +899,18 @@ an `int` label by truncation toward zero. A NaN or a value outside the `int` ran
   that gives -1), stored as the volume's type stores a value; its messages as above, voxel by voxel.
 - **`MRIlrswapSeg(seg, lh, rh)`**: the labels of each list are the first `rows` numbers of its matrix
   in row order (`rows` its row count: an `n x 1` list, as FreeSurfer's callers pass, gives its n
-  numbers; a `1 x n` list its first number only); a matrix with fewer numbers than rows (0 columns) is
-  read past its end (FS-315, an error here). Different row counts: `ERROR: MRIlrswapSeg(): lh=<rows>
-  != rh=<rows>` on standard output and no volume. Else a new volume like `seg` with its pulse
+  numbers; a `1 x n` list its first number only). Different row counts: `ERROR: MRIlrswapSeg(): lh=<rows>
+  != rh=<rows>` on standard output and no volume. **FS-315:** a list with fewer numbers than rows (0
+  columns and at least one row; under FS-13's `reproduce` also a negative column count) is read past
+  its end, where FreeSurfer reads memory it did not write (**(observed)**: most such lines differ
+  between the probe's four runs). **Default:**
+  after the row counts' check, before any voxel is written, the program ends, code -4 (§6),
+  `MRIlrswapSeg(): the label lists hold fewer numbers than rows (FreeSurfer reads past them)`;
+  **reproduce:** the numbers past a list's end are NaN (equal to no label: they swap nothing, and a
+  voxel equal to the other list's number at that place takes the NaN as its new label, FS-311's
+  conversion), the rest as below; FS-315 noted in both modes (**(observed)**: the probe's lines whose
+  four runs agree give `nswaps 0` and every voxel its own label, as the NaNs do). Lists of no rows
+  read nothing (`nswaps 0`). Else a new volume like `seg` with its pulse
   parameters and a copy of its colour table, whose frame 0 holds, for each voxel, the label of the
   first pair (in list order) the voxel's label equals (compared as `float`s, the `lh` side first at
   each pair), swapped (the other side, truncated to an `int` as a label), else the voxel's label; a
@@ -928,27 +952,44 @@ an `int` label by truncation toward zero. A NaN or a value outside the `int` ran
   A file that cannot be made ends the program (`error: could not open file <name> for writing`,
   status 1). Reading (`ReadCachedBrainVolumeStats(subject, subjdir)`): a file that cannot be opened:
   `computing (and caching) brain volume statistics` on standard output, the statistics computed
-  (`ComputeBrainVolumeStats`, the caller's) and written. Else every measure starts at -1; each line
+  (`ComputeBrainVolumeStats`, the caller's, outside this spec: it reads the subject's segmentation
+  and surfaces) and written. (**(observed)**: the probe's one such case, a subject without files and
+  no `FREESURFER_HOME`, prints that line and `[INFO] read, cannot find ./subj/surf/lh.white, trying
+  ./subj/surf/lh.white.gii ...` on standard output (`specs/freesurfer-surfio.md` §60) and stops at
+  FreeSurfer's licence check, its framed `ERROR: FreeSurfer environment FREESURFER_HOME is not
+  defined.` on standard error and status 255; LARMORX performs no licence check
+  (`specs/freesurfer-core.md` §19), so §24's loop lets that line differ.) Else every measure starts at -1; each line
   (up to its `\n`) that holds a measure's `<names>` text (anywhere; a line may hold several) gives
   each of them the first of the line's white-space-separated words that, without its last character,
   reads as a C++ stream reads a `double`: an optional sign, digits with at most one point, an
   exponent after a digit; the longest such start of the word, which must then read whole as
   `strtod` reads it and must not overflow (`12abc,` gives 12, `0x10,` gives 0 (its leading 0),
   `1e,`, `1e400,`, `inf,`, `nan,` give nothing; a word of one character gives nothing); a later line
-  replaces an earlier one's value. A line naming a measure whose words give no number and that ends
-  in white space (a carriage return included) makes FreeSurfer abort (FS-314: by default the line
-  gives no number). Then a measure below 0 (none found, or a negative value; -0 is not below 0) ends
+  replaces an earlier one's value. **FS-314:** a line naming a measure whose words give no number and
+  that ends in white space (a carriage return included) ends FreeSurfer with the C++ runtime's two
+  lines on standard error and an abort (status 134): `terminate called after throwing an instance of
+  'std::length_error'` + `\n` + `  what():  basic_string::_M_create` + `\n` when a word of the line
+  (a run of bytes that are not white space, as the stream reads it) is longer than 15 bytes, else
+  `terminate called after throwing an instance of 'std::bad_alloc'` + `\n` + `  what():
+  std::bad_alloc` + `\n` (**(observed)**: words of 15 and 16 bytes, white space of every kind at the
+  end; a line without white space at its end gives no number, as the default does). **Default:** that
+  line gives no number (noted), so the measure may still come from another line or be missing below;
+  **reproduce:** FreeSurfer's two lines and status 134, as for FS-05 (`specs/freesurfer-core.md`
+  §9); the first such line in the file's order decides. Then a measure below 0 (none found, or a negative value; -0 is not below 0) ends
   the program: `error: could not find stat for <names> in <name>` (status 1), the first such
   measure in the table's order (**(observed)**: §69's `bvc` and `bvr`).
 
 ## 24. Validation plan (the CMA labels)
-§69's group `vcma` (the open probe's commands `cmalab`, `cmavol`, `lrswap`, `fixrib`, `lrseg`, `ohe`,
-`bvc` and `bvr`; §69.2 says what it covers and gives its hash): identical with `reproduce` but where
+§69's groups `vcma` (the open probe's commands `cmalab`, `cmavol`, `lrswap`, `fixrib`, `lrseg`, `ohe`,
+`bvc` and `bvr`) and `vrules5` (fixed cases of FS-314 and FS-315; §69.2 says what each covers and gives
+its hash): identical with `reproduce` but where
 FreeSurfer reads memory it does not own or crashes (FS-314, FS-315, and the volumes' FS-53, FS-58,
 FS-252), lines the loop allows; the default differs only where it notes a defect. The open folder's
-`models.py cma` checks the tables above on every `cmalab` line. Not in the probe: the statistics
-computed when the cache is missing (`ComputeBrainVolumeStats` reads a subject's files: the replays of
-`mri_segstats` and `mris_anatomical_stats` on the recorded heads).
+`models.py cma` checks the tables above on every `cmalab` line, and the loop checks FS-314's abort
+under `reproduce` (§69.3). Not in the probe: the statistics computed when the cache is missing
+(`ComputeBrainVolumeStats` reads a subject's files: the replays of `mri_segstats` and
+`mris_anatomical_stats` on the recorded heads); the probe's one line without a cache ends in
+FreeSurfer's licence check (§23), a line the loop lets differ in both modes.
 
 ## 25. Resolution, planes, fills, resampling by whole factors and changes of type (3.1-36)
 Where two NaNs meet in an operation below, the result keeps the first operand's NaN as written here
@@ -964,9 +1005,13 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   writes) crashes FreeSurfer: an error here (FS-58). Returns 0.
 - **`MRIfillFG(src, dst, seed_x, seed_y, seed_z, threshold, fill_val, &npix)`**: a flood fill on
   frame 0's first byte of each voxel position (bytes whatever the type: a float volume's row is read as
-  bytes, `x` the byte offset). Without `dst`, a clone of `src` (zero voxels, the header). The seed is
+  bytes, `x` the byte offset; a tensor volume's rows as §6 places them, FS-960). Without `dst`, a clone of `src` (zero voxels, the header). The seed is
   clamped into the volume; a row or slice at or past the height or depth is clamped to `width - 1` by
-  FreeSurfer (FS-316; by default to `height - 1`, `depth - 1`). Every byte of `dst` equal to `fill_val`
+  FreeSurfer (FS-316, noted in both modes; by default to `height - 1`, `depth - 1`; under `reproduce`
+  the seed and its box then lie at that row or slice, read and written as §6's direct access places
+  a row or slice past the extent: another voxel of the buffer, FS-289, or outside it, FS-290; a byte
+  written at a place that holds no voxel of `dst` is not stored but is read back at the same
+  coordinates for the rest of the fill, so the fill ends). Every byte of `dst` equal to `fill_val`
   becomes `fill_val - 1` (mod 256), the seed becomes `fill_val` (mod 256); then sweeps of a box (first
   the seed's 3 x 3 x 3 neighbourhood, clamped) set every voxel whose source byte is at least `threshold`,
   whose `dst` byte is not `fill_val` and that has a face neighbour (within the volume) whose `dst` byte
@@ -993,7 +1038,9 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
 - **`MRIupsampleNConserve(src, dst, N)`**: a source that is not float is first changed to floats
   (`MRISeqchangeType(src, MRI_FLOAT, 0, 0, 0)`); upsampled; every voxel of the result is then divided
   by `N * N * N` (a 32-bit product, in `double`, stored as `float`). A change of type that fails leaves
-  FreeSurfer with no volume: it crashes (FS-319: an error here).
+  FreeSurfer with no volume: it crashes (FS-319). In both modes, after the change of type's own error,
+  the program ends, code -4 (§6), `MRIupsampleNConserve(): no volume to upsample (FreeSurfer crashes
+  here)` + `\n`.
 - **`MRIdownsample2(src, dst)`**: a given `dst` of another type: `MRIdownsample2: source and dst must be
   same type` (`ERROR_UNSUPPORTED`), `NULL`. The extent is half the source's (rounded down); without
   `dst`, a new one of the source's type with its header. `dst` is cleared; each 2 x 2 x 2 block of frame
@@ -1003,6 +1050,10 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   the source's, `imnr1 = imnr0 + depth - 1`, the voxel sizes, `thick` and `ps` doubled, the centre the
   source's vox2ras applied to `(w / 2 + 0.5, h / 2 + 0.5, d / 2 + 0.5, 1)` (integer halves), the cached
   matrices recomputed.
+- **FS-317** (here and in `MRIchangeType` below): a number converted to an `int` that is NaN or beyond
+  the `int` range gives -2147483648 in FreeSurfer (x86-64's conversion; `reproduce`); by default NaN
+  gives 0 and a number beyond the range the range's nearer end (2147483647 or -2147483648); noted in
+  both modes.
 - **`MRIdownsampleN(src, dst, Fc, Fr, Fs, KeepType)`**: the extent `(int) ceilf(width / Fc)` (and the
   rows', slices'; a quotient beyond the `int` range or NaN: FS-317). Without `dst`: a new one of floats
   (or the source's type with `KeepType`), the source's frames and header, `imnr0` the source's, `imnr1 =
@@ -1016,7 +1067,7 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   the source's end (`MRIgetVoxVal`'s FS-52, FS-53).
 - **`MRImeanFrameThresh(mri, frame, thresh)`**: `frame >= nframes`: `MRImeanFrame: frame <f> out of
   bounds (<n>)` (`ERROR_BADPARM`), 0. Else the nearest-voxel samples at every whole position of frame 0
-  (FS-318; by default of `frame`) that are not below `thresh` (NaN included) are summed in `double`
+  (FS-318, `reproduce`, noted when `frame` is not 0; by default of `frame`) that are not below `thresh` (NaN included) are summed in `double`
   (the sample the first operand) and divided by their count (none: `0 / 0`, x86's default NaN).
 - **`MRIlimits(mri, &min, &max)`**: a volume without voxels leaves both as they were; else both start at
   voxel (0, 0, 0) of frame 0 and every voxel smaller (larger) replaces them (C's comparisons: a NaN
@@ -1047,18 +1098,15 @@ Where two NaNs meet in an operation below, the result keeps the first operand's 
   slices (its extent restored afterwards), the result given back the depth and frames (and new frame
   records); a failure: `ERROR: MRISeqchangeType: MRIchangeType` on standard error, `NULL`.
 
-## 26. Validation plan (3.1-36's resolution, planes, fills, resampling and changes of type)
-The probe's commands `setres` (voxel sizes with NaNs, infinities, 0 and negatives), `vfill` (values from
-the float table: NaNs, signalling NaNs, 1e10), `fillfg` (byte volumes mostly, other types too; no, a
-given or the same destination; seeds from -1 to the extent; thresholds and fill values outside 0..255),
-`explane` and `fillplane` (every orientation and unknown ones, planes from -1 to 4, destinations of other
-extents), `ups` (`MRIupsampleN`, `MRIupsample2`, `MRIupsampleNConserve` of every type, N from -1 to 3,
-given destinations of the right and wrong extents), `dns2` and `dnsn` (extents the factors divide and
-not, factors 0.5 to 4 and -1, given destinations), `mft`, `lim`, `chtype` (`MRIchangeType` and
-`MRISeqchangeType` of every type to every type, `f_low`, `f_high` and `no_scale` values,
-`FS_FORCE_BIN_CHECK` set or not). Expected: identical with `reproduce` but where FreeSurfer reads memory
-it does not own or crashes (FS-53, FS-58, FS-290 of the voxel access), counted and not compared; the
-default differs only with a notice.
+## 26. Validation plan (resolution, planes, fills, resampling and changes of type)
+§69's group `vres` (the open probe's commands `setres`, `vfill`, `fillfg`, `explane`, `fillplane`, `ups`,
+`dns2`, `dnsn`, `mft`, `lim` and `chtype`; §69.2 says what it covers and gives its hash): identical with
+`reproduce` but where FreeSurfer reads memory it does not own or crashes (FS-52, FS-53, FS-58, FS-252,
+FS-289, FS-290 of the voxel access, FS-316's seeds past the extent, FS-319), lines the loop allows; the
+default differs only where it notes a defect. Not in the probe's cases: a factor of 0 in
+`MRIdownsampleN` (its quotient, infinity, is FS-317's: FreeSurfer's -2147483648 is refused by the
+allocation, but the default's 2,147,483,647 would ask for a volume of that width, so the cases leave it
+out) and FS-319's end of the program: the implementations' own tests, against §25's text.
 
 ## 27. Frame-range samplers, the trilinear kernel and trilinear splatting (3.1-36)
 - **Trilinear corners** (shared by this section): a point unambiguously outside (§18's
@@ -2605,12 +2653,12 @@ both or none, into a new array, another array of 0 to 2 transforms or the source
 `reproduce` but where the original reads memory it does not own or crashes (FS-504, FS-957, the shared voxel defects),
 counted and not compared; the default differs only with a notice (FS-954, FS-956, FS-957 and the shared ones).
 
-## 69. Validation plan (black box), parts 1 to 5
+## 69. Validation plan (black box), parts 1 to 6a
 
 ### 69.1 The probe
 
 The open probe folder `validation/investigations/freesurfer-volume-probe/` holds the probe's source
-(calls of the functions of §2 to §23 by name) and the comparison loop; its README lists every
+(calls of the functions of §2 to §25 by name) and the comparison loop; its README lists every
 command, its arguments and what it prints, and the encodings (every float and double as its bits;
 the volumes, geometries, matrices, colour tables and MINC transforms as the fs.mri probe encodes
 them, with the working volume W, the destination D and the region R added). The implementer runs
@@ -2637,7 +2685,10 @@ commit 9319981f, which adds part 5's commands and `ltareads` and orients standar
 call (§21's `errno`): every earlier hash the same but `vltaread`'s, whose 6 lines of a missing
 `register.dat` now show `errno` 2 and `No such file or directory` instead of 22 and `Invalid argument`,
 the only lines that differ from the 420314bb build's; logs
-`oracles/logs/fs-volume-probe-r8-final-2026-11-17.log` and `fs-volume-probe-r8-vcma-2026-11-17.log`):
+`oracles/logs/fs-volume-probe-r8-final-2026-11-17.log` and `fs-volume-probe-r8-vcma-2026-11-17.log`;
+again 2026-11-18 with the prebuilt probe from commit 53b6d7dc, which adds part 6a's commands: every
+earlier hash the same, logs `oracles/logs/fs-volume-probe-r9-final-2026-11-18.log` and
+`fs-volume-probe-r9-vres-2026-11-18.log`):
 
 | Group | § | Calls | Memory or crash | EXIT | TIMEOUT | SHA-256 |
 |---|---|---|---|---|---|---|
@@ -2658,7 +2709,9 @@ the only lines that differ from the 420314bb build's; logs
 | `vltaread` | 21 | 309 | 25 | 15 | 2 | `788dc779f6ee4392ca98903dc4a57b699aac8a179e2dcf6bca815d534aece7c7` |
 | `vrules4` | 18-21 | 94 | 0 | 0 | 0 | `88160d5bca26290ea58fdf401b5b581594d8e191edb17c64da607260d458b1f7` |
 | `vcma` | 23 | 377 | 23 | 9 | 0 | `4ee5c5e9955e1ddfdda716be28eb300f2bc6ecb94a74e2201cd93d31814aa219` |
-| all | | 9,960 | 1,078 | 531 | 11 | |
+| `vrules5` | 21, 23 | 46 | 19 | 4 | 0 | `dc7ca55bad6aa0ac52e8ebe52039c6e79833dff4fb2f25077777156da60792e7` |
+| `vres` | 25 | 830 | 200 | 35 | 0 | `14f2bc15b849ce1b4d6b7815c9139476d82367b8b2c7774adc3c00964e417f8f` |
+| all | | 10,836 | 1,297 | 570 | 11 | |
 
 Part 4's groups (relay 7): `vsample` (§18: the eight samplers at points inside, at and past the
 edges, whole and within `FLT_EPSILON` of whole, NaN, infinite and beyond the `int` range, frames past
@@ -2693,6 +2746,33 @@ the segmentation's shape (a smaller ribbon is read outside it: memory lines that
 detect, which would make the hash unstable); its hash is the same cold, warm and in two runs without
 the cache.
 
+Relay 9's group: `vrules5` (2026-11-18, the prebuilt probe from 9319981f unchanged; log
+`oracles/logs/fs-volume-probe-r9-vrules5-2026-11-18.log`; the same hash cold, warm and in two runs
+without the cache; every other hash unchanged), fixed cases of the clean room's questions on parts 4
+and 5: `.xfm` texts whose line 2 is neither an information line nor a `Transform_Type` line (§21's
+step 3), `%Generated by` lines with words holding both `src` and `dst`, `src` twice and `dst` first
+(step 5); `MRIlrswapSeg` of `float`, `int` and `uchar` segmentations with lists of 0 columns (one or
+both lists; FS-315: memory lines), of no rows, and ordinary `n x 1` and `1 x n` ones (§23); cache
+lines without a number ending in a space, two spaces, a tab, a carriage return or nothing, a line with
+a number and a trailing space, and full caches with one line's number missing (FS-314's aborts, both
+exceptions, and the measures not found).
+
+Part 6a's group (relay 9): `vres` (§25: `MRIsetResolution` with voxel sizes that are NaN, infinite, 0
+or negative; `MRIvalueFill` with values from the float table; `MRIfillFG` of mostly byte volumes
+(floats, ints, shorts and unsigned shorts too) from seeds -1 to the extent (FS-316's rows and slices
+past the extent among them), thresholds and fill values outside 0 to 255, into no destination, the
+source or another volume; `MRIextractPlane` and `MRIfillPlane` in every orientation and an unknown
+one, planes -1 to 5, destinations of other extents; `MRIupsampleN`, `MRIupsample2` and
+`MRIupsampleNConserve` by N -1 to 3 and `MRIdownsample2`, `MRIdownsampleN` by factors 0.5 to 4 (positive
+only, §26), into no destination, one of the result's extent, of the source's shape, of another type,
+or the source; `MRImeanFrameThresh` with frames -1 to 3; `MRIlimits`; `MRIchangeType` and
+`MRISeqchangeType` of every type to every type, `f_low` and `f_high` 0 to 1, -0.5 and NaN, `no_scale`
+0 to 2, with and without `FS_FORCE_BIN_CHECK`; volumes of up to 5 voxels a side, their cached matrices
+recomputed in 95 % of them). The same hash cold, warm and in two runs without the cache. The memory
+lines are the downsamplers' reads past the source (factors that do not divide the extent: FS-52,
+FS-53), destinations smaller than the result (FS-290), seeds past the extent (FS-316) and volumes of
+types without a voxel size given voxels.
+
 `vrules` (relay 7, 2026-11-17: the prebuilt probe unchanged; log
 `oracles/logs/fs-volume-probe-r7-refs-2026-11-17.log`, the same hash from the cache and without it,
 the other groups' hashes unchanged) holds fixed cases of single statements: FS-291 with tensor
@@ -2716,7 +2796,7 @@ negative length (FS-294) and destinations of another type it frees (FS-293); in 
 the volume's (FS-290), volumes without their cached matrices copied (FS-252), the rotations about an
 axis by NaN or infinite angles (FS-304), names of 500 bytes (FS-306) and FS-309, FS-310; in part 5,
 segmentations without their cached matrices copied (FS-252, `CRASH 11`) and FS-314's aborts (`CRASH 6`,
-the exception named by the memory FreeSurfer overwrote: `std::length_error` or `std::bad_alloc`), with
+the exception named by the line's longest word, §23: `std::length_error` or `std::bad_alloc`), with
 FS-315's lists read past their end among the memory lines; part 5's exits are the statistics cache's
 (§23: the folder missing for writing, a measure not found, and the statistics computed without a
 subject's files, status 255).
@@ -2736,7 +2816,14 @@ standard error) are taken out and their IDs kept. Every line must be identical, 
 - in `--mode fix`, a line where the candidate noted a defect (the corrected result);
 - in both modes, a `vsample` line where the candidate noted FS-300 (§18: the cubic frame sampler's
   window points FreeSurfer never reads; the probe's four runs agree there only by accident of its
-  own stack).
+  own stack);
+- in both modes, the `bvr` line without a cache that FreeSurfer ends at its licence check (§23:
+  `EXIT 255` with the licence message; LARMORX performs none).
+
+One kind of line where FreeSurfer did not finish is checked: under `reproduce`, a line where
+FreeSurfer aborted with the C++ runtime's lines (`CRASH 6`, standard error starting `terminate called
+after throwing`: FS-314, §23) and that is not a memory line must end the same in the candidate
+(`EXIT 134`, or the abort's `CRASH 6`) with the same standard output and standard error.
 
 The loop prints, per group, the identical lines and those of each allowed kind, and the IDs noted on
 the allowed lines; exit status 1 for any other difference. **(observed)** with the probe as its own
@@ -2746,9 +2833,16 @@ identical, 69 memory lines whose contents changed from process to process (11 in
 (`vextract`); relay 7 (the prebuilt probe from 420314bb): no unexplained difference in either mode,
 every line of `vrules` and of part 4's groups identical, memory lines whose contents changed from
 process to process 11 in `vmake`, 2 or 3 in `vtwo` and 57 in `vextract`; relay 8 (the prebuilt
-probe from 9319981f): the same, every line of `vrules4` and `vcma` identical in both modes.
+probe from 9319981f): the same, every line of `vrules4` and `vcma` identical in both modes; relay 9:
+every line of `vcma` and `vrules5` identical in both modes, and two stand-in candidates (the probe's
+lines with FreeSurfer's aborts given as `EXIT 134`, then as `EXIT 1`): the first with no unexplained
+line in either mode (the 9 aborts that are not memory lines counted as checked), the second with
+those 9 unexplained under `reproduce` and none with `fix`; with the prebuilt probe from 53b6d7dc, every
+group identical in both modes but the memory lines whose contents changed from process to process
+(11 in `vmake`, 2 or 3 in `vtwo`, 57 in `vextract`, 22 in `vres`; one `vextract` line where FreeSurfer
+crashed in one process only).
 
-### 69.4 The defects of parts 1 to 5 (index)
+### 69.4 The defects of parts 1 to 6a (index)
 
 | Defect | § | Defect | § | Defect | § |
 |---|---|---|---|---|---|
@@ -2763,18 +2857,20 @@ probe from 9319981f): the same, every line of `vrules4` and `vcma` identical in 
 | FS-308 | 21 | FS-309 | 21 | FS-310 | 21 |
 | FS-311 | 23 | FS-312 | 23 | FS-313 | 23 |
 | FS-314 | 23 | FS-315 | 23 | FS-960 | 6 |
+| FS-316 | 25 | FS-317 | 25 | FS-318 | 25 |
+| FS-319 | 25 | | | | |
 
 Others' defects these parts meet: FS-12 (`nint`, `specs/freesurfer-core.md`), FS-53 and FS-58
 (`specs/freesurfer-mri.md`; FS-252, its header copy without cached matrices, in part 4), FS-47 and
 ITK-112 (`specs/freesurfer-maths.md` §17); FS-252 again in part 5 (segmentations copied without their
 cached matrices).
 
-### 69.5 Beyond the probe, and the sections after §24
+### 69.5 Beyond the probe, and the sections after §26
 
 - **The replays** of the programs that use these functions with `reproduce`, on the recorded heads,
   when they are ported.
 - **Every platform:** the clean room's own golden checks (its results on the other five platforms
   are its Linux results; a NaN's bits as x86-64 gives them).
-- **§25 to §68** are not yet in the open probe: until they are, their clean room checks them against
+- **§27 to §68** are not yet in the open probe: until they are, their clean room checks them against
   the official programs as black boxes and against the replays; their validation plans name the
   replica's probe, which the implementer does not open.

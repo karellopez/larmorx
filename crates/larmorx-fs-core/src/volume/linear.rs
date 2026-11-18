@@ -9,7 +9,7 @@ use super::sample::{FLT_EPSILON, sample_type};
 use super::{Dst, VolOut, Vols};
 use crate::clib::printf::sprintf_f64;
 use crate::maths::Returned;
-use crate::maths::matrix::{MATRIX_REAL, Matrix, real_product_f};
+use crate::maths::matrix::{MATRIX_REAL, Matrix, real_point_f};
 use crate::mri::geom::DIAG_SHOW;
 use crate::mri::{Mri, types};
 use crate::process::{DIAG_VERBOSE, Process, Stop, codes};
@@ -136,19 +136,16 @@ impl Process {
         for z in 0..d {
             for y in 0..h {
                 for x in 0..w {
-                    vx.set(1, 1, x as f32);
-                    vx.set(2, 1, y as f32);
-                    vx.set(3, 1, z as f32);
-                    if fast {
-                        real_product_f(&inv, &vx, &mut vy);
+                    let q = if fast {
+                        real_point_f(&inv, [x as f32, y as f32, z as f32, 1.0])
                     } else {
+                        vx.set(1, 1, x as f32);
+                        vx.set(2, 1, y as f32);
+                        vx.set(3, 1, z as f32);
                         self.matrix_multiply(Some(&inv), Some(&vx), Some(&mut vy))?;
-                    }
-                    let p = [
-                        sse::widen(vy.at(1, 1)),
-                        sse::widen(vy.at(2, 1)),
-                        sse::widen(vy.at(3, 1)),
-                    ];
+                        [vy.at(1, 1), vy.at(2, 1), vy.at(3, 1), vy.at(4, 1)]
+                    };
+                    let p = [sse::widen(q[0]), sse::widen(q[1]), sse::widen(q[2])];
                     // the diagnostic voxel's test (its only trace: FS-12's notices)
                     if self.nint(p[0]) == self.gvoxel[0] && self.nint(p[1]) == self.gvoxel[1] {
                         self.nint(p[2]);

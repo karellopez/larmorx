@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """The timing lines of fs.volume's clean room (one batch file each, written into the current folder):
-part 4's samplers and head box (relay 8) and part 6a's flood fill, downsamplers, upsampler, change of type
-and limits (relay 10). Run with `python -P mk.py` in a scratch folder, then `run.sh`."""
+part 4's samplers and head box (relay 8), part 6a's flood fill, downsamplers, upsampler, change of type
+and limits (relay 10), and parts 6b and 6c's frame-range sampler, splatting, derivative, linear transform and
+resampling onto a template (relay 11). Run with `python -P mk.py` in a scratch folder, then `run.sh`."""
 
 import random
 import struct
@@ -14,8 +15,8 @@ def f64(x: float) -> str:
 one, zero = "3f800000", "00000000"
 
 
-def W(n: int, t: int, fill: object) -> str:
-    geo = [one, one, one, "1", one, zero, zero, zero, one, zero, zero, zero, one] + [zero] * 6
+def W(n: int, t: int, fill: object, size: str = one) -> str:
+    geo = [size, size, size, "1", one, zero, zero, zero, one, zero, zero, zero, one] + [zero] * 6
     head = ["1", str(n)] + [zero] * 11 + ["0000000000000000", "0", zero, zero, "0"]
     return " ".join([f"{n} {n} {n} {t} 1 0", str(fill), *geo, *head, "1", "null", "null"])
 
@@ -38,6 +39,29 @@ lines += [
     f"@60 chtype 0 {W(48, 3, 't7')} 0 3dcccccd 3dcccccd 0 1",
     f"@60 lim {W(64, 3, 't9')}",
 ]
+# parts 6b and 6c (relay 11)
+pts = []
+for _ in range(20000):
+    x, y, z = (r.uniform(0.3, 30.7) for _ in range(3))
+    pts.append(f"{f64(x)} {f64(y)} {f64(z)} 0 0 -1")
+lines.append(f"@60 sseq {W(32, 3, 't3')} {f64(0.0)} {len(pts)} {' '.join(pts)}")
+pts = []
+for _ in range(20000):
+    x, y, z = (r.uniform(0.3, 30.7) for _ in range(3))
+    pts.append(f"0 {f64(x)} {f64(y)} {f64(z)} 0 {f64(r.uniform(-9, 9))}")
+lines.append(f"@60 splat {W(32, 3, 't3')} {len(pts)} {' '.join(pts)}")
+pts = []
+for _ in range(20000):
+    x, y, z = (r.uniform(2.3, 28.7) for _ in range(3))
+    pts.append(f"0 {f64(x)} {f64(y)} {f64(z)} {f64(1.0)} {f64(0.5)} {f64(0.25)} {f64(0.0)}")
+lines.append(f"@60 deriv {W(32, 3, 't3')} {f64(1.0)} {len(pts)} {' '.join(pts)}")
+# a rotation of about 0.2 radians about z with a shift, as floats
+rot = ["3f7ae148", "be4ba5e3", zero, "3f800000", "3e4ba5e3", "3f7ae148", zero, "bf000000",
+       zero, zero, one, "3e800000", zero, zero, zero, one]
+lines.append(f"@60 lxf 1 {W(32, 3, 't3')} {f64(0.0)} new 4 4 {' '.join(rot)} 1")
+lines.append(f"@60 lxf 0 {W(32, 0, 9)} {f64(0.0)} new 4 4 {' '.join(rot)} 0")
+lines.append(f"@60 rsfill {W(32, 3, 't3')} {W(40, 3, 0, '3f4ccccd')} 1 {zero} 0")
+lines.append(f"@60 rsfill {W(32, 0, 9)} {W(40, 0, 0, '3f4ccccd')} 0 {zero} 0")
 for i, line in enumerate(lines):
     with open(f"b{i}.txt", "w", encoding="utf-8") as f:
         f.write(line + "\n")

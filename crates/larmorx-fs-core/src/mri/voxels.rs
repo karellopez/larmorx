@@ -297,7 +297,8 @@ impl Process {
             return Ok(0);
         }
         let at = [c, r, s, f];
-        let bytes: Vec<u8> = match m.kind {
+        // the element in a stack buffer (no allocation per voxel)
+        let (bytes, n): ([u8; 4], usize) = match m.kind {
             types::FLOAT_COMPLEX => {
                 if mode != 0 && mode != 1 {
                     self.error_exit(
@@ -315,24 +316,26 @@ impl Process {
             types::UCHAR => {
                 let x = v.clamp_c(0.0, 255.0);
                 let i = self.nint(sse::widen(x));
-                vec![i as u8]
+                ([i as u8, 0, 0, 0], 1)
             }
             types::SHORT => {
                 let x = v.clamp_c(-32768.0, 32767.0);
                 let i = self.nint(sse::widen(x));
-                (i as i16).to_le_bytes().to_vec()
+                let b = (i as i16).to_le_bytes();
+                ([b[0], b[1], 0, 0], 2)
             }
             types::USHRT => {
                 let x = v.clamp_c(0.0, 65535.0);
                 let i = self.nint(sse::widen(x));
-                (i as u16).to_le_bytes().to_vec()
+                let b = (i as u16).to_le_bytes();
+                ([b[0], b[1], 0, 0], 2)
             }
             types::INT | types::RGB => {
                 let x = v.clamp_c(-2147483648.0, 2147483648.0);
                 let i = self.nint(sse::widen(x));
-                i.to_le_bytes().to_vec()
+                (i.to_le_bytes(), 4)
             }
-            types::FLOAT => v.to_le_bytes().to_vec(),
+            types::FLOAT => (v.to_le_bytes(), 4),
             types::LONG => {
                 let place = m.table_place(c, r, s, f);
                 let Some(o) = self.outside_write(place, at) else {
@@ -345,7 +348,7 @@ impl Process {
         };
         let place = m.table_place(c, r, s, f);
         if let Some(o) = self.outside_write(place, at) {
-            m.put(o, &bytes);
+            m.put(o, &bytes[..n]);
         }
         Ok(0)
     }

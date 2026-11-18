@@ -9,7 +9,7 @@ use super::sample::{FLT_EPSILON, cvtt, sample_type};
 use super::{Dst, VolOut, Vols};
 use crate::clib::printf::sprintf_f64;
 use crate::maths::Returned;
-use crate::maths::matrix::{MATRIX_REAL, Matrix, real_product_f};
+use crate::maths::matrix::{MATRIX_REAL, Matrix, real_point_f};
 use crate::mri::geom::DIAG_SHOW;
 use crate::mri::{Mri, types};
 use crate::process::{DIAG_VERBOSE, Process, Stop, codes};
@@ -28,14 +28,24 @@ fn sampled(kind: i32) -> bool {
     )
 }
 
-/// A float matrix product of a 4 x 4 real matrix and a point (§8.1's product, into `out`).
-fn apply(p: &mut Process, m: &Matrix, v: &Matrix, out: &mut Matrix) -> Result<(), Stop> {
+/// §8.1's float product of a matrix and the point `(x, y, z, 1)` into the 4 x 1 matrix `out`
+/// (whose values stay where the product fails); its first three values.
+fn apply(
+    p: &mut Process,
+    m: &Matrix,
+    q: [f32; 3],
+    v: &mut Matrix,
+    out: &mut Matrix,
+) -> Result<[f32; 3], Stop> {
     if !m.is_complex() && m.rows == 4 && m.cols == 4 {
-        real_product_f(m, v, out);
-    } else {
-        p.matrix_multiply(Some(m), Some(v), Some(out))?;
+        let r = real_point_f(m, [q[0], q[1], q[2], 1.0]);
+        return Ok([r[0], r[1], r[2]]);
     }
-    Ok(())
+    for (k, x) in q.iter().enumerate() {
+        v.set(k as i32 + 1, 1, *x);
+    }
+    p.matrix_multiply(Some(m), Some(v), Some(out))?;
+    Ok([out.at(1, 1), out.at(2, 1), out.at(3, 1)])
 }
 
 impl Process {
@@ -121,6 +131,36 @@ impl Process {
             v.a().nframes,
         );
         let eps = FLT_EPSILON as f32;
+        // two float volumes with every voxel inside: element by element (the voxel access reads and
+        // writes a float as it is)
+        let n = (w.max(0) as usize) * (h.max(0) as usize) * (d.max(0) as usize) * (nf.max(0) as usize);
+        let floats = |m: &Mri| {
+            m.kind == types::FLOAT
+                && m.nframes >= nf
+                && m.voxels.as_ref().is_some_and(|x| x.len() >= 4 * n)
+        };
+        if floats(v.a()) && floats(v.d()) {
+            let swap = |b: &[u8]| {
+                let x = f32::from_le_bytes([b[0], b[1], b[2], b[3]]);
+                if sse::sub32(x, in_val).abs() < eps { out_val } else { x }
+            };
+            if v.d_is_a() {
+                if let Some(x) = v.d_mut().voxels.as_deref_mut() {
+                    for c in x[..4 * n].chunks_exact_mut(4) {
+                        let y = swap(c);
+                        c.copy_from_slice(&y.to_le_bytes());
+                    }
+                }
+            } else {
+                let src: Vec<u8> = v.a().voxels.as_deref().map_or(Vec::new(), |x| x[..4 * n].to_vec());
+                if let Some(x) = v.d_mut().voxels.as_deref_mut() {
+                    for (o, c) in x[..4 * n].chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+                        o.copy_from_slice(&swap(c).to_le_bytes());
+                    }
+                }
+            }
+            return Ok(());
+        }
         for z in 0..d {
             for y in 0..h {
                 for x in 0..w {
@@ -163,6 +203,30 @@ impl Process {
         }
         self.direct_needs_voxels(v.a(), "MRIreplaceValuesUchar")?;
         self.direct_needs_voxels(v.d(), "MRIreplaceValuesUchar")?;
+        // every byte inside both volumes: one walk of the buffers (the same bytes)
+        let n = (w as usize) * (h as usize) * (d as usize) * (frames.max(1) as usize);
+        let fits = |m: &Mri| {
+            m.nframes >= frames.max(1) && m.voxels.as_ref().is_some_and(|x| x.len() >= n)
+        };
+        if fits(v.a()) && fits(v.d()) {
+            if v.d_is_a() {
+                if let Some(x) = v.d_mut().voxels.as_deref_mut() {
+                    for c in &mut x[..n] {
+                        if *c == a {
+                            *c = b;
+                        }
+                    }
+                }
+            } else {
+                let src: Vec<u8> = v.a().voxels.as_deref().map_or(Vec::new(), |x| x[..n].to_vec());
+                if let Some(x) = v.d_mut().voxels.as_deref_mut() {
+                    for (o, &c) in x[..n].iter_mut().zip(&src) {
+                        *o = if c == a { b } else { c };
+                    }
+                }
+            }
+            return Ok(());
+        }
         for f in 0..frames.max(1) {
             for z in 0..d {
                 for y in 0..h {
@@ -264,11 +328,8 @@ impl Process {
             for di in 0..w {
                 for dj in 0..h {
                     for dk in 0..d {
-                        vx.set(1, 1, di as f32);
-                        vx.set(2, 1, dj as f32);
-                        vx.set(3, 1, dk as f32);
-                        apply(self, m, &vx, &mut vy)?;
-                        let sp = [vy.at(1, 1), vy.at(2, 1), vy.at(3, 1)];
+                        let sp =
+                            apply(self, m, [di as f32, dj as f32, dk as f32], &mut vx, &mut vy)?;
                         match kind {
                             sample_type::SINC | sample_type::CUBIC => {
                                 let (x, y, z) =
@@ -304,15 +365,25 @@ impl Process {
                                     base[k] = cvtt(f64::from(sp[k]).floor());
                                     frac[k] = sse::sub32(sp[k], base[k] as f32);
                                 }
-                                let c = self.corner_values(src, base, f)?;
-                                value = match kind {
-                                    sample_type::TRILINEAR => trilinear(frac, &c),
-                                    sample_type::NEAREST => {
-                                        let digit = |x: f32| usize::from(!(x < 0.5));
-                                        c[digit(frac[0]) * 4 + digit(frac[1]) * 2 + digit(frac[2])]
-                                    }
-                                    _ => weighted(frac, &c),
-                                };
+                                let digit = |x: f32| i32::from(!(x < 0.5));
+                                if kind == sample_type::NEAREST && src.kind != types::LONG {
+                                    let q = [
+                                        base[0].wrapping_add(digit(frac[0])),
+                                        base[1].wrapping_add(digit(frac[1])),
+                                        base[2].wrapping_add(digit(frac[2])),
+                                    ];
+                                    value = self.corner_value(src, q, f);
+                                } else {
+                                    let c = self.corner_values(src, base, f)?;
+                                    value = match kind {
+                                        sample_type::TRILINEAR => trilinear(frac, &c),
+                                        sample_type::NEAREST => {
+                                            let i = digit(frac[0]) * 4 + digit(frac[1]) * 2 + digit(frac[2]);
+                                            c[i as usize]
+                                        }
+                                        _ => weighted(frac, &c),
+                                    };
+                                }
                             }
                             _ => {}
                         }
@@ -322,6 +393,19 @@ impl Process {
             }
         }
         Ok(())
+    }
+
+    /// One corner of a sampled point (§31) of a source that is not 64-bit: 0 outside the source
+    /// (and for a type it does not read), else the voxel as a float.
+    fn corner_value(&mut self, src: &Mri, q: [i32; 3], f: i32) -> f32 {
+        let e = [src.geom.width, src.geom.height, src.geom.depth];
+        if !sampled(src.kind) || (0..3).any(|k| q[k] < 0 || q[k] >= e[k]) {
+            return 0.0;
+        }
+        if let Some(v) = super::sample::inside_elem(src, q[0], q[1], q[2], f, false) {
+            return v.to_f32();
+        }
+        self.nearest_voxel(src, q, f, "MRIresample")
     }
 
     /// The eight corners `val[a][b][c]` of a sampled point (§31): 0 outside the source (and for a
@@ -397,22 +481,24 @@ impl Process {
             }
             v
         };
-        let bytes: Vec<u8> = match dest.kind {
+        let (bytes, n): ([u8; 4], usize) = match dest.kind {
             types::UCHAR => {
                 let v = clip(value, 0.0, 255.0);
-                vec![self.nint(sse::widen(v)) as u8]
+                ([self.nint(sse::widen(v)) as u8, 0, 0, 0], 1)
             }
             types::SHORT => {
                 let v = clip(value, -32768.0, 32767.0);
-                (self.nint(sse::widen(v)) as i16).to_le_bytes().to_vec()
+                let b = (self.nint(sse::widen(v)) as i16).to_le_bytes();
+                ([b[0], b[1], 0, 0], 2)
             }
             types::USHRT => {
                 let v = clip(value, 0.0, 65535.0);
-                (self.nint(sse::widen(v)) as u16).to_le_bytes().to_vec()
+                let b = (self.nint(sse::widen(v)) as u16).to_le_bytes();
+                ([b[0], b[1], 0, 0], 2)
             }
             types::INT => {
                 let v = clip(value, i32::MIN as f32, i32::MAX as f32);
-                self.nint(sse::widen(v)).to_le_bytes().to_vec()
+                (self.nint(sse::widen(v)).to_le_bytes(), 4)
             }
             types::LONG => {
                 if reproduce {
@@ -433,12 +519,15 @@ impl Process {
                 self.mri_set_vox_val(dest, p[0], p[1], p[2], f, value, 0)?;
                 return Ok(());
             }
-            types::FLOAT => value.to_le_bytes().to_vec(),
+            types::FLOAT => (value.to_le_bytes(), 4),
             _ => return Ok(()),
         };
-        let n = bytes.len() as u64;
-        let place = self.place_of(dest, x, y, z, fi, n);
-        self.direct_write(dest, place, &bytes, WHAT);
+        let place = self.place_of(dest, x, y, z, fi, n as u64);
+        if let (crate::mri::voxels::Place::In(o), Some(v)) = (place, dest.voxels.as_deref_mut()) {
+            v[o as usize..o as usize + n].copy_from_slice(&bytes[..n]);
+            return Ok(());
+        }
+        self.direct_write(dest, place, &bytes[..n], WHAT);
         Ok(())
     }
 
@@ -481,14 +570,12 @@ impl Process {
             for si in 0..sg.width {
                 for sj in 0..sg.height {
                     for sk in 0..sg.depth {
-                        vx.set(1, 1, si as f32);
-                        vx.set(2, 1, sj as f32);
-                        vx.set(3, 1, sk as f32);
-                        apply(self, &a, &vx, &mut vy)?;
+                        let t =
+                            apply(self, &a, [si as f32, sj as f32, sk as f32], &mut vx, &mut vy)?;
                         let q = [
-                            cvtt(f64::from(vy.at(1, 1)).floor()),
-                            cvtt(f64::from(vy.at(2, 1)).floor()),
-                            cvtt(f64::from(vy.at(3, 1)).floor()),
+                            cvtt(f64::from(t[0]).floor()),
+                            cvtt(f64::from(t[1]).floor()),
+                            cvtt(f64::from(t[2]).floor()),
                         ];
                         if q[0] < 0 || q[0] >= tw || q[1] < 0 || q[1] >= th || q[2] < 0 || q[2] >= td {
                             continue;

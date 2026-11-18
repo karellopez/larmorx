@@ -134,6 +134,7 @@ void finish_dump()
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <sys/resource.h>
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -326,10 +327,23 @@ std::string written()
     std::string path = workdir + "/" + n;
     out += "F " + n + " ";
     if (n.size() > 4 && n.compare(n.size() - 4, 4, ".mgz") == 0) {
+      // read back quietly: MRIread's own messages would go into the parent's output
+      fflush(stdout);
+      fflush(stderr);
+      int keep1 = dup(1), keep2 = dup(2), null = open("/dev/null", O_WRONLY);
+      dup2(null, 1);
+      dup2(null, 2);
       int gd = Gdiag;
       Gdiag = 0;
       MRI *m = MRIread(path.c_str());
       Gdiag = gd;
+      fflush(stdout);
+      fflush(stderr);
+      dup2(keep1, 1);
+      dup2(keep2, 2);
+      close(keep1);
+      close(keep2);
+      close(null);
       put_vol(m);
       if (m) MRIfree(&m);
     } else {
@@ -448,6 +462,9 @@ int main(int argc, char *argv[])
       close(fd);
       setvbuf(stdout, NULL, _IONBF, 0);
       if (chdir(workdir.c_str()) != 0) _exit(4);
+      // every case under 4 GiB of address space (a reader that never ends grows without bound)
+      struct rlimit rl = {4ull << 30, 4ull << 30};
+      setrlimit(RLIMIT_AS, &rl);
       alarm(60);
       memcpy(buf, line.c_str(), line.size() + 1);
       toks.clear();

@@ -1,8 +1,8 @@
 # fs.volume's clean room: what black-box runs showed (unrestricted)
 
-The clean room of FreeSurfer 8.2.0's volume functions, parts 1 to 6a of the spec
+The clean room of FreeSurfer 8.2.0's volume functions, parts 1 to 6c of the spec
 (`crates/larmorx-fs-core/src/volume/`, the rest of queue item C3.1-05), was written from
-[`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) §1 to §26 and checked only against
+[`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) §1 to §32 and checked only against
 black boxes: the prebuilt probe `fs_volume_probe` (FreeSurfer's compiled library and the C library,
 glibc 2.35) run through the open folder
 [`validation/investigations/freesurfer-volume-probe/`](../../validation/investigations/freesurfer-volume-probe/README.md).
@@ -12,20 +12,22 @@ tools are in
 
 ## The comparison
 
-- **What:** the 19 groups of the spec's §69.2 (10,836 calls, seed 7: parts 1 to 3's ten, the fixed
-  groups `vrules`, `vrules4` and `vrules5`, part 4's `vsample`, `vmove`, `vskull`, `vltaread`, part
-  5's `vcma` and part 6a's `vres`), on the probe (plainly, again, and in two guard runs; every
-  reference hash the spec's, the probe of commit `53b6d7dc`) and on the clean room's candidate, in
-  both modes. `reproduce`: 9,937 identical, 744 where FreeSurfer did not finish (9 of them FS-314's
-  aborts, which the candidate gives too and the loop checks), 148 memory lines, 7 `vsample` lines
-  noting FS-300 (§69.3 allows them in both modes), none other. `fix`: 7,220 identical, 744 not
-  finished, 499 memory, 2,373 corrected by a noted defect, none other. Every line of `vgblock`,
-  `vgcopy`, `vcoords`, `vheader`, `vskull` and `vrules4` is identical in `reproduce`. fs.mri (16
-  groups) and fs.maths (24) were not touched by relay 10; relay 9's runs of them stand (none
-  unexplained in either mode).
-- **How we know:** *validated* (`compare.py compare`, both modes, 2026-11-18, relay 10; log
-  `oracles/logs/fs-cleanroom-2-relay10-cmp.log`; relay 9's fs.mri and fs.maths runs in
-  `oracles/logs/fs-cleanroom-2-relay9-cmp.log`).
+- **What:** the 24 groups of the spec's §69.2 (12,270 calls, seed 7: parts 1 to 3's ten, the fixed
+  groups `vrules`, `vrules4`, `vrules5` and `vrules6`, part 4's `vsample`, `vmove`, `vskull`,
+  `vltaread`, part 5's `vcma`, part 6a's `vres`, part 6b's `vframes`, `vderiv`, `vlinear` and part
+  6c's `vresamp`), on the probe (plainly, again, and in two guard runs; every reference hash the
+  spec's, the probe of commit `20578b55`) and on the clean room's candidate, in both modes.
+  `reproduce`: 11,310 identical, 799 where FreeSurfer did not finish (9 of them FS-314's aborts,
+  which the candidate gives too and the loop checks), 152 memory lines, 7 `vsample` lines noting
+  FS-300 (§69.3 allows them in both modes), and 2 lines that differ where FreeSurfer uses a value it
+  never wrote that happens to be the same in the probe's four runs (FS-325 in `vlinear`, FS-300 in
+  `vresamp`: below; both noted by the candidate). `fix`: 8,321 identical, 799 not finished, 508
+  memory, 2,642 corrected by a noted defect, none other. Every line of `vgblock`, `vgcopy`,
+  `vcoords`, `vheader`, `vskull`, `vrules4` and `vframes` but its 3 crashes is identical in
+  `reproduce`. fs.mri (16 groups, 9,511 calls) was run again after relay 11's change of
+  `MRIsetVoxVal`'s buffer: none unexplained in either mode; fs.maths was not touched.
+- **How we know:** *validated* (`compare.py compare`, both modes, 2026-11-18, relay 11; log
+  `oracles/logs/fs-cleanroom-2-relay11-fullb.log`).
 
 ## FS-291 on volumes of other types (resolved by the spec's tensor rows)
 
@@ -188,12 +190,17 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
   - `MRIfillPlane` with an orientation that is not 0, 1 or 2 fills the coronal plane, as
     `MRIextractPlane` reads it (5 lines of orientation 3).
   - `MRIchangeType`'s histogram ends: the low end adds bins from 0 while their total is below the
-    target and stops at bin 999 at most; the high end adds bins from 999 down and stops at bin 0 at
-    most (6 lines of `chtype` and `ups 2` whose ranges would otherwise be empty).
+    target, up to all 1000 of them (relay 10 stopped at 999: no `vres` line tells them apart; the
+    spec's `vrules6` cases with `f_low` 1 and 2 add all 1000, relay 11); the high end adds bins from
+    999 down and never adds bin 0 (6 lines of `chtype` and `ups 2` whose ranges would otherwise be
+    empty).
   - `MRIdownsample2` into the source itself doubles the voxel sizes before it takes the source's
     voxel-to-RAS matrix for the centre (the matrix then has the doubled sizes).
   - `MRIfillFG`: a byte written where the destination holds no voxel is read back at the same
-    coordinates (§25 states it); without that a fill into a smaller destination never ends.
+    coordinates (§25 states it); without that a fill into a smaller destination never ends. Under
+    FS-316's `reproduce` a seed past the depth writes its byte into a later frame's voxel and the
+    sweeps' box, clamped to the extent on every axis, holds the last slice (one past) or nothing
+    (further): `npix` 1 (`vrules6`, relay 11).
 - **FS-319 is not reachable:** `MRIupsampleNConserve` changes a source to floats with `f_low` and
   `f_high` 0; the low end then keeps the minimum and the high end's maximum is the minimum plus a
   bin count (0 or more) times a size that is not below 0, so the range is never empty (a NaN range
@@ -202,6 +209,34 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
   plain conversion of a volume with a registration matrix, one with a colour table, and an
   upsampling into the source itself).
 - **How we know:** *validated* (`vres`, both modes, 2026-11-18, relay 10).
+
+## Parts 6b and 6c: frame-range samplers, splatting, derivatives, neighbour counts, linear transforms, resampling onto a template (§27 to §31)
+
+- **What:** `vframes`, `vderiv`, `vlinear` and `vresamp` (1,418 calls) are identical with
+  `reproduce` but where FreeSurfer did not finish (54), the memory lines (4) and the two lines below;
+  in `fix` 267 lines are corrected by a noted defect (FS-320 to FS-328, FS-461, FS-298 and the voxel
+  access's). Measured beyond the text:
+  - **`MRIindexNotInVolume` rounds the double:** its "ambiguous" test (§15: the coordinates rounded
+    to the nearest integers, ties to even, as floats, in `[0, extent)`) takes the double's rounding,
+    then the float: a sample at row 2.500000119 of a volume 3 rows high is unambiguously outside
+    (`vderiv`'s line 81: the derivative's sample at `y + 1.5` gives `outside_val`; rounding the float
+    first, 2.5 to 2, would sample it and give 18.2116 for the probe's 7.7501). Every earlier group is
+    identical either way (no earlier line has a coordinate within half a float step of a half).
+  - **FS-325's value never written:** an `lxf` with the sinc method into an integer destination
+    (`vlinear`'s line 235: every sample fails at points that are not whole) stores FreeSurfer's never
+    written double, which is -1 (stored as `0xffffffff`) in all four of the probe's runs, so the line
+    is not a memory line; the clean room stores 0 as §29 states (FS-325, noted in both modes): the
+    one `vlinear` line that differs under `reproduce`.
+  - **FS-300 in a cubic resampling:** `MRIresampleFill` with `SAMPLE_CUBIC` reads the cubic sampler's
+    window points FreeSurfer never reads (`vresamp`'s line 31: one voxel 0x7f in the probe, 0x8d in the
+    clean room, whose `reproduce` takes the double of all bits set there, §18); the probe's four runs
+    agree there by accident of its stack, as in `vsample`, where §69.3 allows such lines; `vresamp`'s
+    one differing line under `reproduce`.
+  - **FS-326 is not reached by the probe:** no `vresamp` line has a label with more than 255 votes in
+    one voxel (the 8 x 8 x 8 sources' fills spread their labels), so no line notes it in either mode;
+    the crate's own test gives 280 and 320 votes (`tests/defects_volume.rs`).
+- **How we know:** *validated* (`vframes`, `vderiv`, `vlinear`, `vresamp`, both modes, 2026-11-18,
+  relay 11).
 
 ## Speed (part 4)
 
@@ -228,13 +263,29 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
   floats to bytes with its histogram 0.027 s against 0.031 s; `MRIlimits` 0.0045 s against 0.0050 s.
 - **How we know:** *measured* (2026-11-18).
 
+## Speed (parts 6b and 6c)
+
+- **What:** §30 and §32 name no speed measure; measured anyway, one batch line each end to end (process
+  start, parsing and printing included, about 0.004 s; best of 3, one thread, the reference machine;
+  `validation/investigations/freesurfer-cleanroom-volume/speed/`, every result line identical):
+  `MRIsampleSeqVolume` at 20,000 points of a 32^3 float volume 0.0225 s against FreeSurfer's 0.0268 s
+  (1.19x); splatting 20,000 values into it 0.0273 s against 0.0377 s (1.38x); the directional
+  derivative at 20,000 points 0.0450 s against 0.0473 s (1.05x); the trilinear linear transform of the
+  volume by a rotation 0.0102 s against 0.0106 s, the nearest one of a 32^3 byte volume 0.0049 s against
+  0.0056 s (1.14x); `MRIresampleFill` onto a 40^3 template of 0.8 mm voxels, trilinear 0.0181 s against
+  0.0178 s (0.98x), nearest on bytes 0.0074 s against 0.0080 s (1.09x). The changes that brought these
+  (relay 11, results unchanged): `MRIsetVoxVal`'s element in a stack buffer, the 4 x 4 matrix's
+  product with a point without allocation, the value replacements of byte and float volumes in one
+  walk of the buffers, the nearest resampling's one corner, the stores straight into the buffer.
+- **How we know:** *measured* (2026-11-18, relay 11).
+
 ## Golden cases and platforms
 
 - **What:** `tests/golden_volume.rs`, every command of the probe's grammar on seeded arguments in
-  both modes (32 SHA-256 over 16 groups: part 4's samplers, moves, head's box and transform reader,
+  both modes (40 SHA-256 over 20 groups: part 4's samplers, moves, head's box and transform reader,
   the transform files in memory, several in one process; part 5's labels, segmentation functions
-  and the statistics cache's text and reading in memory; part 6a's 11 commands; 0.05 s in a debug
-  build), identical in
+  and the statistics cache's text and reading in memory; part 6a's 11 commands; part 6b's and 6c's
+  13, the diagnostic bits' prints included; 0.05 s in a debug build), identical in
   debug and release builds on x86-64 and under the AArch64 NaN emulation of both
   (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`).
-- **How we know:** *measured* (2026-11-18, relay 10).
+- **How we know:** *measured* (2026-11-18, relays 10 and 11).

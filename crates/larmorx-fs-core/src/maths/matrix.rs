@@ -680,7 +680,30 @@ fn real_product_d(a: &Matrix, b: &Matrix, out: &mut Matrix) {
 /// The real product accumulated in float (§8.1 step 4) with the official build's operand order
 /// (§16): each product `m2(i, c) × m1(r, i)`; blocks of four `val + p0`, `p1 + val`, `p2 + val`,
 /// `val + p3`, then `val + p`.
-fn real_product_f(a: &Matrix, b: &Matrix, out: &mut Matrix) {
+/// [`real_product_f`] of a real 4 x 4 matrix and a point (a 4 x 1 matrix), without allocation:
+/// the same plain arithmetic, and the same official order for the NaN results.
+pub(crate) fn real_point_f(a: &Matrix, p: [f32; 4]) -> [f32; 4] {
+    debug_assert!(!a.is_complex() && a.rows == 4 && a.cols == 4);
+    let mut out = [0f32; 4];
+    for (r, o) in out.iter_mut().enumerate() {
+        let ra = 2 + r * 4;
+        let mut v = 0.0f32;
+        for (i, x) in p.iter().enumerate() {
+            v += x * a.data[ra + i];
+        }
+        if v.is_nan() {
+            let q = |i: usize| sse::mul32(p[i], a.data[ra + i]);
+            v = sse::add32(0.0, q(0));
+            v = sse::add32(q(1), v);
+            v = sse::add32(q(2), v);
+            v = sse::add32(v, q(3));
+        }
+        *o = v;
+    }
+    out
+}
+
+pub(crate) fn real_product_f(a: &Matrix, b: &Matrix, out: &mut Matrix) {
     let (n, m) = (a.cols.max(0) as usize, b.cols.max(0) as usize);
     let simple = !out.is_complex() && out.cols == b.cols;
     // As `real_product_d`: plain arithmetic in each element's order (an operand order changes

@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //! FreeSurfer 8.2.0's volume functions (`fs.volume`), a clean room of
-//! `specs/freesurfer-volume.md` parts 1 to 6a: the volume-geometry text block (§2, §3), the
+//! `specs/freesurfer-volume.md` parts 1 to 6c: the volume-geometry text block (§2, §3), the
 //! geometry's copies, matrices, comparison and printer (§4), the voxel arithmetic (§6-§11),
 //! coordinates and geometry (§13-§16), the samplers (§18), the moves (§19), the head's box (§20),
-//! the reader of linear transforms (§21), the CMA labels and segmentation functions (§23) and
-//! resolution, planes, fills, resampling by whole factors and changes of type (§25).
+//! the reader of linear transforms (§21), the CMA labels and segmentation functions (§23),
+//! resolution, planes, fills, resampling by whole factors and changes of type (§25), the
+//! frame-range samplers, the trilinear kernel and splatting (§27, `frames`), derivatives,
+//! gradients and neighbour counts (§28, `deriv`), linear transforms of a volume (§29, `linear`)
+//! and resampling onto a template's grid and replacing a value (§31, `regrid`).
 //!
 //! Functions that take a destination (§6) take a [`Dst`]: none (the function makes one), the
 //! first source itself, the second source itself, or the caller's volume; they return a
@@ -13,11 +16,15 @@
 
 pub mod arith;
 pub mod cma;
+pub mod deriv;
 pub mod extract;
+pub mod frames;
 pub mod geomblock;
 pub mod geometry;
+pub mod linear;
 pub mod ltaread;
 pub mod moves;
+pub mod regrid;
 pub mod resample;
 pub mod sample;
 pub mod skull;

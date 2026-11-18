@@ -2,7 +2,7 @@
 //! Golden cases of fs.volume's clean room (`specs/freesurfer-volume.md` §69.5, CLAUDE.md rule
 //! 10): every command of the black-box probe's grammar (`tests/volume_cmd/`, the comparison's
 //! candidate commands) on seeded arguments, in both defect modes, one SHA-256 per group of the
-//! spec's parts 1 to 6a over every result line (the printed values, both streams and the notices;
+//! spec's parts 1 to 6c over every result line (the printed values, both streams and the notices;
 //! NaN bits included), recorded on Linux x86-64 and checked on every platform. The arguments
 //! come from a seeded generator and plain arithmetic (special values written as their bits); no
 //! file system (the transform reader reads an in-memory file, `ltamem`), no clock; volumes of at
@@ -20,6 +20,38 @@ use larmorx_fs_core::Environment;
 use sha2::{Digest, Sha256};
 
 const GOLDEN: &[(&str, &str)] = &[
+    (
+        "deriv.fix",
+        "a99b44b74602adbc03238a12d81d5afce4e98b525c0aebcd610ec9f23117f9a6",
+    ),
+    (
+        "deriv.reproduce",
+        "bf1cf71578e53b728a50500e96e21e1a31fdd796dd388e83215c6905007b7797",
+    ),
+    (
+        "frames.fix",
+        "ed14ad568160972ccbaffda334ba1e919f2ec2bf858b09597e53b84d855c882e",
+    ),
+    (
+        "frames.reproduce",
+        "b9c485a414a6e65737f9f462ce759ea094858d4f2f3322bad3d2811507087ecf",
+    ),
+    (
+        "linear.fix",
+        "701a77a3c4c0d18f7d393c7c6caf880f70969824df3c040ca4c5619088e20aba",
+    ),
+    (
+        "linear.reproduce",
+        "358a58730f2df6d34979e10e86eb9f1a6b3c1688d15ed086ce3fb70873d9c177",
+    ),
+    (
+        "regrid.fix",
+        "60e8e3db564123d07a3706284455a17b56ce1a1cb00d4e6a7229062b65e2d735",
+    ),
+    (
+        "regrid.reproduce",
+        "75fb32a32bf8c70a1696b167bcf38bff80e40a69d9b54edd654edfc11c1b8385",
+    ),
     (
         "block.fix",
         "35aadda73ae86414bdcfb64f401ea0c0ad1dc69f237b5775780e4a9c801e2900",
@@ -1384,6 +1416,313 @@ const RES: &[(&str, Make)] = &[
     }),
 ];
 
+impl G {
+    /// A 4 x 4 matrix (M): the identity, a scaling, a shift, a permutation with a shift, seeded
+    /// ratios with special values, a singular one; or a 3 x 3 one, or none.
+    fn mat4(&mut self) -> String {
+        let one = "3f800000";
+        let z = "00000000";
+        match self.below(9) {
+            0 => format!(
+                "4 4 {one} {z} {z} {z} {z} {one} {z} {z} {z} {z} {one} {z} {z} {z} {z} {one}"
+            ),
+            1 => {
+                let d = [self.size(false), self.size(false), self.size(false)];
+                format!(
+                    "4 4 {} {z} {z} {z} {z} {} {z} {z} {z} {z} {} {z} {z} {z} {z} {one}",
+                    d[0], d[1], d[2]
+                )
+            }
+            2 => {
+                let t = [self.f(false), self.f(false), self.f(false)];
+                format!(
+                    "4 4 {one} {z} {z} {} {z} {one} {z} {} {z} {z} {one} {} {z} {z} {z} {one}",
+                    t[0], t[1], t[2]
+                )
+            }
+            3 => {
+                let c = self.cosines(false);
+                let t = [self.f(false), self.f(false), self.f(false)];
+                format!(
+                    "4 4 {} {} {} {} {} {} {} {} {} {} {} {} {z} {z} {z} {one}",
+                    c[0], c[1], c[2], t[0], c[3], c[4], c[5], t[1], c[6], c[7], c[8], t[2]
+                )
+            }
+            4 | 5 => {
+                let v: Vec<String> = (0..12)
+                    .map(|_| {
+                        let special = self.one_in(4);
+                        self.f(special)
+                    })
+                    .collect();
+                format!("4 4 {} {z} {z} {z} {one}", v.join(" "))
+            }
+            6 => {
+                format!("4 4 {one} {z} {z} {z} {z} {z} {z} {z} {z} {z} {one} {z} {z} {z} {z} {one}")
+            }
+            7 => self.mat3(),
+            _ => "null".to_owned(),
+        }
+    }
+
+    /// A small working volume of the sampled types (bytes to floats, sometimes any type).
+    fn ws(&mut self) -> String {
+        let types = if self.one_in(6) { ALL } else { NUMERIC };
+        self.w(types)
+    }
+}
+
+/// `sseq W d n (x y z first last code)×n` and `sxyz W d n (x y z begin end k)×n` (§27).
+fn frame_range(g: &mut G, seq: bool) -> String {
+    let a = g.ws();
+    let n = g.int(1, 3);
+    let mut pts = Vec::new();
+    for _ in 0..n {
+        if seq {
+            let (x, y, z) = (g.coord(), g.coord(), g.coord());
+            let code = if g.one_in(12) {
+                "5"
+            } else {
+                g.pick(&["-1", "-1", "0", "1", "1", "2", "3", "4", "6", "7"])
+            };
+            pts.push(format!(
+                "{x} {y} {z} {} {} {code}",
+                g.int(-1, 2),
+                g.int(-1, 3)
+            ));
+        } else {
+            pts.push(format!(
+                "{} {} {} {} {} {}",
+                g.int(-2, 4),
+                g.int(-2, 4),
+                g.int(-2, 4),
+                g.int(-1, 2),
+                g.int(-1, 3),
+                g.int(0, 1)
+            ));
+        }
+    }
+    format!("{a} {} {n} {}", g.d(true), pts.join(" "))
+}
+
+const FRAMES: &[(&str, Make)] = &[
+    ("splat", |g| {
+        let a = g.ws();
+        let n = g.int(1, 3);
+        let v: Vec<String> = (0..n)
+            .map(|_| {
+                let val = match g.below(4) {
+                    0 => g
+                        .pick(&["4202a05f20000000", "40f1170000000000", "c0f1170000000000"])
+                        .to_owned(),
+                    _ => g.d(true),
+                };
+                format!(
+                    "{} {} {} {} {} {val}",
+                    g.int(0, 1),
+                    g.coord(),
+                    g.coord(),
+                    g.coord(),
+                    g.int(0, 2)
+                )
+            })
+            .collect();
+        format!("{a} {n} {}", v.join(" "))
+    }),
+    ("sseq", |g| frame_range(g, true)),
+    ("sxyz", |g| frame_range(g, false)),
+    ("tkern", |g| {
+        let a = g.w(ALL);
+        let n = g.int(1, 3);
+        let v: Vec<String> = (0..n)
+            .map(|_| format!("{} {} {} {}", g.coord(), g.coord(), g.coord(), g.int(0, 1)))
+            .collect();
+        format!("{a} {n} {}", v.join(" "))
+    }),
+];
+
+fn sigma(g: &mut G) -> String {
+    let v: f64 = match g.below(10) {
+        0 => 0.0,
+        1 => 1e-9,
+        2 => -1.0,
+        3 => 1e300,
+        4 => f64::NAN,
+        5 => {
+            if g.one_in(3) {
+                return g.pick(&["7fefffffffffffff", "7ff0000000000000"]).to_owned();
+            }
+            0.5
+        }
+        _ => g.int(1, 12) as f64 / 4.0,
+    };
+    format!("{:016x}", v.to_bits())
+}
+
+const DERIV: &[(&str, Make)] = &[
+    ("deriv", |g| {
+        let a = g.ws();
+        let s = g.pick(&[
+            "3ff0000000000000",
+            "bff0000000000000",
+            "3fe0000000000000",
+            "7ff8000000000000",
+        ]);
+        let n = g.int(1, 3);
+        let v: Vec<String> = (0..n)
+            .map(|_| {
+                format!(
+                    "{} {} {} {} {} {} {} {}",
+                    g.int(0, 1),
+                    g.coord(),
+                    g.coord(),
+                    g.coord(),
+                    g.d(true),
+                    g.d(true),
+                    g.d(true),
+                    sigma(g)
+                )
+            })
+            .collect();
+        format!("{a} {s} {n} {}", v.join(" "))
+    }),
+    ("grad", |g| {
+        let a = g.ws();
+        let n = g.int(1, 3);
+        let v: Vec<String> = (0..n)
+            .map(|_| {
+                format!(
+                    "{} {} {} {} {}",
+                    g.int(0, 1),
+                    g.coord(),
+                    g.coord(),
+                    g.coord(),
+                    g.int(0, 2)
+                )
+            })
+            .collect();
+        format!("{a} {n} {}", v.join(" "))
+    }),
+    ("nbrs", |g| {
+        let a = g.w(ALL);
+        let n = g.int(1, 4);
+        let v: Vec<String> = (0..n)
+            .map(|_| {
+                let k = g.int(0, 7);
+                let x = if g.one_in(30) { 600 } else { g.int(-3, 5) };
+                let pq = match k {
+                    2 => format!("{} {}", g.int(-3, 7), g.int(0, 255)),
+                    4 => format!("{} 0", g.int(0, 2)),
+                    _ => format!("{} 0", g.int(-1, 255)),
+                };
+                format!(
+                    "{k} {x} {} {} {pq} {} {}",
+                    g.int(-3, 5),
+                    g.int(-3, 5),
+                    g.f(true),
+                    g.f(true)
+                )
+            })
+            .collect();
+        format!("{a} {n} {}", v.join(" "))
+    }),
+];
+
+const LINEAR: &[(&str, Make)] = &[
+    ("setvals", |g| {
+        let a = g.w(ALL);
+        format!("{a} {}", g.f(true))
+    }),
+    ("rasvox", |g| {
+        let a = g.ws();
+        let b = if g.one_in(3) {
+            "null".to_owned()
+        } else {
+            g.ws()
+        };
+        format!("{a} {b} {}", g.mat4())
+    }),
+    ("lxf", |g| {
+        let k = g.int(0, 5);
+        let s = g.shape(NUMERIC);
+        let a = g.w_of(&s);
+        let ov = g.pick(&[
+            "0000000000000000",
+            "4014000000000000",
+            "3e112e0be826d695",
+            "c004000000000000",
+            "7ff8000000000000",
+        ]);
+        let d = rdst(g, &s, None);
+        let interp = if g.one_in(14) {
+            "5"
+        } else {
+            g.pick(&["0", "1", "1", "2", "3", "4", "7"])
+        };
+        format!("{k} {a} {ov} {d} {} {interp}", g.mat4())
+    }),
+    ("rsmat", |g| {
+        let a = g.ws();
+        let b = g.ws();
+        format!("{a} {b}")
+    }),
+    ("+gdiag=10000040 rsmat", |g| {
+        let a = g.ws();
+        let b = g.ws();
+        format!("{a} {b}")
+    }),
+];
+
+/// A template of a source's shape: its extent divided or kept, the voxel sizes scaled.
+fn template_of(g: &mut G, s: &str) -> String {
+    if g.one_in(3) {
+        return g.ws();
+    }
+    let (w, h, d) = ext3(s);
+    let t: Vec<&str> = s.split(' ').collect();
+    let k = g.int(1, 2);
+    let shape = format!(
+        "{} {} {} {} {} 0",
+        (w / k).max(1),
+        (h / k).max(1),
+        (d / k).max(1),
+        t[3],
+        g.int(1, 2)
+    );
+    g.w_of(&shape)
+}
+
+const REGRID: &[(&str, Make)] = &[
+    ("rsfill", |g| {
+        let s = g.shape(&[0, 0, 1, 2, 3, 4]);
+        let a = g.w_of(&s);
+        let b = template_of(g, &s);
+        let t = if g.one_in(16) {
+            "5"
+        } else {
+            g.pick(&["0", "1", "1", "2", "3", "4", "6", "6", "7"])
+        };
+        format!("{a} {b} {t} {} {}", g.f(true), i64::from(g.one_in(5)))
+    }),
+    ("+gdiag=10000040 rsfill", |g| {
+        let s = g.shape(&[0, 3]);
+        let a = g.w_of(&s);
+        let b = template_of(g, &s);
+        format!("{a} {b} {} {} 0", g.pick(&["0", "1", "6"]), g.f(false))
+    }),
+    ("repval", |g| {
+        let s = g.shape(&[0, 0, 0, 1, 3, 4, 6]);
+        let a = g.w_of(&s);
+        let d = rdst(g, &s, None);
+        let rest = if g.one_in(2) {
+            format!("1 {} {}", g.int(-1, 256), g.int(-1, 256))
+        } else {
+            format!("0 {} {}", g.f(true), g.f(true))
+        };
+        format!("{a} {d} {rest}")
+    }),
+];
+
 fn group(name: &str, table: &[(&str, Make)], per: usize) {
     let seed = name.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
         (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
@@ -1489,4 +1828,24 @@ fn transform_reader() {
 #[test]
 fn resampling() {
     group("res", RES, 8);
+}
+
+#[test]
+fn frame_samplers_and_splats() {
+    group("frames", FRAMES, 8);
+}
+
+#[test]
+fn derivatives_and_neighbours() {
+    group("deriv", DERIV, 8);
+}
+
+#[test]
+fn linear_transforms() {
+    group("linear", LINEAR, 8);
+}
+
+#[test]
+fn template_resampling() {
+    group("regrid", REGRID, 8);
 }

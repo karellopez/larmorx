@@ -34,8 +34,8 @@ use larmorx_freesurfer_core::sse::{add, div, div64, mul, mul64, sqrt64, sub};
 use larmorx_freesurfer_core::utils::nint;
 use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::mri::{
-    MAX_INDEX, MRI_FLOAT, MRI_INT, MRI_SHORT, MRI_UCHAR, Mri, mri_alloc, mri_alloc_sequence,
-    mri_copy_header,
+    MAX_INDEX, MRI_FLOAT, MRI_INT, MRI_LONG, MRI_RGB, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri,
+    mri_alloc, mri_alloc_sequence, mri_copy_header,
 };
 use larmorx_freesurfer_mri::vol_geom::{extract_i_to_r, reinit_cache};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
@@ -263,14 +263,232 @@ impl OutType {
             OutType::Int => MRI_INT,
         }
     }
-    /// The stored bytes of a sum: the float itself, or `nint`'s int in the type's low bits.
-    fn bytes(self, g: &mut Globals, v: f32) -> Vec<u8> {
+    /// The stored bytes of a sum: the float itself, or `nint`'s int in the type's low bits (the
+    /// first `n` bytes of the array, `n` the type's size).
+    fn bytes(self, g: &mut Globals, v: f32) -> ([u8; 4], usize) {
         match self {
-            OutType::Float => v.to_le_bytes().to_vec(),
-            OutType::Byte => vec![nint(g, f64::from(v)) as u8],
-            OutType::Short => (nint(g, f64::from(v)) as i16).to_le_bytes().to_vec(),
-            OutType::Int => nint(g, f64::from(v)).to_le_bytes().to_vec(),
+            OutType::Float => (v.to_le_bytes(), 4),
+            OutType::Byte => ([nint(g, f64::from(v)) as u8, 0, 0, 0], 1),
+            OutType::Short => {
+                let [a, b] = (nint(g, f64::from(v)) as i16).to_le_bytes();
+                ([a, b, 0, 0], 2)
+            }
+            OutType::Int => (nint(g, f64::from(v)).to_le_bytes(), 4),
         }
+    }
+}
+
+/// A frame read in place (no copy: FreeSurfer reads the volume's own rows): the frame exists, the
+/// type is the volume's and its voxels lie in the buffer, so every direct access is `In` (no
+/// notice). Voxel `i` is `[z][y][x]` over the volume's extent.
+struct Frame<'a> {
+    bytes: &'a [u8],
+    ty: i32,
+}
+
+impl<'a> Frame<'a> {
+    /// The frame `f` of `m` read as type `ty`, when every access is `In`.
+    fn of(m: &'a Mri, ty: i32, f: i32) -> Option<Frame<'a>> {
+        let (w, h, d) = ext(m);
+        if !mem::fits(m, ty, f, w, h, d) {
+            return None;
+        }
+        let size = mem::elem_size(ty);
+        let start = (f as usize)
+            .checked_mul(usize::try_from(m.vox_per_vol).ok()?)?
+            .checked_mul(size)?;
+        let end = start.checked_add(count(w, h, d).checked_mul(size)?)?;
+        let c = m.chunk.as_ref()?;
+        // the voxel index `[z][y][x]` is FreeSurfer's offset only for rows and slices of the
+        // header's extent
+        let rows_ok = m.vox_per_row == w as u64 && m.vox_per_slice == (w as u64) * (h as u64);
+        (rows_ok && end <= c.len() && end as u64 <= m.bytes_total).then(|| Frame {
+            bytes: &c[start..end],
+            ty,
+        })
+    }
+
+    /// C's `(float)` of voxel `i`.
+    #[inline(always)]
+    fn get(&self, i: usize) -> f32 {
+        let b = self.bytes;
+        match self.ty {
+            MRI_UCHAR => f32::from(b[i]),
+            MRI_FLOAT => f32::from_le_bytes([b[4 * i], b[4 * i + 1], b[4 * i + 2], b[4 * i + 3]]),
+            MRI_SHORT => f32::from(i16::from_le_bytes([b[2 * i], b[2 * i + 1]])),
+            MRI_USHRT => f32::from(u16::from_le_bytes([b[2 * i], b[2 * i + 1]])),
+            MRI_LONG => {
+                i64::from_le_bytes(b[8 * i..8 * i + 8].try_into().expect("8 bytes")) as f32
+            }
+            _ => i32::from_le_bytes([b[4 * i], b[4 * i + 1], b[4 * i + 2], b[4 * i + 3]]) as f32,
+        }
+    }
+
+    /// The voxels `start..start + out.len()` into `out`.
+    fn row(&self, start: usize, out: &mut [f32]) {
+        let n = out.len();
+        match self.ty {
+            MRI_UCHAR => {
+                for (t, &b) in out.iter_mut().zip(&self.bytes[start..start + n]) {
+                    *t = f32::from(b);
+                }
+            }
+            MRI_FLOAT => {
+                let b = &self.bytes[4 * start..4 * (start + n)];
+                for (t, c) in out.iter_mut().zip(b.chunks_exact(4)) {
+                    *t = f32::from_le_bytes([c[0], c[1], c[2], c[3]]);
+                }
+            }
+            _ => {
+                for (j, t) in out.iter_mut().enumerate() {
+                    *t = self.get(start + j);
+                }
+            }
+        }
+    }
+
+    /// `out[j] += v[start + j] * k` for each `j` (plain `float` arithmetic: the numbers of the
+    /// official build's `total + k v`, its NaNs' bits apart).
+    #[inline(always)]
+    fn acc(&self, out: &mut [f32], start: usize, k: f32) {
+        let n = out.len();
+        match self.ty {
+            MRI_UCHAR => {
+                for (t, &b) in out.iter_mut().zip(&self.bytes[start..start + n]) {
+                    *t += f32::from(b) * k;
+                }
+            }
+            MRI_FLOAT => {
+                let b = &self.bytes[4 * start..4 * (start + n)];
+                for (t, c) in out.iter_mut().zip(b.chunks_exact(4)) {
+                    *t += f32::from_le_bytes([c[0], c[1], c[2], c[3]]) * k;
+                }
+            }
+            _ => {
+                for (j, t) in out.iter_mut().enumerate() {
+                    *t += self.get(start + j) * k;
+                }
+            }
+        }
+    }
+}
+
+/// The frame `f` of `dst` written in place over an extent `(w, h, d)` as type `ty`: the byte
+/// offset of each row's first voxel (`[z][y]`, rows of the destination's own width and height),
+/// when every write is `In`.
+fn dst_rows(dst: &Mri, ty: i32, f: i32, (w, h, d): (i32, i32, i32)) -> Option<(usize, usize, usize)> {
+    if !mem::fits(dst, ty, f, w, h, d) {
+        return None;
+    }
+    let size = mem::elem_size(ty);
+    let (dw, dh) = (dst.vg.width as usize, dst.vg.height as usize);
+    let base = (f as usize).checked_mul(usize::try_from(dst.vox_per_vol).ok()?)?;
+    if count(w, h, d) > 0 {
+        let last = ((d as usize - 1) * dh + h as usize - 1) * dw + w as usize;
+        let end = base.checked_add(last)?.checked_mul(size)?;
+        if end > dst.chunk.as_ref()?.len() {
+            return None;
+        }
+    }
+    Some((base, dw, dh))
+}
+
+/// The convolution of `src` with `k` along `axis` into `dst`'s frame, both in place, a row at a
+/// time (the buffers of one row, where FreeSurfer writes each sum straight into the destination):
+/// each tap's voxel the nearest of the axis (the index tables), each output's sum `total + v k[i]`
+/// from tap 0, computed for a whole row at once in plain `float` arithmetic (no operation fused or
+/// reordered); a sum that ends as a NaN is computed again one operation at a time for its bits
+/// (the official build multiplies the voxel by the weight and adds the product to the sum).
+/// `rows` is [`dst_rows`]'s answer for `dst`.
+#[allow(clippy::too_many_arguments)]
+fn convolve_rows(
+    g: &mut Globals,
+    src: &Frame,
+    (w, h, d): (i32, i32, i32),
+    k: &[f32],
+    axis: i32,
+    dst: &mut Mri,
+    rows: (usize, usize, usize),
+    ot: OutType,
+) {
+    let (wu, hu, du) = (w as usize, h as usize, d as usize);
+    if wu == 0 || hu == 0 || du == 0 {
+        return;
+    }
+    let (base, dw, dh) = rows;
+    let size = mem::elem_size(ot.mri());
+    let halflen = (k.len() / 2) as i32;
+    let mut row = vec![0.0f32; wu];
+    let mut pad = if axis == MRI_WIDTH {
+        vec![0.0f32; wu + k.len().saturating_sub(1)]
+    } else {
+        Vec::new()
+    };
+    let mut line = vec![0.0f32; wu];
+    for z in 0..du {
+        for y in 0..hu {
+            row.fill(0.0);
+            let at = (z * hu + y) * wu;
+            match axis {
+                MRI_WIDTH => {
+                    src.row(at, &mut line);
+                    for (p, v) in pad.iter_mut().enumerate() {
+                        *v = line[clamp_index(p as i32 - halflen, w) as usize];
+                    }
+                    for (i, &ki) in k.iter().enumerate() {
+                        for (t, &v) in row.iter_mut().zip(&pad[i..i + wu]) {
+                            *t += v * ki;
+                        }
+                    }
+                }
+                MRI_HEIGHT => {
+                    for (i, &ki) in k.iter().enumerate() {
+                        let yi = clamp_index(y as i32 + i as i32 - halflen, h) as usize;
+                        src.acc(&mut row, (z * hu + yi) * wu, ki);
+                    }
+                }
+                _ => {
+                    for (i, &ki) in k.iter().enumerate() {
+                        let zi = clamp_index(z as i32 + i as i32 - halflen, d) as usize;
+                        src.acc(&mut row, (zi * hu + y) * wu, ki);
+                    }
+                }
+            }
+            for (x, t) in row.iter_mut().enumerate() {
+                if !t.is_nan() {
+                    continue;
+                }
+                let mut total = 0.0f32;
+                for (i, &ki) in k.iter().enumerate() {
+                    let j = i as i32 - halflen;
+                    let idx = match axis {
+                        MRI_WIDTH => at + clamp_index(x as i32 + j, w) as usize,
+                        MRI_HEIGHT => (z * hu + clamp_index(y as i32 + j, h) as usize) * wu + x,
+                        _ => (clamp_index(z as i32 + j, d) as usize * hu + y) * wu + x,
+                    };
+                    total = add(total, mul(src.get(idx), ki));
+                }
+                *t = total;
+            }
+            write_row(g, dst, (base + (z * dh + y) * dw) * size, &row, ot);
+        }
+    }
+}
+
+/// A row of sums stored at byte `o` of `dst`'s buffer (in place: [`dst_rows`]).
+fn write_row(g: &mut Globals, dst: &mut Mri, o: usize, row: &[f32], ot: OutType) {
+    let size = mem::elem_size(ot.mri());
+    if let OutType::Float = ot {
+        let c = &mut dst.chunk.as_mut().expect("voxels")[o..o + 4 * row.len()];
+        for (b, &v) in c.chunks_exact_mut(4).zip(row) {
+            b.copy_from_slice(&v.to_le_bytes());
+        }
+        return;
+    }
+    for (x, &v) in row.iter().enumerate() {
+        let (b, n) = ot.bytes(g, v);
+        let p = o + x * size;
+        dst.chunk.as_mut().expect("voxels")[p..p + n].copy_from_slice(&b[..n]);
     }
 }
 
@@ -295,9 +513,9 @@ fn store(
         for z in 0..d as usize {
             for y in 0..h as usize {
                 for x in 0..w as usize {
-                    let b = ot.bytes(g, vals[i]);
+                    let (b, n) = ot.bytes(g, vals[i]);
                     let o = (base + (z * dh + y) * dw + x) * size;
-                    dst.chunk.as_mut().expect("voxels")[o..o + size].copy_from_slice(&b);
+                    dst.chunk.as_mut().expect("voxels")[o..o + size].copy_from_slice(&b[..n]);
                     i += 1;
                 }
             }
@@ -309,7 +527,7 @@ fn store(
     for z in 0..d {
         for y in 0..h {
             for x in 0..w {
-                let b = ot.bytes(g, vals[i]);
+                let (b, n) = ot.bytes(g, vals[i]);
                 mem::write(
                     g,
                     (&FS_546, &FS_546),
@@ -318,7 +536,7 @@ fn store(
                     base + i64::from(z),
                     i64::from(y),
                     i64::from(x),
-                    &b,
+                    &b[..n],
                 );
                 i += 1;
             }
@@ -499,7 +717,25 @@ fn convolve_float(
     }
     long_kernel(g, WHAT, k.len());
     let e = ext(src);
-    let vals = if src.mtype == MRI_UCHAR || src.mtype == MRI_FLOAT {
+    let direct = src.mtype == MRI_UCHAR || src.mtype == MRI_FLOAT;
+    // in place where every access is `In` (FreeSurfer holds no copy of either frame)
+    if direct || vox_in_place(src.mtype) {
+        if let (Some(fr), Some(rows)) = (
+            Frame::of(src, src.mtype, src_frame),
+            dst_rows(dst, MRI_FLOAT, dst_frame, e),
+        ) {
+            if !direct {
+                note_fs545(g, src.mtype, k.len());
+                if g.notices.reproduce() {
+                    convolve_vox_rows(g, err, src, &fr, k, axis, src_frame, dst, rows)?;
+                    return Ok(true);
+                }
+            }
+            convolve_rows(g, &fr, e, k, axis, dst, rows, OutType::Float);
+            return Ok(true);
+        }
+    }
+    let vals = if direct {
         let a = mem::plane(g, (&FS_546, &FS_546), WHAT, src, src.mtype, src_frame);
         convolve_plane(&a, e, k, axis)
     } else {
@@ -507,6 +743,29 @@ fn convolve_float(
     };
     store(g, WHAT, dst, dst_frame, e, &vals, OutType::Float);
     Ok(true)
+}
+
+/// The default branch's types whose voxels `MRIgetVoxVal` reads within the volume as they are
+/// (no notice, no other value): their frames are read in place.
+fn vox_in_place(ty: i32) -> bool {
+    matches!(ty, MRI_SHORT | MRI_USHRT | MRI_INT | MRI_RGB | MRI_LONG)
+}
+
+/// FS-545's notice for a kernel of more than one tap.
+fn note_fs545(g: &mut Globals, ty: i32, len: usize) {
+    if len > 1 {
+        g.notices.add(
+            &FS_545,
+            format!(
+                "MRIconvolve1d: a source of type {ty} past the axis' ends: {}",
+                if g.notices.reproduce() {
+                    "its outside value and the next row's voxels, as FreeSurfer"
+                } else {
+                    "the edge voxel"
+                }
+            ),
+        );
+    }
 }
 
 /// `MRIconvolve1d`'s default branch: the taps read by `MRIgetVoxVal` at their own column, row or
@@ -527,20 +786,7 @@ fn convolve_vox(
         MRI_HEIGHT => h,
         _ => d,
     };
-    if k.len() > 1 {
-        g.notices.add(
-            &FS_545,
-            format!(
-                "MRIconvolve1d: a source of type {} past the axis' ends: {}",
-                src.mtype,
-                if g.notices.reproduce() {
-                    "its outside value and the next row's voxels, as FreeSurfer"
-                } else {
-                    "the edge voxel"
-                }
-            ),
-        );
-    }
+    note_fs545(g, src.mtype, k.len());
     if !g.notices.reproduce() {
         return Ok(convolve_plane(&a, (w, h, d), k, axis));
     }
@@ -574,6 +820,62 @@ fn convolve_vox(
         }
     }
     Ok(o)
+}
+
+/// [`convolve_vox`] reproduced in place: the taps within the axis read from the frame `fr` (what
+/// `MRIgetVoxVal` reads there), those past its ends by `MRIgetVoxVal` (in FreeSurfer's order of
+/// voxels and taps), each sum one operation at a time, a row at a time into `dst`.
+#[allow(clippy::too_many_arguments)]
+fn convolve_vox_rows(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    src: &Mri,
+    fr: &Frame,
+    k: &[f32],
+    axis: i32,
+    frame: i32,
+    dst: &mut Mri,
+    (base, dw, dh): (usize, usize, usize),
+) -> Result<(), Fatal> {
+    let (w, h, d) = ext(src);
+    let halflen = (k.len() / 2) as i32;
+    let n_axis = match axis {
+        MRI_WIDTH => w,
+        MRI_HEIGHT => h,
+        _ => d,
+    };
+    let (wu, hu) = (w as usize, h as usize);
+    let mut row = vec![0.0f32; wu];
+    for z in 0..d {
+        for y in 0..h {
+            for x in 0..w {
+                let mut total = 0.0f32;
+                for (i, &ki) in k.iter().enumerate() {
+                    let j = i as i32 - halflen;
+                    let (xx, yy, zz) = match axis {
+                        MRI_WIDTH => (x + j, y, z),
+                        MRI_HEIGHT => (x, y + j, z),
+                        _ => (x, y, z + j),
+                    };
+                    let at = match axis {
+                        MRI_WIDTH => xx,
+                        MRI_HEIGHT => yy,
+                        _ => zz,
+                    };
+                    let v = if (0..n_axis).contains(&at) {
+                        fr.get((zz as usize * hu + yy as usize) * wu + xx as usize)
+                    } else {
+                        mri_get_vox_val(g, err, src, xx, yy, zz, frame, 0)?
+                    };
+                    total = add(total, mul(v, ki));
+                }
+                row[x as usize] = total;
+            }
+            let o = (base + (z as usize * dh + y as usize) * dw) * 4;
+            write_row(g, dst, o, &row, OutType::Float);
+        }
+    }
+    Ok(())
 }
 
 /// The integer-typed convolutions (`MRIconvolve1dByte`, `Short`, `Int`) into a given destination
@@ -623,6 +925,14 @@ fn convolve_typed(
     }
     long_kernel(g, what, k.len());
     let e = ext(src);
+    // in place where every access is `In` (FreeSurfer holds no copy of either frame)
+    if let (Some(fr), Some(rows)) = (
+        Frame::of(src, read_ty, src_frame),
+        dst_rows(dst, ot.mri(), dst_frame, e),
+    ) {
+        convolve_rows(g, &fr, e, k, axis, dst, rows, ot);
+        return Ok(true);
+    }
     let a = source_plane(g, err, what, src, read_ty, src_frame)?;
     let vals = convolve_plane(&a, e, k, axis);
     store(g, what, dst, dst_frame, e, &vals, ot);

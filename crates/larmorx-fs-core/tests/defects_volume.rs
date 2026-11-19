@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//! fs.volume's defects as D13 switches (`specs/freesurfer-volume.md` §69.4, parts 1 to 6c): each one noted in
+//! fs.volume's defects as D13 switches (`specs/freesurfer-volume.md` §69.4, parts 1 to 7a; fs.bspline's,
+//! `specs/freesurfer-bspline.md` §7): each one noted in
 //! both modes on a case that meets it, and its two modes' results different where the correction
 //! changes them (memory reads and crashes give the same result in both modes; the end of the
 //! program that §22's modes table gives in both modes differs only by FS-01's NUL in its C-style
@@ -599,4 +600,134 @@ fn fs461_both_frames_of_a_byte_volume() {
         assert_eq!(p.mri_get_vox_val(&d, 0, 0, 0, 1, 0).expect("a voxel"), want);
         assert!(noted(&mut p, "FS-461"));
     }
+}
+
+// ---- part 7a (§33)
+
+/// FS-329: the statistics of a 64-bit volume of two voxels 5 and 7: their own values by default
+/// (mean 6), 32-bit integers at the voxels' indices with `reproduce` (voxel 5's two halves: 5
+/// and 0, mean 2.5).
+#[test]
+fn fs329_a_64_bit_volume() {
+    for (mode, want) in [
+        (UpstreamDefects::Fix, (5.0f32, 7.0f32, 6.0f32)),
+        (UpstreamDefects::Reproduce, (0.0, 5.0, 2.5)),
+    ] {
+        let mut p = Process::silent(Environment::new(), mode);
+        let mut m = p
+            .mri_alloc_sequence(2, 1, 1, types::LONG, 1)
+            .expect("a volume");
+        let v = m.voxels.as_mut().expect("voxels");
+        v[..8].copy_from_slice(&5i64.to_le_bytes());
+        v[8..16].copy_from_slice(&7i64.to_le_bytes());
+        let s = p.mri_stats(&m).expect("statistics");
+        assert_eq!((s.min, s.max, s.n), (Some(want.0), Some(want.1), 2));
+        assert_eq!(s.mean, want.2);
+        assert!(noted(&mut p, "FS-329"));
+    }
+}
+
+/// FS-330: the printed statistics of an RGB volume: its minimum and maximum, never written, 0
+/// in both modes, noted.
+#[test]
+fn fs330_a_type_the_statistics_do_not_read() {
+    let line = format!("pstats {}", w("2 1 1 9 1 0", "7"));
+    // the modes differ only by FS-01's NUL in the centre of mass's errors
+    check("FS-330", true, &line);
+    let (fix, _) = run(&line, UpstreamDefects::Fix);
+    let want: String = b"2 values\nmin = 0\nmax = 0\n"
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    assert!(fix.contains(&format!("| x{want}")), "{fix}");
+}
+
+/// FS-462: the centre of a volume sampled onto a destination of no columns ends the program in
+/// both modes (FreeSurfer divides by the extent and crashes).
+#[test]
+fn fs462_a_sampled_extent_of_zero() {
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut p = Process::silent(Environment::new(), mode);
+        let mut src = bytes(&mut p, 1, |_| 3.0);
+        let mut dst = bytes(&mut p, 1, |_| 0.0);
+        dst.geom.width = 0;
+        let r = p.mri_calc_cras_for_sampled_volume(&mut src, &dst);
+        assert!(matches!(r, Err(s) if s.status() == 252), "{r:?}");
+        assert!(noted(&mut p, "FS-462"));
+    }
+}
+
+/// FS-463: an orientation string of one character: the places past its end read as NUL in both
+/// modes (FreeSurfer reads memory contents), noted.
+#[test]
+fn fs463_a_string_of_one_character() {
+    check("FS-463", false, "chkostr x4c");
+    let (fix, _) = run("chkostr x4c", UpstreamDefects::Fix);
+    let want: String =
+        b"Character Character   PA axis not represented.\n  IS axis not represented.\n"
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+    assert!(fix.starts_with(&format!("x{want} |")), "{fix}");
+}
+
+/// FS-464: a voxel-to-RAS matrix of 2 x 2: refused in both modes (`ERROR_BADPARM`, the volume
+/// unchanged; FreeSurfer reads past the matrix).
+#[test]
+fn fs464_a_matrix_smaller_than_3_by_4() {
+    let line = format!(
+        "setv2r {} 2 2 3f800000 00000000 00000000 3f800000 unset",
+        w("2 2 2 0 1 0", "5")
+    );
+    // the modes differ only by FS-01's NUL in the error
+    check("FS-464", true, &line);
+    let (fix, _) = run(&line, UpstreamDefects::Fix);
+    assert!(fix.starts_with("-4 2 2 2 "), "{fix}");
+}
+
+// ---- fs.bspline (specs/freesurfer-bspline.md §7)
+
+/// FS-962: doubling a 4 x 1 x 1 volume: by default the expanded row stays; with `reproduce` pass y
+/// copies the source's voxels at the destination's columns (columns 1 to 7 of a source of 4: past
+/// it from column 4), noted in both modes.
+#[test]
+fn fs962_an_axis_of_one_voxel_doubled() {
+    let line = format!("bsup {} new", w("4 1 1 3 1 0", "t6"));
+    check("FS-962", true, &line);
+}
+
+/// FS-963: halving a 4 x 4 x 1 volume: the depth's voxel size doubles in both modes (FreeSurfer's
+/// geometry), noted.
+#[test]
+fn fs963_an_axis_of_one_voxel_halved() {
+    let line = format!("bsdown {} new", w("4 4 1 3 1 0", "t6"));
+    check("FS-963", false, &line);
+}
+
+/// FS-964: sampling coefficients of degree 10 or -1 on one voxel: refused in both modes with its
+/// error (`ERROR_BADPARM`, no sample); degree 10 on 3 x 3 x 3: refused by default, FreeSurfer's end
+/// (`Invalid spline degree`, status 1) with `reproduce`.
+#[test]
+fn fs964_degrees_past_the_arrays() {
+    let mid = "3ff8000000000000 3fd0000000000000 0000000000000000";
+    let at0 = "0000000000000000 0000000000000000 0000000000000000";
+    for deg in ["10", "-1"] {
+        let line = format!(
+            "bsraw {deg} 0 {} 0000000000000000 1 {at0} 0",
+            w("1 1 1 3 1 0", "t22")
+        );
+        // the modes differ only by FS-01's NUL in the error
+        check("FS-964", true, &line);
+        let (fix, _) = run(&line, UpstreamDefects::Fix);
+        assert!(fix.starts_with("-4 401c000000000000 |"), "{fix}");
+    }
+    let line = format!(
+        "bsraw 10 0 {} 0000000000000000 1 {mid} 0",
+        w("3 3 3 3 1 0", "t22")
+    );
+    check("FS-964", true, &line);
+    let (fix, _) = run(&line, UpstreamDefects::Fix);
+    let (rep, _) = run(&line, UpstreamDefects::Reproduce);
+    assert!(fix.starts_with("-4 401c000000000000 |"), "{fix}");
+    assert!(rep.starts_with("EXIT 1 |"), "{rep}");
 }

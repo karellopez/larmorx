@@ -18,6 +18,10 @@ port's ``larmorx:`` notices aside) and every file written (FreeSurfer's provenan
 ``fix`` may differ only with a notice.
 
     python -P validation/probes/fs-normalize/prog.py --seed 1 [--only 3,7] [--json out.json]
+    python -P validation/probes/fs-normalize/prog.py --golden
+
+``--golden``: the official program on the golden cases' inputs (written by the port's example
+``fs_normalize_golden``), hashed as ``tests/mri_normalize_golden.rs`` hashes the port's run.
 """
 
 from __future__ import annotations
@@ -312,6 +316,72 @@ def port_binary(jobs: int) -> Path:
     return REPO / "crates-freesurfer" / "target" / "release" / "larmorx-freesurfer"
 
 
+def golden_line(line: str) -> str:
+    """``mask_line`` of the golden test (``tests/mri_normalize_golden/common.rs``): the timing
+    line's numbers, and a tissue level read from a histogram bin below 0 (FS-597: memory contents
+    in FreeSurfer) as ``?`` without its padding."""
+    if line.startswith("3D bias adjustment took "):
+        return "3D bias adjustment took M minutes and S seconds."
+    w = line.split(" ")
+    keep: list[str | None] = list(w)
+    for i in range(1, len(w)):
+        if w[i] != "at" or w[i - 1] not in ("peak", "valley"):
+            continue
+        j = next((j for j in range(i + 1, len(w)) if w[j]), None)
+        if j is None:
+            continue
+        if j + 1 < len(w) and w[j + 1].startswith("(-"):
+            for k in range(i + 1, j):
+                keep[k] = None
+            keep[j] = "?"
+    return " ".join(x for x in keep if x is not None)
+
+
+def golden(ws: Path, env: dict[str, str], jobs: int) -> int:
+    """The golden cases (``tests/mri_normalize_golden.rs``): the official program on the port's
+    32^3 inputs, hashed as the test hashes the port's run; prints the value to record."""
+    import hashlib
+
+    subprocess.run(
+        ["cargo", "build", "--release", "-p", "larmorx-freesurfer-volumes", "--example",
+         "fs_normalize_golden", "-j", str(jobs), "--manifest-path",
+         str(REPO / "crates-freesurfer" / "Cargo.toml")],
+        check=True,
+        env={k: v for k, v in os.environ.items() if k != "FSLDIR"},
+    )  # fmt: skip
+    ex = REPO / "crates-freesurfer" / "target" / "release" / "examples" / "fs_normalize_golden"
+    root = ws / "oracles" / "inputs" / "fs-normalize-prog" / "golden"
+    if root.exists():
+        shutil.rmtree(root)
+    (root / "in").mkdir(parents=True)
+    subprocess.run([ex, "inputs", root / "in"], check=True)
+    lines = subprocess.run([ex, "cases"], check=True, capture_output=True, text=True).stdout
+    h = hashlib.sha256()
+    for line in lines.splitlines():
+        k, args, outs = line.split("\t")
+        d = root / f"case-{k}"
+        shutil.copytree(root / "in", d)
+        done = oracle_cache.run(
+            ["mri_normalize", *args.split()],
+            env=env,
+            cwd=d,
+            outputs=[d],
+            policy=oracle_cache.Policy(threads=1, family="freesurfer"),
+            timeout=600,
+            runner="fs-normalize-prog-golden",
+        )
+        text = "\n".join(golden_line(x) for x in done.stdout.splitlines())
+        h.update(f"case {k} {done.returncode & 0xFF}\n{text}\n".encode())
+        for name in outs.split():
+            dig = subprocess.run(
+                [ex, "digest", d / name], check=True, capture_output=True, text=True
+            )
+            h.update(f"{name} {dig.stdout.strip()}\n".encode())
+        print(f"case {k}: exit {done.returncode}, {outs}", flush=True)
+    print(f"golden OFFICIAL_SHA256 {h.hexdigest()}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--seed", type=int, default=1)
@@ -319,11 +389,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--only", help="comma-separated case numbers")
     ap.add_argument("--json", type=Path)
     ap.add_argument("--show", type=int, default=6)
+    ap.add_argument("--golden", action="store_true", help="the golden cases' official value")
     a = ap.parse_args(argv)
     ws = workspace()
     if ws is None:
         raise SystemExit("no workspace with oracles/")
     exe = ws / "oracles" / "freesurfer-8.2.0-unit" / "bin" / "mri_normalize"
+    if a.golden:
+        genv = {"PATH": f"{exe.parent}:/usr/bin:/bin", "LC_ALL": "C", "LANG": "C",
+                "OMP_NUM_THREADS": "1", "USER": "probe"}  # fmt: skip
+        genv.update(freesurfer_env())
+        return golden(ws, genv, a.jobs)
     port = port_binary(a.jobs)
     f = inputs(ws, a.seed)
     all_cases = cases(f)

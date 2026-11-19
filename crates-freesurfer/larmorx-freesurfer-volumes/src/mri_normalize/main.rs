@@ -44,7 +44,7 @@ use larmorx_freesurfer_core::sse::{div, div64, mul64};
 use larmorx_freesurfer_core::timer::Timer;
 use larmorx_freesurfer_core::utils::{get_vm_peak, nint, stricmp};
 use larmorx_freesurfer_core::version::{get_all_info, handle_version_option};
-use larmorx_freesurfer_filter::conv::{mri_convolve_gaussian, mri_gaussian1d, mri_gaussian_smooth};
+use larmorx_freesurfer_filter::conv::{mri_convolve_gaussian, mri_gaussian_smooth, mri_gaussian1d};
 use larmorx_freesurfer_filter::norm::{CONTROL_MARKED, CONTROL_NONE, mri_soap_bubble};
 use larmorx_freesurfer_filter::normalize::{
     DEFAULT_DESIRED_WHITE_MATTER_VALUE, Dst, Mni, NormState, mri_3d_gentle_normalize,
@@ -56,7 +56,9 @@ use larmorx_freesurfer_filter::normalize::{
 use larmorx_freesurfer_filter::sobel::mri_sobel;
 use larmorx_freesurfer_gca::surftransform::{Volumes, mris_transform};
 use larmorx_freesurfer_gca::transform::transform_invert;
-use larmorx_freesurfer_io::mriio::{mri_add_command_line, mri_read_volume, mri_remove_nans, mri_write};
+use larmorx_freesurfer_io::mriio::{
+    mri_add_command_line, mri_read_volume, mri_remove_nans, mri_write,
+};
 use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::mri::{MRI_FLOAT, MRI_UCHAR, Mri, SAMPLE_NEAREST, SAMPLE_TRILINEAR};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
@@ -377,7 +379,10 @@ fn main(
         if p.o.do_gentle_cp_file != 0
             && (p.o.control_point_fname.is_some() || p.o.control_point_label.is_some())
         {
-            let _ = writeln!(p.out, "Doing gentle normalization with control points/label");
+            let _ = writeln!(
+                p.out,
+                "Doing gentle normalization with control points/label"
+            );
             let ib2 = div(p.o.intensity_below, 2.0);
             let r = mri_3d_gentle_normalize(
                 g,
@@ -398,7 +403,10 @@ fn main(
             )?;
             dst = r.into_new();
         } else {
-            let _ = writeln!(p.out, "NOT doing gentle normalization with control points/label");
+            let _ = writeln!(
+                p.out,
+                "NOT doing gentle normalization with control points/label"
+            );
             dst = Some(mri_copy(g, p.out, p.err, &src, None)?.unwrap_new());
         }
     }
@@ -798,7 +806,15 @@ fn with_surfaces(
         .unwrap_new();
         let mut mag = mri_clone_different_type(g, p.out, p.err, &dst, MRI_FLOAT)?;
         let grad = mri_sobel(g, p.out, p.err, &smooth, None, Some(&mut mag))?;
-        mri_binarize(g, p.out, p.err, Pair::Same(&mut mag), p.o.mask_thresh, 1.0, 0.0)?;
+        mri_binarize(
+            g,
+            p.out,
+            p.err,
+            Pair::Same(&mut mag),
+            p.o.mask_thresh,
+            1.0,
+            0.0,
+        )?;
         mri_mask(
             g,
             p.out,
@@ -1045,7 +1061,15 @@ fn gradient_mask(g: &mut Globals, p: &mut Prog, src: &Mri) -> Result<(), Fatal> 
     let mut mag = mri_clone_different_type(g, p.out, p.err, src, MRI_FLOAT)?;
     let grad = mri_sobel(g, p.out, p.err, &smooth, None, Some(&mut mag))?;
     p.write(g, &mut mag, "m.mgz")?;
-    mri_binarize(g, p.out, p.err, Pair::Given(&mag, &mut nc), thresh, 0.0, 1.0)?;
+    mri_binarize(
+        g,
+        p.out,
+        p.err,
+        Pair::Given(&mag, &mut nc),
+        thresh,
+        0.0,
+        1.0,
+    )?;
     p.write(g, &mut nc, "nc.mgz")?;
     drop((mag, grad, smooth, kernel));
     p.not_control = Some(nc);

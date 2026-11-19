@@ -126,8 +126,10 @@ fn main() {
                 env: &env,
                 dir: None,
             };
-            h::mri_remove_wm_outliers_and_retain_medial_surface(&mut g, &mut r, &src, &mut ctrl, ib)
-                .unwrap();
+            h::mri_remove_wm_outliers_and_retain_medial_surface(
+                &mut g, &mut r, &src, &mut ctrl, ib,
+            )
+            .unwrap();
             c.stage("MRIremoveWMOutliersAndRetainMedialSurface");
             println!("digest {:016x}", fnv(&ctrl));
         }

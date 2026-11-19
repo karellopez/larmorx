@@ -22,7 +22,8 @@
 //   opt <nfiles> [<name> <hex>]... <nargs> <arg>...   mri_convert's main with those arguments: its
 //       output up to the dump hook, which prints every variable its options set (build.sh)
 //   cnv <nfiles> [<name> <hex>]... <nargs> <arg>...   mri_convert's main with those arguments, run
-//       to its end (the dump hook off): `EXIT <status>`, then every file written as
+//       to its end (the dump hook off; its getAllInfo text with the time, user, machine and kernel
+//       version as `X`, probe::canon_info): `EXIT <status>`, then every file written as
 //       `F <name> <bytes> <FNV-1a>` of its contents read through zlib's gzread (a compressed file
 //       decompressed), each command line's text from `TimeStamp: ` to its NUL masked with `X`
 
@@ -42,6 +43,7 @@ namespace pcsv {
 #include "matrix.h"
 #include "mri.h"
 #include "stats.h"
+#include "version.h"
 
 namespace probe {
 
@@ -131,10 +133,38 @@ void finish_dump()
   _exit(0);
 }
 
+// getAllInfo's text with the values that change from run to run and from machine to machine (the
+// time, the user, the machine and its kernel's version) as `X`, so that the command lines the
+// written files keep compare on every platform (the port's probe does the same to its own text)
+std::string canon_info(const std::string &s)
+{
+  std::string r = s;
+  auto blank = [&](const std::string &key, const std::string &next) {
+    size_t a = r.find(key);
+    if (a == std::string::npos) return;
+    a += key.size();
+    size_t b = r.find(next, a);
+    if (b == std::string::npos) return;
+    r.replace(a, b - a, "X");
+  };
+  blank("TimeStamp: ", "  BuildTime: ");
+  blank("User: ", "  Machine: ");
+  blank("Machine: ", "  Platform: ");
+  blank("PlatformVersion: ", "  CompilerName: ");
+  return r;
+}
+
+std::string all_info(int argc, char **argv, const std::string &progname)
+{
+  return canon_info(getAllInfo(argc, argv, progname));
+}
+
 }  // namespace probe
 
 #define main mri_convert_main
+#define getAllInfo(a, b, c) probe::all_info(a, b, c)
 #include "mri_convert_hooked.cpp"
+#undef getAllInfo
 #undef main
 
 #include <dirent.h>

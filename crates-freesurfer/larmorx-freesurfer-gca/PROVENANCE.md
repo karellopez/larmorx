@@ -112,6 +112,7 @@ NaN a sum of two keeps); `TransformCreateDensityMap` of a transform that could n
 | `utils/gcamorph.cpp` 7647-7659, 16269-16522 | `GCAMfreeInverse`, `GCAMconcat2` (into the second morph, `TransformConcat`'s call), `GCAMconcat3`, `GCAMfillInverse` (FS-934, FS-935, FS-936, FS-17) | `concat.rs` |
 | `utils/transform.cpp` 2660-2734, 4122-4135, 5026-5090 | the morph branches of `TransformApplyType`, `TransformApply`, `TransformApplyInverse`, `TransformApplyInverseType`, `TransformCreateDensityMap`; `TransformConcat`, `TransformInvertReplace` | `transform.rs` |
 | `utils/gcamorph.cpp` 5274-5320 | `GCAMsampleMorph`'s NaN point outside the nodes (FS-933: both modes end the program) | `transform.rs` |
+| `utils/gcamorph.cpp` 16526-16588 (track A relay 47, `mri_convert --downsample2` of a morph) | `GCAMdownsample2` | `gcam.rs` |
 
 Relay 43 also: `GCAMmorphToAtlas`' OpenMP loop runs as one thread does (the voxels are independent; the messages and
 FS-930's chain in one thread's order); `val` across the loop as the object code keeps it (one stack slot,

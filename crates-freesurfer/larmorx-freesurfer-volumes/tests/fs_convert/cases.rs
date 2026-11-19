@@ -1948,7 +1948,11 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
                     env: &mut env,
                     dir: Some(dir),
                 };
-                larmorx_freesurfer_volumes::mri_convert::main::main(&mut g, &mut r, &argv)?;
+                // main, with fsconvert's canonical command line (canon_info)
+                let mut o = parse(&mut g, &mut r, &argv)?;
+                larmorx_freesurfer_volumes::mri_convert::options::check_gdf_stem(&g, &mut r, &o)?;
+                o.cmdline = canon_info(&o.cmdline);
+                larmorx_freesurfer_volumes::mri_convert::main::convert(&mut g, &mut r, o)?;
                 res += "RETURNED ";
             }
             c => panic!("unknown command {c}"),
@@ -2548,6 +2552,27 @@ pub fn generate_cnv(seed: u64, n: usize) -> Vec<String> {
         v.push(cnv_case(&mut g));
     }
     v
+}
+
+/// `fsconvert`'s `canon_info`: `getAllInfo`'s text with the time, the user, the machine and its
+/// kernel's version as `X`.
+fn canon_info(s: &str) -> String {
+    let mut r = s.to_owned();
+    let mut blank = |key: &str, next: &str| {
+        let Some(a) = r.find(key) else {
+            return;
+        };
+        let a = a + key.len();
+        let Some(b) = r[a..].find(next) else {
+            return;
+        };
+        r.replace_range(a..a + b, "X");
+    };
+    blank("TimeStamp: ", "  BuildTime: ");
+    blank("User: ", "  Machine: ");
+    blank("Machine: ", "  Platform: ");
+    blank("PlatformVersion: ", "  CompilerName: ");
+    r
 }
 
 /// `fsconvert`'s `slurp_gz_masked`: a file's bytes through zlib's `gzread` (a gzip file

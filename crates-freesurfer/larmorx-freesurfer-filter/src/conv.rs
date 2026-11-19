@@ -332,9 +332,9 @@ impl<'a> Frame<'a> {
                 }
             }
             MRI_FLOAT => {
-                let b = &self.bytes[4 * start..4 * (start + n)];
-                for (t, c) in out.iter_mut().zip(b.chunks_exact(4)) {
-                    *t = f32::from_le_bytes([c[0], c[1], c[2], c[3]]);
+                let (b, _) = self.bytes[4 * start..4 * (start + n)].as_chunks::<4>();
+                for (t, c) in out.iter_mut().zip(b) {
+                    *t = f32::from_le_bytes(*c);
                 }
             }
             _ => {
@@ -357,9 +357,9 @@ impl<'a> Frame<'a> {
                 }
             }
             MRI_FLOAT => {
-                let b = &self.bytes[4 * start..4 * (start + n)];
-                for (t, c) in out.iter_mut().zip(b.chunks_exact(4)) {
-                    *t += f32::from_le_bytes([c[0], c[1], c[2], c[3]]) * k;
+                let (b, _) = self.bytes[4 * start..4 * (start + n)].as_chunks::<4>();
+                for (t, c) in out.iter_mut().zip(b) {
+                    *t += f32::from_le_bytes(*c) * k;
                 }
             }
             _ => {
@@ -482,9 +482,9 @@ fn convolve_rows(
 fn write_row(g: &mut Globals, dst: &mut Mri, o: usize, row: &[f32], ot: OutType) {
     let size = mem::elem_size(ot.mri());
     if let OutType::Float = ot {
-        let c = &mut dst.chunk.as_mut().expect("voxels")[o..o + 4 * row.len()];
-        for (b, &v) in c.chunks_exact_mut(4).zip(row) {
-            b.copy_from_slice(&v.to_le_bytes());
+        let (c, _) = dst.chunk.as_mut().expect("voxels")[o..o + 4 * row.len()].as_chunks_mut::<4>();
+        for (b, &v) in c.iter_mut().zip(row) {
+            *b = v.to_le_bytes();
         }
         return;
     }
@@ -722,21 +722,21 @@ fn convolve_float(
     let e = ext(src);
     let direct = src.mtype == MRI_UCHAR || src.mtype == MRI_FLOAT;
     // in place where every access is `In` (FreeSurfer holds no copy of either frame)
-    if direct || vox_in_place(src.mtype) {
-        if let (Some(fr), Some(rows)) = (
+    if (direct || vox_in_place(src.mtype))
+        && let (Some(fr), Some(rows)) = (
             Frame::of(src, src.mtype, src_frame),
             dst_rows(dst, MRI_FLOAT, dst_frame, e),
-        ) {
-            if !direct {
-                note_fs545(g, src.mtype, k.len());
-                if g.notices.reproduce() {
-                    convolve_vox_rows(g, err, src, &fr, k, axis, src_frame, dst, rows)?;
-                    return Ok(true);
-                }
+        )
+    {
+        if !direct {
+            note_fs545(g, src.mtype, k.len());
+            if g.notices.reproduce() {
+                convolve_vox_rows(g, err, src, &fr, k, axis, src_frame, dst, rows)?;
+                return Ok(true);
             }
-            convolve_rows(g, &fr, e, k, axis, dst, rows, OutType::Float);
-            return Ok(true);
         }
+        convolve_rows(g, &fr, e, k, axis, dst, rows, OutType::Float);
+        return Ok(true);
     }
     let vals = if direct {
         let a = mem::plane(g, (&FS_546, &FS_546), WHAT, src, src.mtype, src_frame);

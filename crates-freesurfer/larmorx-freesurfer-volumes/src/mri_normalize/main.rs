@@ -536,6 +536,8 @@ fn main(
 
 /// The conformed result's clamp: each voxel (x outermost, z innermost) below 0 set to 0, above
 /// 255 to 255, written back (`MRIgetVoxVal`, `MRIsetVoxVal`).
+// C's two comparisons as written (the same values as `clamp`, NaN kept)
+#[allow(clippy::manual_clamp)]
 fn clamp_to_bytes(g: &mut Globals, err: &mut dyn Write, m: &mut Mri) -> Result<(), Fatal> {
     for x in 0..m.vg.width {
         for y in 0..m.vg.height {

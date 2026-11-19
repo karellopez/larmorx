@@ -34,8 +34,9 @@ pub(crate) struct AxisWeights {
     pub n: usize,
 }
 
-/// The weights of `t` against the indices `i` for a degree of 2 to 9 (§4.3).
-#[allow(clippy::many_single_char_names)]
+/// The weights of `t` against the indices `i` for a degree of 2 to 9 (§4.3), each operation as the
+/// spec writes it (`w0 *= w0 * w0` is `w0 = w0 * (w0 * w0)`: its order of operations).
+#[allow(clippy::many_single_char_names, clippy::misrefactored_assign_op)]
 fn weights(degree: i32, t: f64, i: &[i32; 10]) -> [f64; 10] {
     let mut w = [0f64; 10];
     let at = |k: usize| t - f64::from(i[k]);

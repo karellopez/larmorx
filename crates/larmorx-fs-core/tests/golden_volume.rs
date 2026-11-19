@@ -1753,9 +1753,9 @@ fn ostring(g: &mut G) -> String {
     const C: &[u8] = b"LRPAISlrpaisX0\x00\x80";
     if g.one_in(2) {
         let mut axes = [
-            [b'L', b'R'][g.below(2) as usize],
-            [b'P', b'A'][g.below(2) as usize],
-            [b'I', b'S'][g.below(2) as usize],
+            b"LR"[g.below(2) as usize],
+            b"PA"[g.below(2) as usize],
+            b"IS"[g.below(2) as usize],
         ];
         let k = g.below(3) as usize;
         axes.swap(0, k);

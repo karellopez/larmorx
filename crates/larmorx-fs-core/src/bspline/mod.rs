@@ -31,7 +31,9 @@ pub struct BSpline {
 /// `DBL_EPSILON`.
 const DBL_EPSILON: f64 = f64::EPSILON;
 
-/// The poles of a degree (§3.2's table), none for a degree outside 2 to 9.
+/// The poles of a degree (§3.2's table), none for a degree outside 2 to 9: the published decimal
+/// strings as the spec gives them, each converted to its nearest `double`.
+#[allow(clippy::excessive_precision)]
 pub fn poles(degree: i32) -> Vec<f64> {
     match degree {
         2 => vec![8f64.sqrt() - 3.0],
@@ -116,7 +118,9 @@ impl Process {
 }
 
 impl LineFilter {
-    /// Filters one line of `n` samples in place (§3.2); a line of one sample is left as it is.
+    /// Filters one line of `n` samples in place (§3.2); a line of one sample is left as it is. Each
+    /// operation in the spec's order (`z2n *= z2n * iz` is `z2n = z2n * (z2n * iz)`).
+    #[allow(clippy::misrefactored_assign_op)]
     pub(crate) fn apply(&self, c: &mut [f64]) {
         let n = self.n;
         debug_assert_eq!(c.len(), n);
@@ -168,7 +172,9 @@ impl LineFilter {
         }
     }
 
-    /// [`LineFilter::apply`] of a line of finite samples, with the plain operations.
+    /// [`LineFilter::apply`] of a line of finite samples, with the plain operations, in the same
+    /// order (`c[i - 1] * z + c[i]` keeps the product first, as the SSE path's).
+    #[allow(clippy::misrefactored_assign_op, clippy::assign_op_pattern)]
     fn apply_finite(&self, c: &mut [f64]) {
         let n = self.n;
         for v in c.iter_mut() {

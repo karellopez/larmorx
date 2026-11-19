@@ -4,6 +4,8 @@
 //! The port's side of the fs-convert probe (`validation/probes/fs-convert/`):
 //!
 //!     fs_convert_probe cases <seed> <n>            the case file, on standard output
+//!     fs_convert_probe cnv-cases <seed> <n>        the conversions' case file (`cnv`)
+//!     fs_convert_probe cnv-heavy-cases <seed> <n>  the conformed conversions (`n` ignored)
 //!     fs_convert_probe run <cases> fix|reproduce   one line per case: the output, a tab, the
 //!                                            defects the port noted (comma-separated)
 
@@ -22,6 +24,19 @@ fn main() {
                 println!("{line}");
             }
         }
+        Some("cnv-cases") if args.len() == 4 => {
+            let seed: u64 = args[2].parse().expect("seed");
+            let n: usize = args[3].parse().expect("n");
+            for line in cases::generate_cnv(seed, n) {
+                println!("{line}");
+            }
+        }
+        Some("cnv-heavy-cases") if args.len() == 4 => {
+            let seed: u64 = args[2].parse().expect("seed");
+            for line in cases::generate_cnv_heavy(seed) {
+                println!("{line}");
+            }
+        }
         Some("run") if args.len() == 4 => {
             let mode = match args[3].as_str() {
                 "fix" => UpstreamDefects::Fix,
@@ -35,7 +50,9 @@ fn main() {
             }
         }
         _ => {
-            eprintln!("usage: fs_convert_probe cases <seed> <n> | run <cases> fix|reproduce");
+            eprintln!(
+                "usage: fs_convert_probe cases|cnv-cases|cnv-heavy-cases <seed> <n> | run <cases> fix|reproduce"
+            );
             std::process::exit(2);
         }
     }

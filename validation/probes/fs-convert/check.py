@@ -14,6 +14,12 @@ differ only where a defect it corrects changed the result (its notices). Prints 
 hash the port's recorded test checks (``tests/fs_convert_official.rs``).
 
     python -P validation/probes/fs-convert/check.py --seed 1 --n 500 [--json out.json]
+    python -P validation/probes/fs-convert/check.py --kind cnv --seed 1 --n 300
+
+``--kind cnv-heavy``: the conformed conversions (outputs of 256 voxels per axis), not in the
+recorded test. ``--kind cnv``: whole conversions (``cnv`` cases: small MGH inputs, options with arguments they
+accept, every written file compared through ``gzread`` with the command lines' time stamps
+masked).
 """
 
 from __future__ import annotations
@@ -22,6 +28,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from collections import Counter
@@ -56,6 +63,35 @@ SKIP = (
     "FS-1041",
     "FS-1042",
 )
+# whole conversions: also the library's reads and writes outside a volume's buffer (FS-53),
+# MRIcopy writing past a smaller destination (FS-163), and main's own crashes and writes past its
+# buffers (FS-1043, FS-1044, FS-1046, FS-1047, FS-1049 to FS-1052)
+SKIP_CNV = (
+    *SKIP,
+    "FS-53",
+    "FS-163",
+    "FS-1043",
+    "FS-1044",
+    "FS-1046",
+    "FS-1047",
+    "FS-1049",
+    "FS-1050",
+    "FS-1051",
+    "FS-1052",
+)
+
+
+# FreeSurfer prints memory contents in a line the case otherwise compares: FS-1053 (a new
+# volume's printed validity flag); both sides' lines are compared with that line masked
+MASK = {"FS-1053": (re.compile(r"valid   : -?[0-9]+"), "valid   : ?")}
+
+
+def masked(line: str, ids: list[str]) -> str:
+    for x in ids:
+        if x in MASK:
+            pat, rep = MASK[x]
+            line = pat.sub(rep, line)
+    return line
 
 
 def probe_binary(ws: Path) -> Path:
@@ -90,6 +126,7 @@ def port_binary(jobs: int) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--kind", choices=("opt", "cnv", "cnv-heavy"), default="opt")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--n", type=int, default=500)
     ap.add_argument("--jobs", type=int, default=6)
@@ -107,9 +144,11 @@ def main(argv: list[str] | None = None) -> int:
     inputs = ws / "oracles" / "inputs" / "fs-convert"
     inputs.mkdir(parents=True, exist_ok=True)
     tag = f"-{a.only.replace(',', '_')}" if a.only else ""
-    cases_path = inputs / f"cases-{a.seed}-{a.n}{tag}.txt"
+    kind = "" if a.kind == "opt" else f"{a.kind}-"
+    cases_path = inputs / f"{kind}cases-{a.seed}-{a.n}{tag}.txt"
+    gen = "cases" if a.kind == "opt" else f"{a.kind}-cases"
     text = subprocess.run(
-        [str(port), "cases", str(a.seed), str(a.n)], check=True, capture_output=True, text=True
+        [str(port), gen, str(a.seed), str(a.n)], check=True, capture_output=True, text=True
     ).stdout
     if a.only:
         keep = set(a.only.split(","))
@@ -152,12 +191,13 @@ def main(argv: list[str] | None = None) -> int:
         cmd = case.split()[0]
         for x in ids:
             rep_ids[x] += 1
-        if any(x in ids for x in SKIP):
+        if any(x in ids for x in (SKIP if a.kind == "opt" else SKIP_CNV)):
             skipped[cmd] += 1
             if c == r:
                 skipped_same[cmd] += 1
             hashed.update(b"SKIP\n")
             continue
+        c, r, f = masked(c, ids), masked(r, ids), masked(f, ids)
         hashed.update(c.encode() + b"\n")
         if c == r:
             equal[cmd] += 1
@@ -174,6 +214,7 @@ def main(argv: list[str] | None = None) -> int:
             for x in fids:
                 fix_ids[x] += 1
     summary = {
+        "kind": a.kind,
         "seed": a.seed,
         "cases": len(cases),
         "served": done.cached,

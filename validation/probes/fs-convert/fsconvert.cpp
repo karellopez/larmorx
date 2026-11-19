@@ -21,11 +21,17 @@
 //   wst <vol> <name|-|@> <hex|-> <out>   the same, then WriteStatTable(out, table) when there is one
 //   opt <nfiles> [<name> <hex>]... <nargs> <arg>...   mri_convert's main with those arguments: its
 //       output up to the dump hook, which prints every variable its options set (build.sh)
+//   cnv <nfiles> [<name> <hex>]... <nargs> <arg>...   mri_convert's main with those arguments, run
+//       to its end (the dump hook off; its getAllInfo text with the time, user, machine and kernel
+//       version as `X`, probe::canon_info): `EXIT <status>`, then every file written as
+//       `F <name> <bytes> <FNV-1a>` of its contents read through zlib's gzread (a compressed file
+//       decompressed), each command line's text from `TimeStamp: ` to its NUL masked with `X`
 
 #include <climits>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
+#include <zlib.h>
 #include <istream>
 #include <string>
 #include <vector>
@@ -37,6 +43,7 @@ namespace pcsv {
 #include "matrix.h"
 #include "mri.h"
 #include "stats.h"
+#include "version.h"
 
 namespace probe {
 
@@ -126,10 +133,38 @@ void finish_dump()
   _exit(0);
 }
 
+// getAllInfo's text with the values that change from run to run and from machine to machine (the
+// time, the user, the machine and its kernel's version) as `X`, so that the command lines the
+// written files keep compare on every platform (the port's probe does the same to its own text)
+std::string canon_info(const std::string &s)
+{
+  std::string r = s;
+  auto blank = [&](const std::string &key, const std::string &next) {
+    size_t a = r.find(key);
+    if (a == std::string::npos) return;
+    a += key.size();
+    size_t b = r.find(next, a);
+    if (b == std::string::npos) return;
+    r.replace(a, b - a, "X");
+  };
+  blank("TimeStamp: ", "  BuildTime: ");
+  blank("User: ", "  Machine: ");
+  blank("Machine: ", "  Platform: ");
+  blank("PlatformVersion: ", "  CompilerName: ");
+  return r;
+}
+
+std::string all_info(int argc, char **argv, const std::string &progname)
+{
+  return canon_info(getAllInfo(argc, argv, progname));
+}
+
 }  // namespace probe
 
 #define main mri_convert_main
+#define getAllInfo(a, b, c) probe::all_info(a, b, c)
 #include "mri_convert_hooked.cpp"
+#undef getAllInfo
 #undef main
 
 #include <dirent.h>
@@ -308,8 +343,27 @@ std::string slurp(const std::string &path)
   return r;
 }
 
+// a file's bytes through gzread (a gzip file decompressed, any other read as it is), each command
+// line's text from `TimeStamp: ` (the time, user, machine, platform) to its NUL masked
+std::string slurp_gz_masked(const std::string &path)
+{
+  std::string r;
+  gzFile f = gzopen(path.c_str(), "rb");
+  if (!f) return r;
+  char b[65536];
+  int n;
+  while ((n = gzread(f, b, sizeof b)) > 0) r.append(b, n);
+  gzclose(f);
+  const std::string key = "TimeStamp: ";
+  for (size_t at = r.find(key); at != std::string::npos; at = r.find(key, at + 1)) {
+    for (size_t k = at + key.size(); k < r.size() && r[k] != '\0'; k++) r[k] = 'X';
+  }
+  return r;
+}
+bool full_files = false;
 // the files the case wrote (not the ones it was given: names starting with `in_`), sorted: a
-// volume read back and printed, any other file's FNV-1a
+// volume read back and printed, any other file's FNV-1a (cnv: every file's size and FNV-1a
+// through slurp_gz_masked)
 std::string written()
 {
   std::vector<std::string> names;
@@ -326,7 +380,12 @@ std::string written()
   for (const std::string &n : names) {
     std::string path = workdir + "/" + n;
     out += "F " + n + " ";
-    if (n.size() > 4 && n.compare(n.size() - 4, 4, ".mgz") == 0) {
+    if (full_files) {
+      std::string b = slurp_gz_masked(path);
+      char h[48];
+      snprintf(h, sizeof h, "%zu %016" PRIx64 " ", b.size(), fnv(b));
+      out += h;
+    } else if (n.size() > 4 && n.compare(n.size() - 4, 4, ".mgz") == 0) {
       // read back quietly: MRIread's own messages would go into the parent's output
       fflush(stdout);
       fflush(stderr);
@@ -405,7 +464,7 @@ void run_case()
       std::string o = next();
       if (st) WriteStatTable(o.c_str(), st);
     }
-  } else if (cmd == "opt") {
+  } else if (cmd == "opt" || cmd == "cnv") {
     int nfiles = geti();
     for (int i = 0; i < nfiles; i++) {
       std::string name = next();
@@ -419,7 +478,7 @@ void run_case()
     for (std::string &s : keep) av.push_back(&s[0]);
     av.push_back(NULL);
     av.push_back(NULL);
-    dump_on = 1;
+    dump_on = cmd == "opt";
     mri_convert_main((int)keep.size(), av.data());
     out += "RETURNED ";
   } else {
@@ -496,6 +555,7 @@ int main(int argc, char *argv[])
     } else {
       result = "EXIT " + std::to_string(WEXITSTATUS(status));
     }
+    full_files = line.compare(0, 4, "cnv ") == 0;
     std::string files = written();
     if (!files.empty()) result += (result.empty() ? "" : " ") + files;
     std::string esc;

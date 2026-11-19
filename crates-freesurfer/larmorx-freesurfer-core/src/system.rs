@@ -92,6 +92,20 @@ pub fn cwd(dir: Option<&Path>) -> Option<String> {
     }
 }
 
+/// Whether the process's standard error (descriptor 2) is open for reading and writing (a
+/// terminal), as `/proc/self/fdinfo/2` gives its access mode on Linux; false (writing only) when
+/// it cannot be told (other systems: a program's standard error is then taken as a log or pipe).
+/// [`crate::globals::StderrState`].
+pub fn stderr_read_write() -> bool {
+    let Ok(info) = std::fs::read_to_string("/proc/self/fdinfo/2") else {
+        return false;
+    };
+    info.lines()
+        .find_map(|l| l.strip_prefix("flags:"))
+        .and_then(|f| u32::from_str_radix(f.trim(), 8).ok())
+        .is_some_and(|f| f & 3 == 2)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

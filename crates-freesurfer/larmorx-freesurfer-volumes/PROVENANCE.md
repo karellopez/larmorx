@@ -26,6 +26,9 @@ ported file is audited for third-party code first).
 | `utils/fsgdf.cpp` 868-886 (3.2-04) | `gdfCountItemsInString` (FS-948) | `src/mri_convert/stat_table.rs` |
 | `mri_convert/mri_convert.cpp` 57-73, 79-1882, 3889-4001 (3.2-04 and 3.2-05, first half) | the file statics, `main` from its start to the check of a GDF image stem (the option loop, its checks, the parse-only report; FS-1038 to FS-1042), `get_ints`, `get_floats`, `get_string`, `usage_message`, `usage`; `include/DICOMRead.h`'s globals the options set (`DicomSettings`) | `src/mri_convert/options.rs` |
 | `mri_convert/mri_convert.help.xml` | the help text `usage` renders (FreeSurfer's file, copied unchanged) | `src/mri_convert/mri_convert.help.xml` |
+| `mri_convert/mri_convert.cpp` 1876-3848, 3860-3888 (3.2-05, second half; track A relay 47) | `main` after the GDF stem check (the input reads, the steps on the input, the header overrides, the reports, the transform and template, the transform applied, the type change, the reslice, the steps after it, the colour table, the outputs; FS-1043 to FS-1053), `applyGaussianFilter`; the in-place `MRIhalfCosBias` (`utils/mri.cpp`'s loop, `MRIcopy` of a volume onto itself a no-op) | `src/mri_convert/main.rs` |
+| `utils/transform.cpp` 4182-4218, 4239-4277 (3.2-07's lines, taken with 3.2-05) | `LTAtransformTypeName`, `LTAdumpLinearTransform`, `LTAdump` | `src/mri_convert/lta_dump.rs` |
+| `include/mri.h` 1931-1934 (3.2-06) | `READ_OTL_*` flags; `MRIreadOtl` itself waits for relay 48 (a not-ported message) | `src/mri_convert/otl.rs` |
 
 Third-party code: none in `mri_normalize.cpp` (FreeSurfer's own file, MGH's notice). Its library
 calls are the other crates' (`larmorx-freesurfer-filter`'s normalisation, `-volume`, `-surf`,
@@ -62,3 +65,11 @@ reader, file names, format identification and `MRIwrite`; `-core`'s matrices, ve
   `strtof` and `%f` share the conversion).
 - FS-948 (the item count's read past the line: the count kept, no notice), FS-949 and FS-950 (rule
   A), FS-1031 to FS-1042 (crashes and memory: both modes as `specs/mri_convert.md` says).
+- Relay 47: `main`'s volumes are owned values (a step's result replaces the volume; FreeSurfer's
+  `MRIfree`s are drops); its NULL checks follow FreeSurfer's, the unchecked ones FS-1052; the
+  float arithmetic the output and messages show through fs.core's `sse` helpers (C's operand
+  order, x86-64's NaNs), `x *= -1.0` as a sign flip (the object code's `xorps`);
+  `applyGaussianFilter`'s constants as the official build has them (`logf(5)` folded,
+  `docs/findings/freesurfer-convert.md` Part 3); `run` reads the process's standard error's
+  access mode and tracks writes to it (`Globals::stderr`, the C library's `perror`); DICOM inputs
+  wait for 3.7-14 (fs.io's not-ported message), outline inputs for relay 48.

@@ -8,9 +8,16 @@
 //!   (`utils/stats.cpp`, `utils/fsgdf.cpp`'s item count; 3.2-04, taken from 3.2-07).
 //! - [`options`]: `main`'s start, its option loop and the checks before the input is read, with
 //!   `get_ints`, `get_floats`, `get_string` and the help (3.2-05).
+//! - [`main`]: the rest of `main` and `applyGaussianFilter`, the program's entry point (3.2-05).
+//! - [`lta_dump`]: `transform.cpp`'s `LTAdump`, `LTAdumpLinearTransform` and
+//!   `LTAtransformTypeName` (3.2-07's lines).
+//! - [`otl`]: the outline reader `MRIreadOtl` (3.2-06).
 //!
 //! `include/affine.h`, the rest of 3.2-04, is `larmorx-freesurfer-core`'s `affine` (wave 3.1).
 
 pub mod csv;
+pub mod lta_dump;
+pub mod main;
 pub mod options;
+pub mod otl;
 pub mod stat_table;

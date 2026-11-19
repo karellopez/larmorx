@@ -1927,6 +1927,34 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
                 res = dump(&o, &g, &env);
                 res += " ";
             }
+            "cnv" => {
+                let nfiles = t.int();
+                for _ in 0..nfiles {
+                    let f = t.next();
+                    let h = t.next();
+                    write_case_file(dir, f, h);
+                }
+                let n = t.int() as usize;
+                let mut argv = vec!["mri_convert".to_owned()];
+                for _ in 0..n {
+                    argv.push(String::from_utf8(unhex(t.next())).expect("an argument"));
+                }
+                // the official child's standard error: a file (write-only), written to only by
+                // the case
+                let mut tb = larmorx_freesurfer_core::log::TrackedErr::new(&g, &mut b);
+                let mut r = Run {
+                    out: &mut a,
+                    err: &mut tb,
+                    env: &mut env,
+                    dir: Some(dir),
+                };
+                // main, with fsconvert's canonical command line (canon_info)
+                let mut o = parse(&mut g, &mut r, &argv)?;
+                larmorx_freesurfer_volumes::mri_convert::options::check_gdf_stem(&g, &mut r, &o)?;
+                o.cmdline = canon_info(&o.cmdline);
+                larmorx_freesurfer_volumes::mri_convert::main::convert(&mut g, &mut r, o)?;
+                res += "RETURNED ";
+            }
             c => panic!("unknown command {c}"),
         }
         Ok(())
@@ -1936,7 +1964,11 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
         Ok(()) => res.trim_end().to_owned(),
         Err(f) => format!("EXIT {}", f.status()),
     };
-    let files = written(dir);
+    let files = if cmd == "cnv" {
+        written_full(dir)
+    } else {
+        written(dir)
+    };
     if !files.is_empty() {
         if !result.is_empty() {
             result.push(' ');
@@ -1951,4 +1983,643 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
 pub fn run_line(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str>) {
     let dir = tempfile::tempdir().expect("a temporary folder");
     run_line_in(line, mode, dir.path())
+}
+
+// ----- whole conversions (`cnv`, relay 47) -----
+
+/// A small volume of a conversion case.
+struct Vol {
+    dims: [i32; 4],
+    ty: i32,
+    size: [f32; 3],
+    /// `x_r x_a x_s y_r y_a y_s z_r z_a z_s`.
+    mdc: [f32; 9],
+    c: [f32; 3],
+    good: i16,
+    vox: Vec<f32>,
+    /// TR, flip angle, TE, TI, FoV after the voxels.
+    scan: Option<[f32; 5]>,
+}
+
+/// The MGH type codes the cases write: uchar, int, float, short.
+const MGH_TYPES: [i32; 4] = [MRI_UCHAR, MRI_INT, MRI_FLOAT, MRI_SHORT];
+
+/// Direction cosines: a signed permutation (most), an oblique rotation by (0.6, 0.8), or a
+/// degenerate set (two axes alike).
+fn rand_mdc(g: &mut Gen) -> [f32; 9] {
+    let mut m = [0f32; 9];
+    match g.below(10) {
+        0 => {
+            let (a, b) = (0.6f32, 0.8f32);
+            let cols = match g.below(3) {
+                0 => [[a, b, 0.0], [-b, a, 0.0], [0.0, 0.0, 1.0]],
+                1 => [[1.0, 0.0, 0.0], [0.0, a, b], [0.0, -b, a]],
+                _ => [[a, 0.0, -b], [0.0, 1.0, 0.0], [b, 0.0, a]],
+            };
+            for k in 0..3 {
+                m[3 * k..3 * k + 3].copy_from_slice(&cols[k]);
+            }
+        }
+        1 => {
+            // two axes alike (not orthogonal), or no axis left-right
+            let cols = if g.chance(2) {
+                [[-1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
+            } else {
+                [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0]]
+            };
+            for k in 0..3 {
+                m[3 * k..3 * k + 3].copy_from_slice(&cols[k]);
+            }
+        }
+        _ => {
+            let perms = [
+                [0, 1, 2],
+                [0, 2, 1],
+                [1, 0, 2],
+                [1, 2, 0],
+                [2, 0, 1],
+                [2, 1, 0],
+            ];
+            let p = g.pick(&perms);
+            for k in 0..3 {
+                let s = if g.chance(2) { -1.0 } else { 1.0 };
+                m[3 * k + p[k]] = s;
+            }
+        }
+    }
+    m
+}
+
+fn rand_vol(g: &mut Gen, dims: [i32; 4], ty: i32) -> Vol {
+    let sizes = [1.0f32, 1.0, 0.5, 2.0, 1.5, 3.0];
+    let size = [g.pick(&sizes), g.pick(&sizes), g.pick(&sizes)];
+    let c = [
+        g.int(-8, 8) as f32 * 0.5,
+        g.int(-8, 8) as f32 * 0.25,
+        g.int(-8, 8) as f32,
+    ];
+    let n = dims.iter().product::<i32>() as usize;
+    let labels = [0.0f32, 0.0, 2.0, 3.0, 41.0, 42.0, 17.0, 53.0, 4.0, 43.0];
+    let seg = g.chance(4);
+    let mut vox = Vec::with_capacity(n);
+    for _ in 0..n {
+        let v = if seg {
+            g.pick(&labels)
+        } else {
+            match ty {
+                MRI_UCHAR => g.int(0, 12) as f32 * if g.chance(3) { 20.0 } else { 1.0 },
+                MRI_FLOAT => {
+                    if g.chance(60) {
+                        f32::NAN
+                    } else {
+                        g.int(-40, 200) as f32 * 0.125
+                    }
+                }
+                _ => g.int(-5, 60) as f32,
+            }
+        };
+        vox.push(if ty == MRI_UCHAR {
+            v.clamp(0.0, 255.0)
+        } else {
+            v
+        });
+    }
+    Vol {
+        dims,
+        ty,
+        size,
+        mdc: rand_mdc(g),
+        c,
+        good: if g.chance(8) { 0 } else { 1 },
+        vox,
+        scan: if g.chance(2) {
+            Some([2000.0, std::f32::consts::FRAC_PI_6, 30.0, 900.0, 256.0])
+        } else {
+            None
+        },
+    }
+}
+
+/// The bytes of an `.mgh` file of `v` (big-endian: the header padded to 284 bytes, the voxels
+/// column fastest and frame slowest, then the scan parameters when given).
+fn mgh_bytes(v: &Vol) -> Vec<u8> {
+    let mut b: Vec<u8> = Vec::new();
+    for x in [1, v.dims[0], v.dims[1], v.dims[2], v.dims[3], v.ty, 0] {
+        b.extend_from_slice(&x.to_be_bytes());
+    }
+    b.extend_from_slice(&v.good.to_be_bytes());
+    for x in v.size.iter().chain(v.mdc.iter()).chain(v.c.iter()) {
+        b.extend_from_slice(&x.to_be_bytes());
+    }
+    b.resize(284, 0);
+    for &x in &v.vox {
+        match v.ty {
+            MRI_UCHAR => b.push(x as u8),
+            MRI_INT => b.extend_from_slice(&(x as i32).to_be_bytes()),
+            MRI_SHORT => b.extend_from_slice(&(x as i16).to_be_bytes()),
+            _ => b.extend_from_slice(&x.to_be_bytes()),
+        }
+    }
+    if let Some(s) = v.scan {
+        for x in s {
+            b.extend_from_slice(&x.to_be_bytes());
+        }
+    }
+    b
+}
+
+/// A `cnv` case of the given files and arguments.
+fn cnv_line(files: &[(String, Vec<u8>)], args: &[String]) -> String {
+    let mut t = vec!["cnv".to_owned(), files.len().to_string()];
+    for (f, c) in files {
+        t.push(f.clone());
+        t.push(hex(c));
+    }
+    t.push(args.len().to_string());
+    t.extend(args.iter().map(|a| hex(a.as_bytes())));
+    t.join(" ")
+}
+
+/// An LTA file's text: one transform of `ltype` (0 voxel-to-voxel, 1 RAS-to-RAS), the matrix
+/// rows, the source and destination geometries (`None`: not valid).
+fn lta_text(ltype: i32, m: [[f32; 4]; 4], src: Option<&Vol>, dst: Option<&Vol>) -> Vec<u8> {
+    let mut s = format!(
+        "# transform file in_t.lta\ntype      = {ltype}\nnxforms   = 1\nmean      = 0.0000 0.0000 0.0000\nsigma     = 1.0000\n1 4 4\n"
+    );
+    for row in m {
+        s += &format!("{} {} {} {}\n", row[0], row[1], row[2], row[3]);
+    }
+    for (name, v) in [("src", src), ("dst", dst)] {
+        s += &format!("{name} volume info\n");
+        match v {
+            None => s += "valid = 0  # volume info invalid\n",
+            Some(v) => {
+                s += "valid = 1  # volume info valid\nfilename = in_v.mgh\n";
+                s += &format!("volume = {} {} {}\n", v.dims[0], v.dims[1], v.dims[2]);
+                s += &format!("voxelsize = {} {} {}\n", v.size[0], v.size[1], v.size[2]);
+                for (k, a) in ["xras", "yras", "zras"].iter().enumerate() {
+                    s += &format!(
+                        "{a}   = {} {} {}\n",
+                        v.mdc[3 * k],
+                        v.mdc[3 * k + 1],
+                        v.mdc[3 * k + 2]
+                    );
+                }
+                s += &format!("cras   = {} {} {}\n", v.c[0], v.c[1], v.c[2]);
+            }
+        }
+    }
+    s.into_bytes()
+}
+
+const LUT: &[u8] = b"0 Unknown 0 0 0 0\n2 Left-Cerebral-White-Matter 245 245 245 0\n3 Left-Cerebral-Cortex 205 62 78 0\n41 Right-Cerebral-White-Matter 0 225 0 0\n42 Right-Cerebral-Cortex 205 62 78 0\n";
+
+/// One whole conversion: a small MGH input, up to three options with arguments they accept (a
+/// few combinations conflict), the output in one of five formats.
+fn cnv_case(g: &mut Gen) -> String {
+    let dims = [
+        g.int(1, 6) as i32,
+        g.int(1, 6) as i32,
+        if g.chance(6) { 1 } else { g.int(2, 6) as i32 },
+        if g.chance(3) { g.int(2, 4) as i32 } else { 1 },
+    ];
+    let ty = g.pick(&MGH_TYPES);
+    let v = rand_vol(g, dims, ty);
+    let mut files: Vec<(String, Vec<u8>)> = vec![("in_v.mgh".into(), mgh_bytes(&v))];
+    let mut args: Vec<String> = Vec::new();
+    let a = |xs: &[&str]| -> Vec<String> { xs.iter().map(|s| (*s).to_owned()).collect() };
+    let f3 = |g: &mut Gen, xs: &[&str]| -> Vec<String> {
+        (0..3).map(|_| g.pick(xs).to_owned()).collect()
+    };
+    let nopt = g.int(1, 3);
+    for _ in 0..nopt {
+        let mut o: Vec<String> = match g.below(61) {
+            0 => a(&["-odt", g.pick(&["uchar", "short", "int", "float"])]),
+            1 => a(&["-odt", g.pick(&["uchar", "short"]), "-ns", "1"]),
+            2 => a(&["-nc", "-odt", "uchar"]),
+            3 => a(&[
+                "-rt",
+                g.pick(&["nearest", "interpolate", "weighted", "vote", "cubic"]),
+            ]),
+            4 => {
+                let mut x = a(&["-vs"]);
+                x.extend(f3(g, &["1", "2", "0.75", "1.5", "3"]));
+                x
+            }
+            5 => {
+                let mut x = a(&[g.pick(&["-ds", "-dsold"])]);
+                x.extend(f3(g, &["1", "2", "1.5", "3"]));
+                x
+            }
+            6 => a(&[
+                g.pick(&["-ois", "-ojs", "-oks"]),
+                g.pick(&["0.5", "2", "1.5"]),
+            ]),
+            7 => a(&[
+                g.pick(&["-oni", "-onj", "-onk"]),
+                g.pick(&["1", "3", "5", "8"]),
+            ]),
+            8 => a(&[
+                g.pick(&["-iis", "-ijs", "-iks"]),
+                g.pick(&["0.5", "2", "1.25"]),
+            ]),
+            9 => {
+                let mut x = a(&[g.pick(&["-iid", "-ijd", "-ikd", "-oid", "-ojd", "-okd"])]);
+                x.extend(
+                    g.pick(&[
+                        ["1", "0", "0"],
+                        ["0", "-1", "0"],
+                        ["0", "0", "1"],
+                        ["0.6", "0.8", "0"],
+                        ["1", "1", "0"],
+                    ])
+                    .iter()
+                    .map(|s| (*s).to_owned()),
+                );
+                x
+            }
+            10 => a(&[
+                g.pick(&["-io", "-oo"]),
+                g.pick(&["LIA", "RAS", "LPS", "PIL", "SAR", "RSA"]),
+            ]),
+            11 => {
+                let mut x = a(&[g.pick(&["-ic", "-dic", "-oc"])]);
+                x.extend(f3(g, &["0", "1.5", "-2", "10"]));
+                x
+            }
+            12 => a(&[
+                g.pick(&["-tr", "-te", "-TI", "-flip_angle"]),
+                g.pick(&["2.5", "0.7", "1000"]),
+            ]),
+            13 => a(&[
+                g.pick(&["-sc", "-osc", "--rescale"]),
+                g.pick(&["2", "0.5", "100", "-1"]),
+            ]),
+            14 => a(&["--rescale-voxel", "0", "0", g.pick(&["0", "1"])]),
+            15 => a(&["-nth", g.pick(&["0", "1", "5"])]),
+            16 => {
+                let mut x = a(&["-f"]);
+                for _ in 0..g.int(1, 3) {
+                    x.push(g.int(0, 3).to_string());
+                }
+                x
+            }
+            17 => a(&["--mid-frame"]),
+            18 => a(&[g.pick(&["--nskip", "--ndrop"]), g.pick(&["1", "2"])]),
+            19 => a(&[
+                "--fsubsample",
+                "0",
+                g.pick(&["1", "2"]),
+                g.pick(&["1", "3"]),
+            ]),
+            20 => a(&["--cutends", g.pick(&["0", "1", "2"])]),
+            21 => {
+                let mut x = a(&["--crop"]);
+                x.extend(f3(g, &["1", "2", "3"]));
+                if g.chance(2) {
+                    x.push("--cropsize".into());
+                    x.extend(f3(g, &["1", "2", "3", "4"]));
+                }
+                x
+            }
+            22 => a(&[
+                "--slice-crop",
+                g.pick(&["0", "1"]),
+                g.pick(&["1", "2", "3"]),
+            ]),
+            23 => a(&["--slice-reverse"]),
+            24 => a(&["--slice-bias", g.pick(&["0.5", "1", "1.5"])]),
+            25 => a(&["--reduce", "1"]),
+            26 => a(&["--fwhm", g.pick(&["1", "2.5"])]),
+            27 => {
+                let mut x = a(&["--antialias", "-vs"]);
+                x.extend(f3(g, &["1", "2", "3"]));
+                x
+            }
+            28 => a(&["-ut", g.pick(&["3", "10.5"])]),
+            29 => a(&["-oval", g.pick(&["0", "7"])]),
+            30 => a(&["--upsample", "2"]),
+            31 => a(&["--left-right-reverse"]),
+            32 => a(&["--left-right-reverse-pix"]),
+            33 => a(&[
+                g.pick(&["--left-right-mirror", "--left-right-keep"]),
+                g.pick(&["lh", "rh"]),
+            ]),
+            34 => a(&["--left-right-swap-label"]),
+            35 => a(&["--flip-cols"]),
+            36 => a(&["--invert_contrast", g.pick(&["0", "5"])]),
+            37 => a(&[
+                "--shift",
+                g.pick(&["1", "2", "3"]),
+                g.pick(&["1", "-1", "2"]),
+                g.pick(&["0", "1"]),
+            ]),
+            38 => a(&[
+                "-r",
+                g.pick(&["1", "-1", "2"]),
+                g.pick(&["2", "3", "-3"]),
+                g.pick(&["3", "1", "-2"]),
+            ]),
+            39 => a(&["-r4", "1", "2", "3", "4"]),
+            40 => a(&[g.pick(&["-ii", "-oi", "-ti", "-is", "-os", "-im", "-om"])]),
+            41 => a(&[g.pick(&["-ro", "-nw"])]),
+            42 => a(&["--split"]),
+            43 => a(&[g.pick(&["--ascii", "--ascii+crsf", "--ascii-fcol"])]),
+            44 => a(&["--delete-cmds"]),
+            45 => a(&["--new-transform-fname", "talairach.xfm"]),
+            46 => a(&["-sn", "bert"]),
+            47 => a(&["--sphinx"]),
+            48 => a(&[g.pick(&["--erode-seg", "--dil-seg"]), g.pick(&["1", "2"])]),
+            49 => {
+                files.push(("in_lut.txt".into(), LUT.to_vec()));
+                a(&["--ctab", g.pick(&["in_lut.txt", "remove"])])
+            }
+            50 | 51 => {
+                // another volume: the template, --like or --in_like
+                let same = g.chance(2);
+                let d2 = if same {
+                    dims
+                } else {
+                    [
+                        g.int(1, 6) as i32,
+                        g.int(1, 6) as i32,
+                        g.int(1, 6) as i32,
+                        1,
+                    ]
+                };
+                let t2 = g.pick(&MGH_TYPES);
+                let v2 = rand_vol(g, d2, t2);
+                files.push(("in_l.mgh".into(), mgh_bytes(&v2)));
+                a(&[g.pick(&["-rl", "--like", "-il"]), "in_l.mgh"])
+            }
+            52..=54 => {
+                let ltype = if g.chance(2) { 1 } else { 0 };
+                let m = match g.below(3) {
+                    0 => [
+                        [1.0, 0.0, 0.0, 0.0],
+                        [0.0, 1.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [0.0, 0.0, 0.0, 1.0],
+                    ],
+                    1 => [
+                        [1.0, 0.0, 0.0, 1.0],
+                        [0.0, 1.0, 0.0, -2.0],
+                        [0.0, 0.0, 1.0, 0.5],
+                        [0.0, 0.0, 0.0, 1.0],
+                    ],
+                    _ => [
+                        [0.0, 1.0, 0.0, 0.0],
+                        [-1.0, 0.0, 0.0, 3.0],
+                        [0.0, 0.0, 2.0, 0.0],
+                        [0.0, 0.0, 0.0, 1.0],
+                    ],
+                };
+                let src = if g.chance(3) { None } else { Some(&v) };
+                let dst = if g.chance(2) { None } else { Some(&v) };
+                files.push(("in_t.lta".into(), lta_text(ltype, m, src, dst)));
+                a(&[g.pick(&["-at", "-ait"]), "in_t.lta"])
+            }
+            55 => a(&["--store_orig_ras2vox"]),
+            56 => {
+                files.push((
+                    "in_m0.txt".into(),
+                    b"1 0 0 4\n0 1 0 -2\n0 0 1 3.5\n0 0 0 1\n".to_vec(),
+                ));
+                a(&["--autoalign", "in_m0.txt"])
+            }
+            57 => a(&["--force_ras_good"]),
+            58 => a(&["-zgez"]),
+            59 => a(&["--diag", "1", "-at", "in_t.lta"]),
+            // the conformed outputs (at least 256 voxels per axis) are generate_cnv_heavy's
+            _ => a(&["--no_scale", "1"]),
+        };
+        if o.first().is_some_and(|x| x == "--diag") {
+            // the transform the LTA dump prints
+            files.push((
+                "in_t.lta".into(),
+                lta_text(
+                    1,
+                    [
+                        [1.0, 0.0, 0.0, 1.0],
+                        [0.0, 1.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [0.0, 0.0, 0.0, 1.0],
+                    ],
+                    Some(&v),
+                    Some(&v),
+                ),
+            ));
+        }
+        args.append(&mut o);
+    }
+    let out = g.pick(&[
+        "o.mgh", "o.mgh", "o.mgh", "o.mgz", "o.nii", "o.nii.gz", "o.img",
+    ]);
+    args.push("in_v.mgh".into());
+    args.push(out.into());
+    // a file given twice keeps its last contents (both sides write them in order)
+    cnv_line(&files, &args)
+}
+
+/// The conversions every seed starts with: each option's path once on a 4 x 3 x 2 float volume
+/// of two frames.
+fn cnv_prelude() -> Vec<String> {
+    let mut g = Gen::new(12345);
+    let v = rand_vol(&mut g, [4, 3, 2, 2], MRI_FLOAT);
+    let files = vec![("in_v.mgh".to_owned(), mgh_bytes(&v))];
+    let lines: Vec<Vec<&str>> = vec![
+        vec![],
+        vec!["-odt", "uchar"],
+        vec!["-odt", "short", "-ns", "1"],
+        vec!["-vs", "2", "2", "2"],
+        vec!["-ds", "2", "2", "1"],
+        vec!["-dsold", "2", "2", "1"],
+        vec!["--antialias", "-vs", "2", "2", "2"],
+        vec!["--left-right-reverse"],
+        vec!["--left-right-reverse-pix"],
+        vec!["--left-right-mirror", "lh"],
+        vec!["--left-right-keep", "rh"],
+        vec!["--flip-cols"],
+        vec!["--slice-reverse"],
+        vec!["--slice-bias", "0.5"],
+        vec!["--fwhm", "2"],
+        vec!["--rescale", "10"],
+        vec!["-sc", "2", "-osc", "0.5"],
+        vec!["-ii", "-oi", "-ti", "-is", "-os", "-im", "-om"],
+        vec!["-ro", "-ii"],
+        vec!["-nw"],
+        vec!["--split"],
+        vec!["--ascii"],
+        vec!["--ascii+crsf"],
+        vec!["--ascii-fcol"],
+        vec!["-f", "1", "0"],
+        vec!["--mid-frame"],
+        vec!["--ndrop", "1"],
+        vec!["--nskip", "1"],
+        vec!["--crop", "2", "1", "1", "--cropsize", "2", "2", "1"],
+        vec!["--rescale-voxel", "1", "1", "0"],
+        vec!["--sphinx"],
+        vec!["--invert_contrast", "1"],
+        vec!["-r", "2", "1", "3"],
+        vec!["--shift", "1", "1", "1"],
+        vec!["-oni", "6", "-ois", "0.5"],
+        vec!["-iid", "1", "1", "0"],
+        vec!["--upsample", "2"],
+        vec!["--reduce", "1"],
+        vec!["-ut", "5"],
+        vec!["--store_orig_ras2vox"],
+        vec![
+            "--delete-cmds",
+            "--new-transform-fname",
+            "x.xfm",
+            "-sn",
+            "bert",
+        ],
+        // a register.dat and a linear transform that are not there (the C library's perror)
+        vec!["-at", "in_missing.dat"],
+        vec!["-at", "in_missing.lta"],
+        vec!["-at", "in_missing.xfm"],
+        vec!["-ait", "in_missing.dat"],
+        vec![
+            "--left-right-reverse",
+            "-iid",
+            "0",
+            "1",
+            "0",
+            "-ijd",
+            "0",
+            "0",
+            "1",
+            "-ikd",
+            "0",
+            "1",
+            "0",
+        ],
+        vec!["--like", "in_missing.mgh"],
+        vec!["--ascii", "-o", "nodir/o.txt"],
+    ];
+    let mut out = Vec::new();
+    for l in lines {
+        let mut args: Vec<String> = l.iter().map(|s| (*s).to_owned()).collect();
+        args.push("in_v.mgh".into());
+        if !l.contains(&"-o") {
+            args.push("o.mgh".into());
+        }
+        out.push(cnv_line(&files, &args));
+    }
+    out
+}
+
+/// The conformed conversions (outputs of 256 x 256 x 256 voxels and more: too slow for the
+/// recorded test's debug build): each conform option on small inputs of each type.
+pub fn generate_cnv_heavy(seed: u64) -> Vec<String> {
+    let mut g = Gen::new(seed ^ 0x6865_6176);
+    let opts: [&[&str]; 8] = [
+        &["-c"],
+        &["--conform"],
+        &["-c", "-cs", "2"],
+        &["-cm"],
+        &["--conform-dc"],
+        &["-c", "--cw256", "-cs", "4"],
+        &["-c", "-odt", "float", "-rt", "nearest"],
+        &["-c", "-oc", "1", "2", "3"],
+    ];
+    let mut v = Vec::new();
+    for (k, o) in opts.iter().enumerate() {
+        let ty = MGH_TYPES[k % 4];
+        let dims = [
+            g.int(2, 5) as i32,
+            g.int(2, 5) as i32,
+            g.int(2, 5) as i32,
+            1,
+        ];
+        let vol = rand_vol(&mut g, dims, ty);
+        let files = vec![("in_v.mgh".to_owned(), mgh_bytes(&vol))];
+        let mut args: Vec<String> = o.iter().map(|s| (*s).to_owned()).collect();
+        args.push("in_v.mgh".into());
+        args.push(g.pick(&["o.mgh", "o.mgz"]).into());
+        v.push(cnv_line(&files, &args));
+    }
+    v
+}
+
+/// `n` conversion cases of seed `seed`: the [`cnv_prelude`], then seeded ones.
+pub fn generate_cnv(seed: u64, n: usize) -> Vec<String> {
+    let mut v = cnv_prelude();
+    v.truncate(n);
+    let mut g = Gen::new(seed ^ 0x636e_7600);
+    while v.len() < n {
+        v.push(cnv_case(&mut g));
+    }
+    v
+}
+
+/// `fsconvert`'s `canon_info`: `getAllInfo`'s text with the time, the user, the machine and its
+/// kernel's version as `X`.
+fn canon_info(s: &str) -> String {
+    let mut r = s.to_owned();
+    let mut blank = |key: &str, next: &str| {
+        let Some(a) = r.find(key) else {
+            return;
+        };
+        let a = a + key.len();
+        let Some(b) = r[a..].find(next) else {
+            return;
+        };
+        r.replace_range(a..a + b, "X");
+    };
+    blank("TimeStamp: ", "  BuildTime: ");
+    blank("User: ", "  Machine: ");
+    blank("Machine: ", "  Platform: ");
+    blank("PlatformVersion: ", "  CompilerName: ");
+    r
+}
+
+/// `fsconvert`'s `slurp_gz_masked`: a file's bytes through zlib's `gzread` (a gzip file
+/// decompressed), each command line's text from `TimeStamp: ` to its NUL masked with `X`.
+fn slurp_gz_masked(path: &Path) -> Vec<u8> {
+    let mut r = Vec::new();
+    let name = path.to_string_lossy().into_owned();
+    let Some(mut f) = larmorx_io::znz::GzFile::open(name.as_bytes(), b"rb") else {
+        return r;
+    };
+    let mut b = vec![0u8; 65536];
+    loop {
+        let n = f.gzread(&mut b);
+        if n <= 0 {
+            break;
+        }
+        r.extend_from_slice(&b[..n as usize]);
+    }
+    let key = b"TimeStamp: ";
+    let mut at = 0;
+    while let Some(p) = r[at..].windows(key.len()).position(|w| w == key) {
+        let mut k = at + p + key.len();
+        while k < r.len() && r[k] != 0 {
+            r[k] = b'X';
+            k += 1;
+        }
+        at = at + p + 1;
+    }
+    r
+}
+
+/// The files a `cnv` case wrote (names not starting with `in_`), sorted: `F <name> <bytes>
+/// <FNV-1a>` of [`slurp_gz_masked`].
+fn written_full(dir: &Path) -> String {
+    let mut names: Vec<String> = std::fs::read_dir(dir)
+        .map(|d| {
+            d.filter_map(|e| e.ok())
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .filter(|n| !n.starts_with("in_"))
+                .collect()
+        })
+        .unwrap_or_default();
+    names.sort();
+    let mut s = String::new();
+    for n in names {
+        let b = slurp_gz_masked(&dir.join(&n));
+        s += &format!("F {n} {} {:016x} ", b.len(), fnv(&b));
+    }
+    s.trim_end().to_owned()
 }

@@ -564,8 +564,10 @@ pub fn label_read_from(
 /// `SUBJECTS_DIR` must be set); otherwise the name itself when it holds `.label`, else the name
 /// with `.label` added. When that file cannot be opened for reading and the name as given can,
 /// the name as given. The file is opened with `errno` cleared; when the open sets it, its text on
-/// standard error (`perror`); a file that does not open is an error (`<Progname>: could not open
-/// label file <name>`, `ERROR_NOFILE`) and `None`.
+/// standard error (`perror`, which leaves `EINVAL` in `errno` when nothing was written to a
+/// write-only standard error before: `Globals::stderr`); a file that does not open is an error
+/// (`<Progname>: could not open label file <name>`, `ERROR_NOFILE`, with `errno`'s text) and
+/// `None`.
 #[allow(clippy::too_many_arguments)]
 pub fn label_read(
     g: &mut Globals,
@@ -622,7 +624,8 @@ pub fn label_read(
         g.errno = *e;
     }
     if g.errno != 0 {
-        let _ = writeln!(err, "{}", log::strerror(g.errno));
+        // `perror(NULL)`: the C library may leave `EINVAL` in `errno` (Globals::stderr)
+        log::perror_errno(g, err, None);
     }
     let Ok(mut fp) = opened else {
         let mut m = format!("{}: could not open label file ", g.progname).into_bytes();

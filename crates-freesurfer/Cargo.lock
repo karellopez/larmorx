@@ -380,6 +380,7 @@ dependencies = [
  "larmorx-freesurfer-robust",
  "larmorx-freesurfer-surf",
  "larmorx-freesurfer-volume",
+ "larmorx-io",
  "sha2",
  "tempfile",
 ]

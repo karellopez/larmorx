@@ -2,7 +2,7 @@
 //! Golden cases of fs.volume's clean room (`specs/freesurfer-volume.md` §69.5, CLAUDE.md rule
 //! 10): every command of the black-box probe's grammar (`tests/volume_cmd/`, the comparison's
 //! candidate commands) on seeded arguments, in both defect modes, one SHA-256 per group of the
-//! spec's parts 1 to 6c over every result line (the printed values, both streams and the notices;
+//! spec's parts 1 to 7a and of fs.bspline (`specs/freesurfer-bspline.md`) over every result line (the printed values, both streams and the notices;
 //! NaN bits included), recorded on Linux x86-64 and checked on every platform. The arguments
 //! come from a seeded generator and plain arithmetic (special values written as their bits); no
 //! file system (the transform reader reads an in-memory file, `ltamem`), no clock; volumes of at
@@ -179,6 +179,30 @@ const GOLDEN: &[(&str, &str)] = &[
     (
         "vgcopy.reproduce",
         "1477d2565a910423a35da424178294939e54346c0de01c3f2ad2dac283cec951",
+    ),
+    (
+        "bspline.fix",
+        "95378741724e25165a8edb8e8dc4da3b6df5cf5b35d6e4a61660d4bbd01dccaf",
+    ),
+    (
+        "bspline.reproduce",
+        "547f266687ddf96763c8170ff9e8e126fb43a477696002fa1b0f2763498756ae",
+    ),
+    (
+        "bsvol.fix",
+        "7661c9e083d2fb0916c1a97211458cb336f60c9b6cb4e6a7a04ab46563ade7a2",
+    ),
+    (
+        "bsvol.reproduce",
+        "6e5203f12add523a75f1503dcd19fd625c5b4c1f5b70e827fcd92e39b77fc8d5",
+    ),
+    (
+        "info.fix",
+        "d65d8cc2f282a4b212edac697402b1c7d064e6ab49505ef635709104f6682022",
+    ),
+    (
+        "info.reproduce",
+        "817b8b62fe02a52fdb072204841ff3646f11b24b8e301e2d0416e236496b640e",
     ),
 ];
 
@@ -1723,6 +1747,286 @@ const REGRID: &[(&str, Make)] = &[
     }),
 ];
 
+/// An orientation string (§33): 0 to 5 characters of the axes' letters in both cases, an invalid
+/// letter, a NUL and a byte past ASCII, as `x<hex>`.
+fn ostring(g: &mut G) -> String {
+    const C: &[u8] = b"LRPAISlrpaisX0\x00\x80";
+    if g.one_in(2) {
+        let mut axes = [
+            [b'L', b'R'][g.below(2) as usize],
+            [b'P', b'A'][g.below(2) as usize],
+            [b'I', b'S'][g.below(2) as usize],
+        ];
+        let k = g.below(3) as usize;
+        axes.swap(0, k);
+        return xs(&axes);
+    }
+    let n = g.int(0, 5) as usize;
+    let b: Vec<u8> = (0..n)
+        .map(|_| C[g.below(C.len() as u64) as usize])
+        .collect();
+    xs(&b)
+}
+
+/// A matrix of `rows x cols` seeded floats (some special).
+fn matrix(g: &mut G, rows: i64, cols: i64) -> String {
+    let v: Vec<String> = (0..rows * cols).map(|_| g.f(true)).collect();
+    format!("{rows} {cols} {}", v.join(" "))
+}
+
+const INFO: &[(&str, Make)] = &[
+    ("stats", |g| g.w(ALL)),
+    ("pstats", |g| g.w(ALL)),
+    ("type2s", |_| {
+        "15 -2 -1 0 1 2 3 4 5 6 7 8 9 10 11 12".to_owned()
+    }),
+    ("cropbb", |g| {
+        let a = g.w(NUMERIC);
+        let mut v = Vec::new();
+        for _ in 0..3 {
+            v.push(
+                g.pick(&["-3", "0", "1", "2", "5", "2147483647", "-2147483648"])
+                    .to_owned(),
+            );
+        }
+        for _ in 0..3 {
+            v.push(g.pick(&["-1", "0", "1", "3", "7", "2147483647"]).to_owned());
+        }
+        format!("{a} {}", v.join(" "))
+    }),
+    ("crass", |g| {
+        let a = g.ws();
+        let b = g.ws();
+        format!("{a} {b}")
+    }),
+    ("+gdiag=10000040 crass", |g| {
+        let a = g.ws();
+        let b = g.ws();
+        format!("{a} {b}")
+    }),
+    ("chkostr", ostring),
+    ("o2dc", |g| {
+        let a = g.ws();
+        format!("{a} {}", ostring(g))
+    }),
+    ("s44", |g| {
+        let k = g.int(0, 3);
+        let size = if k == 2 {
+            format!(" {} {}", g.int(3, 5), g.int(3, 5))
+        } else {
+            String::new()
+        };
+        let v: Vec<String> = (0..16).map(|_| g.f(true)).collect();
+        format!("{k}{size} {}", v.join(" "))
+    }),
+    ("vx2rx", |g| {
+        let a = g.ws();
+        let b = if g.one_in(3) {
+            "null".to_owned()
+        } else {
+            g.ws()
+        };
+        let mv = g.mat4();
+        let mr = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            g.mat4()
+        };
+        format!("{a} {b} {mv} {mr}")
+    }),
+    ("v2v", |g| {
+        let a = g.ws();
+        let b = g.ws();
+        format!("{a} {b}")
+    }),
+    ("setv2r", |g| {
+        let a = g.ws();
+        let m = match g.below(4) {
+            0 | 1 => g.mat4(),
+            2 => matrix(g, 3, 4),
+            _ => matrix(g, 2, 2),
+        };
+        let e = g.pick(&["unset", "unset", "x302e35", "x616263", "x", "x3130"]);
+        format!("{a} {m} {e}")
+    }),
+];
+
+/// A B-spline sampling point (§4.1): `x y z frame`.
+fn bpoint(g: &mut G) -> String {
+    format!("{} {} {} {}", g.coord(), g.coord(), g.coord(), g.int(-1, 2))
+}
+
+/// An LT of a transform array: the matrix, the type, the label and two geometries (Gf).
+fn bslt(g: &mut G) -> String {
+    let mut m = g.mat4();
+    while m == "null" {
+        m = g.mat4();
+    }
+    let gs = format!("{} {} null", g.geom(false), g.int(0, 1));
+    let gd = format!("{} {} null", g.geom(false), g.int(0, 1));
+    format!(
+        "{} {} {} {} {m} null null {} 0 {gs} {gd}",
+        g.f(false),
+        g.f(false),
+        g.f(false),
+        g.f(false),
+        g.int(0, 2)
+    )
+}
+
+const BSPLINE: &[(&str, Make)] = &[
+    ("bsp", |g| {
+        let k = g.int(0, 3);
+        let s = g.shape(NUMERIC);
+        let a = g.w_of(&s);
+        let deg = g.pick(&["2", "3", "3", "4", "5", "6", "7", "8", "9", "0", "10", "-1"]);
+        let extra = if k == 2 {
+            if g.one_in(2) {
+                let t: Vec<&str> = s.split(' ').collect();
+                format!(
+                    " {}",
+                    g.w_of(&format!("{} {} {} 3 {} 0", t[0], t[1], t[2], t[4]))
+                )
+            } else {
+                format!(" {}", g.w(NUMERIC))
+            }
+        } else {
+            String::new()
+        };
+        format!("{k} {a} {deg}{extra}")
+    }),
+    ("bsamp", |g| {
+        let deg = g.int(2, 9);
+        let a = g.w(NUMERIC);
+        let n = g.int(1, 3);
+        let p: Vec<String> = (0..n).map(|_| bpoint(g)).collect();
+        format!("{deg} {a} {} {n} {}", g.d(true), p.join(" "))
+    }),
+    ("bsraw", |g| {
+        let deg = g.int(-2, 12);
+        let a = g.w(&[3]);
+        let n = g.int(1, 3);
+        let p: Vec<String> = (0..n).map(|_| bpoint(g)).collect();
+        format!(
+            "{deg} {} {a} {} {n} {}",
+            g.int(0, 1),
+            g.d(true),
+            p.join(" ")
+        )
+    }),
+    ("bsseq", |g| {
+        let deg = g.int(2, 9);
+        let a = g.w(NUMERIC);
+        let n = g.int(1, 3);
+        let p: Vec<String> = (0..n)
+            .map(|_| {
+                let first = g.int(0, 1);
+                let last = first + g.int(-1, 1);
+                format!("{} {} {} {first} {last}", g.coord(), g.coord(), g.coord())
+            })
+            .collect();
+        format!("{deg} {a} {} {n} {}", g.d(true), p.join(" "))
+    }),
+    ("bslxf", |g| {
+        let s = g.shape(NUMERIC);
+        let a = g.w_of(&s);
+        let d = rdst(g, &s, None);
+        format!("{} {a} {d} {}", g.int(2, 5), g.mat4())
+    }),
+    ("bsras", |g| {
+        let s = g.shape(NUMERIC);
+        let a = g.w_of(&s);
+        let d = rdst(g, &s, None);
+        format!("{} {a} {d} {}", g.int(2, 5), g.mat4())
+    }),
+    ("bslta", |g| {
+        let s = g.shape(NUMERIC);
+        let a = g.w_of(&s);
+        let d = if g.one_in(2) {
+            "new".to_owned()
+        } else {
+            rdst(g, &s, None)
+        };
+        let n = if g.one_in(12) { 2 } else { 1 };
+        let ty = g.pick(&["0", "0", "1", "1", "1", "2", "14"]);
+        let lts: Vec<String> = (0..2 * n).map(|_| bslt(g)).collect();
+        format!(
+            "{} {a} {d} {n} {ty} 3f800000 x {} {}",
+            g.int(2, 4),
+            lts.join(" "),
+            g.int(0, 2)
+        )
+    }),
+    ("bslta", |g| {
+        // a clean source and geometries: the transform-array paths that succeed
+        let z = "00000000";
+        let one = "3f800000";
+        let t = g.pick(&["0", "3"]);
+        let c = [g.f(false), g.f(false), g.f(false)];
+        let a = format!(
+            "3 2 2 {t} 1 0 {} {one} 3fc00000 {one} 1 {one} {z} {z} {z} {one} {z} {z} {z} {one} {} {} {} {z} {z} {z} \
+             0 1 {z} {z} {z} {z} {z} {z} {one} {one} {z} {z} {z} 0000000000000000 0 {z} {z} 0 1 null null",
+            g.int(0, 255),
+            c[0],
+            c[1],
+            c[2]
+        );
+        let geo = |g: &mut G| {
+            let valid = g.pick(&["1", "1", "0"]);
+            format!(
+                "{valid} 3 2 2 {one} 3fc00000 {one} 1 {one} {z} {z} {z} {one} {z} {z} {z} {one} {z} {z} {z} {z} {z} {z} x 1 null"
+            )
+        };
+        let rot = format!(
+            "4 4 3f7ae148 be4ba5e3 {z} {one} 3e4ba5e3 3f7ae148 {z} bf000000 {z} {z} {one} 3e800000 {z} {z} {z} {one}"
+        );
+        let lt = |g: &mut G| {
+            let (gs, gd) = (geo(g), geo(g));
+            format!("{z} {z} {z} {z} {rot} null null 0 0 {gs} {gd}")
+        };
+        let (l1, l2) = (lt(g), lt(g));
+        format!(
+            "3 {a} new 1 {} {one} x {l1} {l2} {}",
+            g.pick(&["0", "1", "1"]),
+            g.int(0, 2)
+        )
+    }),
+    ("bsdown", |g| {
+        let s = g.shape(NUMERIC);
+        let a = g.w_of(&s);
+        let (w, h, d) = ext3(&s);
+        let e = ((w / 2).max(1), (h / 2).max(1), (d / 2).max(1));
+        let dd = rdst(g, &s, Some(e));
+        format!("{a} {dd}")
+    }),
+    ("bsup", |g| {
+        let s = g.shape(NUMERIC);
+        let a = g.w_of(&s);
+        let (w, h, d) = ext3(&s);
+        let up = |e: i64| if e > 1 { 2 * e } else { 1 };
+        let dd = rdst(g, &s, Some((up(w), up(h), up(d))));
+        format!("{a} {dd}")
+    }),
+    ("bsfree", |g| g.int(0, 2).to_string()),
+];
+
+const BSVOL: &[(&str, Make)] = &[
+    ("lxf", |g| {
+        let k = g.pick(&["0", "3"]);
+        let s = g.shape(NUMERIC);
+        let a = g.w_of(&s);
+        let ov = g.pick(&["0000000000000000", "4014000000000000", "7ff8000000000000"]);
+        let d = rdst(g, &s, None);
+        format!("{k} {a} {ov} {d} {} 5", g.mat4())
+    }),
+    ("rsfill", |g| {
+        let s = g.shape(&[0, 0, 1, 2, 3, 4]);
+        let a = g.w_of(&s);
+        let b = template_of(g, &s);
+        format!("{a} {b} 5 {} {}", g.f(true), i64::from(g.one_in(5)))
+    }),
+];
+
 fn group(name: &str, table: &[(&str, Make)], per: usize) {
     let seed = name.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
         (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
@@ -1848,4 +2152,19 @@ fn linear_transforms() {
 #[test]
 fn template_resampling() {
     group("regrid", REGRID, 8);
+}
+
+#[test]
+fn statistics_and_orientation() {
+    group("info", INFO, 8);
+}
+
+#[test]
+fn bsplines() {
+    group("bspline", BSPLINE, 8);
+}
+
+#[test]
+fn bspline_paths() {
+    group("bsvol", BSVOL, 8);
 }

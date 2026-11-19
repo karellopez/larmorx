@@ -2533,6 +2533,8 @@ defects! {
         "mri_convert --split writes a frame's file name of 1,024 bytes or more past its buffer (corrupted memory or a crash)";
     FS_1052 = "FS-1052", "FreeSurfer", true,
         "mri_convert crashes when a step gives no volume and the program goes on with it (an upper threshold, upsampling, a label swap, a reduction, a crop, a downsampled template, a morph that cannot be applied, a frame copy)";
+    FS_1053 = "FS-1053", "FreeSurfer", true,
+        "mri_convert --upsample, --conform and --downsample (-ds, -dsold) print the new volume's geometry with a validity flag (valid) that FreeSurfer never sets: the printed value is memory contents";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

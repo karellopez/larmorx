@@ -861,6 +861,9 @@ pub(crate) fn run_line_with(
     let shared = Shared::default();
     let mut io = shared.clone();
     let mut g = Globals::new(mode);
+    // fsio orients its standard error before each case (as a program that has written to it):
+    // glibc's perror then leaves errno alone
+    g.stderr.mark_written();
     let t: Vec<&str> = line.split_whitespace().collect();
     let mut o = Out::default();
     let mut extra: Vec<&'static str> = Vec::new();

@@ -115,6 +115,56 @@ pub fn write_to_error_log(g: &Globals, message: &[u8]) {
     }
 }
 
+/// A program's standard error that marks [`Globals::stderr`] as written to on its first byte
+/// (the C library's stream orientation, which `perror` depends on: [`perror_errno`]).
+pub struct TrackedErr<'a> {
+    inner: &'a mut dyn Write,
+    written: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl<'a> TrackedErr<'a> {
+    /// `err` tracked for `g`'s standard error.
+    pub fn new(g: &Globals, err: &'a mut dyn Write) -> TrackedErr<'a> {
+        TrackedErr {
+            inner: err,
+            written: g.stderr.written.clone(),
+        }
+    }
+}
+
+impl Write for TrackedErr<'_> {
+    fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+        if !b.is_empty() {
+            self.written
+                .store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+        self.inner.write(b)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+/// `EINVAL`, what the first `perror` on a write-only standard error leaves in `errno`.
+pub const EINVAL: i32 = 22;
+
+/// `perror(prefix)`: `<prefix>: <errno's text>` (or the text alone) on standard error, and what
+/// the C library leaves in `errno` ([`crate::globals::StderrState`]): `EINVAL` when nothing was
+/// written to a write-only standard error before, else `errno` unchanged.
+pub fn perror_errno(g: &mut Globals, err: &mut dyn Write, prefix: Option<&str>) {
+    let first = !g.stderr.was_written() && !g.stderr.read_write;
+    let text = strerror(g.errno);
+    let _ = match prefix {
+        Some(p) => writeln!(err, "{p}: {text}"),
+        None => writeln!(err, "{text}"),
+    };
+    if first {
+        g.errno = EINVAL;
+    }
+    g.stderr.mark_written();
+}
+
 /// `fs::error() << message`: `error: <message>\n` on standard error, and the message in the
 /// error log.
 pub fn error(g: &Globals, err: &mut dyn Write, message: &str) {

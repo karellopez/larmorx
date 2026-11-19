@@ -51,12 +51,15 @@
 //! - **FS-1050** (crash): `--out_stats_table` when the table cannot be made from the volume.
 //! - **FS-1051** (memory): `--split` with a frame's name of 1,024 bytes or more.
 //! - **FS-1052** (crash): a step that gives no volume where `main` goes on with one.
+//! - **FS-1053** (memory): the geometry printed after `--upsample`, `--conform` and `--downsample`
+//!   shows a validity flag FreeSurfer never sets (here 0).
 
 use std::io::Write;
 
 use larmorx_core::cfmt;
 use larmorx_core::defects::{
     FS_1043, FS_1044, FS_1045, FS_1046, FS_1047, FS_1048, FS_1049, FS_1050, FS_1051, FS_1052,
+    FS_1053,
 };
 use larmorx_core::math::Libm;
 use larmorx_freesurfer_core::affine::{
@@ -154,14 +157,17 @@ const CLOSE_ENOUGH: f64 = 5e-3;
 /// (`larmorx: ...`).
 pub fn run(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
     let mut g = Globals::new(settings.mode);
+    // the process's own standard error, as the C library's perror sees it
+    g.stderr.read_write = larmorx_freesurfer_core::system::stderr_read_write();
     let mut env: Environment = settings.env.clone();
     let argv: Vec<String> = std::iter::once(NAME.to_owned())
         .chain(args.iter().cloned())
         .collect();
     let status = {
+        let mut terr = log::TrackedErr::new(&g, &mut *err);
         let mut r = Run {
             out: &mut *out,
-            err: &mut *err,
+            err: &mut terr,
             env: &mut env,
             dir: settings.dir.as_deref(),
         };
@@ -274,6 +280,16 @@ fn fix_fov(m: &mut Mri) {
     } else {
         fov_z
     };
+}
+
+/// `vgprint(true)` of a volume FreeSurfer has just made (FS-1053: its `valid` flag, which no
+/// constructor sets, is printed from memory contents; here 0 unless set).
+fn print_new_geometry(g: &mut Globals, r: &mut Run, vg: &VolGeom, what: &str) {
+    g.notices.add(
+        &FS_1053,
+        format!("mri_convert {what}: the new volume's printed geometry has a validity flag FreeSurfer never sets (memory contents)"),
+    );
+    vgprint(r.out, vg, true);
 }
 
 /// `MatrixPrint(stdout, m)`.
@@ -535,7 +551,7 @@ pub fn convert(g: &mut Globals, r: &mut Run, mut o: Options) -> Result<(), Fatal
         let _ = writeln!(r.out, "UpsampleFactor = {}", o.upsample_factor);
         let t = mri_upsample_n(g, r.out, r.err, &mri, None, o.upsample_factor)?.into_new();
         mri = need(g, r.err, t, "MRIupsampleN")?;
-        vgprint(r.out, &mri.vg, true);
+        print_new_geometry(g, r, &mri.vg, "--upsample");
     }
 
     if o.slice_crop_flag != 0 {
@@ -1082,7 +1098,7 @@ pub fn convert(g: &mut Globals, r: &mut Run, mut o: Options) -> Result<(), Fatal
                 f64::from(conform_size),
                 o.conf_keep_dc != 0,
             )?;
-            vgprint(r.out, &mri_template.vg, true);
+            print_new_geometry(g, r, &mri_template.vg, "--conform");
         } else if o.voxel_size_flag != 0 {
             let vs = o.voxel_size.unwrap_or([0.0; 3]);
             mri_template = header_like(g, r, &mri)?;
@@ -1143,7 +1159,7 @@ pub fn convert(g: &mut Globals, r: &mut Run, mut o: Options) -> Result<(), Fatal
                 t.zstart = half(t.vg.zsize, t.vg.depth);
                 t.zend = halfp(t.vg.zsize, t.vg.depth);
             }
-            vgprint(r.out, &mri_template.vg, true);
+            print_new_geometry(g, r, &mri_template.vg, "--downsample");
         }
     }
 

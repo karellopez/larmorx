@@ -1,9 +1,9 @@
 # `mri_convert` (FreeSurfer 8.2.0): behaviour spec
 
-Status: part 1 of 3 (queue items 3.2-04 and 3.2-05, first half: the stats tables, the CSV reader,
-and the command line up to the checks before the input volume is read); part 2 (the steps from
-reading the input to writing the output, 3.2-05's second half and 3.2-06) and part 3 (the program
-assembled, its exit statuses after the checks, 3.2-07) follow. Written by the replica's author
+Status: parts 1 and 2 of 3 (queue items 3.2-04 and 3.2-05: the stats tables, the CSV reader, the
+command line up to the checks before the input volume is read (part 1, §1-3), and the steps from
+reading the input to writing the output (part 2, §4-5)); the outline (`.otl`) input of §4.2
+(3.2-06) and part 3 (the replay of the recorded steps, 3.2-07) follow. Written by the replica's author
 (track A) as the spec writer: behaviour, conventions and messages, for the clean room
 (`larmorx-fs-volumes`), which works from this file, the library modules' specs
 (`specs/freesurfer-*.md`) and black-box runs of the official program only.
@@ -360,3 +360,299 @@ beyond `float`, `.tac` columns) and each defect's case in both modes (`--upstrea
 `reproduce`). The replica's own probe (`validation/probes/fs-convert`, closed to clean-room
 implementers) compares the replica with FreeSurfer's code case by case: 1,000 cases of seed 1,
 947 identical, 53 where FreeSurfer reads memory it does not own (observed).
+
+## 4. From the input to the output (part 2)
+
+### 4.1 The input
+
+1. With `--in_like <name>`: `reading info from <name>...`, the volume's header read (no voxels; the
+   reading's own messages, `specs/freesurfer-io.md`); none: status 1.
+2. The input's format (not for `--in_stats_table`): the forced one, else identified from the name
+   without its `@`/`#` parts. Unknown: `ERROR: file <name> does not exist` when that name is not a
+   readable file, else `ERROR: cannot determine file type for <name> ` (a space before the new
+   line), status 1.
+3. `--roi` with an input that is not GE Genesis: the error line `rois must be in GE format`
+   (FreeSurfer's error format, `specs/freesurfer-core.md`, with `errno` cleared first), status 1.
+   `--zero_ge_z_offset` with an input that is not DICOM: `Not a GE dicom volume: -zgez =
+   --zero_ge_z_offset option ignored.` (standard error), the option dropped.
+4. `reading from <name without @/#>...` (also for a stats table).
+5. A morph input (`.m3z`): read (`specs/freesurfer-gca.md`; none: the fatal error `<prog>: could not
+   read input morph from <name>`, `ERROR_NOFILE`), with `--downsample2` halved (below), written to
+   the output name as a morph (its writer's own status ignored), status 0. Halving: a morph of
+   `width / 2` x `height / 2` x `depth / 2` nodes (integer division); node (x, y, z) takes node
+   (2x, 2y, 2z)'s positions, original and saved positions, the two sums of positions, the nearest
+   voxel, prior, area, area1, area2, orig_area1, orig_area2, invalid flag, status and label (every
+   other node field as a new morph has it); the image and atlas geometries, type, status, input count,
+   affine matrix and determinant copied, the spacing doubled.
+6. An outline input (`.otl`): needs `--in_like` or `--in_k_count` (else the error line
+   `parcellation read: must specifya volume depth with either in_like or in_k_count`, status 1:
+   the words run together as printed) and `--color_file` (else `parcellation read: must specify
+   acolor file name`, status 1); without `--fill_parcellation`: `notice: unfilled parcellations
+   currently unimplemented`, `notice: filling outlines` (the outlines are filled anyway); then the
+   reader of §4.2 (3.2-06; until it is ported, the replica prints `larmorx-freesurfer: reading
+   outline (.otl) volumes is not ported yet (<name>)` on standard error and ends with status 1).
+   `--smooth_parcellation <n>`: `smoothing parcellation...` and the mode filter of
+   `specs/freesurfer-volume.md` (a failure: status 1). The volume is then sampled nearest and
+   changed in type without scaling.
+7. `--roi`: the GE ROI series (`specs/freesurfer-io.md`; its slice count from `--in_like`'s depth or
+   `--in_k_count`, else the error line `roi read: must specify a volumedepth with either in_like or
+   in_k_count`, status 1); sampled nearest, no scaling.
+8. Otherwise: with `--read_only` and `--in_info` or `--in_matrix` and no `--in_stats`, the header
+   only (of the forced format, or found from the name); else the volume (of the forced format;
+   `--nth_frame <n>`: frame n only; `--in_stats_table`: `Loading in stat table <name>`, the table
+   of §1 and its volume, a failure `ERROR: loading y <name> as a stat table`, status 1). A DICOM
+   input waits for the DICOM reader (queue 3.7-14): the replica prints `larmorx-freesurfer: reading
+   DICOM volumes is not ported yet (<name>)`. No volume: status 1.
+
+### 4.2 The outline reader (3.2-06; to be written)
+
+### 4.3 The steps on the input, in order
+
+1. The input's embedded colour table is kept aside (a deep copy).
+2. `--upper_thresh <t>`: every voxel above t (any frame) set to t (`specs/freesurfer-volume.md`).
+3. `--outside_val <v>` with v > 0: the volume's outside value.
+4. `--upsample <n>`: `UpsampleFactor = <n>`, each voxel repeated n times per axis
+   (`specs/freesurfer-volume.md`), then the new geometry printed with its `valid` line (§4.6).
+5. `--slice-crop <a> <b>`: `Cropping slices from <a> to <b>`, the slices a to b kept (a failure:
+   status 1).
+6. `--left-right-reverse`: the four-line warning `WARNING: applying left-right reversal to the input
+   geometry` / `without reversing the pixel data. This will likely make ` / `the volume geometry
+   WRONG, so make sure you know what you  ` / `are doing.` (the trailing blanks as shown), then
+   `  CRAS Before: %g %g %g`. For each axis (column, row, slice) whose orientation letter (§4.6) is
+   L or R, in that order: `  Reversing geometry for the columns` (`rows`, `slices`), the centre
+   computed as the voxel-to-RAS matrix (base 0, no shear) times the voxel (width/2.0, height/2.0,
+   depth/2.0) with 1 taken from that axis's coordinate (in `double`, stored as `float`, the product
+   in `float`), and the axis's direction cosines negated (the sign bit flipped, a NaN's too). The
+   centre becomes the last such product: `  CRAS After %g %g %g`. No axis L or R: FS-1043 (below).
+7. `--left-right-swap-label`: `Performing left-right swap of labels`, the left/right labels swapped
+   (`specs/freesurfer-volume.md`; with `--left-right-swap-label-table` the two tables).
+8. `--left-right-reverse-pix`: the warning `WARNING: applying left-right reversal to the input
+   pixels` / `without changing geometry. This will likely make ` / `the volume geometry WRONG, so
+   make sure you know what you  ` / `are doing.`; a copy of the volume; for each axis whose letter
+   is L or R (column, row, slice, in that order; `  Reversing pixels for the columns` ...), voxel
+   (i, ...) of the input written at index (n - 1 - i) of that axis in the copy (each pass reads the
+   input, so two L/R axes give the input reversed along the last only).
+9. `--left-right-mirror <h>` / `--left-right-keep <h>`: `WARNING: Mirroring <h> half into the other
+   half,` / `or masking one half of the image is only meaningful if` / `the image is upright and
+   centerd, see make_upright.`, `  Orientation string: <ostr>`; on a copy, for each L/R axis
+   (`  Mirror or keep pixels for the columns`, ...): for i below n/2 (integer), i1 = i, or n-1-i when
+   the axis's letter equals the hemisphere's first letter in upper case; the copy's voxel at n-1-i1
+   becomes the input's at i1 (mirror) or 0 (keep: the value stays 0 from its start).
+10. `--flip-cols`: `WARNING: flipping cols without changing geometry`, `type <t> <t>` (the input's
+    and the copy's type codes), the columns reversed into a copy, `type <t> <t>` again.
+11. `--slice-reverse`: `Reversing slices, updating vox2ras`, the slices reversed with the geometry
+    (`specs/freesurfer-volume.md`; a failure: status 1).
+12. `--slice-bias <a>`: `Applying Half-Cosine Slice Bias, Alpha = %g`, each voxel of slice s times
+    `(a cos(pi s / (depth - 1)) + (2 - a)) / 2` (double, the C library's `cos`), in place.
+13. `--reduce <n>`: n times the 2:1 reduction (`specs/freesurfer-filter.md`; a volume of one slice:
+    the 2-D one).
+14. `--antialias` (with `--voxsize v`): `Applying Gaussian Filter ...`; for each axis whose output
+    size is larger than its input voxel size: `sigma = (float)((v * logf(5)) / pi)` (the product in
+    `float`, `logf(5)` the correctly rounded `0x3fce0210`, the division in `double`), `fwhm =
+    (float)(sqrt(8 log 2) * sigma)` (`sqrt(8 log 2)` = 2.3548200450309493), `std =
+    (float)(fwhm / sqrt(log 256))` (the same constant), and `dimension #<k>: insize = %f, outsize
+    = %f, sigma = %g, fwhm = %g, gstd = %g`; the other axes 0; then the three-axis Gaussian of those
+    standard deviations in place (`specs/freesurfer-filter.md`). Else `--fwhm f` (f > 0):
+    `Smoothing input at fwhm = %g, gstd = %g`, the Gaussian of `gstd` in place, normalised.
+15. `--rescale <m>` (m not 1 within 1e-10): the mean of every voxel of every frame (a `double` sum
+    in column, row, slice, frame order, divided by the voxel count as an `int` product), `Global
+    rescaling input mean from %g to %g`, the volume times `(float)(m / mean)`.
+16. `--store_orig_ras2vox`: `copying original vox2ras`, the RAS-to-voxel matrix kept for the
+    output.
+17. The command line added to the volume's history (`specs/freesurfer-io.md`).
+18. `--scale <s>` (not 1): `scaling input volume by %2.3f`, the volume times s.
+19. `--zero_ge_z_offset` (a DICOM input only): the centre's S set to 0.
+20. `TR=%2.2f, TE=%2.2f, TI=%2.2f, flip angle=%2.2f` (the flip angle in degrees: radians * 180 /
+    pi in `double`). Not an outline input: `fill_parcellation flag ignored on a non-parcellation
+    read` and `smooth_parcellation flag ignored on a non-parcellation read` for those options.
+21. `--in_like`: its width, height and depth must be the input's, else three error lines `volume
+    sizes do not match\n`, `<input>: (width, height, depth, frames) = (w, h, d, f)\n`, `<like>:
+    (...)\n` (each with FreeSurfer's error format and `errno` cleared), status 1; other frame
+    counts: `INFO: frames are not the same`; then the like volume's header copied onto the input's
+    (`specs/freesurfer-mri.md`), the input's type kept.
+22. An input without orientation (`ras_good_flag` 0): `WARNING: it does not appear that there was
+    sufficient information` / `in the input to assign orientation to the volume... `; with
+    `--force_ras_good`: `However, you have specified that the default orientation should` / `be used
+    with by adding --force_ras_good on the command-line.` and the flag set; with any input
+    direction option: `However, you have specified one or more orientations on the ` /
+    `command-line using -i?d or --in-?-direction (?=i,j,k).` and the flag set.
+
+### 4.4 The input's header from the command line
+
+In this order: `-iis`/`-ijs`/`-iks` the voxel sizes; `-iid`/`-ijd`/`-ikd` the direction cosines (and
+the orientation flag set); `--delete-cmds` the history emptied (mri_convert's own line included);
+`--new-transform-fname <n>`: `Changing xform name to <n>`, the volume's transform name; `-io <o>`:
+`Setting input orientation to <o>`, the direction cosines of that orientation
+(`specs/freesurfer-volume.md`), the flag set; `-ic` the centre; `-dic` added to the centre (`float`
+sums); `-sn` the subject name; `-tr`, `-TI`, `-te`, `-flip_angle` (the angle as given, in
+radians). After a new voxel size: each axis's extent `fov = size * n` (`float`), its end `fov / 2`
+and start `-end`, the field of view the largest of the three. Then the dot products of the axes
+(`float`: `x_r y_r + x_a y_a + x_s y_s`, in that order) and, when the absolute value of i·j or i·k
+is above 0.005 (FS-1045: or of j·k), `warning: input volume axes are not orthogonal:i_dot_j =
+%.6f, i_dot_k = %.6f, j_dot_k = %.6f`; always `i_ras = (%g, %g, %g)`, `j_ras = ...`, `k_ras = ...`.
+`--in_info`: `input structure:` and the volume's dump (`specs/freesurfer-mri.md`); `--in_matrix`:
+`input ijk -> ras:` and the voxel-to-RAS matrix (`% 2.5f`, `specs/freesurfer-maths.md`);
+`--in_stats`: the volume's statistics (`specs/freesurfer-volume.md`).
+
+### 4.5 The transform and the template
+
+1. `-at`/`-ait <file>`: `INFO: Reading transformation from file <file>...`; a linear transform (an
+   `.xfm`, a transform array `.lta`, a `register.dat`, an FSL matrix: by its name,
+   `specs/freesurfer-volume.md`): `Reading transform with LTAreadEx()`, read (none: `ERROR:
+   Reading transform from file <file>` on standard error, status 1). FSL's needs `--like` (else
+   `ERROR: fslmat does not have the information on the dst volume` / `ERROR: you must give option
+   '--like volume' to specify the dst volume info`, status 1): the like volume's header as the
+   destination, the input as the source, the transform made voxel-to-voxel. `--devolvexfm <subj>`:
+   `INFO: devolving XFM (<subj>)`, `-------- before ---------`, the matrix, the devolved matrix
+   (`specs/freesurfer-volume.md`; a failure: status 1), `-------- after ---------`, the matrix,
+   `-----------------`. `-ait`: the matrix inverted (singular: `ERROR: inverting transform` on
+   standard error, the matrix printed, status 1); a transform without a valid source geometry:
+   `INFO: Trying to get the source volume information from the transform name` (standard error),
+   the header of `<the transform's folder>/../orig` (`./../orig` for a bare name) as the source
+   when it can be read (`INFO: Succeeded in retrieving the source volume info.`, standard error),
+   else `INFO: Failed to find <name> as a source volume.  ` / `      The inverse c_(ras) may not be
+   valid.`; then the source and destination geometries swapped. A morph (`.m3z`) is read when
+   applied.
+2. The template: `--reslice_like <v>` (`reading template info from (type <t>) volume <v>...` with
+   `--template_type`, its header of that format; else `reading template info from volume
+   <v>...`, the header found from the name; none: `error reading from volume <v>` on standard
+   error, status 1; without a forced type and with a linear transform: the transform made
+   RAS-to-RAS with the template as its destination). Otherwise the input's header (the transform's
+   destination geometry when it is valid), then: `--conform` (the width 256, or `--conform_min`'s
+   smallest voxel and its width, or `--cw256`, else the width the conformed size needs; the
+   conformed template, `specs/freesurfer-volume.md`, printed with its `valid` line); `--voxsize v`
+   (the input's header, extents `(int)ceil(size * n / v)` per axis in `float`, voxel sizes v,
+   starts `-(n/2)` and ends `n/2` in integers); `--downsample f` (`DownsampleFactor = %f, %f, %f`,
+   the downsampled template, printed) or `--downsampleold f` (the input's header, extents
+   `(int)ceil(n / f)`, sizes times f, starts `-size * n / 2` and ends `size * n / 2` in `float`,
+   printed).
+3. On the template: `-ois` etc. (the scale `old size / new size`, the extent `nint(n * scale)`),
+   `-oni`, `-onj`, `-onk` (with the last image number `first + n - 1`), `-oid` ..., `-oo <o>`
+   (`Setting output orientation to <o>`), `-oc`; the field of view after new sizes or counts (as
+   §4.4); the orthogonality warning `warning: output volume axes are not orthogonal:...` followed
+   here by the three `?_ras` lines; `-odt` the template's type; `--template_info`: `template
+   structure:` and its dump. `--read_only` ends here with status 0.
+
+### 4.6 Applying the transform, the type, the reslice
+
+1. A linear transform: `INFO: Applying transformation from file <file>...`, `-----...` (33 dashes),
+   `INFO: Transform Matrix (<type name>)` (`linear_vox_to_vox`, `linear_ras_to_ras`,
+   `linear_physvox_to_physvox`, `transform_array`, `morph_3d`, `mni_transform`, `matlab_ascii`,
+   `linear_cor_to_cor`, `register.dat`, `FSL`, else `unknown`), the matrix, the dashes. With
+   `--like`: `INFO: transform dst into the like-volume (resample_type <n>)`, the input resampled
+   through the transform into a one-frame volume of the like volume's header and the input's type
+   (FS-1047 when it cannot be read). Otherwise with `-oc`: the transform made voxel-to-voxel as
+   the template-to-input resampling matrix times the input's RAS-to-voxel form of the matrix;
+   `Applying LTAtransformInterp (resample_type <n>)`; with `--diag n` (n > 0) the transform dumped
+   between `Dumping LTA ---------++++++++++++-----------------------` and
+   `========-------------++++++++++++-------------------=====` (`num_xforms <n>`, `type <n>`,
+   `typename <name>`, then per transform `nthxform <k> =====================================`, `x0`,
+   `y0`, `z0`, `sigma` (`%f`), `type`, `typename`, `label`, `m_L Matrix ----------`, the matrix,
+   21 dashes, `Source Geometry ----------` and `Destination Geometry ----------` with their
+   geometry dumps); the resampling (`specs/freesurfer-volume.md`); none: `ERROR: applying transform
+   to volume` (standard error), status 1; with `-oc` the result's centre the template's.
+2. A morph: `Applying morph_3d ...`, read (none: the fatal error `<prog>: could not read xform from
+   <file>`); `morphing to atlas with resample type <n>` and the morph applied, the template taking
+   the atlas geometry; with `-ait`: `morphing from atlas with resample type <n>`, the inverse
+   applied (FS-1048: FreeSurfer also writes it to `t.mgz`). Any other transform name: `unknown
+   transform type in file <file>` (standard error), status 1.
+3. `--like` without a transform (not with `--out_stats_table`): `INFO: transform src into the
+   like-volume: <name>`, the input resampled into a one-frame volume of the like volume's header
+   (the like volume's RAS-to-voxel times the input's voxel-to-RAS, `-rt`'s interpolation).
+4. The type: when the volume's differs from the template's and not `--nochange`: `changing data
+   type from <a> to <b> (noscale = <0|1>)...` (`uchar`, `short`, `int`, `long`, `float`, ...), the
+   frames changed with the 0 to 0.999 range (`specs/freesurfer-volume.md`; none: `ERROR:
+   MRISeqchangeType`, status 1), then every voxel that was 0 set to 0.
+5. The reslice, without `--like` and a morph: when any voxel size, extent, direction cosine or
+   centre coordinate differs from the template's (by more than 1e-5 for the numbers): `Reslicing
+   using ` and `trilinear interpolation `, `nearest `, `cubic `, `weighted ` or `voting ` with a new
+   line (nothing more for sinc and the B-spline), the volume resampled onto the template (a
+   failure: status 1).
+6. The orientation string of a geometry: for each axis (column, row, slice) the letter of its
+   direction cosine's largest component (`specs/freesurfer-volume.md`).
+
+### 4.7 After the reslice
+
+In this order: `--invert_contrast t` (`inverting contrast...`); `--shift d n w` (`shifting dim
+...`); `-r` (`reordering axes...`; a failure `error reordering axes`, standard error, status 1);
+`-r4` (`reordering all axes...`, `reordering, values are a b c d`; a failure `error reordering all
+axes`); the GDF image stem stored; `--out_info` (`output structure:`), `--out_matrix` (`output ijk
+-> ras:`), `--out_stats`; `--erode-seg n` (`Eroding segmentation n`), `--dil-seg n` (`Dilating
+segmentation n`, or `Dilating segmentation, mask <m>` with the mask read, else `ERROR: could not
+read <m>`, status 1); `-f` frames (`keeping frame <n>` or `keeping frames <a> <b> ...`; `--mid-frame`:
+the frame `nint(nframes / 2)` with integer division; a frame outside the volume: `   ERROR: valid
+frame numbers are between 0 and <n-1>`, status 1; the kept frames in the order given with the
+volume's header and pulse parameters); `--ndrop n` (`Dropping last n frames`; n not below the frame
+count: `   ERROR: can't drop, volume only has <k> frames`, status 1), `--nskip n` (`Skipping n
+frames`, `   ERROR: can't skip, ...`); `--fsubsample a d b` (`SubSample: Start = a  Delta = d, End =
+b`); `--cutends n` (`Cutting ends: n = <n>`); `--crop c` with `--cropsize s` (default 128 and 256):
+the region of size s starting at `c - s/2` (integers); `--rescale-voxel c r s`: `rescale voxel c r
+s`, the voxel's value v (frame 0; 0: `Rescale voxel has a value of 0`, status 1), the output scale
+divided by v (`Voxel val = %g, scaling by %g`); an output scale not 1: `scaling output intensities
+by %2.3f` and the volume scaled; `--sphinx`: `Changing orientation information to Sphinx`;
+`--autoalign`'s matrix stored; the colour table: `--ctab remove` (`removing color lookup table`
+when there is one), `--ctab <file>` (`embedding color lookup table`, the table read; none: `error:
+could not read lookup table from <file>`, status 1), otherwise the input's embedded table put
+back.
+
+### 4.8 The output
+
+1. `--out_stats_table`: `Writing as Stats-Table to <out> using template <like>`, the table of §1.5
+   made from the volume and written, `done`, status 0 (FS-1050 when no table can be made).
+2. `--ascii` (one value per line), `--ascii+crsf` (`%3d %3d %3d %3d %lf`: column, row, slice, frame,
+   value), `--ascii-fcol` (each voxel's frames on one line, one blank between): every voxel as
+   `%lf`, frame slowest for the first two, `Writing as ASCII to <out>`, `done`, status 0 (FS-1049
+   when the file cannot be created).
+3. Unless `--no_write`: the stored RAS-to-voxel matrix as the volume's original one (`orig
+   ras2vox:` and the matrix when stored; otherwise the volume has none); without `--split`:
+   `writing to <out>...` and the volume written in the forced format (`ERROR: failure writing
+   <out> as volume type <t>`, status 1) or the one its name gives (`ERROR: failure writing <out>`,
+   status 1); with `--split`: `Splitting frames, stem = <stem>, ext = <ext>` (the name's stem and
+   extension, `specs/freesurfer-io.md`; `(null)` when there is none), each frame `%2d <name>` with
+   `<name> = <stem>%04d.<ext>`, written alone.
+4. `--first-dicom <f>`: the first DICOM file's name (a DICOM input only; none: `ERROR: there is no
+   first dicom file`, status 1) written to f with a new line (`Writing FirstDicomFile <d> to <f>`;
+   `ERROR: opening <f>`, status 1).
+5. Status 0.
+
+### 4.9 Defects of part 2 (both modes unless said)
+
+- FS-1043: `--left-right-reverse` with no axis L or R (FreeSurfer crashes): `mri_convert:
+  --left-right-reverse: no axis of the input points left or right (FreeSurfer crashes here)`
+  (standard error), status 1.
+- FS-1044: `--new-transform-fname` of 1,024 bytes or more: the whole name.
+- FS-1045: by default the orthogonality warnings test j·k too; `reproduce` tests i·j, i·k, i·k.
+- FS-1046: `-ait`'s source volume name of 512 bytes or more: the whole name.
+- FS-1047: `--like` whose header cannot be read, where the input is resampled into it: `mri_convert:
+  the --like volume <name> could not be read (FreeSurfer crashes here)` (standard error), status 1.
+- FS-1048: an inverted morph's result is written to `t.mgz` only with `reproduce`.
+- FS-1049: an ASCII output that cannot be created: `mri_convert: <out> cannot be created
+  (FreeSurfer crashes here)` (standard error), status 1.
+- FS-1050: no table from the volume: the output file created empty, then `mri_convert:
+  --out_stats_table: no table could be made from the volume (FreeSurfer crashes here)`, status 1.
+- FS-1051: `--split` names of 1,024 bytes or more: whole.
+- FS-1052: a step that gives no volume where the program goes on: `mri_convert: <step> gave no volume
+  (FreeSurfer crashes here)` (standard error), status 1.
+- FS-1053: the geometry printed after `--upsample`, `--conform` and `--downsample` has a `valid` line
+  whose value FreeSurfer never sets (memory contents): the replica prints 0.
+
+### 4.10 The C library's `perror` (observed)
+
+Where FreeSurfer prints `errno`'s text with `perror` and then prints `errno` again (a label or a
+`register.dat` that cannot be opened), the second text depends on the standard error stream: the
+first `perror` on a standard error nothing has written to yet that is open for writing only (a
+file, a pipe) leaves `EINVAL` in `errno` (`Invalid argument`); otherwise `errno` stays. A terminal
+(read and write) keeps it.
+
+## 5. Validation plan for part 2 (for the clean room)
+
+Black box, the official `mri_convert`: small volumes (MGH files of 1 to 6 voxels per axis, 1 to 4
+frames, uchar, short, int and float voxels, NaN voxels, signed permutations, oblique and degenerate
+direction cosines, inputs with and without orientation and scan parameters) converted with each
+option of §4 alone and in twos and threes (with the inputs those options read: a second volume for
+`--like`, `--reslice_like` and `--in_like`, linear transforms of both types with and without
+geometries, a colour table, an auto-align matrix), written as `.mgh`, `.mgz`, `.nii`, `.nii.gz` and
+`.img`: compare standard output and error, the exit status and every written file's bytes (a
+compressed file decompressed; the command-line text in the files from its `TimeStamp: ` on
+differs from run to run and is left out). Each defect of §4.9 in both modes. The replica's probe
+(`validation/probes/fs-convert`, closed): `check.py --kind cnv` (observed results in its README).

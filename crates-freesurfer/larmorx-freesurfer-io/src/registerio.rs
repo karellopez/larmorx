@@ -115,8 +115,10 @@ pub struct Register {
     pub float2int: i32,
 }
 
-fn perror(g: &Globals, err: &mut dyn Write, then: &str) {
-    let _ = writeln!(err, "regio_read_register(): {}", strerror(g.errno));
+/// `perror("regio_read_register()")` (which may leave `EINVAL` in `errno`: `Globals::stderr`),
+/// then `then` on standard error.
+fn perror(g: &mut Globals, err: &mut dyn Write, then: &str) {
+    larmorx_freesurfer_core::log::perror_errno(g, err, Some("regio_read_register()"));
     let _ = err.write_all(then.as_bytes());
 }
 

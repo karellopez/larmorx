@@ -15,6 +15,8 @@
 //! tests each start from FreeSurfer's initial values.
 
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use larmorx_core::defects::{Notices, UpstreamDefects};
 use larmorx_core::drand48::Drand48;
@@ -130,8 +132,37 @@ pub struct Globals {
     /// `imageio.cpp`'s `static bool FS_TIFF_DEBUG`: true once a TIFF image was read with
     /// `FS_TIFF_DEBUG` in the environment (for the rest of the process).
     pub fs_tiff_debug: bool,
+    /// The standard error stream's state that the C library's `perror` depends on
+    /// ([`StderrState`]).
+    pub stderr: StderrState,
     /// D13's choice and the notices of the defects that changed this run's results.
     pub notices: Notices,
+}
+
+/// The state of the C library's standard error that decides what `perror` leaves in `errno`
+/// (observed with glibc 2.35, black box): the first `perror` on a stream nothing has written to
+/// yet goes through a second stream it opens for reading and writing on the same descriptor, which
+/// fails with `EINVAL` when standard error is open for writing only (a file or a pipe: a log, a
+/// probe's child), and `perror` leaves that `EINVAL` in `errno`; once anything was written to
+/// standard error (by `perror` too), `errno` stays as it was.
+#[derive(Clone, Debug, Default)]
+pub struct StderrState {
+    /// Standard error is open for reading too (a terminal); false: for writing only.
+    pub read_write: bool,
+    /// Something was written to standard error ([`crate::log::TrackedErr`] and `perror` set it).
+    pub written: Arc<AtomicBool>,
+}
+
+impl StderrState {
+    /// Whether something was written to standard error.
+    pub fn was_written(&self) -> bool {
+        self.written.load(Ordering::Relaxed)
+    }
+
+    /// Marks standard error as written to.
+    pub fn mark_written(&self) {
+        self.written.store(true, Ordering::Relaxed);
+    }
 }
 
 /// The DICOM format probe's process-wide state (`utils/DICOMRead.cpp`'s `IsDICOM` and the CTN
@@ -196,6 +227,7 @@ impl Globals {
             remove_nans_shown: false,
             gcam_metric_width_reported: false,
             fs_tiff_debug: false,
+            stderr: StderrState::default(),
             notices: Notices::new(mode),
         }
     }

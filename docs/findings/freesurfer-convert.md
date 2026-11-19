@@ -95,6 +95,75 @@ The replica: `crates-freesurfer/larmorx-freesurfer-volumes/src/mri_convert/`; th
     values (`INT_MIN + 12345`, `0x7fa5a5a5`, `"\x01"`), so the dump tells an unset variable; a case
     whose result depends on one is a defect's (FS-1040) and is skipped.
 
+## Part 3: `main` after the option loop (relay 47)
+
+19. **FS-1043**: `--left-right-reverse` keeps `MATRIX *cras = NULL` and sets it only inside the
+    three `if (ostr[k] == 'L' || ostr[k] == 'R')` blocks; with none true (degenerate direction
+    cosines such as two axes pointing A/P) `mri->c_r = cras->rptr[1][1]` dereferences NULL
+    (SIGSEGV). With two L/R axes both are negated and `cras` is the last product (the first one
+    leaks). Both modes: the replica's message, status 1.
+20. The negations `mri->x_r *= -1.0;` (a `float` times a `double`) compile to `xorps` with the sign
+    mask (`fsconvert.o`, `mri_convert_main+0x7257`): a sign flip, a NaN's sign too. The replica
+    uses `-x`.
+21. **FS-1044**: `strcpy(mri->transform_fname, NewTransformFname)`: the volume's field is
+    `char[STRLEN]`, the option's buffer 2,000 bytes. Both modes: the whole name.
+22. **FS-1045**: both orthogonality checks test `fabs(i_dot_j) > CLOSE_ENOUGH || fabs(i_dot_k) >
+    CLOSE_ENOUGH || fabs(i_dot_k) > CLOSE_ENOUGH` (`j_dot_k` never). The products are `float`
+    (`float i_dot_j, i_dot_k, j_dot_k`), `x_r*y_r + x_a*y_a + x_s*y_s` left to right, SSE2 without
+    fused operations. Rule A for the warning; `reproduce` FreeSurfer's test.
+23. **FS-1046**: `-ait` of a transform whose source geometry is not valid copies `transform_fname`
+    (`char[STRLEN]`) into `char buf[512]` and appends `../orig`. Both modes: the whole name.
+24. **FS-1047**: `--like` with a transform (`tmp = MRIreadHeader(out_like_name, ...)`, then
+    `MRIalloc(tmp->width, ...)`) and without one (the same) dereference a NULL header. (The FSL
+    path's `MRIreadHeader` NULL only reaches `LTAmodifySrcDstGeom(lta, mri, NULL)` and
+    `MRIfree(&tmp)`: no crash.) Both modes: the replica's message, status 1.
+25. **FS-1048**: the inverted morph's branch ends with `MRIwrite(mri_transformed, "t.mgz")`, a
+    debugging line: a file in the working directory. Rule A: not by default.
+26. **FS-1049**: `fptmp = fopen(out_name, "w")` for the ASCII outputs is not checked; `fprintf`
+    on NULL crashes. Both modes: the replica's message, status 1.
+27. **FS-1050**: `OutStatTable = InitStatTableFromMRI(mri, out_like_name); WriteStatTable(out_name,
+    OutStatTable);`: `InitStatTableFromMRI` returns NULL after its errors (a template that cannot
+    be read, wrong column or row counts); `WriteStatTable` opens the file first, then
+    `PrintStatTable(fp, NULL)` dereferences it. Both modes: the file created empty, the replica's
+    message, status 1.
+28. **FS-1051**: `sprintf(tmpstr, "%s%04d.%s", stem, i, ext)` into `char tmpstr[STRLEN]`. Both
+    modes: the whole name. A name without a recognised extension gives NULL `stem`/`ext`, printed
+    `(null)` by glibc (as the replica does).
+29. **FS-1052**: not checked for NULL: `MRIupperthresholdAllFrames`, `MRIupsampleN`,
+    `MRIlrswapAseg`/`MRIlrswapSeg`, `MRIcopy` (left-right pixels, flip-cols, mirror), `MRIreduce`,
+    `MRIextract` (`--crop`), `MRIdownsampleN` (template), `GCAMmorphToAtlas`/`GCAMmorphFromAtlas`,
+    `MRIcopyFrame` (`--split`). Both modes: the replica's message, status 1.
+30. **FS-1053**: `VOL_GEOM` has no constructor for `valid` (`include/mri.h`: "VOL_GEOM doesn't
+    initialize valid, width, height, depth"); a new `MRI` (`new MRI(...)` in `MRIallocSequence`
+    and `MRIallocHeader`) leaves it as heap contents, and `MRIcopyHeader` does not copy it. The
+    `vgprint(true)` after `--upsample`, `--conform` and `--downsample` prints it: the probe saw
+    `valid : 1` for an upsampled volume in a long run and `0` alone (the parent's earlier
+    allocations change the child's heap). The replica prints 0; the probe masks that line for
+    cases with the notice.
+31. `applyGaussianFilter`: `float F = 5.0; float sigma = R*log(F)/M_PI;` calls C++'s `std::log(float)`
+    (`__builtin_logf`), folded by GCC even with `-fno-builtin` to `0x3fce0210` (`.LC42`), and
+    `R * logf(5)` is a `float` multiply (`mulss`), then `cvtss2sd`, `divsd` by `M_PI`; `sqrt(8 *
+    log(2))`: the product folded (`.LC44` = 5.545177444479562), `sqrt` called at run time;
+    `sqrt(log(256.0))`: glibc's `log(256.0)` and `sqrt` at run time (`.LC45` = 256.0); `fwhm =
+    sqrt(...) * sigma` (the operands as GCC orders them, `mulsd 0x8(%rsp),%xmm0`).
+32. `MRIhalfCosBias(mri, SliceBiasAlpha, mri)`: `MRIcopy(in, out)` returns at once for `in ==
+    out`; each voxel is read before it is written, so the in-place loop equals a loop reading an
+    unchanged copy. The replica writes the loop in `main.rs` (fs.volume's function takes the source
+    and destination apart).
+33. Observed, other defects: `--dil-seg` and `--erode-seg` of a volume of several frames crash
+    (`MRIdilateSegmentation` allocates a one-frame destination, then `MRIcopy(seg, out)`: FS-163);
+    `--shift` along slices with more columns than slices crashes (FS-513's wrap by the column count,
+    a write outside the buffer: FS-53); a resample or reorder that reads outside the voxels reads
+    memory contents (FS-53: the same case gave other bytes alone and in a long run).
+34. **The PE case** (track D's relay 45): glibc 2.35's `perror` (black box) on a standard error
+    that nothing has written to and that is open for writing only leaves `EINVAL` in `errno`
+    (`LabelRead`'s `perror(NULL)` then `ErrorReturn(..., "could not open label file ...")`
+    prints `Invalid argument`); after any write to standard error (`fsio` orients it with
+    `fwide(stderr, -1)` before each case) `errno` stays. The replica: `Globals::stderr`
+    (`read_write`, `written`), `log::TrackedErr` (a program's standard error that marks it written
+    on its first byte), `log::perror_errno` (fs.io's `label_read` and `registerio`'s `perror`); a
+    program's `run` reads descriptor 2's access mode (`/proc/self/fdinfo/2`).
+
 ## The probe's results (relay 46)
 
 `check.py --seed 1 --n 1000` (45 fixed cases, then seeded; 65 % of the seeded ones command lines,

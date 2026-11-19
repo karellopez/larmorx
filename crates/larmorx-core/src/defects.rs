@@ -2513,6 +2513,26 @@ defects! {
         "mri_convert -f (--frame) with more than 2,000 frame numbers writes them past the end of its list (a crash or corrupted memory)";
     FS_1042 = "FS-1042", "FreeSurfer", true,
         "mri_convert --debug crashes when debug.gdb cannot be created in the working directory";
+    FS_1043 = "FS-1043", "FreeSurfer", true,
+        "mri_convert --left-right-reverse crashes when no axis of the input volume points left or right";
+    FS_1044 = "FS-1044", "FreeSurfer", true,
+        "mri_convert --new-transform-fname with a name of 1,024 bytes or more writes it past the volume's transform-name field (corrupted memory or a crash)";
+    FS_1045 = "FS-1045", "FreeSurfer", true,
+        "mri_convert's warning that a volume's axes are not orthogonal never checks the second against the third axis (it checks the first against the third twice): a volume whose only non-orthogonal pair is the second and third gets no warning";
+    FS_1046 = "FS-1046", "FreeSurfer", true,
+        "mri_convert --invert_transform of a linear transform without a source geometry and with a name of 505 bytes or more writes the name of the volume it then looks for past its buffer (corrupted memory or a crash)";
+    FS_1047 = "FS-1047", "FreeSurfer", true,
+        "mri_convert --like (--out_like) crashes when the volume it names cannot be read, where the input is resampled into it (with or without a transform)";
+    FS_1048 = "FS-1048", "FreeSurfer", true,
+        "mri_convert applying a nonlinear morph inverted (-ait) writes the result also to t.mgz in the working directory (replacing a file of that name)";
+    FS_1049 = "FS-1049", "FreeSurfer", true,
+        "mri_convert --ascii, --ascii+crsf and --ascii-fcol crash when the output file cannot be created";
+    FS_1050 = "FS-1050", "FreeSurfer", true,
+        "mri_convert --out_stats_table crashes after creating the output file when no table can be made from the volume (its --like template cannot be read or does not fit the volume)";
+    FS_1051 = "FS-1051", "FreeSurfer", true,
+        "mri_convert --split writes a frame's file name of 1,024 bytes or more past its buffer (corrupted memory or a crash)";
+    FS_1052 = "FS-1052", "FreeSurfer", true,
+        "mri_convert crashes when a step gives no volume and the program goes on with it (an upper threshold, upsampling, a label swap, a reduction, a crop, a downsampled template, a morph that cannot be applied, a frame copy)";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

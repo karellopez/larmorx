@@ -340,6 +340,60 @@ pub fn gcam_alloc(
     Ok(gcam)
 }
 
+/// `GCAMdownsample2(gcam)` (`gcamorph.cpp` 16526; `mri_convert --downsample2` of a morph): a morph
+/// of half the nodes on each axis (`GCAMalloc(width / 2, height / 2, depth / 2)`), its node
+/// (x, y, z) the source's node (2x, 2y, 2z) (positions, original and saved positions, the
+/// sums `xs`, `xs2`, the nearest voxel, prior, the areas, `invalid`, status and label; the
+/// other fields as `GCAMalloc` leaves them); the image and atlas geometries, the type, status,
+/// input count, affine matrix and determinant the source's, the spacing twice the source's.
+pub fn gcam_downsample2(g: &mut Globals, err: &mut dyn Write, gcam: &Gcam) -> Result<Gcam, Fatal> {
+    let mut dst = gcam_alloc(g, err, gcam.width / 2, gcam.height / 2, gcam.depth / 2)?;
+    dst.image.assign(g, &gcam.image);
+    dst.atlas.assign(g, &gcam.atlas);
+    dst.spacing = gcam.spacing.wrapping_mul(2);
+    dst.ninputs = gcam.ninputs;
+    dst.status = gcam.status;
+    dst.mtype = gcam.mtype;
+    dst.m_affine = gcam.m_affine.clone();
+    dst.det = gcam.det;
+    for xd in 0..dst.width {
+        for yd in 0..dst.height {
+            for zd in 0..dst.depth {
+                let s = gcam.node(xd * 2, yd * 2, zd * 2).clone();
+                let d = dst.node_mut(xd, yd, zd);
+                d.x = s.x;
+                d.y = s.y;
+                d.z = s.z;
+                d.origx = s.origx;
+                d.origy = s.origy;
+                d.origz = s.origz;
+                d.xs2 = s.xs2;
+                d.ys2 = s.ys2;
+                d.zs2 = s.zs2;
+                d.xs = s.xs;
+                d.ys = s.ys;
+                d.zs = s.zs;
+                d.xn = s.xn;
+                d.yn = s.yn;
+                d.zn = s.zn;
+                d.saved_origx = s.saved_origx;
+                d.saved_origy = s.saved_origy;
+                d.saved_origz = s.saved_origz;
+                d.prior = s.prior;
+                d.area = s.area;
+                d.area1 = s.area1;
+                d.area2 = s.area2;
+                d.orig_area1 = s.orig_area1;
+                d.orig_area2 = s.orig_area2;
+                d.invalid = s.invalid;
+                d.status = s.status;
+                d.label = s.label;
+            }
+        }
+    }
+    Ok(dst)
+}
+
 /// A compressed file whose data zlib could not inflate (its error state, which every later read
 /// answers with -1 without reaching the end).
 fn damaged(fp: &mut ZnzFile) -> bool {

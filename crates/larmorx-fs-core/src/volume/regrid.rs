@@ -7,6 +7,7 @@ use larmorx_core::defects::{FS_298, FS_326, FS_327, FS_328, FS_461};
 
 use super::sample::{FLT_EPSILON, cvtt, sample_type};
 use super::{Dst, VolOut, Vols};
+use crate::bspline::BSpline;
 use crate::clib::printf::sprintf_f64;
 use crate::maths::Returned;
 use crate::maths::matrix::{MATRIX_REAL, Matrix, real_point_f};
@@ -302,19 +303,18 @@ impl Process {
         self.mri_replace_values(&mut dest, Dst::Src, 0.0, fill)?;
         self.copy_header_into(template, &mut dest)?;
         self.copy_pulse_parameters(src, &mut dest);
-        if kind == sample_type::CUBIC_BSPLINE {
-            self.error_exit(
-                codes::UNSUPPORTED,
-                b"MRIresampleFill: cubic B-spline sampling needs fs.bspline (not yet ported)\n",
-            )?;
-            return Ok(None);
-        }
+        // step 4: the source's cubic B-spline (freed after the geometry)
+        let bs = if kind == sample_type::CUBIC_BSPLINE {
+            Some(self.mri_to_bspline(src, None, 3)?)
+        } else {
+            None
+        };
         if kind == SAMPLE_VOTE {
             if !self.vote(src, template, &mut dest)? {
                 return Ok(None);
             }
         } else {
-            self.resample_samples(src, &m, &mut dest, kind)?;
+            self.resample_samples(src, &m, &mut dest, kind, bs.as_ref())?;
         }
         self.resample_geometry(src, &m, &mut dest, show)?;
         Ok(Some(dest))
@@ -328,6 +328,7 @@ impl Process {
         m: &Matrix,
         dest: &mut Mri,
         kind: i32,
+        bs: Option<&BSpline>,
     ) -> Result<(), Stop> {
         let (w, h, d, nf) = (
             dest.geom.width,
@@ -348,6 +349,13 @@ impl Process {
                         let sp =
                             apply(self, m, [di as f32, dj as f32, dk as f32], &mut vx, &mut vy)?;
                         match kind {
+                            sample_type::CUBIC_BSPLINE => {
+                                let b = bs.expect("the B-spline");
+                                let (x, y, z) =
+                                    (sse::widen(sp[0]), sse::widen(sp[1]), sse::widen(sp[2]));
+                                let (_, s) = self.mri_sample_bspline(b, x, y, z, f)?;
+                                value = sse::narrow(s.unwrap_or(sse::widen(value)));
+                            }
                             sample_type::SINC | sample_type::CUBIC => {
                                 let (x, y, z) =
                                     (sse::widen(sp[0]), sse::widen(sp[1]), sse::widen(sp[2]));

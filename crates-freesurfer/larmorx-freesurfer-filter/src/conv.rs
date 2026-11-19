@@ -317,9 +317,7 @@ impl<'a> Frame<'a> {
             MRI_FLOAT => f32::from_le_bytes([b[4 * i], b[4 * i + 1], b[4 * i + 2], b[4 * i + 3]]),
             MRI_SHORT => f32::from(i16::from_le_bytes([b[2 * i], b[2 * i + 1]])),
             MRI_USHRT => f32::from(u16::from_le_bytes([b[2 * i], b[2 * i + 1]])),
-            MRI_LONG => {
-                i64::from_le_bytes(b[8 * i..8 * i + 8].try_into().expect("8 bytes")) as f32
-            }
+            MRI_LONG => i64::from_le_bytes(b[8 * i..8 * i + 8].try_into().expect("8 bytes")) as f32,
             _ => i32::from_le_bytes([b[4 * i], b[4 * i + 1], b[4 * i + 2], b[4 * i + 3]]) as f32,
         }
     }
@@ -376,7 +374,12 @@ impl<'a> Frame<'a> {
 /// The frame `f` of `dst` written in place over an extent `(w, h, d)` as type `ty`: the byte
 /// offset of each row's first voxel (`[z][y]`, rows of the destination's own width and height),
 /// when every write is `In`.
-fn dst_rows(dst: &Mri, ty: i32, f: i32, (w, h, d): (i32, i32, i32)) -> Option<(usize, usize, usize)> {
+fn dst_rows(
+    dst: &Mri,
+    ty: i32,
+    f: i32,
+    (w, h, d): (i32, i32, i32),
+) -> Option<(usize, usize, usize)> {
     if !mem::fits(dst, ty, f, w, h, d) {
         return None;
     }

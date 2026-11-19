@@ -12,7 +12,8 @@ topup's and applytopup's, fslmaths' and fslstats' (``FLIRT_CASES``, ``FAST_CASES
 fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``, 2026-11-06) and clean-room original
 (``ORIGINAL_PRELUDE_CASES``, 2026-11-06); tedana's t2smap against the ``larmorx-gpl`` replica
 (``T2SMAP_CASES``, 2026-11-08) and its clean-room original (``T2SMAP_ORIGINAL_CALLS``,
-2026-11-11).
+2026-11-11); FreeSurfer's ``mri_normalize`` against the ``larmorx-freesurfer`` replica
+(``MRI_NORMALIZE_CASES``, 2026-11-19).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -131,13 +132,15 @@ def _original_peak(
     reset,
     cwd: Path | None = None,
     volatile: tuple[str, ...] = (),
+    formats: str = "",
 ) -> tuple[int, float]:
     """An original program's exit status and peak (MiB), through the oracle-output cache: served
     (the median of the peaks its entry keeps for this machine; its outputs replayed), or run
     under ``/usr/bin/time``, the first time three times (``reset`` empties its output place before
     each repeat, so each run starts alike), a run the cache never stores once; ``volatile``: what
-    its messages hold that changes from run to run (tedana's progress bars)."""
-    code, mib, _ = _original_run(cmd, env, family, reset, cwd, volatile)
+    its messages hold that changes from run to run (tedana's progress bars); ``formats``: how its
+    files are compared with its entry (``"freesurfer"``: FreeSurfer's provenance left out)."""
+    code, mib, _ = _original_run(cmd, env, family, reset, cwd, volatile, formats)
     return code, mib
 
 
@@ -148,9 +151,10 @@ def _original_run(
     reset,
     cwd: Path | None = None,
     volatile: tuple[str, ...] = (),
+    formats: str = "",
 ) -> tuple[int, float, str]:
     """:func:`_original_peak` with the original's standard output."""
-    policy = oracle_cache.Policy(threads=1, family=family, volatile=volatile)
+    policy = oracle_cache.Policy(threads=1, family=family, volatile=volatile, formats=formats)
     peaks = []
     for n in range(3):
         if n:
@@ -1992,3 +1996,100 @@ def test_confounds_need_no_more_memory_than_the_originals(tmp_path, name, call, 
         )
         if mode == "reproduce":
             assert _stored(o_dir) == _stored(r_dir), name
+
+
+#: FreeSurfer 8.2.0's ``mri_normalize`` (the unit oracle's ``bin/mri_normalize``, byte-identical
+#: to the official program, run by name as recon-all runs it) against the ``larmorx-freesurfer``
+#: replica's standalone program (queue item 3.2-25, 2026-11-19; the allowance's
+#: ``OVERHEAD_MIB``): recon-all's two calls on a recorded head (ds000005 sub-01's classic run: the
+#: ``T1.mgz`` from ``nu.mgz``, the ``brain.mgz`` from ``norm.mgz`` with the segmentation and the
+#: mask), one thread, both D13 modes; the output identical to FreeSurfer's (provenance aside).
+MRI_NORMALIZE_CASES = [
+    ("T1", ["-g", "1", "-seed", "1234", "-mprage", "{mri}/nu.mgz", "T1.mgz"]),
+    (
+        "brain",
+        [
+            "-seed",
+            "1234",
+            "-mprage",
+            "-aseg",
+            "{mri}/aseg.presurf.mgz",
+            "-mask",
+            "{mri}/brainmask.mgz",
+            "{mri}/norm.mgz",
+            "brain.mgz",
+        ],
+    ),
+]
+
+
+def _freesurfer_replica() -> Path | None:
+    """``LARMORX_FREESURFER_BIN``, else the repository's ``crates-freesurfer/target/{release,
+    debug}``, else ``larmorx-freesurfer`` on the ``PATH``."""
+    if env := os.environ.get("LARMORX_FREESURFER_BIN"):
+        return Path(env) if Path(env).is_file() else None
+    exe = "larmorx-freesurfer.exe" if os.name == "nt" else "larmorx-freesurfer"
+    root = Path(__file__).resolve().parents[2]
+    for profile in ("release", "debug"):
+        p = root / "crates-freesurfer" / "target" / profile / exe
+        if p.is_file():
+            return p
+    found = shutil.which("larmorx-freesurfer")
+    return Path(found) if found else None
+
+
+@pytest.mark.parametrize(("name", "args"), MRI_NORMALIZE_CASES)
+def test_mri_normalize_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, args):
+    from larmorx_validation.freesurfer import files as fsfiles
+    from larmorx_validation.freesurfer_unit import freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / "oracles" / "freesurfer-8.2.0-unit" / "bin" / "mri_normalize" if ws else None
+    mri = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / "ds000005-sub-01-classic" / "subjects"
+        / "sub-01" / "mri"
+        if ws
+        else None
+    )  # fmt: skip
+    if exe is None or not exe.is_file() or not (mri / "nu.mgz").is_file():
+        pytest.skip("the FreeSurfer unit oracle or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    words = [a.format(mri=mri) for a in args]
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        **freesurfer_env(),
+    }
+    o_dir = tmp_path / "freesurfer"
+    o_dir.mkdir()
+    code, fs_mib = _original_peak(
+        ["mri_normalize", *words],
+        env,
+        "freesurfer",
+        _emptier(o_dir),
+        o_dir,
+        (r"3D bias adjustment took \d+ minutes and \d+ seconds\.",),
+        "freesurfer",
+    )
+    assert code == 0
+    out = words[-1]
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_normalize", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(f"mri_normalize {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"mri_normalize {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        c = fsfiles.compare(o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out)
+        assert c.same, f"mri_normalize {name} ({mode}): {c.verdict} {c.detail}"

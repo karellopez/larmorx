@@ -1945,6 +1945,8 @@ defects! {
         "mri_normalize -T2 with -surface walks from each control point along the distance map's gradient in steps of half a voxel's size: an input volume whose voxel size is 0 or not a number never ends that walk when it meets no edge";
     FS_1016 = "FS-1016", "FreeSurfer", true,
         "mri_normalize given an option with fewer arguments than it takes (the option last on the command line) crashes when the missing argument is a number or a file it opens (-sigma, -seed, -atlas, -label, ...), and for an option of two or three arguments given none takes the missing ones after the first from the process's environment (printed, or read as numbers)";
+    FS_1017 = "FS-1017", "FreeSurfer", true,
+        "mri_normalize crashes when a step it relies on gives no volume: -conform's conforming or a resampling of -aseg's or -renorm's volume that fails, -mask_orig's volume that cannot be read, -no1d with -surface_interior after a one-dimensional normalisation that failed, or -r and -l without their volume names";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

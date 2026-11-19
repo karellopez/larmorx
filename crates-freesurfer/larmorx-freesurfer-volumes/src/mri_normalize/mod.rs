@@ -7,8 +7,8 @@
 //!
 //! - [`helpers`]: the program's own functions besides `main` (3.2-24).
 //! - [`options`]: its options (`get_option`) and its help (`usage_exit`) (3.2-24).
-//!
-//! The program itself (`main`) comes with 3.2-25.
+//! - [`main`]: the program itself (`main`, 3.2-25), its entry point [`main::run`].
 
 pub mod helpers;
+pub mod main;
 pub mod options;

@@ -488,3 +488,38 @@ filter spec's §37.
   `MRIdilateUchar`'s 27 indexed reads per voxel), the passes about 1.5 s: 25 s per call against the
   official 5.3 s (`real.py --t2mask`: 32 s for 6 calls). A follow-up for track C's `mriset.rs` (a
   byte dilation over the volume's interior read once, as `erode_bytes_inside`).
+
+## 18. `MRIconvolve1d` in place (relay 47)
+
+The port of `MRIconvolve1d` and its Byte, Short and Int forms
+(`crates-freesurfer/larmorx-freesurfer-filter/src/conv.rs`) copied the source frame into a buffer of
+floats (`mem::plane`) and built the whole output frame in a second one before storing it, with one
+heap allocation per stored voxel. FreeSurfer reads the source's rows and writes each sum straight
+into the destination's row (`*foutPix++ = total`): it holds no copy of either frame. Relay 47 reads
+the source frame in place and writes a row of sums at a time into the destination (the buffers of one
+row) wherever every access is in the volumes: a source of the function's type (uchar or float for
+the float destination; the default branch's short, unsigned short, int, RGB and long; the typed
+forms' own type) with its frame inside the buffer and rows of the header's extent, and a destination
+of its type that holds the frame and the source's extent. Elsewhere (FS-546's frames and extents,
+FS-547's types, a header whose extent is not the buffer's) the old path runs unchanged, so every
+notice keeps its first detail. The sums are the same operations in the same order: plain `float`
+arithmetic a row at a time, a sum that ends as a NaN computed again one operation at a time (the
+voxel times the weight, added to the sum: the official build's operand order); under `reproduce` the
+default branch's taps past the axis' ends are read by `MRIgetVoxVal` per voxel and tap, in
+FreeSurfer's order.
+
+- **Bit for bit.** The fs-filter probe at seeds 7 (1,200 cases), 13 (1,400) and 17 (2,000): 0
+  different under `reproduce`, no default difference without a notice; seed 23 with the convolutions
+  only (`--only cv1,cvb,cvs,cvi,cvg,gs,mgs,red,red2 --n 20000`: 1,917 cases, 1,525 identical, 392
+  counted): 0 different. Track C's fs-robust probe at seed 7 (2,300 cases; `partials` and `blur` go
+  through it): 0 different. The hash tests `fs_filter_official`, `conv_defaults`,
+  `normalize_defaults`, `fs_robust_official` and `fs_normalize_official` pass in debug and release,
+  plain and under `NAN_TRAP_ARM=1`.
+- **Speed and memory** (track C's bench, `validation/probes/fs-robust/bench.cpp` against the example
+  `fs_robust_bench`, one thread, a 256³ float volume, three runs each, identical hashes): `getPartials`
+  (ten convolutions) 0.81 s / 402 MB in FreeSurfer, 3.16 s / 461 MB before, 0.58 s / 395 MB after;
+  `getBlur` 0.39 s / 202 MB, 1.51 s / 330 MB before, 0.66 s / 199 MB after. Both peaks are now under
+  FreeSurfer's. `getBlur`'s remaining time is not the convolutions (its three take about 0.15 s): it
+  is `MRIconvolveGaussian`'s two `MRIcopyFrame`s (fs.volume's `arith.rs`, `copy_frame`: one
+  `MRIgetVoxVal` and one `MRIsetVoxVal` per voxel, 16.7 million each), a follow-up for fs.volume's
+  owner (a direct path for a frame copied within one type, bit for bit).

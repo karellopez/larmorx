@@ -139,7 +139,10 @@ inside `cabs` and `csqrt` (D4: correctly rounded in both modes; then glibc's `cs
   thread, a 256^3 float volume, identical hashes): `getPartials` 0.81 s / 402 MB (FreeSurfer) against 3.16
   s / 461 MB (port), `getBlur` 0.39 s / 202 MB against 1.50 s / 330 MB, `MRIvalscale` 0.084 s / 136 MB
   against 0.113 s / 133 MB, `subSample` 0.029 s / 78 MB against 0.051 s / 76 MB, `centroid` 0.060 s / 71 MB
-  against 0.121 s / 68 MB. The convolutions' time and their extra memory are `fs.filter`'s
-  `MRIconvolve1d`, which builds each output frame in a buffer of its own before storing it
-  (`crates-freesurfer/larmorx-freesurfer-filter/src/conv.rs`, track D's file: a follow-up for a speed
-  relay, bit for bit).
+  against 0.121 s / 68 MB. The convolutions' time and their extra memory were `fs.filter`'s
+  `MRIconvolve1d`, which built each output frame in a buffer of its own before storing it
+  (`crates-freesurfer/larmorx-freesurfer-filter/src/conv.rs`, track D's file). After track D's relay 47
+  (`MRIconvolve1d` in place, `freesurfer-filter.md` §18): `getPartials` 0.58 s / 395 MB against
+  FreeSurfer's 0.81 s / 402 MB, `getBlur` 0.66 s / 199 MB against 0.39 s / 202 MB (its remaining time is
+  `MRIconvolveGaussian`'s two `MRIcopyFrame`s in fs.volume's `arith.rs`: a follow-up for a speed relay, bit
+  for bit).

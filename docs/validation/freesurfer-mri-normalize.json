@@ -1,0 +1,103 @@
+{
+ "name": "freesurfer-mri-normalize",
+ "tool": "mri_normalize (FreeSurfer 8.2.0)",
+ "status": "experimental",
+ "larmorx_commit": "9e318bdc4e50",
+ "generated": "2026-11-19",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_normalize/), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's recon-all runs (oracles/freesurfer-8.2.0/runs/) and the unit oracle's bin/mri_normalize (byte-identical to the official program)",
+ "replay": {
+  "reproduce": {
+   "steps": 24,
+   "reproduced": 24,
+   "runs": [
+    "ds000005-sub-01-classic",
+    "ds000005-sub-01-v8",
+    "ds000228-sub-pixar008-classic",
+    "ds000228-sub-pixar008-v8",
+    "ds002422-sub-02-classic",
+    "ds002422-sub-02-v8",
+    "ds004173-sub-603309-classic",
+    "ds004173-sub-603309-v8",
+    "ds005003-sub-RS001-classic",
+    "ds005003-sub-RS001-v8",
+    "ds005454-sub-16-classic",
+    "ds005454-sub-16-v8"
+   ],
+   "seconds_replayed": 974.9,
+   "seconds_recorded": 1728.9
+  },
+  "fix": {
+   "steps": 24,
+   "reproduced": 24,
+   "runs": [
+    "ds000005-sub-01-classic",
+    "ds000005-sub-01-v8",
+    "ds000228-sub-pixar008-classic",
+    "ds000228-sub-pixar008-v8",
+    "ds002422-sub-02-classic",
+    "ds002422-sub-02-v8",
+    "ds004173-sub-603309-classic",
+    "ds004173-sub-603309-v8",
+    "ds005003-sub-RS001-classic",
+    "ds005003-sub-RS001-v8",
+    "ds005454-sub-16-classic",
+    "ds005454-sub-16-v8"
+   ],
+   "seconds_replayed": 969.3,
+   "seconds_recorded": 1728.9
+  }
+ },
+ "program": [
+  {
+   "seed": 1,
+   "cases": 82,
+   "verdicts": {
+    "identical": 58,
+    "fix-identical": 28,
+    "reproduce-skip": 24,
+    "fix-skip": 24,
+    "fix-explained": 30
+   }
+  },
+  {
+   "seed": 2,
+   "cases": 82,
+   "verdicts": {
+    "identical": 59,
+    "fix-identical": 31,
+    "reproduce-skip": 23,
+    "fix-skip": 23,
+    "fix-explained": 28
+   }
+  }
+ ],
+ "golden_sha256": "c94b1d57f871763de5acd8cdb4995f56d2925b6879c1aaf62f302c882dc982c2",
+ "memory": [
+  {
+   "case": "T1",
+   "mode": "reproduce",
+   "larmorx_mib": 566.0,
+   "freesurfer_mib": 569.8
+  },
+  {
+   "case": "T1",
+   "mode": "fix",
+   "larmorx_mib": 565.8,
+   "freesurfer_mib": 569.8
+  },
+  {
+   "case": "brain",
+   "mode": "reproduce",
+   "larmorx_mib": 565.4,
+   "freesurfer_mib": 1172.8
+  },
+  {
+   "case": "brain",
+   "mode": "fix",
+   "larmorx_mib": 565.8,
+   "freesurfer_mib": 1172.8
+  }
+ ]
+}

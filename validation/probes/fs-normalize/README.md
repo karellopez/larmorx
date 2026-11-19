@@ -36,6 +36,18 @@ differs by default only where a defect it corrects is noted. Queue item 3.2-24 (
   line; `SKIP`: FS-04, FS-53, FS-58, FS-540, FS-541, FS-1016 and `PE` (fs.io's `LabelRead` does not
   model the C library's first `perror` on a write-only standard error).
 - `real.py`: `bobmf` and `wmomf` on three recorded heads.
+- `prog.py --seed <s>`: the whole program, the unit oracle's `bin/mri_normalize` (run by name)
+  against the port's `larmorx-freesurfer` in both modes, on the open probe's 82 command lines
+  (`validation/investigations/freesurfer-mri-normalize-probe/compare.py`, whose inputs, cases and
+  comparison it runs; `SKIP` adds the closed probes' lists). `prog.py --golden`: the official
+  program on the golden cases' inputs (the example `fs_normalize_golden`), the value
+  `tests/mri_normalize_golden.rs` records.
+- `record.py`: `docs/validation/freesurfer-mri-normalize.{json,md}` from the replays, `prog.py`'s
+  summaries, the golden value and the memory test's lines, stamped with a clean commit.
+- `bench.cpp` (built by `build.sh` into `.../fs-normalize/bench`): `bench bobm <vol> <atlas>
+  <transform> <whalf>` and `bench wmo <norm> <aseg> <ib>` time `real.py`'s two cases stage by stage
+  and print the result's FNV-1a; the port's example `fs_normalize_bench` prints the same stages and
+  digest (run both in a memory box, one thread: `docs/findings/freesurfer-mri-normalize.md` §2).
 
 ## Results (relay 46)
 
@@ -44,6 +56,16 @@ Recorded: `tests/fs_normalize_official.rs` (seed 1, 450 cases, 21 `SKIP`, `173c9
 10 s, release 1.4 s; the same under the AArch64 NaN emulation (`NAN_TRAP_ARM=1`) and on Windows
 x64. `real.py`: 12/12 identical in both modes (official 66 s, port 79 s).
 
+## Results (relay 47)
+
+The program: `prog.py` seeds 1 and 2 (82 cases each): 58 and 59 identical in `reproduce`, 24 and 23
+counted (FS-597, FS-601, FS-1016, PE), 0 different; `fix` identical or explained by a notice on
+every compared case. The golden cases: `c94b1d57...`, the official value. recon-all's 24 recorded
+calls replayed (12 runs): 24/24 in both modes (`docs/validation/freesurfer-mri-normalize.md`). The
+stage bench: `docs/findings/freesurfer-mri-normalize.md` §2.
+
     validation/probes/fs-normalize/build.sh <workspace>
     scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-normalize/check.py --seed 1 --n 450
     scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-normalize/real.py
+    scripts/orchestration/boxed.sh 14 python -P validation/probes/fs-normalize/prog.py --seed 1
+    scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-normalize/prog.py --golden

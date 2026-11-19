@@ -98,6 +98,10 @@ fn ext(m: &Mri) -> (i32, i32, i32) {
     (m.vg.width, m.vg.height, m.vg.depth)
 }
 
+fn count_voxels(w: i32, h: i32, d: i32) -> usize {
+    (w.max(0) as usize) * (h.max(0) as usize) * (d.max(0) as usize)
+}
+
 fn at_g(g: &Globals, x: i32, y: i32, z: i32) -> bool {
     x == g.gx && y == g.gy && z == g.gz
 }
@@ -598,13 +602,35 @@ pub fn build_outside_of_brain_mask(
         gca.mri_tal.as_ref().expect("GCAread sets the atlas up"),
     );
     let (w, h, d) = ext(src);
+    // the mask's voxels written in place where `MRIsetVoxVal(mask, x, y, z, 0, 1)` stores the byte
+    // 1 at `x + w (y + h z)` (a uchar volume of the source's extent, rows and slices of it)
+    let direct = mask.mtype == MRI_UCHAR
+        && mask.vg.width == w
+        && mask.vg.height == h
+        && mask.vg.depth == d
+        && mask.vox_per_row == w.max(0) as u64
+        && mask.vox_per_slice == (w.max(0) as u64) * (h.max(0) as u64)
+        && mask.nframes >= 1
+        && mask
+            .chunk
+            .as_ref()
+            .is_some_and(|c| c.len() >= count_voxels(w, h, d));
+    let (wu, hu) = (w.max(0) as usize, h.max(0) as usize);
+    let mark = |g: &mut Globals, err: &mut dyn Write, m: &mut Mri, x: i32, y: i32, z: i32| {
+        if direct {
+            m.chunk.as_mut().expect("voxels")[x as usize + wu * (y as usize + hu * z as usize)] = 1;
+            Ok(())
+        } else {
+            set(g, err, m, x, y, z, 1.0)
+        }
+    };
     for x in 0..w {
         for y in 0..h {
             for z in 0..d {
                 let (code, p) =
                     gca_source_voxel_to_prior(g, out, err, env, gca, &tal, xform, [x, y, z])?;
                 if code != NO_ERROR {
-                    set(g, err, &mut mask, x, y, z, 1.0)?;
+                    mark(g, err, &mut mask, x, y, z)?;
                     continue;
                 }
                 let brain = gca.prior(p[0], p[1], p[2]).is_some_and(|gcap| {
@@ -614,7 +640,7 @@ pub fn build_outside_of_brain_mask(
                         .any(|&l| is_brain(i32::from(l)))
                 });
                 if !brain {
-                    set(g, err, &mut mask, x, y, z, 1.0)?;
+                    mark(g, err, &mut mask, x, y, z)?;
                 }
             }
         }

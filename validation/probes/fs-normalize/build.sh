@@ -4,7 +4,8 @@
 # gcc-8 8.4.0), its compile flags (those of the unit oracle's harness, fsunit, without -Werror)
 # and its libraries (the official build's utils and packages, ITK 4.13.2's VNL), linked as fsunit
 # is. The unit oracle must be built first (validation/investigations/freesurfer-unit-oracle,
-# build.py all). Output: <workspace>/oracles/freesurfer-8.2.0-probes/fs-normalize/fsnormalize.
+# build.py all). Output: <workspace>/oracles/freesurfer-8.2.0-probes/fs-normalize/fsnormalize and
+# bench (bench.cpp, the stage bench).
 #
 #   validation/probes/fs-normalize/build.sh [<workspace>]
 set -euo pipefail
@@ -36,6 +37,12 @@ for l in vnl_algo vnl v3p_netlib netlib vcl; do libs+=("$itk/lib/libitk$l-4.13.a
   "${libs[@]}" /usr/lib/x86_64-linux-gnu/libz.so -lm \
   "$ws/oracles/toolchains/gcc-8.4-ubuntu/usr/lib/gcc/x86_64-linux-gnu/8/libgomp.so" \
   /lib/x86_64-linux-gnu/libpthread.a -lcrypt -lrt
-sha256sum "$out/fsnormalize" "$here/fsnormalize.cpp" > "$out/BUILD_INFO.txt"
+# the stage bench (bench.cpp: where the time goes), with the same flags and libraries
+"$gcc" "${flags[@]}" -c "$here/bench.cpp" -o "$out/bench.o"
+"$gcc" -fopenmp -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 "$out/bench.o" -o "$out/bench" \
+  "${libs[@]}" /usr/lib/x86_64-linux-gnu/libz.so -lm \
+  "$ws/oracles/toolchains/gcc-8.4-ubuntu/usr/lib/gcc/x86_64-linux-gnu/8/libgomp.so" \
+  /lib/x86_64-linux-gnu/libpthread.a -lcrypt -lrt
+sha256sum "$out/fsnormalize" "$here/fsnormalize.cpp" "$out/bench" "$here/bench.cpp" > "$out/BUILD_INFO.txt"
 "$gcc" --version | head -1 >> "$out/BUILD_INFO.txt"
 echo "built $out/fsnormalize"

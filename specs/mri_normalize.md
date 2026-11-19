@@ -1,7 +1,8 @@
 # `mri_normalize` (FreeSurfer 8.2.0): behaviour spec
 
-Status: part 1 of 2 (queue item 3.2-24: the options and the control-point steps); part 2 (the
-program's order of steps, its outputs and exit statuses, 3.2-25) comes with the program. Written
+Status: complete (part 1, queue item 3.2-24: the options and the control-point steps; part 2,
+3.2-25: the program's order of steps, its outputs and exit statuses, §3, and the validation plan
+with the open probe, §4). Written
 by the replica's author (track D) as the spec writer: behaviour, maths, conventions and messages,
 for the clean room (`larmorx-fs-volumes`, queue item C3.2-*), which works from this file, the
 library modules' specs (`specs/freesurfer-*.md`) and black-box runs of the official program only.
@@ -192,9 +193,162 @@ status 1).
 - Two steps of FreeSurfer's (an outlier test near the surface, and another of the surface's
   outliers) return before doing anything: they change nothing.
 
-## 3. Validation plan
+## 3. The program
 
-The open probe for the clean room comes with part 2 (the program as a black box: every option
-of §1 through the official program, the steps of §2 through the options that reach them). The
-replica's checks (closed): `validation/probes/fs-normalize/` (each step against the official
-code, case by case, and on three recorded heads).
+The steps in order; each prints its messages on standard output when it runs. `<program>` is the
+program's name as it was run (`argv[0]`: recon-all runs `mri_normalize`); an error ends the
+program with the error code's low 8 bits as its status (`ERROR_NOFILE` -1: 255;
+`ERROR_UNSUPPORTED` -3: 253; `ERROR_BADPARM` -4: 252), its message on standard error as
+`specs/freesurfer-core.md`'s errors print it (`error: <message>`). The volume functions named
+below are the library modules' (`specs/freesurfer-volume.md`, `freesurfer-filter.md`,
+`freesurfer-io.md`); `110` is the target white-matter value.
+
+### 3.1 The start
+
+1. The command line is kept for the output's header (`specs/freesurfer-core.md`'s `getAllInfo`
+   report); the version options are handled (with only version options, the program ends with
+   status 0 after them); the diagnostics are read from the environment (`DIAG`, `DIAGX`, ...).
+2. The options (§1); then fewer than two names: the help, status 0.
+3. `reading mri_src from <input>...`; the input read (any format the readers take); unread:
+   `<program>: could not open source file <input>` (status 255). The command line added to its
+   header.
+4. With `-atlas`: the mask of the voxels outside the brain (§2.6) from the input; the atlas and
+   the transform are then freed. With `-lonly`/`-label`: the label's points are the control
+   points to use (in the input's voxel coordinates).
+
+### 3.2 Three programs of their own
+
+- **`-renorm <volume>`**: the volume read (unread: `<program>: could not read renormalization
+  file <volume>` and a newline, status 255); when its extent or voxel sizes differ from the
+  input's (`MRImatchDimensions`: equal extents and sizes within `FLT_EPSILON`), `resampling
+  renormalization volume`, resampled trilinearly onto the input (`r.mgz` written in the working
+  folder). A uchar control volume of its geometry: its voxels equal to `renorm_val` (110 unless
+  set) marked 1 (`c.mgz`), eroded `-erode` times (`e.mgz`), the file's or label's points added
+  (with `-f` or a label); the bias field built from the input and those points (`b.mgz`); with a
+  bias sigma above 0, `smoothing bias field with sigma=%2.3f` and the field smoothed by a
+  Gaussian of that sigma (in voxels) along the three axes (`bs.mgz`); the input divided by the
+  field and scaled to 110; `writing normalized volume to <output>`, written; status 0.
+- **`-surface`** (one or more): `-f`'s file or the label's points first, then one gentle 3-D pass
+  with those points only into a new volume (else `Copying mri_dst from mri_src`, a copy). For each
+  surface in the order given: read (unread: `<program>: could not surface <name>`, status 255),
+  its transform inverted and applied unless it is `identity.nofile`; `computing distance
+  transform`: the signed distance to the surface (float, the volume's grid; inside negative); the
+  first kept, each later one combined voxel by voxel (the second surface's value where it is
+  negative and the first's positive, both positive and it is smaller, or both negative and it is
+  larger). The combined distance negated; `min_dist = %g`. The control points: with suppression
+  on (`computing nonmaximum suppression`), the distance's non-maximum suppression (threshold 0,
+  direction 1) at or above `min_dist`; else (with `-erode`) the distance at or above `min_dist`
+  eroded `-erode` times; else the distance at or above `min_dist` (all marked 1, others 0). The
+  file's or label's points added. `-mask_sigma <s> <t>`: points where the Sobel magnitude of the
+  volume smoothed with a Gaussian of `s` (normalised) is at or above `t` removed. `-mask_orig <v>
+  <t>`: points where the volume `v` is below `t` removed (unread `v`: FS-1017). `Erasing Border
+  planes 4`: the four outermost planes on each face cleared. With `-aseg`: the segmentation read
+  (unread: `<program>: could not load aseg from <name>`, status 255), `aseg read with width <w>
+  (src width <w>)`, resampled by nearest neighbour onto the control volume when its extent or type
+  differs (`resampling aseg...`), `Removing non-wm voxels` (§2.5); else `Removing surface
+  outliers` (no change). `-checknorm`'s range (§2.8; unread check volume: `<program>: could not
+  load <name>`, status 255); the intensity threshold 10 (§2.8); with `-T2`, §2.7. `Building bias
+  image`; the bias smoothed as above (`smoothing bias field with sigma=%2.3f`); `-w`'s control
+  volume (`Writing control volume to <name>`) and bias (`Writing bias volume to <name>`);
+  `MRIapplyBiasCorrectionSameGeometry()`: the volume divided by the bias and scaled to 110 in
+  place, its not-a-number voxels set to 0 (unless `FS_LEAVE_NANS` is set); `writing normalized
+  volume to <output>`, written (of the input's type: the surface program never makes the
+  input float); `#VMPC# mri_normalize VmPeak  <kB>` (the process's peak
+  virtual memory) and `mri_normalize done`; status 0.
+- **`-r <control> <bias>`** (after `-conform` and `-mask` below): the bias (unread: `<program>:
+  could not read bias volume <name>`, status 252) and control volumes read (`<program>: could not
+  read control volume <name>`, 252), the control volume binarised at 1 (0 and 128), the product
+  of the bias and the input, its mean over the 128 voxels `m`: `mean in wm is %2.0f, scaling by
+  %2.2f` (`m`, `110 / m`), the product scaled by `110 / m` (as a float), written; status 0.
+
+### 3.3 The normalisation
+
+1. `-conform` with an input that is not conformed (256^3, 1 mm, coronal): `unconformed source
+   detected - conforming...`, the input conformed (`specs/freesurfer-volume.md`). `-mask`: read
+   (unread: `<program>: could not open mask volume <name>.` and a newline, 255), the input's
+   voxels where the mask is 0 set to 0.
+2. `-l <control> <bias>`: both read (as `-r`'s, status 252), the control volume binarised at 1 (0
+   and 1) and made uchar (no scaling), the mean `m` of the input in it (`mean in wm is %2.0f,
+   scaling by %2.2f`), the input scaled by `110 / m` into the result; the white-matter outliers
+   removed from the control volume (§2.3, `intensity_below / 2` truncated to an integer); the bias
+   field built from the result and filled by the soap bubble (50 iterations, change 1), and applied
+   to the result in place.
+3. `-grad <t>`: the input smoothed by a Gaussian of 0.5 voxels, its Sobel gradient's magnitude
+   (`m.mgz`) at or above `t` marked 1 in a uchar volume (`nc.mgz`): the voxels that cannot be
+   control points (replacing `-atlas`'s mask).
+4. The input made float (no scaling); when conformed, its negative voxels set to 0.
+5. `-aseg`: `Reading aseg <name>`; unread: `<program>: could not read aseg from file <name>`
+   (255); with `-conform` and a segmentation that is not conformed: `<program>: aseg volume
+   <name> must be conformed` (253); `aseg read with width <w> (src width <w>)`; resampled by
+   nearest neighbour onto the input when its extent or type differs (`************** resampling
+   aseg to account for mismatch with source image ***************`; a resampling that fails:
+   FS-1017).
+6. `normalizing image...` (verbose, the default). The timer starts. `-f`'s control points read
+   (`specs/freesurfer-filter.md`'s control-point file); `-w`'s control-point volume name kept.
+7. Without `-l`: with the gentle pass with control points on (the default) and a file or label:
+   `Doing gentle normalization with control points/label`, one gentle 3-D pass from the input with
+   those points only (intensities `above` and `below / 2`) into a new result; else `NOT doing
+   gentle normalization with control points/label` and a copy of the input.
+8. With `-aseg`: `processing with aseg`; a clone of the segmentation with its labels 2 and 41
+   copied as control points; `removing outliers in the aseg WM...` (§2.2, from the result of 7,
+   `intensity_below` truncated); binarised at 1 (0 and 1) and made uchar; the file's or label's
+   points added; with `-interior`, §2.4 (`1.25 below`, the segmentation given); `Building bias
+   image`; with a bias sigma above 0, `Smoothing with sigma %g` and the field smoothed; `-c`'s
+   volume (`Writing output control points volume to <name>`); `Applying bias correction`: the
+   result divided by the field and scaled to 110 in place.
+9. Without `-aseg`: `processing without aseg, no1d=<0|1>`; unless `-no1d` (or `-l`, `-monkey`,
+   `-lonly`, `-fonly`): `MRInormInit(): `, `MRInormalize(): ` and the 1-D normalisation of the
+   input into the result (`specs/freesurfer-filter.md`), which, when it fails, prints `1d
+   normalization failed - trying no1d...` and continues as `-no1d`. With `-no1d`: with file points
+   only and SNR off, or `-gentle` with a file, the result so far (a copy when there is none); else
+   with SNR off and `-interior`, `computing initial normalization using surface interiors`: a uchar
+   control volume of the input's geometry, §2.4 (no segmentation) on the result so far, the bias
+   field built, smoothed (bias sigma above 0) and the input divided by it into the result (after a
+   failed 1-D pass: FS-1017); else with SNR off and no `-l`, a copy of the input; with SNR on,
+   `computing initial normalization using SNR...` and the high-signal normalisation of the input
+   (`specs/freesurfer-filter.md`) into the result. No result: `<program>: could not allocate
+   volume` (252).
+10. Unless file points only: one gentle 3-D pass of the result in place (intensities `above`,
+    `below / 2`).
+11. A copy of the result (the original of the 3-D passes); an empty line; `Iterating <n> times`;
+    then `n` passes, each (unless file points only, which ends the loop) `---------------------------------`,
+    `3d normalization pass <i> of <n>`, then with `-gentle` a gentle pass (`above / 2`, `below / 2`)
+    of the result in place, else a 3-D normalisation of the result in place with that copy as the
+    original (`above`, `below`, pruning, bias sigma, scan type, the not-control mask). `Done
+    iterating ---------------------------------`.
+12. `-w`'s control-point volume name kept again; with `-w`'s bias name: the bias (§2.1) of the
+    input and the result, `writing bias field to <name>....`, written.
+13. A result that is not uchar: when conformed, each voxel below 0 set to 0 and above 255 to 255;
+    then made uchar (no scaling: values rounded). `writing output to <output>` (verbose); written
+    (a failed write prints its message and does not change the status).
+14. `3D bias adjustment took <m> minutes and <s> seconds.`: the seconds since the timer started
+    (7), rounded to the nearest second, as minutes and seconds; status 0.
+
+**FS-1017** (rule B): where a step gives no volume and FreeSurfer goes on with none (`-conform`'s
+conforming or a resampling that fails, `-mask_orig`'s volume unread, `-no1d` with `-interior`
+after a failed 1-D pass, `-r` or `-l` without their names), FreeSurfer crashes; both modes end
+with `mri_normalize: <step> gave no volume (FreeSurfer crashes here)` (standard error, status 1).
+
+The working folder receives the files named above (`r.mgz`, `c.mgz`, `e.mgz`, `b.mgz`, `bs.mgz`,
+`m.mgz`, `nc.mgz`; with diagnostics, more); every output is written in the input's format rules
+(`specs/freesurfer-io.md`), with the input's header and the command line added.
+
+## 4. Validation plan
+
+- **The open probe** (`validation/investigations/freesurfer-mri-normalize-probe/`, its README):
+  the official program (the unit oracle's `bin/mri_normalize`) against a candidate on 82 command
+  lines over seeded synthetic inputs (every option of §1, the three programs of §3.2, the paths of
+  §3.3, the failures), in both modes: `reproduce` must give the official exit status, standard
+  output and error, and files (provenance aside) on every compared case; `fix` may differ only
+  with a notice.
+- **recon-all's two calls** on the recorded heads (`docs/validation/freesurfer-replay.md`): the
+  replay tool runs a candidate on each recorded step (`python -m larmorx_validation
+  freesurfer-replay run <run> mri_normalize mri_normalize:2 --command '<candidate> ...'`, the 12
+  runs `<head>-classic` and `<head>-v8` of 6 heads): every output must be the recorded one,
+  provenance aside, in both modes.
+- **Speed and memory**: the replica's measures on recon-all's calls (one thread) are the clean
+  room's reference: about 27 s for `T1.mgz` and 47 s for `brain.mgz` (observed, at four replays
+  side by side), and a peak of about 566 MiB (FreeSurfer 570 and 1,172 MiB) (observed).
+
+The replica's checks (closed): `validation/probes/fs-normalize/` (each step against the official
+code, case by case, on three recorded heads, the whole program, the golden cases).

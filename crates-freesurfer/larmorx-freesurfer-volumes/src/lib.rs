@@ -22,4 +22,7 @@ use larmorx_freesurfer_core::run::Program;
 pub mod mri_convert;
 
 /// The programs of this crate, by their original names.
-pub const PROGRAMS: &[Program] = &[];
+pub const PROGRAMS: &[Program] = &[Program {
+    name: mri_normalize::main::NAME,
+    run: mri_normalize::main::run,
+}];

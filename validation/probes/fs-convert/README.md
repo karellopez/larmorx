@@ -69,7 +69,8 @@ cases: 951 identical, 46 `SKIP`, 3 different, all explained (two conformed templ
 the generator's `-c -cs 64 -oks 0.5`, since moved to `cnv-heavy` without such sizes; one FS-1043
 crash before `SKIP_CNV` named it). Seed 7, 800 cases: 755 identical, 45 `SKIP`, 0 different.
 `--kind cnv-heavy`: 8 of 8 identical. Recorded: `tests/fs_convert_cnv_official.rs` (seed 1, 400
-cases, 18 `SKIP`, `af86e44c...`, from the clean commit 079df5b5), debug 2.8 s, release 0.7 s; the
+cases, 18 `SKIP`, `2218d1e4...`, from the clean commit ca89ec6a, after the command lines were
+made canonical: the first record, `af86e44c...`, kept this machine's user and host names' lengths), debug 2.8 s, release 0.7 s; the
 same under the AArch64 NaN emulation (debug and release) and on Windows x64.
 
     validation/probes/fs-convert/build.sh <workspace>

@@ -3,8 +3,8 @@
 // 2026 Karel Lopez Vilaret.
 //! `mri_convert`'s whole conversions against FreeSurfer 8.2.0's official code on every platform:
 //! the SHA-256 of the official build's output lines for the probe's `cnv` cases of seed 1 (small
-//! MGH inputs, options with arguments they accept, every written file through `gzread` with the
-//! command lines' time stamps masked), recorded by `validation/probes/fs-convert/check.py --kind
+//! MGH inputs, options with arguments they accept, every written file through `gzread`; the
+//! command line the files keep with the time, user, machine and kernel version as `X`), recorded by `validation/probes/fs-convert/check.py --kind
 //! cnv --seed 1 --n <N>` on Linux x64 from the unit oracle's build, against the port's output with
 //! `reproduce` (lines where FreeSurfer reads memory it does not own or crashes, `check.py`'s
 //! `SKIP_CNV`, hashed as `SKIP`; FS-1053's `valid` line masked on both sides).
@@ -15,11 +15,12 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-19 from the clean commit 079df5b5 (`mri_convert`'s `main` after its option
-/// loop: 48 fixed conversions, then seeded ones): 400 cases, 382 lines identical, 18 hashed as
-/// `SKIP`.
+/// Recorded 2026-11-19 from the clean commit ca89ec6a (`mri_convert`'s `main` after its option
+/// loop: 48 fixed conversions, then seeded ones; the files' command lines canonical, the time,
+/// user, machine and kernel version as `X`, on both sides): 400 cases, 382 lines identical, 18
+/// hashed as `SKIP`.
 const N: usize = 400;
-const OFFICIAL_SHA256: &str = "af86e44ce96f0540a4d66e7180342a5a61e2aa9529eb93c31d7594be9695e0fc";
+const OFFICIAL_SHA256: &str = "2218d1e4ccceecf5c84860f25e2418bb48c1988110dbe5c6ff72ea3177cf2f76";
 const SKIPPED: usize = 18;
 
 /// `check.py`'s `SKIP_CNV`.

@@ -14,16 +14,20 @@
 #[path = "../mri_cmd/args.rs"]
 pub mod args;
 
+mod bspline;
+
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 use larmorx_core::defects::UpstreamDefects;
-use larmorx_fs_core::maths::matrix::{MATRIX_REAL, Matrix};
+use larmorx_fs_core::maths::Returned;
+use larmorx_fs_core::maths::matrix::{MATRIX_COMPLEX, MATRIX_REAL, Matrix};
 use larmorx_fs_core::maths::mfiles::CStream;
 use larmorx_fs_core::mri::{LinearTransform, Lta, Mri, Region, VolGeom, types};
 use larmorx_fs_core::volume::cma;
 use larmorx_fs_core::volume::deriv::Neighbours;
 use larmorx_fs_core::volume::geometry::SurfacePoint;
+use larmorx_fs_core::volume::info::{CHANGE_VOX_SIZE, mri_type2str};
 use larmorx_fs_core::volume::ltaread::{FileSystem, TransformInputs};
 use larmorx_fs_core::volume::moves::axis;
 use larmorx_fs_core::volume::vgcopy::VG_IS_EQUAL_THRESHOLD;
@@ -1174,7 +1178,144 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
             };
             putres(l, r, &a, None, &d);
         }
-        _ => args::bad("unknown command"),
+        // part 7a: statistics, orientation strings, voxel-to-RAS matrices
+        "stats" => {
+            let a = getw(p, l)?;
+            let s = p.mri_stats(&a);
+            l.puti(0);
+            let s = s.map_or((None, None, None, None, None), |s| {
+                (s.min, s.max, Some(s.n), Some(s.mean), Some(s.std))
+            });
+            l.putf(s.0.unwrap_or(UNSET));
+            l.putf(s.1.unwrap_or(UNSET));
+            l.puti(i64::from(s.2.unwrap_or(-7)));
+            l.putf(s.3.unwrap_or(UNSET));
+            l.putf(s.4.unwrap_or(UNSET));
+        }
+        "pstats" => {
+            let a = getw(p, l)?;
+            let r = p.mri_print_stats(&a, false)?;
+            l.puti(i64::from(r));
+        }
+        "type2s" => {
+            let n = l.geti();
+            for _ in 0..n {
+                let t = l.geti();
+                l.puts(Some(mri_type2str(t).as_bytes()));
+            }
+        }
+        "cropbb" => {
+            let a = getw(p, l)?;
+            let mut b = Region {
+                x: l.geti(),
+                y: l.geti(),
+                z: l.geti(),
+                dx: l.geti(),
+                dy: l.geti(),
+                dz: l.geti(),
+            };
+            let r = p.mri_crop_bounding_box(&a, &mut b);
+            l.puti(i64::from(r));
+            for v in [b.x, b.y, b.z, b.dx, b.dy, b.dz] {
+                l.puti(i64::from(v));
+            }
+        }
+        "crass" => {
+            let mut a = getw(p, l)?;
+            let b = getw(p, l)?;
+            let r = p.mri_calc_cras_for_sampled_volume(&mut a, &b)?;
+            for x in r {
+                l.putd(x);
+            }
+            l.putg(&a.geom, false);
+        }
+        "chkostr" => {
+            let t = l.getx();
+            let r = p.mri_check_orientation_string(&t);
+            l.puts(r.as_deref());
+        }
+        "o2dc" => {
+            let mut a = getw(p, l)?;
+            let t = l.getx();
+            let r = p.mri_orientation_string_to_dircos(&mut a, &t);
+            l.puti(i64::from(r));
+            let g = &a.geom;
+            for v in [g.x, g.y, g.z] {
+                for f in v {
+                    l.putf(f);
+                }
+            }
+        }
+        "s44" => {
+            let k = l.geti();
+            let mut m = match k {
+                1 => Some(Matrix::zeros(4, 4, MATRIX_REAL)),
+                2 => {
+                    let (r, c) = (l.geti(), l.geti());
+                    Some(Matrix::zeros(r, c, MATRIX_REAL))
+                }
+                3 => Some(Matrix::zeros(4, 4, MATRIX_COMPLEX)),
+                _ => None,
+            };
+            let mut v = [0.0f32; 16];
+            for x in v.iter_mut() {
+                *x = l.getf();
+            }
+            let r = p.stuff_four_by_four(m.as_mut(), &v);
+            l.puti(i64::from(r));
+            match &m {
+                Some(m) if m.is_complex() => {
+                    // its 32 floats of storage, after the two unused ones
+                    for i in 0..32 {
+                        l.putf(m.number(i));
+                    }
+                }
+                _ => l.putm(m.as_ref()),
+            }
+        }
+        "vx2rx" => {
+            let a = getw(p, l)?;
+            let b = if l.take("null") {
+                None
+            } else {
+                Some(getw(p, l)?)
+            };
+            let mv = l.getm(p)?;
+            let mut mr = l.getm(p)?;
+            let r = p.mri_voxel_xform_to_ras_xform(&a, b.as_ref(), mv.as_ref(), mr.as_mut())?;
+            match r {
+                Returned::New(m) => l.putm(Some(&m)),
+                Returned::Output => {
+                    l.out("given");
+                    l.putm(mr.as_ref());
+                }
+                Returned::Nothing => l.putm(None),
+            }
+        }
+        "v2v" => {
+            let a = getw(p, l)?;
+            let b = getw(p, l)?;
+            let r = p.mri_get_voxel_to_voxel_xform(&a, &b)?;
+            l.putm(r.as_ref());
+        }
+        "setv2r" => {
+            let mut a = getw(p, l)?;
+            let m = l.getm(p)?;
+            if l.take("unset") {
+                p.env.remove(CHANGE_VOX_SIZE.as_bytes());
+            } else {
+                let v = l.getx();
+                p.env.set(CHANGE_VOX_SIZE.as_bytes(), &v);
+            }
+            let r = p.mri_set_voxel_to_ras_xform(&mut a, m.as_ref())?;
+            l.puti(i64::from(r));
+            l.putg(&a.geom, false);
+        }
+        _ => {
+            if !bspline::call(p, l, &c)? {
+                args::bad("unknown command")
+            }
+        }
     }
     Ok(())
 }

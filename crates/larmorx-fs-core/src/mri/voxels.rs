@@ -86,6 +86,29 @@ impl Mri {
     }
 
     /// The value of the element at `o` as a float (§5), for the types that have one.
+    /// `MRIgetVoxVal(mri, c, r, s, f, 0)` of a voxel inside the volume of a type read through the
+    /// flat place (no message or defect can arise there); `None` elsewhere (the caller then takes
+    /// the full rules of [`Process::mri_get_vox_val`]).
+    pub fn inside_vox_val(&self, c: i32, r: i32, s: i32, f: i32) -> Option<f32> {
+        let reads = matches!(
+            self.kind,
+            types::UCHAR
+                | types::SHORT
+                | types::USHRT
+                | types::INT
+                | types::RGB
+                | types::LONG
+                | types::FLOAT
+        );
+        if !reads || !self.has_voxels() {
+            return None;
+        }
+        match self.flat_place(c, r, s, f) {
+            Place::In(o) => Some(self.value_at(o)),
+            _ => None,
+        }
+    }
+
     fn value_at(&self, o: u64) -> f32 {
         match self.kind {
             types::UCHAR => f32::from(self.bytes(o, 1)[0]),

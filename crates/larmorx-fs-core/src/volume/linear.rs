@@ -121,13 +121,12 @@ impl Process {
             self.mri_set_values(v.d_mut(), sse::narrow(ov))?;
             v.d_mut().outside_val = ov;
         }
-        if interp == sample_type::CUBIC_BSPLINE {
-            self.error_exit(
-                codes::UNSUPPORTED,
-                b"MRIlinearTransformInterp: cubic B-spline sampling needs fs.bspline (not yet ported)\n",
-            )?;
-            return Ok(VolOut::Nothing);
-        }
+        // step 5: the source's cubic B-spline, made from the source as steps 3 and 4 left it
+        let bs = if interp == sample_type::CUBIC_BSPLINE {
+            Some(self.mri_to_bspline(v.a(), None, 3)?)
+        } else {
+            None
+        };
         let (w, h, d) = (v.d().geom.width, v.d().geom.height, v.d().geom.depth);
         let nframes = v.a().nframes;
         let fast = !inv.is_complex() && inv.rows == 4 && inv.cols == 4;
@@ -153,8 +152,16 @@ impl Process {
                         self.nint(p[2]);
                     }
                     for f in 0..nframes {
-                        let ok =
-                            self.frame_type_kept(v.a(), p[0], p[1], p[2], f, interp, &mut val)?;
+                        let ok = match &bs {
+                            Some(b) => {
+                                let (_, s) = self.mri_sample_bspline(b, p[0], p[1], p[2], f)?;
+                                val = s.unwrap_or(val);
+                                true
+                            }
+                            None => {
+                                self.frame_type_kept(v.a(), p[0], p[1], p[2], f, interp, &mut val)?
+                            }
+                        };
                         if !ok && !written {
                             self.note(
                                 &FS_325,

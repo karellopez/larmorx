@@ -14,6 +14,8 @@
 #[path = "../mri_cmd/args.rs"]
 pub mod args;
 
+mod bspline;
+
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 
@@ -1309,7 +1311,11 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
             l.puti(i64::from(r));
             l.putg(&a.geom, false);
         }
-        _ => args::bad("unknown command"),
+        _ => {
+            if !bspline::call(p, l, &c)? {
+                args::bad("unknown command")
+            }
+        }
     }
     Ok(())
 }

@@ -30,6 +30,7 @@
 #![forbid(unsafe_code)]
 
 pub mod atan;
+pub mod bspline;
 pub mod clib;
 pub mod cmdargs;
 pub mod diag;

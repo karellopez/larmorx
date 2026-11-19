@@ -50,3 +50,42 @@ is `specs/mri_normalize.md`). Track D of FreeSurfer's programs, wave 3.2, queue 
 - `real.py` (3 heads of the classic stream: the `-atlas` mask with `RB_all_2020-01-02.gca` and
   `talairach.lta`, brain distances 1 and 3; `-aseg`'s outlier removal on `norm.mgz` with
   `aseg.presurf.mgz`, 15 and 10 below): 12/12 identical in both modes; official 66 s, port 79 s.
+
+## 2. Where the time goes (relay 47)
+
+`real.py`'s twelve cases (official 66 s, port 79 s) timed stage by stage: `bench.cpp` in the probe
+(FreeSurfer's code, built by `build.sh` beside `fsnormalize`) against the port's example
+`fs_normalize_bench`, one thread, the same inputs, every result's digest identical (6 masks, 6
+outlier removals). Seconds summed over the 12 cases:
+
+| stage | FreeSurfer | port |
+|---|---|---|
+| `MRIread` (nu.mgz, norm.mgz, aseg.presurf.mgz) | 3.05 | 0.53 |
+| `GCAread` (`RB_all_2020-01-02.gca`, 3 heads x 2) | 2.74 | 2.12 |
+| `build_outside_of_brain_mask` (6 masks) | 3.68 | 8.04 (6.85 after the direct mask writes below) |
+| `MRIchangeType` (to float) | 0.76 | 1.60 |
+| `MRIclone` + `MRIcopyLabel` | 0.53 | 1.15 |
+| `MRIremoveWMOutliersAndRetainMedialSurface` (6 calls) | 52.6 | 60.5 |
+| its `MRIbinarize` / `MRIdistanceTransform` / `MRIscalarMul` / `MRInonMaxSuppress` alone | 0.93 / 44.6 / 0.64 / 2.27 | 2.01 / 44.9 / 1.51 / 3.31 |
+
+- The distance transform (fast marching), 85 % of the outlier removal, runs at FreeSurfer's speed.
+  The port reads volumes faster (2.5 s less). The 13 s gap is per-voxel work outside them: the
+  mask's loop (`GCAsourceVoxelToPrior` per voxel, x outermost, as FreeSurfer: 77 ns a voxel against
+  37), and the generic per-voxel paths of `MRIbinarize`, `MRIscalarMul`, `MRIchangeType`,
+  `MRIcopyLabel`, `MRInonMaxSuppress`, the histogram and the removal loop, each about twice
+  FreeSurfer's time: they all go through the port's `MRIgetVoxVal` and `MRIsetVoxVal`
+  (`larmorx-freesurfer-mri`'s `voxel.rs`: a place computed in 128-bit integers with the wrapped and
+  outside cases for every voxel) where FreeSurfer's compiler inlines a pointer step.
+- Relay 47's fix here: the mask's voxels written directly (the byte 1 where `MRIsetVoxVal(mask, x,
+  y, z, 0, 1)` stores it, for the clone of the source's extent): 8.04 s to 6.85 s, the same digests.
+- What a speed relay should do (bit for bit; every probe and hash test again): (1) in fs.mri's
+  `voxel.rs` (track A), an inlined fast path of `MRIgetVoxVal` and `MRIsetVoxVal` for a place within
+  the extent of a volume whose rows and slices are its header's (then `In` without the 128-bit
+  place); (2) in fs.volume (`arith.rs`, `resize.rs`, `mriset.rs`, `deriv.rs`), direct row paths for
+  `MRIbinarize`, `MRIscalarMul`, `MRIchangeType`, `MRIcopyLabel`, `MRIcopyFrame` and
+  `MRInonMaxSuppress` where every access is in the volume (as `MRIconvolve1d`'s, filter findings
+  §18); (3) in `build_outside_of_brain_mask`, the transform's type and matrix taken once before the
+  loop (fs.gca's `GCAsourceVoxelToPrior` called per voxel today), the voxel order kept for the
+  notices.
+- Memory: the port's peaks are below FreeSurfer's on every case (the mask 361-410 MB against
+  466-483 MB; the outlier removal 435-437 MB against 1,143-1,147 MB).

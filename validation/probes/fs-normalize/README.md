@@ -36,6 +36,10 @@ differs by default only where a defect it corrects is noted. Queue item 3.2-24 (
   line; `SKIP`: FS-04, FS-53, FS-58, FS-540, FS-541, FS-1016 and `PE` (fs.io's `LabelRead` does not
   model the C library's first `perror` on a write-only standard error).
 - `real.py`: `bobmf` and `wmomf` on three recorded heads.
+- `bench.cpp` (built by `build.sh` into `.../fs-normalize/bench`): `bench bobm <vol> <atlas>
+  <transform> <whalf>` and `bench wmo <norm> <aseg> <ib>` time `real.py`'s two cases stage by stage
+  and print the result's FNV-1a; the port's example `fs_normalize_bench` prints the same stages and
+  digest (run both in a memory box, one thread: `docs/findings/freesurfer-mri-normalize.md` §2).
 
 ## Results (relay 46)
 

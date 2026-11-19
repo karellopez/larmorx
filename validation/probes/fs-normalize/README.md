@@ -56,6 +56,16 @@ Recorded: `tests/fs_normalize_official.rs` (seed 1, 450 cases, 21 `SKIP`, `173c9
 10 s, release 1.4 s; the same under the AArch64 NaN emulation (`NAN_TRAP_ARM=1`) and on Windows
 x64. `real.py`: 12/12 identical in both modes (official 66 s, port 79 s).
 
+## Results (relay 47)
+
+The program: `prog.py` seeds 1 and 2 (82 cases each): 58 and 59 identical in `reproduce`, 24 and 23
+counted (FS-597, FS-601, FS-1016, PE), 0 different; `fix` identical or explained by a notice on
+every compared case. The golden cases: `c94b1d57...`, the official value. recon-all's 24 recorded
+calls replayed (12 runs): 24/24 in both modes (`docs/validation/freesurfer-mri-normalize.md`). The
+stage bench: `docs/findings/freesurfer-mri-normalize.md` §2.
+
     validation/probes/fs-normalize/build.sh <workspace>
     scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-normalize/check.py --seed 1 --n 450
     scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-normalize/real.py
+    scripts/orchestration/boxed.sh 14 python -P validation/probes/fs-normalize/prog.py --seed 1
+    scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-normalize/prog.py --golden

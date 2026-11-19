@@ -2093,7 +2093,7 @@ fn rand_vol(g: &mut Gen, dims: [i32; 4], ty: i32) -> Vol {
         good: if g.chance(8) { 0 } else { 1 },
         vox,
         scan: if g.chance(2) {
-            Some([2000.0, 0.5235988, 30.0, 900.0, 256.0])
+            Some([2000.0, std::f32::consts::FRAC_PI_6, 30.0, 900.0, 256.0])
         } else {
             None
         },

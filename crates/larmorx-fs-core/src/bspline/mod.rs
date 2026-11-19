@@ -409,7 +409,11 @@ impl Process {
             return Ok(());
         }
         for (x, o) in out.iter_mut().enumerate() {
-            let v = self.mri_get_vox_val(src, x as i32, y as i32, z as i32, f as i32, 0)?;
+            let (x, y, z, f) = (x as i32, y as i32, z as i32, f as i32);
+            let v = match src.inside_vox_val(x, y, z, f) {
+                Some(v) => v,
+                None => self.mri_get_vox_val(src, x, y, z, f, 0)?,
+            };
             *o = sse::widen(v);
         }
         Ok(())

@@ -9,6 +9,23 @@ use crate::mri::Mri;
 use crate::process::{Process, Stop, codes};
 use crate::sse;
 
+/// The arithmetic of the sums: plain IEEE operations, or SSE's NaN rules made explicit.
+#[derive(Clone, Copy)]
+struct Ops {
+    add: fn(f64, f64) -> f64,
+    mul: fn(f64, f64) -> f64,
+}
+
+const PLAIN: Ops = Ops {
+    add: |a, b| a + b,
+    mul: |a, b| a * b,
+};
+
+const SSE: Ops = Ops {
+    add: sse::add64,
+    mul: sse::mul64,
+};
+
 /// The indices and weights of one axis: `n` of them (1 on an axis of one voxel).
 #[derive(Clone, Copy)]
 pub(crate) struct AxisWeights {
@@ -359,13 +376,32 @@ impl Process {
         }
     }
 
-    /// The sum of §4.1 step 4 on frame `f`, clipped as step 5.
+    /// The sum of §4.1 step 4 on frame `f`, clipped as step 5: with plain operations, and again
+    /// with SSE's NaN rules made explicit when a NaN reaches the sum (without one both give the
+    /// same bits).
     fn bspline_sum(
         &mut self,
         b: &BSpline,
         c: &Mri,
         a: &[AxisWeights; 3],
         f: i32,
+    ) -> Result<f64, Stop> {
+        let mut sum = self.bspline_sum_with(c, a, f, PLAIN)?;
+        if sum.is_nan() {
+            sum = self.bspline_sum_with(c, a, f, SSE)?;
+        }
+        if b.srcneg == 0 && sum < 0.0 {
+            sum = 0.0;
+        }
+        Ok(sum)
+    }
+
+    fn bspline_sum_with(
+        &mut self,
+        c: &Mri,
+        a: &[AxisWeights; 3],
+        f: i32,
+        o: Ops,
     ) -> Result<f64, Stop> {
         let [ax, ay, az] = a;
         let g = &c.geom;
@@ -393,20 +429,17 @@ impl Process {
                     );
                     for i in 0..ax.n {
                         let x = sse::widen(fget(v, base + ax.idx[i] as usize));
-                        wv = sse::add64(wv, sse::mul64(x, ax.w[i]));
+                        wv = (o.add)(wv, (o.mul)(x, ax.w[i]));
                     }
                 } else {
                     for i in 0..ax.n {
                         let x = self.mri_get_vox_val(c, ax.idx[i], ay.idx[j], az.idx[k], f, 0)?;
-                        wv = sse::add64(wv, sse::mul64(sse::widen(x), ax.w[i]));
+                        wv = (o.add)(wv, (o.mul)(sse::widen(x), ax.w[i]));
                     }
                 }
-                w2 = sse::add64(sse::mul64(wv, ay.w[j]), w2);
+                w2 = (o.add)((o.mul)(wv, ay.w[j]), w2);
             }
-            sum = sse::add64(sse::mul64(w2, az.w[k]), sum);
-        }
-        if b.srcneg == 0 && sum < 0.0 {
-            sum = 0.0;
+            sum = (o.add)((o.mul)(w2, az.w[k]), sum);
         }
         Ok(sum)
     }

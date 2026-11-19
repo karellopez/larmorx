@@ -57,8 +57,45 @@ const H: [f64; 16] = [
     -0.00005894,
 ];
 
+/// The arithmetic of the line functions: plain IEEE operations, or SSE's NaN rules made
+/// explicit. Without a NaN anywhere both give the same bits; a NaN always reaches the output.
+#[derive(Clone, Copy)]
+struct Ops {
+    add: fn(f64, f64) -> f64,
+    mul: fn(f64, f64) -> f64,
+}
+
+const PLAIN: Ops = Ops {
+    add: |a, b| a + b,
+    mul: |a, b| a * b,
+};
+
+const SSE: Ops = Ops {
+    add: sse::add64,
+    mul: sse::mul64,
+};
+
 /// Reduces a line of `n_in` samples to `n_in / 2` (§6.1).
 pub fn reduce_line(input: &[f64]) -> Vec<f64> {
+    let out = reduce_with(input, PLAIN);
+    if out.iter().any(|v| v.is_nan()) {
+        reduce_with(input, SSE)
+    } else {
+        out
+    }
+}
+
+/// Expands a line of `n` samples to `2n` (§6.2).
+pub fn expand_line(input: &[f64]) -> Vec<f64> {
+    let out = expand_with(input, PLAIN);
+    if out.iter().any(|v| v.is_nan()) {
+        expand_with(input, SSE)
+    } else {
+        out
+    }
+}
+
+fn reduce_with(input: &[f64], o: Ops) -> Vec<f64> {
     let n_in = input.len();
     let m = 2 * (n_in / 2);
     let k2 = (2 * m) as i64;
@@ -66,7 +103,7 @@ pub fn reduce_line(input: &[f64]) -> Vec<f64> {
     let mut y = vec![0f64; m];
     for (k, yk) in y.iter_mut().enumerate() {
         let k = k as i64;
-        let mut s = sse::mul64(input[k as usize], G[0]);
+        let mut s = (o.mul)(input[k as usize], G[0]);
         for (i, &g) in G.iter().enumerate().skip(1) {
             let i = i as i64;
             let mut i1 = k - i;
@@ -83,24 +120,23 @@ pub fn reduce_line(input: &[f64]) -> Vec<f64> {
                     i2 = k2 - i2 - 1;
                 }
             }
-            let t = sse::add64(input[i1 as usize], input[i2 as usize]);
-            s = sse::add64(s, sse::mul64(t, g));
+            let t = (o.add)(input[i1 as usize], input[i2 as usize]);
+            s = (o.add)(s, (o.mul)(t, g));
         }
         *yk = s;
     }
     (0..m / 2)
-        .map(|q| sse::mul64(sse::add64(y[2 * q + 1], y[2 * q]), 0.5))
+        .map(|q| (o.mul)((o.add)(y[2 * q + 1], y[2 * q]), 0.5))
         .collect()
 }
 
-/// Expands a line of `n` samples to `2n` (§6.2).
-pub fn expand_line(input: &[f64]) -> Vec<f64> {
+fn expand_with(input: &[f64], o: Ops) -> Vec<f64> {
     let n = input.len() as i64;
     let k2 = 2 * n;
     let mut out = vec![0f64; 2 * input.len()];
     for i in 0..n {
         let j = (2 * i) as usize;
-        let mut s = sse::mul64(input[i as usize], H[0]);
+        let mut s = (o.mul)(input[i as usize], H[0]);
         for k in (2..=14).step_by(2) {
             let mut i1 = i - k / 2;
             let mut i2 = i + k / 2;
@@ -116,8 +152,8 @@ pub fn expand_line(input: &[f64]) -> Vec<f64> {
                     i2 = k2 - i2 - 1;
                 }
             }
-            let t = sse::add64(input[i1 as usize], input[i2 as usize]);
-            s = sse::add64(s, sse::mul64(t, H[k as usize]));
+            let t = (o.add)(input[i1 as usize], input[i2 as usize]);
+            s = (o.add)(s, (o.mul)(t, H[k as usize]));
         }
         out[j] = s;
         let mut s = 0.0f64;
@@ -135,21 +171,18 @@ pub fn expand_line(input: &[f64]) -> Vec<f64> {
                     i1 = k2 - i1 - 1;
                 }
             }
-            s = sse::add64(
-                s,
-                sse::mul64(H[k.unsigned_abs() as usize], input[i1 as usize]),
-            );
+            s = (o.add)(s, (o.mul)(H[k.unsigned_abs() as usize], input[i1 as usize]));
         }
         out[j + 1] = s;
     }
     let len = out.len();
     for j in (2..len).rev() {
-        out[j] = sse::mul64(sse::add64(out[j], out[j - 1]), 0.5);
+        out[j] = (o.mul)((o.add)(out[j], out[j - 1]), 0.5);
     }
     if len > 1 {
-        out[1] = sse::mul64(sse::add64(out[0], out[1]), 0.5);
+        out[1] = (o.mul)((o.add)(out[0], out[1]), 0.5);
     }
-    out[0] = sse::mul64(0.5, out[0]);
+    out[0] = (o.mul)(0.5, out[0]);
     out
 }
 
@@ -172,7 +205,11 @@ impl Process {
                 Axis::Y => p[1] = k,
                 Axis::Z => p[2] = k,
             }
-            let v = self.mri_get_vox_val(m, p[0] as i32, p[1] as i32, p[2] as i32, f as i32, 0)?;
+            let (x, y, z, f) = (p[0] as i32, p[1] as i32, p[2] as i32, f as i32);
+            let v = match m.inside_vox_val(x, y, z, f) {
+                Some(v) => v,
+                None => self.mri_get_vox_val(m, x, y, z, f, 0)?,
+            };
             out.push(sse::widen(v));
         }
         Ok(out)

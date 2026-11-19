@@ -2189,7 +2189,7 @@ fn cnv_case(g: &mut Gen) -> String {
     };
     let nopt = g.int(1, 3);
     for _ in 0..nopt {
-        let mut o: Vec<String> = match g.below(64) {
+        let mut o: Vec<String> = match g.below(61) {
             0 => a(&["-odt", g.pick(&["uchar", "short", "int", "float"])]),
             1 => a(&["-odt", g.pick(&["uchar", "short"]), "-ns", "1"]),
             2 => a(&["-nc", "-odt", "uchar"]),
@@ -2386,13 +2386,7 @@ fn cnv_case(g: &mut Gen) -> String {
             57 => a(&["--force_ras_good"]),
             58 => a(&["-zgez"]),
             59 => a(&["--diag", "1", "-at", "in_t.lta"]),
-            60 => {
-                let mut x = a(&["--cw256", "-c", "-cs"]);
-                x.push(g.pick(&["32", "64"]).to_owned());
-                x
-            }
-            61 => a(&["-cm", "-cs", "64"]),
-            62 => a(&["--conform-dc", "-cs", "32"]),
+            // the conformed outputs (at least 256 voxels per axis) are generate_cnv_heavy's
             _ => a(&["--no_scale", "1"]),
         };
         if o.first().is_some_and(|x| x == "--diag") {
@@ -2510,6 +2504,39 @@ fn cnv_prelude() -> Vec<String> {
         out.push(cnv_line(&files, &args));
     }
     out
+}
+
+/// The conformed conversions (outputs of 256 x 256 x 256 voxels and more: too slow for the
+/// recorded test's debug build): each conform option on small inputs of each type.
+pub fn generate_cnv_heavy(seed: u64) -> Vec<String> {
+    let mut g = Gen::new(seed ^ 0x6865_6176);
+    let opts: [&[&str]; 8] = [
+        &["-c"],
+        &["--conform"],
+        &["-c", "-cs", "2"],
+        &["-cm"],
+        &["--conform-dc"],
+        &["-c", "--cw256", "-cs", "4"],
+        &["-c", "-odt", "float", "-rt", "nearest"],
+        &["-c", "-oc", "1", "2", "3"],
+    ];
+    let mut v = Vec::new();
+    for (k, o) in opts.iter().enumerate() {
+        let ty = MGH_TYPES[k % 4];
+        let dims = [
+            g.int(2, 5) as i32,
+            g.int(2, 5) as i32,
+            g.int(2, 5) as i32,
+            1,
+        ];
+        let vol = rand_vol(&mut g, dims, ty);
+        let files = vec![("in_v.mgh".to_owned(), mgh_bytes(&vol))];
+        let mut args: Vec<String> = o.iter().map(|s| (*s).to_owned()).collect();
+        args.push("in_v.mgh".into());
+        args.push(g.pick(&["o.mgh", "o.mgz"]).into());
+        v.push(cnv_line(&files, &args));
+    }
+    v
 }
 
 /// `n` conversion cases of seed `seed`: the [`cnv_prelude`], then seeded ones.

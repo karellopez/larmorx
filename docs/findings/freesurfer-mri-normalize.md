@@ -89,3 +89,56 @@ outlier removals). Seconds summed over the 12 cases:
   notices.
 - Memory: the port's peaks are below FreeSurfer's on every case (the mask 361-410 MB against
   466-483 MB; the outlier removal 435-437 MB against 1,143-1,147 MB).
+
+## 3. The program (relay 47, queue item 3.2-25)
+
+The port of `main` is `crates-freesurfer/larmorx-freesurfer-volumes/src/mri_normalize/main.rs`,
+registered as `mri_normalize` in `larmorx-freesurfer` (the first program the replica's program
+runs). The behaviour is `specs/mri_normalize.md` §3.
+
+- **FS-1017** (rule B): `main` uses a volume after steps that may give none, with no check:
+  `mri_src = MRIconform(mri_src)` (NULL when its type change or resampling fails), `mri_aseg =
+  MRIresample(...)` and `mri_renorm = MRIresample(...)` (NULL on failure), `mri_orig =
+  MRIread(mask_orig_fname)` (`-mask_orig`: no check at all), `add_interior_points(..., mri_dst, ...)`
+  in the `-no1d` branch where `mri_dst` is NULL after a failed `MRInormalize`, and `-r`/`-l`
+  without their names (`MRIread(NULL)`: FS-1016 covers the option parser's side). FreeSurfer
+  dereferences NULL in each (a crash); both modes end with a clear error (status 1).
+- `MRI3dUseLabelControlPoints` runs twice with `-surface` and a label (once before the
+  renormalisation and surface branches, once in the surface branch): the second replaces the first's
+  points with the same points. Kept.
+- The surface branch never makes the input float: the copy it normalises is of the input's type,
+  and the output is written in it (a uchar input gives a uchar output, its bias correction rounded
+  per voxel). Kept (C: a design that recon-all does not reach; recon-all uses the surfaces through
+  `mris_make_surfaces`, not here).
+- `-grad`'s scan-type threshold (MGH 15, WashU 20, else 12) is overwritten by `-grad`'s own at once:
+  the scan type never changes it. Kept.
+- `GetVmPeak` (the surface branch's `#VMPC#` line) reads the process's own figure: the port prints
+  its own (the replay and the probes mask it), as the timing line's seconds.
+- `Progname` is `argv[0]`: recon-all runs the program by name, so its messages say `mri_normalize`;
+  the port prints `mri_normalize`. The probe runs the official program by name too (a full path
+  in `argv[0]` changes every error message).
+- The licence check: the official program's `MRIwrite` (and `MRIread`) need `FS_LICENSE`; the
+  replica has none (`docs/licensing.md`).
+- **The official outputs' bytes vary from run to run**: the MGZ's command-line record holds the time
+  (`getAllInfo`'s time stamp, to the second) and the gzip stream changes with it; the oracle-output
+  cache compares FreeSurfer's runs with `formats="freesurfer"` (provenance aside) and masks the
+  timing line (`volatile`), else a repeated run is a dispute (two were filed, 2026-11-19, before the
+  policies were set: `<workspace>/oracles/cache/disputes/db3bc5d0...` and `b4fd658e...`, the time
+  stamp and the timing line only; and one more by a duplicated case, `0c505f2c...`).
+- **The PE case** (relay 45's finding, met again): `-label` with a file that does not exist prints
+  `No such file or directory` (glibc's `perror`), then FreeSurfer's `error: Invalid argument`
+  where the port prints `error: No such file or directory`: the C library's first `perror` on a
+  standard error opened write-only (a pipe, a file) leaves `errno` at `EINVAL` (its attempt to open
+  a second stream on the same descriptor for reading and writing fails), and FreeSurfer prints that
+  `errno`. fs.io's `LabelRead` (track A) does not model it; the probes count the case (`PE`).
+- **FS-597 on small volumes**: the 3-D normalisation of a 32^3 or 64^3 head without a usable
+  white-matter histogram (the control points found empty: `white matter peak found at -nan`)
+  prints a grey-matter valley read from below its histogram (`valley at 94 (-9)` in FreeSurfer, the
+  port's 0): memory contents. The output volumes are the same (the valley is printed, not used
+  there); the golden cases mask that number (`tests/mri_normalize_golden/common.rs`, `mask_line`) and
+  the probe counts such cases.
+- **Speed** (the replay at one thread, three replays side by side): `T1.mgz` 26-30 s, `brain.mgz`
+  42-51 s, against FreeSurfer's 54-70 s and 70-99 s recorded at four threads; FreeSurfer's own
+  one-thread figures are in its `-classic-1thread` recordings.
+- **Memory** (`tests/parity/test_memory_peak.py`, ds000005): `T1.mgz` 566 MiB against
+  FreeSurfer's 570; `brain.mgz` 566 MiB against 1,173 (FreeSurfer keeps the leaked copies).

@@ -36,6 +36,14 @@ differs by default only where a defect it corrects is noted. Queue item 3.2-24 (
   line; `SKIP`: FS-04, FS-53, FS-58, FS-540, FS-541, FS-1016 and `PE` (fs.io's `LabelRead` does not
   model the C library's first `perror` on a write-only standard error).
 - `real.py`: `bobmf` and `wmomf` on three recorded heads.
+- `prog.py --seed <s>`: the whole program, the unit oracle's `bin/mri_normalize` (run by name)
+  against the port's `larmorx-freesurfer` in both modes, on the open probe's 82 command lines
+  (`validation/investigations/freesurfer-mri-normalize-probe/compare.py`, whose inputs, cases and
+  comparison it runs; `SKIP` adds the closed probes' lists). `prog.py --golden`: the official
+  program on the golden cases' inputs (the example `fs_normalize_golden`), the value
+  `tests/mri_normalize_golden.rs` records.
+- `record.py`: `docs/validation/freesurfer-mri-normalize.{json,md}` from the replays, `prog.py`'s
+  summaries, the golden value and the memory test's lines, stamped with a clean commit.
 - `bench.cpp` (built by `build.sh` into `.../fs-normalize/bench`): `bench bobm <vol> <atlas>
   <transform> <whalf>` and `bench wmo <norm> <aseg> <ib>` time `real.py`'s two cases stage by stage
   and print the result's FNV-1a; the port's example `fs_normalize_bench` prints the same stages and

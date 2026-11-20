@@ -11,21 +11,27 @@
 //! - [`polar_decomposition`] and [`polar2_decomposition`] (`A = R S`, `A = R S D`, from VNL's SVD);
 //! - the distances between transforms: [`affine_trans_dist_sq`], [`rigid_trans_dist_sq`] (with
 //!   [`rot_matrix_log_norm`]) and [`get_frobenius_diff`];
-//! - [`is_diag`].
+//! - [`is_diag`];
+//! - [`schur_complex`] (`SchurComplex`: LAPACK 3.10.0's `ZGEES`, `larmorx_core::lapack_zgees`) and
+//!   [`matrix_sqrt`] (`MatrixSqrt`: the principal square root from the complex Schur form).
 //!
 //! VNL's matrices are [`VnlMatrix`] (`larmorx_core::vnl_matrix`, ITK 4.13.2's loops); its SVD is
 //! `larmorx_core::vnl_svd`. The `MATRIX` overloads of the distances and the functions only
 //! `mri_robust_template` calls (the matrix logarithm and exponential, the geometric and rotation
-//! means, the LTA conversions) come with that program's items; the matrix square root
-//! (`MatrixSqrt`, LAPACK's complex Schur decomposition) is listed in the crate's `PROVENANCE.md`.
+//! means, the LTA conversions) come with that program's items.
 
 use std::io::Write;
 
 use larmorx_core::cfmt;
-use larmorx_core::defects::FS_968;
+use larmorx_core::cplx::{C64, csqrt, cxx_div, cxx_mul};
+use larmorx_core::defects::{FS_968, FS_969, FS_970};
+use larmorx_core::lapack_zgees::{Zgees, xerbla_line, zgees_vn};
 use larmorx_core::vnl_fixed;
-use larmorx_core::vnl_matrix::VnlMatrix;
+use larmorx_core::vnl_matrix::{
+    VnlCMatrix, VnlMatrix, matlab_print_long, matlab_print_long_complex,
+};
 use larmorx_core::vnl_svd::{matlab_long, vnl_svd_full};
+use larmorx_freesurfer_core::diag::BUILD_ROOT;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc};
@@ -347,4 +353,207 @@ pub fn rot_matrix_log_norm(err: &mut dyn Write, m: &Mat4) -> f64 {
     }
     let theta = larmorx_core::math::acos(trace);
     mul64(std::f64::consts::SQRT_2, theta)
+}
+
+/// `MyMatrix.cpp`'s `__FILE__` in the official build.
+fn mymatrix_cpp() -> String {
+    format!("{BUILD_ROOT}/mri_robust_register/MyMatrix.cpp")
+}
+
+/// `MyMatrix::SchurComplex(M, U, T)` of a square matrix: LAPACK's `ZGEES('V', 'N', ...)` on `M`
+/// (as complex), `M = U T U^H`, `T` upper triangular (row-major here as in VNL). A nonzero `INFO`
+/// prints `<MyMatrix.cpp>: info = <info>, something went wrong:` and its meaning on standard error,
+/// and FreeSurfer goes on (its assertion is compiled out).
+///
+/// - FS-970 (rule B): an empty matrix ends the official program in LAPACK's argument check
+///   (` ** On entry to ZGEES parameter number  6 had an illegal value` on standard output, status
+///   0); by default an error and status 1; `reproduce` ends as FreeSurfer does.
+/// - FS-969 (rule B): a matrix with an infinite or NaN element: by default an error and status 1;
+///   `reproduce` computes as FreeSurfer does where LAPACK's `ZLAHQR` converges (`ZLAQR0`, its
+///   second attempt where it does not, is not ported: an error).
+pub fn schur_complex(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m: &VnlMatrix,
+) -> Result<(VnlCMatrix, VnlCMatrix), Fatal> {
+    assert_eq!(m.rows, m.cols, "MyMatrix::SchurComplex: a square matrix");
+    let n = m.rows;
+    if n == 0 {
+        g.notices.add(
+            &FS_970,
+            "the complex Schur form of an empty matrix: FreeSurfer ends in LAPACK's argument check",
+        );
+        if !g.notices.reproduce() {
+            let _ = writeln!(
+                err,
+                "MyMatrix::SchurComplex: an empty matrix (FreeSurfer ends here with status 0 after LAPACK's message)"
+            );
+            return Err(Fatal::Exit(1));
+        }
+    } else if m.data.iter().any(|x| !x.is_finite()) {
+        g.notices.add(
+            &FS_969,
+            "the complex Schur form of a matrix with an infinite or NaN element: FreeSurfer goes on with a failed or NaN result",
+        );
+        if !g.notices.reproduce() {
+            let _ = writeln!(
+                err,
+                "MyMatrix::SchurComplex: the matrix has an infinite or NaN element (FreeSurfer goes on with LAPACK's failed or NaN result)"
+            );
+            return Err(Fatal::Exit(1));
+        }
+    }
+    // T = vnl_complexify(M), transposed for Fortran: column-major
+    let mut a = vec![C64::ZERO; n * n];
+    for i in 0..n {
+        for j in 0..n {
+            a[i + j * n] = C64::real(m.at(i, j));
+        }
+    }
+    let mut w = vec![C64::ZERO; n];
+    let mut vs = vec![C64::ZERO; n * n];
+    let info = match zgees_vn(n, &mut a, &mut w, &mut vs) {
+        Zgees::Done(info) => info,
+        Zgees::Xerbla(name, i) => {
+            let _ = out.write_all(xerbla_line(name, i).as_bytes());
+            return Err(Fatal::Exit(0));
+        }
+        Zgees::NotPorted(what) => {
+            let _ = writeln!(
+                err,
+                "MyMatrix::SchurComplex: LAPACK's {what} is not ported yet"
+            );
+            return Err(Fatal::Exit(1));
+        }
+    };
+    let mut u = VnlCMatrix::zeros(n, n);
+    let mut t = VnlCMatrix::zeros(n, n);
+    for i in 0..n {
+        for j in 0..n {
+            *t.at_mut(i, j) = a[i + j * n];
+            *u.at_mut(i, j) = vs[i + j * n];
+        }
+    }
+    if info != 0 {
+        let file = mymatrix_cpp();
+        let _ = writeln!(err, "{file}: info = {info}, something went wrong:");
+        let n = n as i32;
+        if info < 0 {
+            let _ = writeln!(
+                err,
+                "{file}: (internal error) the {}th argument had an illegal value",
+                -info
+            );
+        } else if info <= n {
+            let _ = writeln!(
+                err,
+                "{file}: the QR iteration failed, but the last {} eigenvalues may be correct",
+                n - info
+            );
+        } else if info == n + 1 {
+            let _ = writeln!(err, "{file}: EV could not be reordered (ill conditioned)");
+        } else if info == n + 2 {
+            let _ = writeln!(err, "{file}: roundoff error -- maybe due to poor scaling");
+        } else {
+            let _ = writeln!(err, "{file}: unknown error");
+        }
+    }
+    Ok((u, t))
+}
+
+/// `MyMatrix::MatrixSqrt(A)` of a square matrix: the principal square root from the complex Schur
+/// form `A = U T U^H` ([`schur_complex`]): when the real and the imaginary part of `T` are both
+/// diagonal ([`is_diag`], `1e-14`), `U diag(sqrt(T(i, i))) U^H`; otherwise the upper triangular
+/// root `R` of `T` column by column (`R(j, j) = sqrt(T(j, j))`, then for `i` from `j - 1` down
+/// `R(i, j) = (T(i, j) - sum_{i<k<j} R(i, k) R(k, j)) / (R(i, i) + R(j, j))`) and `U R U^H` (C++'s
+/// complex arithmetic, `csqrt` the decided one). Then two checks, each printing FreeSurfer's
+/// diagnostics on standard error and ending with status 1: the imaginary part's one-norm above
+/// `10 n 2^-52` times the root's (`Result too imaginary to ignore!`), and the Frobenius norm of
+/// `real(root)^2 - A` above `1e-10` (`Result not close enough to square root!`). Returns the real
+/// part.
+pub fn matrix_sqrt(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    a: &VnlMatrix,
+) -> Result<VnlMatrix, Fatal> {
+    let n = a.cols;
+    let (u, t) = schur_complex(g, out, err, a)?;
+    let uh = u.conjugate_transpose();
+    let asqrt =
+        if is_diag(&t.real(), 0.000_000_000_000_01) && is_diag(&t.imag(), 0.000_000_000_000_01) {
+            let r: Vec<C64> = (0..n).map(|i| csqrt(t.at(i, i))).collect();
+            u.scale_columns(&r).mul(&uh)
+        } else {
+            let mut r = VnlCMatrix::zeros(n, n);
+            for j in 0..n {
+                *r.at_mut(j, j) = csqrt(t.at(j, j));
+                for i in (0..j).rev() {
+                    let mut s = C64::ZERO;
+                    for k in i + 1..j {
+                        s = s.add(cxx_mul(r.at(i, k), r.at(k, j)));
+                    }
+                    *r.at_mut(i, j) = cxx_div(t.at(i, j).sub(s), r.at(i, i).add(r.at(j, j)));
+                }
+            }
+            u.mul(&r).mul(&uh)
+        };
+    let eps_matlab = f64::EPSILON;
+    let imagone = asqrt.imag().operator_one_norm();
+    let bound = mul64(
+        mul64((10 * n as i32) as f64, eps_matlab),
+        asqrt.operator_one_norm(),
+    );
+    if imagone > bound {
+        let mut s = String::new();
+        s.push_str("MyMatrix::MatrixSqrt Internal Error: \n");
+        s.push_str(&format!(
+            " Result too imaginary to ignore! ( {} )\n",
+            cfmt::ostream(imagone)
+        ));
+        s.push_str(" Debug Info: \n");
+        s.push_str(&matlab_print_long(a, "A"));
+        s.push('\n');
+        s.push_str(&matlab_print_long_complex(&t, "T"));
+        s.push('\n');
+        s.push_str(&matlab_print_long_complex(&u, "U"));
+        s.push('\n');
+        let back = u.mul(&t).mul(&uh).real().sub(a).fro_norm();
+        s.push_str(&format!(
+            " fro( real(U * T * U^*) - A) = {}\n\n",
+            cfmt::ostream(back)
+        ));
+        s.push_str(&matlab_print_long_complex(&asqrt, "Asqrt"));
+        s.push('\n');
+        let re = asqrt.real();
+        let sq = re.mul(&re).sub(a).fro_norm();
+        s.push_str(&format!(
+            " fro( real(sqrt(A)) ^2 - A)  = {}\n\n",
+            cfmt::ostream(sq)
+        ));
+        let _ = err.write_all(s.as_bytes());
+        return Err(Fatal::Exit(1));
+    }
+    let msqrt = asqrt.real();
+    let ms2 = msqrt.mul(&msqrt).sub(a);
+    let fnorm = ms2.fro_norm();
+    if fnorm > 1e-10 {
+        let mut s = String::new();
+        s.push_str("MyMatrix::MatrixSqrt Internal Error: \n");
+        s.push_str("  Result not close enough to square root!\n");
+        s.push_str(&format!(
+            "  Frobenius norm of difference: {}\n",
+            cfmt::ostream(fnorm)
+        ));
+        s.push_str(&matlab_print_long(a, "A"));
+        s.push('\n');
+        s.push_str(&matlab_print_long(&msqrt, "Asqrt"));
+        s.push('\n');
+        s.push_str(&matlab_print_long(&ms2, "Diff"));
+        s.push('\n');
+        let _ = err.write_all(s.as_bytes());
+        return Err(Fatal::Exit(1));
+    }
+    Ok(msqrt)
 }

@@ -40,6 +40,10 @@
 #include "matrix.h"
 #include "mri.h"
 
+// cabs and csqrt (LAPACK's ABS and SQRT of a complex number, std::abs and std::sqrt of
+// std::complex<double>) are linked with --wrap to complexrt.c's: the correctly rounded hypot in both
+// (the project's decision for MatrixSqrt, track C relay 41)
+
 // the double acos of the official code (linked with --wrap=acos, build.sh): the project decided
 // the correctly rounded acos for reproduce too (glibc's is not: GLIBC-07; the decision of
 // 2026-11-04 applied to FreeSurfer, track C relay 38): CORE-MATH's (oracles/core-math-preload)
@@ -130,6 +134,17 @@ void ovm(const vnl_matrix<double> &m)
   oi(m.cols());
   for (unsigned r = 0; r < m.rows(); r++)
     for (unsigned c = 0; c < m.cols(); c++) od(m[r][c]);
+}
+
+void ocm(const vnl_matrix<vcl_complex<double> > &m)
+{
+  oi(m.rows());
+  oi(m.cols());
+  for (unsigned r = 0; r < m.rows(); r++)
+    for (unsigned c = 0; c < m.cols(); c++) {
+      od(m[r][c].real());
+      od(m[r][c].imag());
+    }
 }
 
 void set_geom(VOL_GEOM *v)
@@ -384,6 +399,17 @@ void run_case()
     od(MyMatrix::getFrobeniusDiff(a, b));
   } else if (cmd == "rlog") {
     od(MyMatrix::RotMatrixLogNorm(get_m4()));
+  } else if (cmd == "schur") {
+    // MyMatrix::SchurComplex(A, U, T) of a square matrix (LAPACK's zgees)
+    vnl_matrix<double> a = get_vm();
+    unsigned n = a.rows();
+    vnl_matrix<vcl_complex<double> > u(n, n), t(n, n);
+    MyMatrix::SchurComplex(a, u, t);
+    ocm(u);
+    ocm(t);
+  } else if (cmd == "sqrtm") {
+    // MyMatrix::MatrixSqrt(A) of a square matrix
+    ovm(MyMatrix::MatrixSqrt(get_vm()));
   } else {
     fail("unknown command");
   }

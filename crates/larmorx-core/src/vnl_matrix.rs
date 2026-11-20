@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
 //! `vnl_matrix<double>`'s arithmetic as ITK 4.13.2's VNL computes it (VXL, BSD-3-Clause; the
-//! files `core/vnl/vnl_matrix.hxx`, `vnl_c_vector.hxx`, `vnl_diag_matrix.h`), for the FreeSurfer
+//! files `core/vnl/vnl_matrix.hxx`, `vnl_c_vector.hxx`, `vnl_diag_matrix.h`, `vnl_complexify.h`,
+//! `vnl_matlab_print.hxx`, `vnl_matlab_print_scalar.cxx`), for the FreeSurfer
 //! replica's robust registration (`fs.robust`) and any port that multiplies VNL matrices:
 //!
 //! - [`VnlMatrix::mul`] (`vnl_tag_mul`): each element `sum += a(i, j) * b(j, k)` from `+0`, `j`
@@ -10,12 +11,16 @@
 //! - [`VnlMatrix::operator_one_norm`]: the largest column sum of absolute values (a column sum
 //!   kept only when greater: a NaN sum is never kept);
 //! - [`VnlMatrix::scale_columns`] (`vnl_matrix * vnl_diag_matrix`: `a(i, j) * d(j)`);
-//! - [`VnlMatrix::transpose`], subtraction, identity.
+//! - [`VnlMatrix::transpose`], subtraction, identity;
+//! - [`VnlCMatrix`]: `vnl_matrix<std::complex<double>>`'s product, conjugate transpose, real and
+//!   imaginary parts and one-norm, and `vnl_matlab_print`'s long format of both kinds.
 //!
 //! Every operation that can meet a NaN follows x86-64's SSE rules (`ItkReal::sse_*`: the first
 //! operand's NaN, SSE's default NaN from numbers), so the bits are the official x86-64 build's on
 //! every platform.
 
+use crate::cfmt;
+use crate::cplx::{C64, cabs, cxx_mul};
 use crate::itk_real::ItkReal;
 
 /// `sqrt` (`sqrtsd`) with SSE's NaNs: a NaN quieted, SSE's default NaN for a negative number.
@@ -173,6 +178,194 @@ impl VnlMatrix {
         }
         max
     }
+}
+
+/// A `vnl_matrix<std::complex<double>>`: `rows x cols`, row-major. Its arithmetic is C++'s
+/// complex arithmetic as GCC compiles it (`crate::cplx`: the plain product with `__muldc3` where
+/// both parts are NaN; `abs` is `cabs`, the decided correctly rounded `hypot`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct VnlCMatrix {
+    pub rows: usize,
+    pub cols: usize,
+    pub data: Vec<C64>,
+}
+
+impl VnlCMatrix {
+    /// A `rows x cols` matrix of zeros (`vnl_matrix<std::complex<double>>(r, c, 0.0)`).
+    pub fn zeros(rows: usize, cols: usize) -> VnlCMatrix {
+        VnlCMatrix {
+            rows,
+            cols,
+            data: vec![C64::ZERO; rows * cols],
+        }
+    }
+
+    /// `vnl_complexify(m)`: each element `(x, +0)`.
+    pub fn complexify(m: &VnlMatrix) -> VnlCMatrix {
+        VnlCMatrix {
+            rows: m.rows,
+            cols: m.cols,
+            data: m.data.iter().map(|&x| C64::real(x)).collect(),
+        }
+    }
+
+    /// Element `(i, j)`.
+    #[inline(always)]
+    pub fn at(&self, i: usize, j: usize) -> C64 {
+        self.data[i * self.cols + j]
+    }
+
+    /// Element `(i, j)`, mutable.
+    #[inline(always)]
+    pub fn at_mut(&mut self, i: usize, j: usize) -> &mut C64 {
+        &mut self.data[i * self.cols + j]
+    }
+
+    /// `vnl_real(m)`.
+    pub fn real(&self) -> VnlMatrix {
+        VnlMatrix {
+            rows: self.rows,
+            cols: self.cols,
+            data: self.data.iter().map(|z| z.re).collect(),
+        }
+    }
+
+    /// `vnl_imag(m)`.
+    pub fn imag(&self) -> VnlMatrix {
+        VnlMatrix {
+            rows: self.rows,
+            cols: self.cols,
+            data: self.data.iter().map(|z| z.im).collect(),
+        }
+    }
+
+    /// `transpose()`.
+    pub fn transpose(&self) -> VnlCMatrix {
+        let mut r = VnlCMatrix::zeros(self.cols, self.rows);
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                r.data[j * self.rows + i] = self.data[i * self.cols + j];
+            }
+        }
+        r
+    }
+
+    /// `conjugate_transpose()`: the transpose, each element conjugated.
+    pub fn conjugate_transpose(&self) -> VnlCMatrix {
+        let mut r = self.transpose();
+        for z in &mut r.data {
+            *z = z.conj();
+        }
+        r
+    }
+
+    /// `self * b` (`vnl_tag_mul`): `sum += a(i, j) * b(j, k)` from `(0, 0)` in `j` order.
+    pub fn mul(&self, b: &VnlCMatrix) -> VnlCMatrix {
+        assert_eq!(self.cols, b.rows, "vnl_tag_mul: sizes");
+        let (l, m, n) = (self.rows, self.cols, b.cols);
+        let mut r = VnlCMatrix::zeros(l, n);
+        for i in 0..l {
+            for k in 0..n {
+                let mut sum = C64::ZERO;
+                for j in 0..m {
+                    sum = sum.add(cxx_mul(self.data[i * m + j], b.data[j * n + k]));
+                }
+                r.data[i * n + k] = sum;
+            }
+        }
+        r
+    }
+
+    /// `self * D` for a diagonal `D` (`vnl_matrix * vnl_diag_matrix`): `a(i, j) * d(j)`.
+    pub fn scale_columns(&self, d: &[C64]) -> VnlCMatrix {
+        assert_eq!(self.cols, d.len(), "vnl_matrix * vnl_diag_matrix: sizes");
+        let mut r = self.clone();
+        for i in 0..self.rows {
+            for (j, &dj) in d.iter().enumerate() {
+                r.data[i * self.cols + j] = cxx_mul(self.data[i * self.cols + j], dj);
+            }
+        }
+        r
+    }
+
+    /// `operator_one_norm()`: for each column the sum of `abs(a(i, j))` (`cabs`) from `+0`; the
+    /// largest kept (`tmp > max`, from `max = 0`).
+    pub fn operator_one_norm(&self) -> f64 {
+        let mut max = 0.0f64;
+        for j in 0..self.cols {
+            let mut tmp = 0.0f64;
+            for i in 0..self.rows {
+                tmp = tmp.sse_add(cabs(self.data[i * self.cols + j]));
+            }
+            if tmp > max {
+                max = tmp;
+            }
+        }
+        max
+    }
+}
+
+/// `vnl_matlab_print_scalar(std::complex<double>, buf, vnl_matlab_print_format_long)`: the real
+/// part as `"%16d "` of 0 when it equals zero, else `"%16.12f "`; the imaginary part as `" %15s  "`
+/// of nothing when it equals zero, else its sign (`-` below zero, otherwise `+`, a NaN's sign
+/// printed by `%f`) and `"%15.12fi "` of its magnitude.
+pub fn matlab_long_complex(z: C64) -> String {
+    let mut s = if z.re == 0.0 {
+        format!("{:>16} ", 0)
+    } else {
+        format!("{:>16} ", cfmt::f(z.re, 12))
+    };
+    if z.im == 0.0 {
+        s.push_str(&format!(" {:>15}  ", ""));
+    } else {
+        let (sign, i) = if z.im < 0.0 {
+            ('-', -z.im)
+        } else {
+            ('+', z.im)
+        };
+        s.push_str(&format!("{sign}{:>15}i ", cfmt::f(i, 12)));
+    }
+    s
+}
+
+/// `vnl_matlab_print(os, M, name, vnl_matlab_print_format_long)` of a `vnl_matrix<double>`:
+/// `<name> = [ ...`, each row's elements (`vnl_svd::matlab_long`), ` ]` after the last row, each row
+/// on its line; `<name> = [ ...` and `];` for a matrix without rows.
+pub fn matlab_print_long(m: &VnlMatrix, name: &str) -> String {
+    let mut s = format!("{name} = [ ...\n");
+    if m.rows == 0 {
+        s.push_str("];\n");
+        return s;
+    }
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            s.push_str(&crate::vnl_svd::matlab_long(m.at(i, j)));
+        }
+        if i + 1 == m.rows {
+            s.push_str(" ]");
+        }
+        s.push('\n');
+    }
+    s
+}
+
+/// [`matlab_print_long`] of a `vnl_matrix<std::complex<double>>` ([`matlab_long_complex`]).
+pub fn matlab_print_long_complex(m: &VnlCMatrix, name: &str) -> String {
+    let mut s = format!("{name} = [ ...\n");
+    if m.rows == 0 {
+        s.push_str("];\n");
+        return s;
+    }
+    for i in 0..m.rows {
+        for j in 0..m.cols {
+            s.push_str(&matlab_long_complex(m.at(i, j)));
+        }
+        if i + 1 == m.rows {
+            s.push_str(" ]");
+        }
+        s.push('\n');
+    }
+    s
 }
 
 #[cfg(test)]

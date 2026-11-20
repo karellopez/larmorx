@@ -170,6 +170,11 @@ def nan_canonical(line: str) -> str:
     return " ".join(out)
 
 
+# The port's lines for a path of LAPACK it does not port (ZLAQR0, where ZLAHQR does not converge:
+# a matrix with an infinite or NaN element, FS-969): counted and hashed as NOTPORTED, not compared.
+NOTPORTED = "is not ported yet"
+
+
 def heavy(case: str) -> bool:
     """No case of this probe is heavy (kept for check.py's shape)."""
     return False
@@ -221,6 +226,12 @@ def main(argv: list[str] | None = None) -> int:
         "--only", help="comma-separated commands to keep (a check while porting; no official hash)"
     )
     ap.add_argument(
+        "--family",
+        choices=("helpers", "sqrtm"),
+        default="helpers",
+        help="the seeded stream: the helpers (part 1) or the matrix square root's (schur, sqrtm)",
+    )
+    ap.add_argument(
         "--cases",
         type=Path,
         help="a file of hand-written cases (hand_cases.py) instead of the seeded ones (no official hash)",
@@ -234,13 +245,15 @@ def main(argv: list[str] | None = None) -> int:
     inputs = ws / "oracles" / "inputs" / "fs-robust"
     inputs.mkdir(parents=True, exist_ok=True)
     tag = f"-{a.only.replace(',', '_')}" if a.only else ""
-    cases_path = inputs / f"cases-{a.seed}-{a.n}{tag}.txt"
+    fam = "" if a.family == "helpers" else f"-{a.family}"
+    cases_path = inputs / f"cases{fam}-{a.seed}-{a.n}{tag}.txt"
     if a.cases:
         cases_path = inputs / f"hand-{a.cases.stem}.txt"
         text = a.cases.read_text(encoding="utf-8")
     else:
+        sub = "cases" if a.family == "helpers" else f"cases-{a.family}"
         text = subprocess.run(
-            [str(port), "cases", str(a.seed), str(a.n)], check=True, capture_output=True, text=True
+            [str(port), sub, str(a.seed), str(a.n)], check=True, capture_output=True, text=True
         ).stdout
     if a.only:
         keep = set(a.only.split(","))
@@ -284,6 +297,7 @@ def main(argv: list[str] | None = None) -> int:
                 }
                 fh.write(json.dumps(row) + "\n")
     equal, differ, skipped, skipped_same = Counter(), Counter(), Counter(), Counter()
+    notported = Counter()
     fix_differ, fix_unexplained, fix_ids, rep_ids = Counter(), Counter(), Counter(), Counter()
     hashed = hashlib.sha256()
     heavies = skipped_hashed = 0
@@ -292,6 +306,10 @@ def main(argv: list[str] | None = None) -> int:
         cmd = case.split()[0]
         for x in ids:
             rep_ids[x] += 1
+        if NOTPORTED in r:
+            hashed.update(b"NOTPORTED\n")
+            notported[cmd] += 1
+            continue
         if heavy(case):
             hashed.update(b"HEAVY\n")
             heavies += 1
@@ -322,6 +340,7 @@ def main(argv: list[str] | None = None) -> int:
             for x in fids:
                 fix_ids[x] += 1
     summary = {
+        "family": a.family,
         "seed": a.seed,
         "cases": len(cases),
         "served": done.cached,
@@ -330,6 +349,7 @@ def main(argv: list[str] | None = None) -> int:
         "reproduce_differ": dict(differ),
         "skipped": dict(skipped),
         "skipped_but_identical": dict(skipped_same),
+        "not_ported": dict(notported),
         "reproduce_notices": dict(rep_ids),
         "fix_differ": dict(fix_differ),
         "fix_differ_without_notice": dict(fix_unexplained),

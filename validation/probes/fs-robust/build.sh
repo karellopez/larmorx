@@ -40,6 +40,10 @@ for f in MyMRI MyMatrix CostFunctions Quaternion JointHisto; do
   objs+=("$out/$f.o")
 done
 "$gcc" "${flags[@]}" -c "$here/fsrobust.cpp" -o "$out/fsrobust.o"
+# the decided cabs and csqrt (complexrt.c, CORE-MATH's correctly rounded hypot at its commit in
+# tags/core-math), with the system's gcc as validation/probes/coremath-hypot builds hypot.c
+/usr/bin/gcc -O2 -ffp-contract=off -c "$ws/tags/core-math/src/binary64/hypot/hypot.c" -o "$out/crhypot.o"
+/usr/bin/gcc -O2 -ffp-contract=off -c "$here/complexrt.c" -o "$out/complexrt.o"
 libs=("$b/utils/libutils.a")
 for p in jpeg/libjpeg tiff/libtiff xml2/libxml2 minc/libminc netcdf/libnetcdf nrrdio/libnrrdio \
   dicom/libdicom cephes/libcephes nifti/libnifti dcm2niix/libdcm2niixfs gifti/libgifti expat/libexpat; do
@@ -48,8 +52,9 @@ done
 for l in vnl_algo vnl v3p_netlib netlib vcl; do libs+=("$itk/lib/libitk$l-4.13.a"); done
 lapack=(/usr/lib/x86_64-linux-gnu/lapack/liblapack.a /usr/lib/x86_64-linux-gnu/blas/libblas.a
   /usr/lib/gcc/x86_64-linux-gnu/11/libgfortran.a /usr/lib/gcc/x86_64-linux-gnu/11/libquadmath.a)
-"$gcc" -fopenmp -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl,-z,muldefs -Wl,--wrap=acos -O3 \
-  "$out/fsrobust.o" "${objs[@]}" -o "$out/fsrobust" \
+"$gcc" -fopenmp -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl,-z,muldefs \
+  -Wl,--wrap=acos,--wrap=cabs,--wrap=csqrt -O3 \
+  "$out/fsrobust.o" "${objs[@]}" "$out/complexrt.o" "$out/crhypot.o" -o "$out/fsrobust" \
   "${libs[@]}" "${lapack[@]}" /usr/lib/x86_64-linux-gnu/libz.so -lm \
   "$ws/oracles/toolchains/gcc-8.4-ubuntu/usr/lib/gcc/x86_64-linux-gnu/8/libgomp.so" \
   /lib/x86_64-linux-gnu/libpthread.a -lcrypt -lrt -ldl
@@ -60,6 +65,7 @@ lapack=(/usr/lib/x86_64-linux-gnu/lapack/liblapack.a /usr/lib/x86_64-linux-gnu/b
   "${libs[@]}" "${lapack[@]}" /usr/lib/x86_64-linux-gnu/libz.so -lm \
   "$ws/oracles/toolchains/gcc-8.4-ubuntu/usr/lib/gcc/x86_64-linux-gnu/8/libgomp.so" \
   /lib/x86_64-linux-gnu/libpthread.a -lcrypt -lrt -ldl
-sha256sum "$out/fsrobust" "$out/bench" "$here/fsrobust.cpp" "$here/bench.cpp" "${lapack[@]}" "$ws/oracles/core-math-preload/libcrmath.so" > "$out/BUILD_INFO.txt"
+sha256sum "$out/fsrobust" "$out/bench" "$here/fsrobust.cpp" "$here/bench.cpp" "$here/complexrt.c" \
+  "$ws/tags/core-math/src/binary64/hypot/hypot.c" "${lapack[@]}" "$ws/oracles/core-math-preload/libcrmath.so" > "$out/BUILD_INFO.txt"
 "$gcc" --version | head -1 >> "$out/BUILD_INFO.txt"
 echo "built $out/fsrobust and $out/bench"

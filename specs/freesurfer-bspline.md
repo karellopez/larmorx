@@ -172,10 +172,20 @@ Returns `NO_ERROR` (0) always.
 5. A source without a negative voxel (`srcneg` 0) clips a negative `sum` to 0 (NaN and -0 are kept);
    `val = sum`.
 
-A B-spline whose degree is not 2 to 9 (one allocated and never computed): with an axis longer than one
-voxel the weights end the program (`Invalid spline degree`, status 1) before any index is used, unless
-the degree is above 9; on a volume of one voxel degrees 0 and 1 read its coefficient. The other cases
-are FS-964 (§7).
+A B-spline whose degree is not 2 to 9 (one allocated and never computed), sampled at a point that step 1
+does not answer (§4.2 likewise), in both modes but where said:
+- an axis longer than one voxel (the width, height or depth above 1) and a degree below 2 (1, 0 or
+  negative): the weights end the program (`Invalid spline degree`, status 1) before any index is used;
+- an axis longer than one voxel and a degree above 9: FS-964 (§7). FreeSurfer first stores indices past
+  its arrays, then ends the same way, **(observed)** on 3 x 3 x 3 coefficients for degrees 10 to 64, 99,
+  100, 500, 1,000, 5,000, 10,000, 20,000 and 2,147,483,647 (`Invalid spline degree` + `\n` on standard
+  output, nothing on standard error, status 1, the same in every run), while degrees 30,000, 50,000,
+  70,000, 100,000 and 1,000,000 crash (`SIGSEGV`: those stores reach past the memory it owns; where that
+  begins depends on the process's stack; no probe line asks for such a degree, and a line where FreeSurfer
+  crashes is not compared: §9). Under `reproduce` every degree above 9 ends as `Invalid spline degree`,
+  status 1 (the crash is not reproduced), FS-964 noted; by default FS-964's end;
+- a volume of one voxel: degrees 0 and 1 read its coefficient (the single weight 1); a degree above 9 or
+  below 0 is FS-964's end in both modes (FreeSurfer reads indices it never set: memory).
 
 ### 4.2 `MRIsampleSeqBSpline(b, x, y, z, valvect, first, last)`
 
@@ -259,8 +269,9 @@ a * b / c` does: `x = x * ((a * b) / c)`.)
    matrix!` and end); a singular `A`: the error `MRIlinearTransformSpline: xform is singular`,
    `ERROR_BADPARM`, the result none.
 2. No `dst`: a volume of the source's type with the coefficients' extent, frames and header
-   (`MRIcloneDifferentType(coefficients, source type)`: its `outside_val` 0); a given `dst` is cleared
-   (`MRIclear`).
+   (`MRIcloneDifferentType(coefficients, source type)`, `specs/freesurfer-volume.md` §38: the
+   coefficients' clone when the source type is `float`, else a new volume of that type with their header;
+   its `outside_val` 0 either way); a given `dst` is cleared (`MRIclear`).
 3. For each destination voxel, slices outermost, then rows, columns innermost: the point `A^-1 (y1, y2,
    y3, 1)` with the voxel's indices as `float`s and the product in `float` (`MatrixMultiply`), widened;
    for each frame of the coefficients, `MRIsampleBSpline` there (§4.1) stored into `dst` with
@@ -286,14 +297,31 @@ as the source's, `dst`'s as the destination's, the coefficients' when there is n
    matrices recomputed; else `INFO: Transform dst volume info is not used (valid flag = 0).` on standard
    error and that volume with no Talairach file name.
 3. By the array's type: `LINEAR_RAS_TO_RAS` (1): §5.2 with the matrix. `LINEAR_VOX_TO_VOX` (0): the RAS
-   matrix `i2r · M · r2i` (in `float`, `i2r · M` first, then times `r2i`), `i2r` the destination
-   geometry's voxel-to-RAS matrix when valid, else (with `INFO: LTA dst geometry information missing!`,
-   `      We assume that the dst volume passed is the`, `      same as the dst for the transform.` on
-   standard error) `dst`'s; `r2i` the source geometry's RAS-to-voxel matrix when valid, else (the same
-   three lines with `src`) the coefficients'; then §5.2 with it. `LINEAR_PHYSVOX_TO_PHYSVOX` (2): the
-   array changed to `LINEAR_RAS_TO_RAS` (`LTAchangeType`, `specs/freesurfer-volume.md` §54, its errors and
-   ends of the program included: **(observed)** `LTAchangeType: src geometry must be valid` + `\n`, status
-   252, for an invalid source geometry), then §5.2 with its matrix. Any other type (`REGISTER_DAT` (14)
+   matrix `i2r · M · r2i` (in `float`: `i2r · M` first into a new matrix, then that times `r2i` into
+   itself; `specs/freesurfer-maths.md` §8.1's products, their messages and ends of the program included),
+   in this order: `i2r` the transform's destination geometry's voxel-to-RAS matrix when that geometry is
+   valid, else (with `INFO: LTA dst geometry information missing!`, `      We assume that the dst volume
+   passed is the`, `      same as the dst for the transform.` on standard error) `dst`'s; the first
+   product; `r2i` the transform's source geometry's RAS-to-voxel matrix when valid, else (the same three
+   lines with `src`, so printed after the first product) the coefficients'; the second product. Every one
+   of these four matrices is made from the geometry's fields, never from a volume's cached matrices: a
+   transform's geometry's with `vg_i_to_r`, `vg_r_to_i` (`specs/freesurfer-volume.md` §4), a volume's with
+   `extract_i_to_r`, `extract_r_to_i` (`specs/freesurfer-mri.md` §3); a RAS-to-voxel matrix that does not
+   invert is none, which the second product's `m2 is null` end answers (**(observed)**: `vbspline`'s
+   `bslta` lines with type 0, every line identical with the implementation that follows this). Then §5.2
+   with it. `LINEAR_PHYSVOX_TO_PHYSVOX` (2): the
+   array changed to `LINEAR_RAS_TO_RAS` (`LTAchangeType`, `specs/freesurfer-volume.md` §54: the geometries'
+   validity, the change from physical-voxel to RAS-to-RAS (FS-506: FreeSurfer's products under `reproduce`,
+   the RAS transform by default, noted in both modes) and `LTAfillInverse` (FS-505), their errors and ends
+   of the program included: **(observed)** `LTAchangeType: src geometry must be valid` + `\n`, status 252,
+   for an invalid source geometry; `TransformInvert: xform noninvertible`, status 252, where the changed
+   matrix does not invert), then §5.2 with its matrix (its own ends included: `MatrixMultiply: m1 is
+   null` where the destination's voxel-to-RAS matrix does not invert). **(observed)**: `vbspline`'s two
+   `bslta` lines of this type with valid geometries end so, the first where the changed matrix (with an
+   infinite element) does not invert, the second at §5.2's product (its destination's matrix does not
+   invert, whatever the array's type); the volume probe's group `vltapv` holds 25 more
+   (`specs/freesurfer-volume.md` §69.2) and its `ltachg` lines the change itself (`models.py physvox`: the
+   `reproduce` products bit for bit). Any other type (`REGISTER_DAT` (14)
    included): the error `LTAtransformBSpline: unknown linear transform` + `\n` and the program's end
    (status 252), after step 2's volume and its messages.
 
@@ -376,9 +404,13 @@ status 1). All passes write into `dst` itself (§3.4), so each pass reads the pr
   voxel size of an axis of one voxel, which they do not resample (and §6.3's centre moves that voxel by
   half a source voxel). Both modes give FreeSurfer's geometry, noted.
 - **FS-964** (memory): sampling (§4.1, §4.2) a B-spline whose degree is above 9, or below 0 on a volume of
-  one voxel: FreeSurfer writes indices past its arrays or reads indices it never set. An error in both
-  modes (`<function>: a B-spline of degree <d> (FreeSurfer reads or writes memory it does not own here)`,
-  `ERROR_BADPARM`).
+  one voxel: FreeSurfer writes indices past its arrays or reads indices it never set. FS-964's end: the
+  program's end after the error `<function>: a B-spline of degree <d> (FreeSurfer reads or writes memory it
+  does not own here)` + `\n` (`<function>` `MRIsampleBSpline` or `MRIsampleSeqBSpline`, `<d>` the degree in
+  decimal; status 252, nothing on standard output), noted. By default every such case; under `reproduce`
+  only a volume of one voxel, while a degree above 9 with an axis longer than one voxel ends as FreeSurfer
+  does (§4.1: `Invalid spline degree`, status 1, noted; FreeSurfer's stray stores before it are memory it
+  does not own, and the crash where they reach too far is not reproduced).
 
 ## 8. What is not part of the module
 
@@ -443,7 +475,9 @@ of §5 is independent, so any thread count gives the same result.
   | `vbsrules` | 71 | 3 | 8 | 0 | `713d7bb825ce469535a36d88d3537882127b0d32a16f0504c2b0a10ab1738a90` |
 
   The memory lines: the upsampling's axes of one voxel (FS-962's reads past the source), a frame-range
-  sample one frame past the volume's, FS-964's degrees above 9; the crashes: sources without their
+  sample one frame past the volume's, FS-964's degrees above 9 on coefficients of one voxel (on larger
+  coefficients those degrees end as §4.1 says, the same in every run: `EXIT 1` lines, compared under
+  `reproduce`); the crashes: sources without their
   cached matrices, whose header copy crashes (`specs/freesurfer-volume.md`'s FS-252), a source without
   voxels, and transforms into a given destination with fewer frames than the source (written past its
   voxels, `specs/freesurfer-mri.md`). The exits are FreeSurfer's own: `Invalid spline degree`, the

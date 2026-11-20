@@ -1,14 +1,15 @@
-# FreeSurfer 8.2.0's volume functions and B-splines, as a black box (fs.volume parts 1 to 6c, fs.bspline)
+# FreeSurfer 8.2.0's volume functions and B-splines, as a black box (fs.volume parts 1 to 7b, fs.bspline)
 
 The probe behind the **(observed)** marks and the validation plan (§69) of
-[`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 6c (§1 to §32:
+[`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 7b (§1 to §35, and §54's change of a transform array from physical-voxel to RAS-to-RAS:
 the volume-geometry text block, its copies, matrices, comparison and printer; the voxel
 arithmetic; coordinates, orientation, the Talairach point, centre of mass, principal components,
 the running average, the header comparison, determinant and dump; the samplers, the moves, the
 head's box and the transform reader; the CMA label tests and the segmentation functions; resolution,
 planes, fills, resampling by whole factors and changes of type; the frame-range samplers, the trilinear
 kernel and splatting, derivatives, gradients, neighbour counts, linear transforms; resampling onto a
-template and replacing a value), and of
+template and replacing a value; statistics, orientation strings and voxel-to-RAS matrices; slices as 2-D
+images; neighbourhoods and labels), and of
 [`specs/freesurfer-bspline.md`](../../../specs/freesurfer-bspline.md) (§9: the B-spline coefficients,
 their sampling, the transforms through them and the factor-of-two pyramids). **Open to the clean-room
 implementer of that spec**: the files here hold only calls of FreeSurfer's functions (and of the C
@@ -21,8 +22,8 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 |---|---|
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 23 groups of seeded cases and seven of fixed cases (`vrules`, `vrules4` to `vrules8`, `vbsrules`; 13,347 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
-| `models.py` | statements of the spec checked as models of the probe's printed results: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`) |
+| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 26 groups of seeded cases and eight of fixed cases (`vrules`, `vrules4` to `vrules9`, `vbsrules`; 14,247 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `models.py` | statements of the spec checked as models of the probe's printed results: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
 runs use the fs.maths probe's guard allocator, `guard_malloc.so` beside it
@@ -54,7 +55,7 @@ fs.mri probe's (its README, "Encodings"). Added here:
 
 | Kind | Form |
 |---|---|
-| W, a working volume | V; a fill: a seed (the fs.mri probe's fill seed: byte i is (seed + 101 i) mod 256; -1 leaves the voxels as allocated) or `t<seed>` (for a float volume: float i of the buffer, frames included, is the table's entry (7 i + seed) mod 34; for another type the seed's bytes); the geometry's fields but `valid`, the extent and the name: `xsize ysize zsize ras_good_flag x_r x_a x_s y_r y_a y_s z_r z_a z_s c_r c_a c_s s_r s_a s_s`; the header fields `imnr0 imnr1` (integers) `xstart xend ystart yend zstart zend thick ps tr te ti` (floats) `flip_angle` (a double) `dof` (an integer) `fov location` (floats) `ptype`; the cache: 0 the cached matrices as the allocation left them, 1 recomputed from the fields (`MRIreInitCache`), 2 none; the registration matrix (M); the colour table (CT) |
+| W, a working volume | V; a fill: a seed (the fs.mri probe's fill seed: byte i is (seed + 101 i) mod 256; -1 leaves the voxels as allocated, zeros), `t<seed>` (for a float volume: float i of the buffer, frames included, is the table's entry (7 i + seed) mod 34; for another type the seed's bytes) or `i<a>,<b>,...` (the buffer's 32-bit words from the list in order, repeated: integers that a float cannot hold); the geometry's fields but `valid`, the extent and the name: `xsize ysize zsize ras_good_flag x_r x_a x_s y_r y_a y_s z_r z_a z_s c_r c_a c_s s_r s_a s_s`; the header fields `imnr0 imnr1` (integers) `xstart xend ystart yend zstart zend thick ps tr te ti` (floats) `flip_angle` (a double) `dof` (an integer) `fov location` (floats) `ptype`; the cache: 0 the cached matrices as the allocation left them, 1 recomputed from the fields (`MRIreInitCache`), 2 none; the registration matrix (M); the colour table (CT) |
 | the table | the floats `00000000 80000000 3f000000 bf000000 3f800000 bf800000 40200000 437f8000 437e8000 43800000 bfc00000 501502f9 d01502f9 7f7fffff ff7fffff 00000001 7f800000 ff800000 7fc00000 ffc00000 7fc12345 7f800001 40500000 42c80000 1e3ce508 477fff80 46ffff00 c7000080 4f000000 4f800000 41200000 c1200000 3dcccccd 40490fdb` (entry 0 first): zeros, halves, ones, 2.5, 255.5, 254.5, 256, -1.5, ±1e10, the largest floats, the smallest subnormal, infinities, NaNs (both signs, a payload, a signalling one), 3.25, 100, 1e-20, 65535.5, 32767.5, -32768.5, 2^31, 2^32, ±10, 0.1, π |
 | D, a destination | `new` (none: the function makes one), `self` (the first source), `other` (the second source), or a W |
 | R, a region | `null`, or `x y z dx dy dz` |
@@ -62,6 +63,7 @@ fs.mri probe's (its README, "Encodings"). Added here:
 | a result (printed) | `self`, `other` or `given` when the returned volume is that one, then the volume; then, when a given destination is not the result, the destination's state |
 | unset | an output the call may leave is 7.0 before the call (`40e00000`, `401c000000000000`) |
 | P, a painting | n, then n times `x y z value` (integers and a float): frame 0's voxels set with `MRIsetVoxVal` after the volume is made |
+| I, an image | `null`, or `<rows> <cols> <format> <frames>` (`ImageAlloc`: the format's code, 0 `PFBYTE`, 1 `PFSHORT`, 2 `PFINT`, 3 `PFFLOAT`, 4 `PFCOMPLEX`, 6 `PFDOUBLE`, 35 `PFRGB`, 36 `PFRGBZ`), `<xsize> <ysize>` (floats), a fill (a seed: byte i of the pixels is (seed + 101 i) mod 256; -1 as allocated, zeros; `t<seed>`: float i is the table's entry (7 i + seed) mod 34), then `<orows> <ocols> <rows> <cols> <num_frame>` written over the header after the fill (-1 keeps the allocation's). Printed: `orows ocols rows cols format num_frame xsize ysize`, then the pixels (a string of the buffer's bytes as allocated, `null` without a buffer). A result is `given` (the given image itself, still marked as the probe's), `new` or `null` |
 
 ## Commands
 
@@ -165,6 +167,23 @@ The spec's sections in brackets.
 | `bslta i W D LTA i` | `USE_AVERAGE305` unset (0), set to `true` (1) or set empty (2), `MRItoBSpline` with the degree, then `LTAtransformBSpline` into the destination with the array [§5.3] | the result |
 | `bsdown W D`, `bsup W D` | `MRIdownsample2BSpline`, resp. `MRIupsample2BSpline` [§6.3, §6.4] | the result |
 | `bsfree k` | `MRIfreeBSpline` of k 0 none, 1 a B-spline without coefficients, 2 one of 1 x 1 x 1 [§2] | its value, then `none` or `kept` |
+| `toimgv W P I i i i` | `MRItoImageView` of the painted volume into the image (the slice, the view, the frame) [§34] | the result (I) |
+| `toimg W P I i` | `MRItoImage` (the slice) | the result (I) |
+| `img2mri I` | `ImageToMRI` | the image's `xsize`, `ysize` after the call, then the volume |
+| `smpar W P i` | `MRIsmoothParcellation` (the count) [§35] | the result |
+| `erasebp W i` | `MRIeraseBorderPlanes` (the border) | its value, the volume |
+| `nbhd W P n (k i i i i i f)×n` | per point k 0 `MRImaxInNbhd` (wsize x y z frame), 1 `MRIcountNonzeroInNbhd`, 2 `MRIcountThreshInNbhd` (the threshold, the float), 3 `MRIareNonzeroInNbhd` | the integers |
+| `nearnz W P n (i d d d i)×n` | per point `MRIfindNearestNonzeroLocation` (wsize, xr yr zr; the place asked for: 1, or not: 0) into a place set to -7 | per point the float and the place's three integers |
+| `lmeans k W W P i i i i i i` | the source, the label volume painted, then label, x0 y0 z0 whalf and whether the spread is asked for: k 0 `MRImeanInLabelMultispectral`, 1 `MRImeanInLabel`, 2 `MRImeanAndStdInLabel`, 3 `MRImeanInLabelInRegion`, 4 `MRImaxInLabelInRegion` | k 0 the vector (M); 1, 4 the double; 2, 3 the double and the spread (unset 7.0) |
+| `mkpos W D` | `MRImakePositive` | the result |
+| `mlbv W P D i i i` | `MRImarkLabelBorderVoxels` (label, mark, six) | the result |
+| `lnbhd W P W\|null i i i i i i` | `MRIcomputeLabelNbhd` of the painted label volume and the values (x y z, whalf, max_labels, the means given: 1, or none: 0) into arrays of exactly max_labels entries set to -7 and 7.0 | its value, the counts, then the means when given |
+| `linbhd W P n (k i i i i i i)×n` | per point k 0 `MRIlabelsInNbhd` (x y z whalf label), 1 `MRIlabelsInPlanarNbhd` (and the plane) | the counts |
+| `lbbox W P i` | `MRIlabelBoundingBox` (the label) into a box set to -7 | its value, the box's six integers |
+| `fillbox W R f` | `MRIfillBox` (the box, the value) | its value, the volume |
+| `mskz W W P D` | `MRImaskZero` (the source, the painted mask, the destination) | the result |
+| `clipwm W W P` | `MRIclipBrightWM` (the T1 volume, the painted white-matter volume) | its value, the T1 volume |
+| `ltachg LTA i` | `LTAchangeType` (the type) [§54] | `self` when it returns the array, then the array (LTA) |
 
 ## The models
 
@@ -265,7 +284,23 @@ and voxel-to-voxel matrices; `MRIsetVoxelToRasXform` with scaled, odd and NaN ma
 unset, a number, a word, empty), the fixed cases of `vrules8` (§33: statistics of one voxel, a NaN first
 voxel, 64-bit integers, types not read, no voxels; orientation strings of 0 to 4 characters, every case,
 NUL and 0x80; centres with factors that do not divide and of 0), `vbsvol` (§29, §31: the linear transforms with method 5 and `MRIresampleFill` with type 5, the cubic
-B-spline), and fs.bspline's `vbspline` (the coefficients of volumes of the six numeric types, degrees 2
+B-spline), part 7b's `vimage` (§34: `MRItoImageView` of volumes with direction cosines that are mostly
+signed permutations, every slice direction and view, slices negative, inside and past, frames -1 to one
+past, no, a fitting or another given image; `MRItoImage` of bytes, ints, floats and other types into no or
+a given image of every format and size; `ImageToMRI` of every pixel format, 0 to 3 frames, sizes 0, tiny
+and NaN, headers that count other rows, columns or frames) and `vnbhd` (§35: the parcellation smoothing
+on shorts with small labels and on other types, counts 0 to 27; the border planes; the window counts and
+maxima with window sizes -2 to 7 and points up to two voxels outside; the nearest non-zero voxel at points
+that round inside; the label means with label volumes of the source's or another extent; the positive
+shift; the label borders; the label counts of a window, in it and in a plane; the label's box; boxes
+filled across the edges; the masks; the clipping of bright white matter), §54's `vltapv` (transform arrays
+changed from physical-voxel to RAS-to-RAS or to the same type, 0 to 2 transforms, geometries valid in most
+cases, voxel sizes 0 and NaN, matrices of every kind, inverses without a matrix; fs.bspline's
+`LTAtransformBSpline` with such arrays), the fixed cases of `vrules9` (§34, §35: the image view of 32-bit
+integers that a float cannot hold, RGB images of 1 to 3 frames, headers that count more than their pixels,
+the formats `ImageToMRI` refuses, a given image too small or too narrow for `MRItoImage`, negative labels
+in the smoothing, bright white matter of values outside 0 to 255, windows more than 500 voxels outside and
+the nearest non-zero voxel at points outside, on lines of their own, planes not supported), and fs.bspline's `vbspline` (the coefficients of volumes of the six numeric types, degrees 2
 to 9 and 0, 1, 10, -1, given B-splines with fitting, other or no coefficients; sampling at points inside,
 at and past the edges, NaN and infinite, frames -1 to one past; the frame-range sampler; coefficients
 sampled as given with degrees -2 to 12; the linear, RAS and transform-array transforms; the pyramids into
@@ -342,3 +377,14 @@ cached matrices as allocated, recomputed or dropped.
   `vsample` and `vresamp`, FS-322 in `vderiv` and FS-325 in `vlinear`. A negative B-spline degree on a
   volume of one voxel (FS-964) is left out: its indices are stack contents whose detection changed in one
   of four reference runs.
+- Relay 12 (2026-11-20): the prebuilt probe rebuilt from commit `0b5c7bb6` (part 7b's commands, `ltachg`,
+  the image encoding and the integer fill; its build in `BUILD_INFO.txt`, the same bytes twice; the
+  5d35ae1f build kept in `<workspace>/archive/2026-11-20-fs-volume-probe-5d35ae1f/`): every earlier group's
+  hash unchanged; the new groups `vimage` (290 calls), `vnbhd` (441), `vltapv` (135) and `vrules9` (34) the
+  same cold, warm and twice without the cache; the probe as its own candidate: no unexplained difference
+  in either mode; `models.py fs291` 127, `skull` 160, `cma` 95 lines as their models (log
+  `oracles/logs/fs-volume-probe-r12-final-2026-11-20.log`), `view` 76, `smooth` 22, `nearest` 40 and
+  `physvox` 60 as theirs, none different (log `oracles/logs/fs-volume-probe-r12-models-2026-11-20.log`).
+  Label volumes are zeros with small labels painted (a seeded fill would make nearly every point's own
+  voxel non-zero); the nearest non-zero voxel's points round inside the volume (its direct read of the
+  point itself outside is on lines of their own, `vrules9`).

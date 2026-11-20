@@ -2063,6 +2063,380 @@ class Gen9(Gen8):
         return [Batch("vrules8", "vrules8", L)]
 
 
+class Gen10(Gen9):
+    """Part 7b (§34, §35): slices as 2-D images, neighbourhoods and labels; §54's change of a
+    transform array from physical-voxel to RAS-to-RAS (with the inverses' fill)."""
+
+    def pvol(self, r: random.Random, shape: str, perm: float = 0.9, **kw) -> str:
+        """W whose direction cosines are mostly a signed permutation (a principal slice
+        direction), its cache recomputed."""
+        t = self.rvol(r, shape=shape, **kw).split(" ")
+        if r.random() < perm:
+            order = r.sample(range(3), 3)
+            for j in range(3):
+                for i in range(3):
+                    t[11 + 3 * j + i] = f32(r.choice([1.0, -1.0]) if i == order[j] else 0.0)
+            if r.random() < 0.05:
+                t[11 + r.randrange(9)] = QNAN
+        return " ".join(t)
+
+    def img(
+        self, r: random.Random, fmts=(0, 0, 3, 3, 1, 2, 35), ext: tuple[int, int] = (0, 4)
+    ) -> str:
+        """I (README.md): rows cols format frames, xsize ysize, a fill, the header's overrides."""
+        rows, cols = r.randint(*ext), r.randint(*ext)
+        fmt = r.choice(fmts)
+        nf = r.choice([1, 1, 1, 2, 3, 0])
+        size = [r.choice([1.0, 1.0, 2.0, 0.5, 0.0, 1e-16, 3.0]) for _ in range(2)]
+        sv = [f32(v) for v in size]
+        if r.random() < 0.05:
+            sv[r.randrange(2)] = QNAN
+        fill = (
+            f"t{r.randint(0, 33)}"
+            if fmt == 3 and r.random() < 0.6
+            else str(r.choice([-1, r.randint(0, 255)]))
+        )
+        ov = ["-1"] * 5
+        if r.random() < 0.15:
+            k = r.randrange(5)
+            ov[k] = str(r.choice([0, 1, 2, 3, 5]))
+        return " ".join([str(rows), str(cols), str(fmt), str(nf), *sv, fill, *ov])
+
+    def labpaint(self, r: random.Random, shape: str, labels=(0, 1, 2, 3)) -> str:
+        w, h, d = (int(x) for x in shape.split()[:3])
+        n = r.randint(0, min(12, w * h * d))
+        pts = []
+        for _ in range(n):
+            v = (
+                float(r.choice(labels))
+                if r.random() < 0.9
+                else r.choice([-1.0, 250.0, 2.5, 1.4999])
+            )
+            pts.append(f"{r.randrange(w)} {r.randrange(h)} {r.randrange(d)} {f32(v)}")
+        return " ".join([str(n), *pts])
+
+    def vimage(self) -> list[Batch]:
+        """§34: MRItoImageView (every slice direction and view, the slice negative, inside and
+        past, frames -1 to one past on lines of their own, no, a fitting or another given image),
+        MRItoImage (bytes, ints, floats and other types; slices -1 to past; no or a given image of
+        every format and size), ImageToMRI (every pixel format, 0 to 3 frames, sizes 0, tiny and
+        NaN, headers that count other rows, columns or frames)."""
+        r = self.rng("vimage")
+        L = []
+        for _ in range(140):
+            s = self.vshape(r, types=NUMERIC, ext=(2, 4), frames=(1, 2), hdr=0.02)
+            a = self.pvol(r, s, special=0.04, ct=0.0)
+            nf = int(s.split()[4])
+            view = r.choice([0, 0, 0, 1, 1, 1, 2, 2, 2, 3, -1])
+            slice_ = r.choice([-1, -1, -1, 0, 0, 0, 1, 1, 2, 3, -5])
+            frame = r.choice([0, 0, 0, 0, 0, 0, nf - 1, nf - 1, nf - 1, nf, -1])
+            im = "null" if r.random() < 0.6 else self.img(r, fmts=(0, 0, 0, 3, 1), ext=(0, 4))
+            paint = "0" if r.random() < 0.7 else self.labpaint(r, s, labels=(0, 1, 7, 100))
+            L.append(f"toimgv {a} {paint} {im} {slice_} {view} {frame}")
+        for _ in range(80):
+            s = self.vshape(
+                r, types=[0, 0, 1, 1, 3, 3, 2, 4, 10], ext=(1, 4), frames=(1, 2), hdr=0.03
+            )
+            a = self.rvol(r, shape=s, special=0.05, ct=0.0)
+            slice_ = r.choice([0, 0, 1, 2, 3, -1, 4])
+            im = "null" if r.random() < 0.6 else self.img(r, ext=(1, 4))
+            L.append(f"toimg {a} 0 {im} {slice_}")
+        for _ in range(70):
+            fm = (0, 0, 1, 2, 3, 3, 35, 35, 4, 6) if r.random() < 0.15 else (0, 1, 2, 3, 35)
+            L.append(f"img2mri {self.img(r, fmts=fm, ext=(1, 4))}")
+        return [Batch("vimage", "vimage", L)]
+
+    def vnbhd(self) -> list[Batch]:
+        """§35: MRIsmoothParcellation (shorts with small labels, counts 0 to 27; other types),
+        MRIeraseBorderPlanes (borders -1 to 5), the window counts and maxima (window sizes -2 to 7,
+        points up to two voxels outside, frames -1 to one past on lines of their own),
+        MRIfindNearestNonzeroLocation (points inside, rounded both ways, the place asked for or
+        not), the label means (labels painted, regions inside and across the edges, the spread
+        asked for or not, label volumes of another extent), MRImakePositive, MRImarkLabelBorderVoxels,
+        MRIcomputeLabelNbhd, MRIlabelsInNbhd, MRIlabelsInPlanarNbhd (planes 0 to 3), MRIlabelBoundingBox,
+        MRIfillBox (boxes inside, across and past the edges), MRImaskZero, MRIclipBrightWM."""
+        r = self.rng("vnbhd")
+        L = []
+
+        def lv(shape: str) -> str:
+            return f"{self.rvol(r, shape=shape, special=0.0, ct=0.0)} {self.labpaint(r, shape)}"
+
+        for _ in range(30):
+            t = 4 if r.random() < 0.85 else r.choice([0, 3])
+            s = f"{r.randint(1, 5)} {r.randint(1, 5)} {r.randint(1, 5)} {t} {r.randint(1, 2)} 0"
+            a = self.rvol(r, shape=s, ct=0.0)
+            fill = r.choice(["-1", "-1", "-1", "0"]) if t == 4 else None
+            if fill is not None:
+                ta = a.split(" ")
+                # zeros as allocated (small labels painted over), or seed 0 (FS-467's negatives)
+                ta[6] = fill
+                a = " ".join(ta)
+            L.append(
+                f"smpar {a} {self.labpaint(r, s, labels=(0, 1, 2, 2, 3))} {r.choice([0, 1, 2, 3, 5, 8, 13, 26, 27])}"
+            )
+        for _ in range(25):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 5), frames=(1, 2))
+            m = min(int(x) for x in s.split()[:3])
+            b = (
+                r.choice([-1, 0, 1, 1, (m + 1) // 2, (m + 1) // 2])
+                if r.random() < 0.9
+                else r.choice([m, m + 2])
+            )
+            L.append(f"erasebp {self.rvol(r, shape=s, ct=0.0)} {b}")
+        for _ in range(45):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 5), frames=(1, 2))
+            w, h, d, nf = (int(x) for x in (s.split()[0], s.split()[1], s.split()[2], s.split()[4]))
+            pts = []
+            for _ in range(r.randint(1, 5)):
+                k = r.randint(0, 3)
+                xyz = [r.randint(-2, e + 1) for e in (w, h, d)]
+                fr = r.choice([0, 0, nf - 1])
+                pts.append(
+                    f"{k} {r.choice([-2, -1, 0, 1, 2, 3, 3, 5, 7])} {xyz[0]} {xyz[1]} {xyz[2]} {fr} {self.fv(r, 0.1)}"
+                )
+            a = self.rvol(r, shape=s, special=0.05, ct=0.0)
+            L.append(f"nbhd {a} {self.labpaint(r, s)} {len(pts)} {' '.join(pts)}")
+        for _ in range(6):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 2))
+            nf = int(s.split()[4])
+            a = self.rvol(r, shape=s, ct=0.0)
+            L.append(f"nbhd {a} 0 1 0 3 1 1 1 {r.choice([nf, -1])} {f32(0.0)}")
+        for _ in range(40):
+            t = 0 if r.random() < 0.8 else r.choice([3, 4, 1])
+            s = f"{r.randint(1, 5)} {r.randint(1, 5)} {r.randint(1, 5)} {t} 1 0"
+            w, h, d = (int(x) for x in s.split()[:3])
+            pts = []
+
+            def inside(e: int) -> str:
+                # a coordinate whose rounding (half away from zero) stays inside: the direct read of
+                # the point itself (§35) is then a voxel of the volume
+                while True:
+                    c = r.randint(0, e - 1) + r.choice(
+                        [0.0, 0.0, 0.4, -0.4, 0.5, -0.5, 0.49, -0.49]
+                    )
+                    n = int(c + 0.5) if c >= 0 else int(c - 0.5)
+                    if 0 <= n < e:
+                        return f64(c)
+
+            for _ in range(r.randint(1, 4)):
+                xyz = [inside(e) for e in (w, h, d)]
+                pts.append(f"{r.choice([1, 3, 3, 5, 0, -1])} {' '.join(xyz)} {r.choice([0, 1, 1])}")
+            a = self.rvol(r, shape=s, ct=0.0)
+            ta = a.split(" ")
+            ta[6] = "-1"  # zeros (as allocated), then the labels painted
+            a = " ".join(ta)
+            L.append(
+                f"nearnz {a} {self.labpaint(r, s, labels=(0, 0, 5, 200))} {len(pts)} {' '.join(pts)}"
+            )
+        for _ in range(60):
+            k = r.randint(0, 4)
+            s = self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 3))
+            sl = (
+                s if r.random() < 0.85 else self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 1))
+            )
+            sl = " ".join([*sl.split()[:3], r.choice(["0", "1", "3"]), "1", "0"])
+            src = self.rvol(r, shape=s, special=0.04, ct=0.0)
+            w, h, d = (int(x) for x in s.split()[:3])
+            reg = [
+                r.randint(-1, w),
+                r.randint(-1, h),
+                r.randint(-1, d),
+                r.choice([-1, 0, 1, 1, 2, 3]),
+            ]
+            L.append(
+                f"lmeans {k} {src} {lv(sl)} {r.choice([0, 1, 1, 2, 3])} {' '.join(map(str, reg))} {r.choice([0, 1, 1])}"
+            )
+        for _ in range(25):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 2))
+            L.append(f"mkpos {self.rvol(r, shape=s, special=0.08, ct=0.0)} {self.rdst(r, s)}")
+        for _ in range(35):
+            t = r.choice([0, 0, 1, 3, 4])
+            s = f"{r.randint(1, 4)} {r.randint(1, 4)} {r.randint(1, 4)} {t} 1 0"
+            a = self.rvol(r, shape=s, ct=0.0)
+            ta = a.split(" ")
+            ta[6] = "-1"  # zeros (as allocated), then the labels painted
+            a = " ".join(ta)
+            L.append(
+                f"mlbv {a} {self.labpaint(r, s)} {self.rdst(r, s)} {r.choice([0, 1, 2, 3])} "
+                f"{r.choice([0, 1, 7, 255, 300, -1])} {r.choice([0, 1])}"
+            )
+        for _ in range(30):
+            t = r.choice([0, 0, 1, 3])
+            s = f"{r.randint(1, 4)} {r.randint(1, 4)} {r.randint(1, 4)} {t} 1 0"
+            w, h, d = (int(x) for x in s.split()[:3])
+            labs = (
+                f"{self.rvol(r, shape=s, ct=0.0)} {self.labpaint(r, s, labels=(0, 1, 2, 3, 4, 5))}"
+            )
+            ta = labs.split(" ")
+            ta[6] = "-1"  # zeros (as allocated), then the labels painted
+            labs = " ".join(ta)
+            vals = (
+                "null"
+                if r.random() < 0.4
+                else self.rvol(r, shape=s.replace(f" {t} 1 0", " 3 1 0"), ct=0.0)
+            )
+            wm = 1 if vals != "null" else r.choice([0, 1])
+            xyz = [r.randint(0, e - 1) for e in (w, h, d)]
+            L.append(
+                f"lnbhd {labs} {vals} {xyz[0]} {xyz[1]} {xyz[2]} {r.choice([0, 1, 1, 2])} {r.choice([1, 3, 4, 6, 0])} {wm}"
+            )
+        for _ in range(35):
+            t = r.choice([0, 0, 1, 3])
+            s = f"{r.randint(1, 5)} {r.randint(1, 5)} {r.randint(1, 5)} {t} 1 0"
+            w, h, d = (int(x) for x in s.split()[:3])
+            pts = []
+            for _ in range(r.randint(1, 5)):
+                xyz = [r.randint(-1, e) for e in (w, h, d)]
+                pts.append(
+                    f"{r.choice([0, 1, 1])} {' '.join(map(str, xyz))} {r.choice([-1, 0, 1, 1, 2])} "
+                    f"{r.choice([0, 1, 2, 3])} {r.choice([0, 1, 2, 2, 3, -1])}"
+                )
+            a = self.rvol(r, shape=s, ct=0.0)
+            ta = a.split(" ")
+            ta[6] = "-1"  # zeros (as allocated), then the labels painted
+            a = " ".join(ta)
+            L.append(f"linbhd {a} {self.labpaint(r, s)} {len(pts)} {' '.join(pts)}")
+        for _ in range(25):
+            s = self.vshape(r, types=[0, 1, 3, 4], ext=(1, 5), frames=(1, 1))
+            a = self.rvol(r, shape=s, special=0.04, ct=0.0)
+            L.append(f"lbbox {a} {self.labpaint(r, s)} {r.choice([0, 1, 2, 3, 7])}")
+        for _ in range(25):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 5), frames=(1, 2))
+            box = [r.choice([-3, -1, 0, 1, 2, 4, 9]) for _ in range(3)] + [
+                r.choice([-1, 0, 1, 2, 3, 10]) for _ in range(3)
+            ]
+            L.append(
+                f"fillbox {self.rvol(r, shape=s, ct=0.0)} {' '.join(map(str, box))} {self.fillv(r)}"
+            )
+        for _ in range(30):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 2))
+            sm = (
+                s if r.random() < 0.85 else self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 1))
+            )
+            a = self.rvol(r, shape=s, special=0.05, ct=0.0)
+            m = self.rvol(r, shape=sm, special=0.05, ct=0.0)
+            k = r.random()
+            d = (
+                "new"
+                if k < 0.4
+                else "self"
+                if k < 0.55
+                else "other"
+                if k < 0.65
+                else self.rvol(r, shape=s, ct=0.0)
+            )
+            L.append(f"mskz {a} {m} {self.labpaint(r, sm)} {d}")
+        for _ in range(30):
+            t1 = 0 if r.random() < 0.7 else r.choice([3, 1, 4])
+            s = f"{r.randint(1, 4)} {r.randint(1, 4)} {r.randint(1, 4)} {t1} 1 0"
+            tw = 0 if r.random() < 0.8 else r.choice([3, 1])
+            sw = " ".join([*s.split()[:3], str(tw), "1", "0"])
+            t = self.rvol(r, shape=s, special=0.08, ct=0.0)
+            w = self.rvol(r, shape=sw, ct=0.0)
+            L.append(f"clipwm {t} {w} {self.labpaint(r, sw, labels=(0, 4, 5, 6, 110, 255))}")
+        return [Batch("vnbhd", "vnbhd", L)]
+
+    def vltapv(self) -> list[Batch]:
+        """§54: LTAchangeType from physical-voxel to RAS-to-RAS (FS-506; geometries valid mostly,
+        voxel sizes 0 and NaN, singular cosines; 4 x 4 matrices and others; 0 to 2 transforms;
+        inverses without a matrix: FS-505), the same type (nothing done); fs.bspline §5.3's
+        transform arrays of that type."""
+        r = self.rng("vltapv")
+        L = []
+
+        def g(valid: float = 0.95) -> str:
+            t = self.gf(r).split(" ")
+            t[0] = "1" if r.random() < valid else "0"
+            return " ".join(t)
+
+        def lt(m: str, a: str, b: str) -> str:
+            return " ".join([*[f32(0.0)] * 4, m, "null", "null", "0", "0", a, b])
+
+        for _ in range(110):
+            n = r.choice([1, 1, 1, 1, 1, 2, 0])
+            ty = 2 if r.random() < 0.9 else r.choice([1, 0])
+            target = 1 if r.random() < 0.92 else 2
+            fw, inv = [], []
+            for _ in range(n):
+                a, b = g(), g()
+                m = self.affine(r, special=0.04) if r.random() < 0.88 else self.xmat(r)
+                if m == "null":
+                    m = self.affine(r)
+                fw.append(lt(m, a, b))
+                im = "null" if r.random() < 0.15 else self.affine(r)
+                inv.append(lt(im, b, a))
+            L.append(f"ltachg {n} {ty} {f32(1.0)} {xs('')} {' '.join(fw + inv)} {target}")
+        for _ in range(25):
+            a = self.bvol(r, ext=(1, 4))
+            d = r.choice(["new", "new", "self"])
+            fw = lt(self.affine(r, special=0.03), g(), g())
+            inv = lt("null" if r.random() < 0.2 else self.affine(r), g(), g())
+            arr = f"1 2 {f32(1.0)} {xs(r.choice(['', 'bert']))} {fw} {inv}"
+            L.append(f"bslta {r.choice([3, 3, 2])} {a} {d} {arr} {r.choice([0, 0, 1, 2])}")
+        return [Batch("vltapv", "vltapv", L)]
+
+    @staticmethod
+    def vrules9() -> list[Batch]:
+        """§34 and §35's fixed cases: the image view of 32-bit integers that float cannot hold
+        (the extremes rounded), the RGB frames (FS-466), images whose header counts more frames or
+        pixels than they hold (FS-465), an image given to MRItoImage that is too small or too
+        narrow (FS-465), the unsupported formats; negative labels in the parcellation smoothing
+        (FS-467), MRIclipBrightWM's values outside the byte range (FS-468), windows more than 500
+        voxels outside (FS-323), planes not supported."""
+        L = []
+        one, zero = f32(1.0), f32(0.0)
+        # MRItoImageView of 32-bit integers above 2^24 (fill -1: zeros, then painted)
+        for vals in (
+            (16777219, 16777222),
+            (16777217, 16777218),
+            (100000001, 100000003),
+            (5, 9),
+            (-16777219, -16777216),
+            (16777222, 16777219, 16777220),
+        ):
+            w = fixed_w(len(vals), 1, 1, 1, fill="i" + ",".join(map(str, vals)))
+            L.append(f"toimgv {w} 0 null 0 0 0")
+
+        # ImageToMRI: RGB images of 1 to 3 frames (FS-466), headers counting more frames, rows or
+        # columns than the pixels hold (FS-465), the formats it refuses
+        def im(rows: int, cols: int, fmt: int, nf: int, fill, ov: str = "-1 -1 -1 -1 -1") -> str:
+            return f"{rows} {cols} {fmt} {nf} {one} {one} {fill} {ov}"
+
+        for nf in (1, 2, 3):
+            L.append(f"img2mri {im(2, 3, 35, nf, 17)}")
+        L.append(f"img2mri {im(2, 2, 0, 1, 9, '-1 -1 -1 -1 3')}")
+        L.append(f"img2mri {im(2, 2, 3, 1, 't5', '3 -1 -1 -1 -1')}")
+        L.append(f"img2mri {im(2, 2, 1, 2, 40, '-1 -1 3 3 -1')}")
+        L.append(f"img2mri {im(1, 2, 35, 1, 200, '-1 -1 -1 -1 2')}")
+        for fmt in (4, 6, 36):
+            L.append(f"img2mri {im(2, 2, fmt, 1, 3)}")
+        # MRItoImage into an image too small or of a narrower format (FS-465)
+        L.append(f"toimg {fixed_w(3, 2, 1, 3, fill='t3')} 0 {im(1, 1, 0, 1, -1)} 0")
+        L.append(f"toimg {fixed_w(3, 2, 1, 1, fill=7)} 0 {im(2, 3, 0, 1, -1)} 0")
+        L.append(f"toimg {fixed_w(3, 2, 1, 0, fill=7)} 0 {im(2, 3, 3, 1, -1)} 0")
+        L.append(f"toimg {fixed_w(3, 2, 2, 6, hdr=1)} 0 null 1")
+        # MRIsmoothParcellation with negative labels (FS-467): every count of 26
+        neg = "3 1 1 1 bf800000 0 0 0 bf800000 2 2 2 c0000000"
+        for k in (1, 2, 24, 25):
+            L.append(f"smpar {fixed_w(3, 3, 3, 4, fill=-1)} {neg} {k}")
+        # MRIclipBrightWM of values outside 0 to 255 and NaN (FS-468)
+        t1 = fixed_w(8, 1, 1, 3, fill="t0")
+        L.append(f"clipwm {t1} {fixed_w(8, 1, 1, 0, fill=-1)} 0")
+        L.append(f"clipwm {fixed_w(8, 1, 1, 3, fill='t7')} {fixed_w(8, 1, 1, 0, fill=5)} 0")
+        # windows more than 500 voxels outside (FS-323): lines of their own
+        v = fixed_w(2, 2, 2, 0, fill=3)
+        L.append(f"nbhd {v} 0 1 1 3 -600 0 0 0 {zero}")
+        L.append(f"linbhd {v} 0 1 0 0 0 0 600 1 0")
+        L.append(f"nearnz {v} 0 1 3 {f64(-700.0)} {f64(0.0)} {f64(0.0)} 1")
+        # MRIfindNearestNonzeroLocation at points outside the volume: lines of their own
+        for x in (-1.0, 2.0, 5.0):
+            L.append(f"nearnz {v} 0 1 1 {f64(x)} {f64(0.0)} {f64(0.0)} 1")
+        # the planar count's planes not supported, MRIcomputeLabelNbhd with no labels counted
+        L.append(f"linbhd {v} 0 2 1 0 0 0 1 3 3 1 0 0 0 1 3 -1")
+        L.append(f"lnbhd {v} 0 null 0 0 0 1 0 1")
+        return [Batch("vrules9", "vrules9", L)]
+
+
 GROUPS = [
     "vgblock",
     "vgcopy",
@@ -2094,6 +2468,10 @@ GROUPS = [
     "vbsvol",
     "vstat7",
     "vrules8",
+    "vimage",
+    "vnbhd",
+    "vltapv",
+    "vrules9",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -2201,7 +2579,7 @@ def mask(b: Batch, line: bytes) -> bytes:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen9) else Gen9(gen.seed)
+    gen = gen if isinstance(gen, Gen10) else Gen10(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

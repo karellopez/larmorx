@@ -1,7 +1,7 @@
-# fs.volume's and fs.bspline's clean rooms against FreeSurfer 8.2.0, as a black box (parts 1 to 7a, fs.bspline)
+# fs.volume's and fs.bspline's clean rooms against FreeSurfer 8.2.0, as a black box (parts 1 to 7b, §54's two ready parts, fs.bspline)
 
 larmorx's clean rooms of FreeSurfer's volume functions (`crates/larmorx-fs-core/src/volume/`, written
-from [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) §1 to §33 alone) and of its
+from [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) §1 to §36 and §54's two ready parts alone) and of its
 B-splines (`crates/larmorx-fs-core/src/bspline/`, from
 [`specs/freesurfer-bspline.md`](../../../specs/freesurfer-bspline.md) alone) compared
 with the prebuilt probe of the open folder [`../freesurfer-volume-probe/`](../freesurfer-volume-probe/README.md)
@@ -30,10 +30,10 @@ The golden cases: `cargo test -p larmorx-fs-core --test golden_volume` (record w
 NAN_TRAP_DIR=<scratch>/nt`, the library built from `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`
 as that folder's README says. The defects' own tests: `cargo test -p larmorx-fs-core --test defects_volume`.
 
-## Results (2026-11-19, relay 12, seed 7, every group of the volume spec's §69.2 and the B-spline spec's §9; the probe's reference hashes are the specs', the probe of commit `5d35ae1f`)
+## Results (2026-11-21, relay 13, seed 7, every group of the volume spec's §69.2 and the B-spline spec's §9; the probe's reference hashes are the specs', the probe of commit `0b5c7bb6`)
 
 `compare.py` per group: calls, identical, FreeSurfer did not finish, memory, defect corrected,
-unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay12-full.log`).
+unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay13-full.log`).
 
 | Group | Calls | reproduce | fix |
 |---|---|---|---|
@@ -55,31 +55,38 @@ unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay12-full.log`).
 | vrules4 | 94 | 94 / 0 / 0 / 0 / **0** | 42 / 0 / 0 / 52 / **0** |
 | vcma | 377 | 354 / 13 / 10 / 0 / **0** | 296 / 13 / 10 / 58 / **0** |
 | vrules5 | 46 | 27 / 7 / 12 / 0 / **0** | 25 / 7 / 12 / 2 / **0** |
-| vres | 830 | 718 / 77 / 35 / 0 / **0** | 498 / 77 / 98 / 157 / **0** |
+| vres | 830 | 719 / 77 / 34 / 0 / **0** | 499 / 77 / 97 / 157 / **0** |
 | vrules6 | 16 | 15 / 1 / 0 / 0 / **0** | 13 / 1 / 0 / 2 / **0** |
 | vframes | 404 | 401 / 3 / 0 / 0 / **0** | 371 / 3 / 0 / 30 / **0** |
 | vderiv | 382 | 358 / 22 / 2 / 0 / **0** | 342 / 22 / 4 / 14 / **0** |
 | vlinear | 360 | 346 / 12 / 1 / 1 / **0** | 217 / 12 / 4 / 127 / **0** |
 | vresamp | 272 | 253 / 17 / 1 / 1 / **0** | 158 / 17 / 1 / 96 / **0** |
 | vrules7 | 12 | 12 / 0 / 0 / 0 / **0** | 10 / 0 / 0 / 2 / **0** |
-| vbspline | 410 | 375 / 24 / 9 / 0 / **2** | 318 / 24 / 10 / 58 / **0** |
-| vbsrules | 71 | 68 / 0 / 3 / 0 / **0** | 64 / 0 / 3 / 4 / **0** |
+| vbspline | 410 | 377 / 24 / 9 / 0 / **0** | 318 / 24 / 10 / 58 / **0** |
+| vbsrules | 71 | 69 / 0 / 2 / 0 / **0** | 64 / 0 / 3 / 4 / **0** |
 | vbsvol | 70 | 66 / 4 / 0 / 0 / **0** | 29 / 4 / 1 / 36 / **0** |
 | vstat7 | 481 | 474 / 0 / 7 / 0 / **0** | 432 / 0 / 7 / 42 / **0** |
 | vrules8 | 32 | 29 / 0 / 3 / 0 / **0** | 27 / 0 / 3 / 2 / **0** |
-| all | 13,346 | 12,336 / 827 / 172 / 9 / **2** | 9,201 / 827 / 532 / 2,786 / **0** |
+| vimage | 290 | 274 / 15 / 1 / 0 / **0** | 133 / 15 / 1 / 141 / **0** |
+| vnbhd | 441 | 428 / 10 / 3 / 0 / **0** | 379 / 10 / 5 / 47 / **0** |
+| vltapv | 135 | 127 / 1 / 0 / 0 / **7** | 47 / 1 / 0 / 87 / **0** |
+| vrules9 | 34 | 30 / 1 / 3 / 0 / **0** | 18 / 1 / 4 / 11 / **0** |
+| all | 14,246 | 13,199 / 854 / 177 / 9 / **7** | 9,779 / 854 / 541 / 3,072 / **0** |
 
-Totals: `reproduce` 12,336 of 13,346 identical (827 where FreeSurfer did not finish, 9 of them
-FS-314's aborts that the candidate gives too, which §69.3 checks; 172 memory lines; 9 lines where the
+Totals: `reproduce` 13,199 of 14,246 identical (854 where FreeSurfer did not finish, 9 of them
+FS-314's aborts that the candidate gives too, which §69.3 checks; 177 memory lines; 9 lines where the
 candidate noted a defect whose value in FreeSurfer is memory it never wrote, which §69.3 allows in both
-modes: FS-300 in `vsample` and `vresamp`, FS-325 in `vlinear`) and 2 `vbspline` lines not yet
-implemented: transform arrays of physical voxels (`LTAchangeType`, the volume spec's §54, not yet
-read through for the clean room; reported to the spec writer); `fix` 9,201 identical (827 not
-finished, 532 memory, 2,786 corrected by a noted defect), none unexplained. Relay 12 followed the
-spec writer's answers to relay 11's items (§15's rounding of the double, FS-325's and FS-300's lines
-allowed in both modes, FS-326 reached by `vrules7`, item 44's choices: every earlier line as
-before), then part 7a (§33: `vstat7`, `vrules8`), fs.bspline (`vbspline`, `vbsrules`) and the cubic
-B-spline paths (`vbsvol`); fs.bspline's own findings: `docs/findings/fs-bspline-clean-room.md`.
+modes: FS-300 in `vsample` and `vresamp`, FS-325 in `vlinear`) and 7 `vltapv` lines of type changes
+whose text in the volume spec's §54 is not yet ready for the clean room (voxel to RAS, voxel to
+physical-voxel, RAS to physical-voxel: an interim end, status 253; reported to the spec writer);
+`fix` 9,779 identical (854 not finished, 541 memory, 3,072 corrected by a noted defect), none
+unexplained. Relay 13 followed the spec writer's answers to relay 12's items (FS-462's and FS-464's
+ends, FS-964's end in each mode, §54's change of a physical-voxel array to RAS-to-RAS with the
+inverses' fill: `vbspline`'s two lines relay 12 left are identical now), then part 7b (§34, §35:
+`vimage`, `vnbhd`, `vrules9`) and §54's group `vltapv`; part 7b's groups were run again after the label
+sums' NaN order (unchanged). fs.bspline's own findings: `docs/findings/fs-bspline-clean-room.md`.
+`nan-order/mk.py` holds the black-box check of §35's label sums' NaN order (its docstring says how to
+run it and what it showed).
 
 - **Where FreeSurfer did not finish** (crashes: header copies from a volume without its cached
   matrix, FS-252; volumes without voxels walked directly, FS-58; smaller second volumes and frames
@@ -110,7 +117,8 @@ B-spline paths (`vbsvol`); fs.bspline's own findings: `docs/findings/fs-bspline-
   the group `res`; part 6b's 11 commands and 6c's 2, the groups `frames`, `deriv`, `linear` and
   `regrid`, with the diagnostic bits' prints of `rsmat` and `rsfill`; part 7a's 11 commands, the
   group `info`; fs.bspline's 10, the group `bspline`, its transform arrays on clean geometries too;
-  the cubic B-spline paths, the group `bsvol`), both modes, 46 SHA-256 over 23 groups (0.06 s in a
+  the cubic B-spline paths, the group `bsvol`; part 7b's 16 commands, the groups `image` and `nbhd`;
+  §54's change of type, the group `ltapv`), both modes, 52 SHA-256 over 26 groups (0.06 s in a
   debug build). Identical in debug and release builds and under the AArch64
   NaN emulation of both.
 - `cargo test -p larmorx-fs-core --test defects_volume`: each defect of the spec's §69.4 (FS-265,
@@ -129,8 +137,11 @@ B-spline paths (`vbsvol`); fs.bspline's own findings: `docs/findings/fs-bspline-
   and FS-301's corrections avoid those walks); part 7a's FS-329 (a 64-bit volume's statistics),
   FS-330 (an RGB volume's printed statistics), FS-462 (a sampled extent of 0), FS-463 (a string of
   one character) and FS-464 (a 2 x 2 matrix); fs.bspline's FS-962 (an axis of one voxel doubled),
-  FS-963 (halved) and FS-964 (degrees 10 and -1 on one voxel, 10 on 3 x 3 x 3); also FS-12, FS-47,
-  ITK-112, FS-52, FS-53 and FS-58.
+  FS-963 (halved) and FS-964 (degrees 10 and -1 on one voxel, 10 on 3 x 3 x 3: its two ends); part
+  7b's FS-465 (an image too small for `MRItoImage`), FS-466 (an RGB image of two frames), FS-467
+  (negative labels in the smoothing) and FS-468 (T1 values outside the byte range), §54's FS-505 and
+  FS-506 (a `vltapv` line), `MRIcomputeLabelNbhd` with values and no means; also FS-12, FS-47, ITK-112,
+  FS-52, FS-53 and FS-58.
 - Speed (part 4; the spec's plan names none): one batch line each through the probe and the
   candidate, end to end, best of 3: 20,000 points on a 32^3 float volume, trilinear 1.3x faster than
   FreeSurfer, cubic 1.1x, nearest 1.5x, windowed sinc 0.72x (the main package's `sin` and `cos`
@@ -147,4 +158,7 @@ B-spline paths (`vbsvol`); fs.bspline's own findings: `docs/findings/fs-bspline-
   halving a 64^3 volume 1.0x, doubling a 32^3 one 1.1x, the linear transform and `MRIresampleFill`
   with the cubic B-spline 1.2x each; every line identical. The numbers in the findings. Part
   5's functions (label tests and walks over a segmentation) were not timed: §24 names no speed
-  check.
+  check. Part 7b (relay 13, `mk.py part7b`; §36 names none): the parcellation's smoothing of 64^3
+  shorts 6.2x, the mask 1.45x, the clipping of bright white matter 1.17x, a 256 x 256 slice as an
+  image 1.27x, the label mean and spread 0.92x, window counts 0.80x, the label borders 0.61x; every
+  line identical.

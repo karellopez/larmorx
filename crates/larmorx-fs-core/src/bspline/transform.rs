@@ -197,7 +197,7 @@ impl Process {
                 self.mri_apply_ras_linear_transform_bspline(b, Some(d), ras.as_ref())?
             }
             lta_type::LINEAR_PHYSVOX_TO_PHYSVOX => {
-                self.lta_physvox_to_ras(lta)?;
+                self.lta_change_type(lta, lta_type::LINEAR_RAS_TO_RAS)?;
                 let m = lta.xforms[0].m_l.clone();
                 self.mri_apply_ras_linear_transform_bspline(b, Some(d), m.as_ref())?
             }
@@ -223,26 +223,5 @@ impl Process {
             )
             .as_bytes(),
         );
-    }
-
-    /// `LTAchangeType(lta, LINEAR_RAS_TO_RAS)` of a physical-voxel array, as far as
-    /// `specs/freesurfer-bspline.md` §5.3 states it: every transform's source and destination
-    /// geometry must be valid (`LTAchangeType: src geometry must be valid`, `dst`: the program's
-    /// end, status 252).
-    fn lta_physvox_to_ras(&mut self, lta: &mut Lta) -> Result<(), Stop> {
-        for lt in &lta.xforms {
-            for (g, which) in [(&lt.src, "src"), (&lt.dst, "dst")] {
-                if g.valid != 1 {
-                    self.error_exit(
-                        codes::BAD_PARM,
-                        format!("LTAchangeType: {which} geometry must be valid\n").as_bytes(),
-                    )?;
-                }
-            }
-        }
-        self.error_exit(
-            codes::UNSUPPORTED,
-            b"LTAtransformBSpline: physical-voxel transform arrays need LTAchangeType (not yet ported)\n",
-        )
     }
 }

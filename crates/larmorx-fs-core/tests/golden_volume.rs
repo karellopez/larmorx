@@ -182,11 +182,11 @@ const GOLDEN: &[(&str, &str)] = &[
     ),
     (
         "bspline.fix",
-        "95378741724e25165a8edb8e8dc4da3b6df5cf5b35d6e4a61660d4bbd01dccaf",
+        "21c898491f6aed35f86d925c22490801e1e4084b75992a47828732f167f93e52",
     ),
     (
         "bspline.reproduce",
-        "547f266687ddf96763c8170ff9e8e126fb43a477696002fa1b0f2763498756ae",
+        "affbe200de469b9e60a05c0e57834a8930e3618bdc76de6f83345073b240dded",
     ),
     (
         "bsvol.fix",
@@ -198,11 +198,11 @@ const GOLDEN: &[(&str, &str)] = &[
     ),
     (
         "info.fix",
-        "d65d8cc2f282a4b212edac697402b1c7d064e6ab49505ef635709104f6682022",
+        "45094de4e58042c463941a205be23adab83705ae5c13d5dbd3f11fe12d330318",
     ),
     (
         "info.reproduce",
-        "817b8b62fe02a52fdb072204841ff3646f11b24b8e301e2d0416e236496b640e",
+        "1948f6ffc67df060955b7fbee088894926114571929e42dbf544fbe671f47793",
     ),
 ];
 

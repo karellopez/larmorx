@@ -2,8 +2,8 @@
 // fs.robust's speed and memory against FreeSurfer's own code (build.sh builds it beside fsrobust).
 // CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (it names FreeSurfer's functions).
 //
-//     bench <op> <n>     op: partials | subsample | valscale | blur | centroid | all; one n^3 float
-//                        volume of a fixed pattern; prints each op's seconds and the FNV-1a of its
+//     bench <op> <n>     op: partials | subsample | valscale | blur | centroid | sqrtm | all; one n^3
+//                        float volume of a fixed pattern (sqrtm: n 4 x 4 square roots); prints each op's seconds and the FNV-1a of its
 //                        outputs' voxels (the port's example fs_robust_bench prints the same hashes)
 #include <chrono>
 #include <cinttypes>
@@ -51,7 +51,7 @@ int main(int argc, char **argv)
   if (argc != 3) { fprintf(stderr, "usage: bench <op> <n>\n"); return 2; }
   std::string op = argv[1];
   int n = atoi(argv[2]);
-  MRI *src = pattern(n);
+  MRI *src = op == "sqrtm" ? NULL : pattern(n);  // sqrtm: n is a count, no volume
   auto run = [&](const char *name, std::function<uint64_t()> f) {
     if (op != "all" && op != name) return;
     auto t0 = std::chrono::steady_clock::now();
@@ -88,6 +88,19 @@ int main(int argc, char **argv)
     std::vector<double> c = CostFunctions::centroid(src);
     uint64_t h = 0;
     for (double v : c) { uint64_t u; memcpy(&u, &v, 8); h = h * 31 + u; }
+    return h;
+  });
+  // n square roots of 4 x 4 transforms (a rotation by atan(4/3) about z, scaled, translated by k)
+  run("sqrtm", [&] {
+    uint64_t h = 0;
+    for (int k = 0; k < n; k++) {
+      vnl_matrix<double> m(4, 4, 0.0);
+      m[0][0] = 0.6; m[0][1] = -0.8; m[1][0] = 0.8; m[1][1] = 0.6; m[2][2] = 1.02; m[3][3] = 1.0;
+      m[0][3] = k * 0.001; m[1][3] = -k * 0.002; m[2][3] = 0.5;
+      vnl_matrix<double> r = MyMatrix::MatrixSqrt(m);
+      for (unsigned i = 0; i < 4; i++)
+        for (unsigned j = 0; j < 4; j++) { uint64_t u; memcpy(&u, &r[i][j], 8); h = h * 31 + u; }
+    }
     return h;
   });
   return 0;

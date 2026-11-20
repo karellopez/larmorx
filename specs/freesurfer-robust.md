@@ -20,9 +20,9 @@ FreeSurfer specs it cites, the main package's open code and documentation, IEEE 
 as black boxes the official FreeSurfer 8.2.0 programs (§8).
 
 Status: **part 1**, the helpers both `mri_robust_register` and `mri_robust_template` reach (the image
-helpers of §2, the moments of §3, the matrix helpers of §4). Part 2 (the registration itself, its
-transformations, steps and robust regression, and the matrix square root of §6) follows with queue item
-3.2-03. What black-box runs confirmed is marked **(observed)**.
+helpers of §2, the moments of §3, the matrix helpers of §4), with **part 2's first piece**, the complex
+Schur form and the matrix square root (§4.5, §4.6; relay 41, 2026-11-20). The rest of part 2 (the
+registration itself, its transformations, steps and robust regression) follows with queue item 3.2-03. What black-box runs confirmed is marked **(observed)**.
 
 ## 1. Conventions
 
@@ -236,6 +236,63 @@ by it.
   (FreeSurfer's assertion is compiled out); `t = 0.5 ((+0 + m(0,0) + m(1,1) + m(2,2)) - 1)`, clipped to
   `[-1, 1]` (`t > 1` then `t < -1`); the result `sqrt(2) acos(t)` (`sqrt(2)` the `double` nearest).
 
+### 4.5 `SchurComplex(A, U, T)` (a square `n x n` matrix; part 2, relay 41)
+
+The complex Schur form `A = U T U^H`, `T` upper triangular, `U` unitary: reference LAPACK 3.10.0's
+`ZGEES` with `JOBVS = 'V'`, `SORT = 'N'`, `LDA = LDVS = N`, `LWORK = 10 N` on `A` converted to complex
+(each element `(a, +0)`), as Ubuntu 22.04's `liblapack.a` (3.10.0-2ubuntu1, gfortran 11) computes it,
+which is the main package's open `larmorx_core::lapack_zgees::zgees_vn` (its column-major `a` is `A`
+read column by column; `T(i, j)` and `U(i, j)` come back as `a[i + j n]` and `vs[i + j n]`). Its
+complex arithmetic and its `ABS` and `SQRT` of a complex number are `larmorx_core::cplx`'s (gfortran's
+plain product and Smith's division; the correctly rounded `hypot` inside `cabs` and `csqrt`: the
+project's decision D4, §5).
+
+- When `ZGEES` returns a non-zero `info`, on standard error `<MyMatrix.cpp>: info = <info>, something went
+  wrong:` and, for `info` from 1 to `n`, `<MyMatrix.cpp>: the QR iteration failed, but the last <n -
+  info> eigenvalues may be correct` (for `info < 0`: `... (internal error) the <-info>th argument had an
+  illegal value`; `n + 1`: `... EV could not be reordered (ill conditioned)`; `n + 2`: `... roundoff
+  error -- maybe due to poor scaling`; otherwise `... unknown error`), each line ended by a newline,
+  `<MyMatrix.cpp>` being `/home/rd521/space_freesurfer/build/docker_ubuntu22/trunk/rd521-8.2.0/mri_robust_register/MyMatrix.cpp`
+  **(observed)**; then it goes on with what `ZGEES` left in `U` and `T`. On the matrices FreeSurfer
+  computes this happens only with an infinite or NaN element (FS-969, §5), whose `info` is 2 on the
+  2 x 2 matrices observed.
+- An empty matrix: FS-970 (§5).
+
+### 4.6 `MatrixSqrt(A)` (a square `n x n` matrix; part 2, relay 41)
+
+The principal square root, from `SchurComplex(A, U, T)` (§4.5), in C++'s complex arithmetic
+(`larmorx_core::cplx`: `cxx_mul`, the plain product with C11 Annex G's `_Cmultd` where both parts are
+NaN; `cxx_div`, Smith's quotient with Annex G's recovery; `csqrt`; `cabs`) and VNL's complex matrices
+(`larmorx_core::vnl_matrix::VnlCMatrix`: products `sum = (0, 0)`, then `sum = sum + a(i, k) b(k, j)` for
+`k` in order; `U^H` the conjugate transpose):
+
+1. When `isDiag(real(T), 1e-14)` and `isDiag(imag(T), 1e-14)` (§4.2): `R_i = csqrt(T(i, i))` and the root
+   `S = (U diag(R)) U^H`, `U diag(R)` being `U(i, j) R_j` element by element.
+2. Otherwise the upper triangular `R`: for each column `j` from 0, `R(j, j) = csqrt(T(j, j))`, then for
+   `i` from `j - 1` down to 0: `s = (0, 0)`, `s = s + R(i, k) R(k, j)` for `k = i + 1 .. j - 1`, and `R(i,
+   j) = (T(i, j) - s) / (R(i, i) + R(j, j))` (the difference and the sum part by part, the quotient
+   `cxx_div`); the other elements `(0, 0)`. The root `S = (U R) U^H`.
+3. `imagone` = the one-norm of `imag(S)` (the largest column sum of absolute values, from `+0`, a column
+   kept when greater); when `imagone > ((10 n) 2^-52) |S|_1` (`|S|_1` the one-norm of `S` with `cabs`):
+   on standard error `MyMatrix::MatrixSqrt Internal Error: ` and a newline, ` Result too imaginary to
+   ignore! ( <imagone> )`, ` Debug Info: `, then `A`, `T` and `U` printed by VNL's long format, each
+   followed by an empty line, ` fro( real(U * T * U^*) - A) = <f>` and an empty line, `S` printed (`Asqrt`)
+   and an empty line, ` fro( real(sqrt(A)) ^2 - A)  = <g>` and an empty line; the program ends, status 1.
+   The numbers are C++'s default `%g` (6 digits); `<f>` is the Frobenius norm of `real((U T) U^H) - A`,
+   `<g>` of `real(S) real(S) - A`. VNL's long format (`larmorx_core::vnl_matrix::matlab_print_long` and
+   `matlab_print_long_complex`): `<name> = [ ...`, each row's elements, ` ]` after the last row's, each row
+   then a newline; a `double` as `%16.13f ` (`%16d ` of 0 for a zero of either sign), a complex number's
+   real part as `%16.12f ` (`%16d ` of 0 for a zero) and its imaginary part as `+` or `-` (its sign, `-`
+   only below zero) and `%15.12fi ` of its magnitude, or 18 blanks (` %15s  ` of nothing) for a zero.
+4. `M = real(S)`, `D = M M - A` (VNL's product, then the difference element by element); when `|D|_F >
+   1e-10`: on standard error `MyMatrix::MatrixSqrt Internal Error: `, `  Result not close enough to square
+   root!`, `  Frobenius norm of difference: <|D|_F>`, then `A`, `M` (as `Asqrt`) and `D` (as `Diff`) in
+   VNL's long format, each followed by an empty line; the program ends, status 1.
+5. Otherwise the result is `M`.
+
+**(observed)**: `[[-1, 0], [0, 1]]` ends in step 3 with `imagone` 1 and its `T`, `U` and `S` printed;
+Jordan blocks with a zero eigenvalue end in step 4.
+
 ## 5. Defects (`larmorx_core::defects`; the register's FS entries)
 
 - **FS-966** (memory): in §3.2, when no eigenvalue is above another (all equal, or NaN), `largest =
@@ -253,17 +310,28 @@ by it.
   entry): FreeSurfer computes the distance from the decomposition reached (an arbitrary number). By
   default, after VNL's warning, `MyMatrix: no inverse of a matrix whose singular value decomposition did
   not converge (an infinite or NaN entry)` and status 1; `reproduce` gives FreeSurfer's number.
+- **FS-969** (rule B): §4.5 and §4.6 on a matrix with an infinite or NaN element: the Schur form's QR
+  iteration does not converge (§4.5's lines, `info = 2` on the 2 x 2 matrices observed) and NaN factors
+  come back, or the NaNs pass through; §4.6's checks never fail on NaNs, so a NaN matrix is returned. By
+  default, before anything, `MyMatrix::SchurComplex: the matrix has an infinite or NaN element (FreeSurfer
+  goes on with LAPACK's failed or NaN result)` on standard error and status 1; `reproduce` computes as
+  FreeSurfer does, except where LAPACK's `ZLAHQR` does not converge: there `ZHSEQR` retries with `ZLAQR0`
+  (on a 49 x 49 copy), which the main package does not port (`zgees_vn` returns `NotPorted`): `MyMatrix::
+  SchurComplex: LAPACK's ZLAQR0 (ZHSEQR's second attempt where ZLAHQR does not converge) is not ported yet`
+  and status 1. Noted in both modes.
+- **FS-970** (rule B): §4.5 and §4.6 on an empty matrix: ` ** On entry to ZGEES parameter number  6 had an
+  illegal value` on standard output and the end of the program with status 0 **(observed)**. By default
+  `MyMatrix::SchurComplex: an empty matrix (FreeSurfer ends here with status 0 after LAPACK's message)` on
+  standard error and status 1; `reproduce` FreeSurfer's line and status 0. Noted in both modes.
+- **`cabs` and `csqrt`** (not a defect: the project's decision D4, GLIBC-07): the correctly rounded
+  `hypot` in both modes where glibc's misses the last bit on about 0.5 % of arguments; `csqrt` otherwise
+  glibc's form (`larmorx_core::cplx::csqrt`'s documentation; its measured divergences near overflow).
 - **ITK-115**, **ITK-116** (VNL's eigensystem and SVD never returning): an error in both modes, `MyMatrix:
   VNL's singular value decomposition never returns on this matrix (an infinite or NaN entry)` and status
   1 for the SVD.
 
 ## 6. What is not part of this piece
 
-- **The matrix square root** (`MatrixSqrt`, with `isDiag` above): the complex Schur decomposition of
-  LAPACK 3.10.0's `zgees` as Ubuntu 22.04's `liblapack.a` computes it (statically linked into the
-  official programs **(observed)**), glibc's complex square root and absolute value, and the C runtime's
-  complex division: part 2 (relay 41), with the black-box measurements of
-  `validation/investigations/complex-runtime/`.
 - The registration (`RegRobust`, `Registration`'s multi-resolution loop), its transformations, steps and
   regression: part 2 (queue 3.2-03).
 - The helpers only one program reaches (`MRInorm255`, the entropy, NLSD, normalised, mean and median
@@ -291,6 +359,18 @@ by it.
 - **The open probe** (to come from the spec finisher, track E): calls of the functions of §2 to §4 by name
   on volumes (the fs-volume probe's line protocol) and matrices, compared bit for bit (NaNs as their bits),
   with the cases of §5 counted apart.
+- **The square root** (§4.5, §4.6): reached at every step of the symmetric robust registration (both
+  programs' default: each step's transform is split into two half transforms), by the half-way maps of
+  the result, and by the Powell registration's steps; the open probe should call both functions by name on 4 x 4 registration
+  transforms, 3 x 3 rotations (a scale times a rotation), rotations by a right and a straight angle (purely
+  imaginary and negative eigenvalues), Jordan blocks, diagonal, triangular and sparse matrices (LAPACK's
+  balancing permutes rows and columns that isolate eigenvalues), sizes 1 to 12, matrices scaled by 1e-300
+  and 1e300 (LAPACK's scaling below `2^-459` and above `2^459`), columns of tiny numbers (1e-300, the
+  reflectors' rescaling; 1e-160, the norm's small sums), negative and zero eigenvalues, the empty matrix and
+  special elements. **(observed)** on 10,200 such cases: 4,780 Schur forms and 3,735 square roots
+  returned, 906 ends in §4.6's step 3 and 128 in step 4, 516 FS-970 ends, 135 FS-969 matrices on which
+  `ZLAHQR` does not converge; everything else reproduced bit for bit, the messages byte for byte, by
+  `zgees_vn` and `larmorx_core::cplx` with the correctly rounded `hypot` in the official code too.
 - **Reference numbers (observed)**: on 16,100 seeded cases (23 functions; volumes up to 7 x 7 x 6 of every
   type, 1 or 2 frames, ordinary and special voxels; transforms of random rotations, scales and
   translations, near-identities and special entries) FreeSurfer's lines are reproduced but where the

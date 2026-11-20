@@ -509,7 +509,11 @@ dgelqf, dgeqr2, dgelq2, dlarft, dlarfb, dlarf, dlarf1f, dlarfg, dorgqr, dorglq, 
 dormqr, dormlq, dorm2r, dorml2, dormbr, dorgbr), the bidiagonal reduction (dgebrd, dlabrd, dgebd2),
 the divide-and-conquer SVD (dbdsdc, dlasd0 to dlasd8, dlasdq, dlasdt, dlaed6, dlamrg, dlascl),
 dgesdd on its four thin paths, dgelsd on every path (dlalsd, dlasda, dlalsa, dlals0, dlasrt),
-dgesvd and dbdsqr's lower case, in crates/larmorx-transform/src/numpy_linalg/) - modified BSD licence
+dgesvd and dbdsqr's lower case, in crates/larmorx-transform/src/numpy_linalg/); and Reference-LAPACK
+3.10.0 as Ubuntu 22.04's liblapack and libblas 3.10.0-2ubuntu1 build it (zgees, zgebal, zgehrd, zgehd2,
+zlarfg, zlarf, ilazlc, ilazlr, zlacpy, zunghr, zungqr, zung2r, zhseqr, zlahqr, zgebak, zlange, zlascl,
+zladiv, dladiv, dlapy3, dlamch and the BLAS zgemv, zgerc, zscal, zdscal, zcopy, zswap and dznrm2;
+crates/larmorx-core/src/lapack_zgees.rs, since 2026-11-20) - modified BSD licence
   Copyright (c) 1992-2023 The University of Tennessee and The University
                           of Tennessee Research Foundation.  All rights
                           reserved.

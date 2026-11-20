@@ -12,7 +12,7 @@ use std::io::Write;
 use std::rc::Rc;
 
 use larmorx_core::defects::UpstreamDefects;
-use larmorx_core::vnl_matrix::VnlMatrix;
+use larmorx_core::vnl_matrix::{VnlCMatrix, VnlMatrix};
 use larmorx_freesurfer_core::affine::AffineMatrix;
 use larmorx_freesurfer_core::cname::CName;
 use larmorx_freesurfer_core::globals::Globals;
@@ -521,6 +521,200 @@ fn gen_case(g: &mut Gen, t: &mut Vec<String>, cmd: &str) {
 }
 
 // ------------------------------------------------------------------------------------------
+// The matrix square root's cases (3.2-02 part 2: `schur`, `sqrtm`), a stream of their own
+
+/// The square root's commands, alternating.
+pub const SQRTM: [&str; 2] = ["schur", "sqrtm"];
+
+/// A 3 x 3 rotation from a random unit quaternion, sometimes scaled.
+fn rot3(g: &mut Gen) -> [[f64; 3]; 3] {
+    let q: [f64; 4] = std::array::from_fn(|_| g.unit() - 0.5);
+    let n = (q.iter().map(|x| x * x).sum::<f64>()).sqrt();
+    let [a, b, c, d] = q.map(|x| x / n);
+    let mut r = [
+        [
+            a * a + b * b - c * c - d * d,
+            2.0 * (b * c - a * d),
+            2.0 * (b * d + a * c),
+        ],
+        [
+            2.0 * (b * c + a * d),
+            a * a - b * b + c * c - d * d,
+            2.0 * (c * d - a * b),
+        ],
+        [
+            2.0 * (b * d - a * c),
+            2.0 * (c * d + a * b),
+            a * a - b * b - c * c + d * d,
+        ],
+    ];
+    if g.chance(4) {
+        let s = 1.0 + (g.unit() - 0.5) * 0.4;
+        for row in &mut r {
+            for v in row {
+                *v *= s;
+            }
+        }
+    }
+    r
+}
+
+/// A square matrix for the square root: the registration's transforms and rotations, and the
+/// structures LAPACK's paths turn on (zero patterns its balancing permutes, Jordan blocks,
+/// rotations by a right or a straight angle, negative and zero eigenvalues, tiny and huge
+/// scales, subnormal and special entries, other sizes).
+fn sq_matrix(g: &mut Gen) -> (usize, Vec<f64>) {
+    let kind = g.below(20);
+    let (n, mut m): (usize, Vec<f64>) = match kind {
+        0..=5 => (4, m44(g).iter().flatten().copied().collect()),
+        6..=8 => (3, rot3(g).iter().flatten().copied().collect()),
+        9 => {
+            // a rotation by a right or a straight angle, maybe with a translation
+            let (c, s) = g.pick(&[(0.0, 1.0), (-1.0, 0.0), (0.0, -1.0), (1.0, 0.0)]);
+            let mut m = vec![
+                c, -s, 0.0, 0.0, s, c, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ];
+            if g.chance(2) {
+                m[3] = (g.unit() - 0.5) * 20.0;
+                m[7] = (g.unit() - 0.5) * 20.0;
+            }
+            (4, m)
+        }
+        10 => {
+            // a Jordan block, maybe defective in a larger matrix
+            let n = g.pick(&[2usize, 3, 4]);
+            let l = g.pick(&[1.0, 2.0, 0.5, -1.0, 0.0]);
+            let mut m = vec![0.0; n * n];
+            for i in 0..n {
+                m[i * n + i] = l;
+                if i + 1 < n {
+                    m[i * n + i + 1] = g.pick(&[1.0, 1e-8, 0.0]);
+                }
+            }
+            (n, m)
+        }
+        11 => {
+            // diagonal or triangular, with zeros the balancing permutes
+            let n = g.pick(&[2usize, 3, 4, 5]);
+            let mut m = vec![0.0; n * n];
+            let tri = g.below(3);
+            for i in 0..n {
+                for j in 0..n {
+                    let keep = i == j || (tri == 1 && j > i) || (tri == 2 && j < i);
+                    if keep && !g.chance(5) {
+                        m[i * n + j] = if i == j {
+                            g.pick(&[1.0, 2.0, 0.25, 9.0, -4.0, 1.5, 0.0])
+                        } else {
+                            (g.unit() - 0.5) * 4.0
+                        };
+                    }
+                }
+            }
+            (n, m)
+        }
+        12 => {
+            // a sparse matrix: zero rows and columns isolate eigenvalues
+            let n = g.pick(&[3usize, 4, 5, 6]);
+            let mut m = vec![0.0; n * n];
+            for v in m.iter_mut() {
+                if g.chance(2) {
+                    *v = (g.unit() - 0.5) * 4.0;
+                }
+            }
+            for i in 0..n {
+                if m[i * n + i] == 0.0 {
+                    m[i * n + i] = 1.0 + g.unit();
+                }
+            }
+            (n, m)
+        }
+        13 => {
+            // another size, dense
+            let n = g.pick(&[1usize, 2, 5, 6, 8, 12]);
+            let mut m = vec![0.0; n * n];
+            for (k, v) in m.iter_mut().enumerate() {
+                *v = (g.unit() - 0.5) * 2.0 + if k % (n + 1) == 0 { 2.0 } else { 0.0 };
+            }
+            (n, m)
+        }
+        14 => {
+            // tiny or huge: LAPACK scales the matrix (below 2^-459, above 2^459)
+            let f = g.pick(&[1e-150, 1e-300, 1e150, 1e300, 1e-200, 4e-320]);
+            let mut m: Vec<f64> = m44(g).iter().flatten().copied().collect();
+            for v in m.iter_mut() {
+                *v *= f;
+            }
+            (4, m)
+        }
+        15 => {
+            // a column of tiny numbers below the diagonal (the reflectors' rescaling) or of
+            // numbers below 2^-511 (the norm's small sums)
+            let n = g.pick(&[3usize, 4]);
+            let mut m = vec![0.0; n * n];
+            for i in 0..n {
+                m[i * n + i] = 1.0 + g.unit();
+            }
+            let t = g.pick(&[1e-300, 1e-160, 1e-310, 5e-324, 1e-200]);
+            for i in 1..n {
+                m[i * n] = t * (1.0 + g.unit());
+            }
+            if g.chance(2) {
+                m[1] = 0.5;
+            }
+            (n, m)
+        }
+        16 => {
+            // a negative eigenvalue (the root is complex) or a singular matrix
+            let mut m: Vec<f64> = m44(g).iter().flatten().copied().collect();
+            if g.chance(2) {
+                for v in m.iter_mut().take(4) {
+                    *v = -*v;
+                }
+            } else {
+                for k in 0..4 {
+                    m[4 + k] = m[k];
+                }
+            }
+            (4, m)
+        }
+        17 => (0, Vec::new()),
+        18 => {
+            // the identity, the zero matrix, a scalar multiple
+            let n = g.pick(&[1usize, 3, 4]);
+            let v = g.pick(&[1.0, 0.0, 4.0, -0.0, 1e-20]);
+            let mut m = vec![0.0; n * n];
+            for i in 0..n {
+                m[i * n + i] = v;
+            }
+            (n, m)
+        }
+        _ => {
+            // any numbers, special ones among them
+            let n = g.pick(&[2usize, 3, 4]);
+            (n, (0..n * n).map(|_| d64(g)).collect())
+        }
+    };
+    if g.chance(30) && n > 0 {
+        let k = g.below((n * n) as u64) as usize;
+        m[k] = f64::from_bits(g.pick(&SPECIAL64));
+    }
+    (n, m)
+}
+
+/// The matrix square root's cases of `seed`.
+pub fn generate_sqrtm(seed: u64, n: usize) -> Vec<String> {
+    let mut g = Gen::new(seed ^ 0x5157_524d);
+    (0..n)
+        .map(|k| {
+            let (m, v) = sq_matrix(&mut g);
+            let mut t = vec![SQRTM[k % 2].to_owned(), m.to_string(), m.to_string()];
+            t.extend(v.iter().map(|&x| dx(x)));
+            t.join(" ")
+        })
+        .collect()
+}
+
+// ------------------------------------------------------------------------------------------
 // The answers
 
 /// One buffer both streams write into, in order.
@@ -608,6 +802,14 @@ impl Out {
         self.i(m.cols as i64);
         for &v in &m.data {
             self.d(v);
+        }
+    }
+    fn cm(&mut self, m: &VnlCMatrix) {
+        self.i(m.rows as i64);
+        self.i(m.cols as i64);
+        for z in &m.data {
+            self.d(z.re);
+            self.d(z.im);
         }
     }
     fn geom(&mut self, v: &VolGeom) {
@@ -1030,6 +1232,17 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "rlog" => {
             let m = get_m4(t);
             o.d(mx::rot_matrix_log_norm(&mut cx.b, &m));
+        }
+        "schur" => {
+            let m = get_vm(t);
+            let (u, tm) = mx::schur_complex(&mut cx.g, &mut cx.a, &mut cx.b, &m)?;
+            o.cm(&u);
+            o.cm(&tm);
+        }
+        "sqrtm" => {
+            let m = get_vm(t);
+            let r = mx::matrix_sqrt(&mut cx.g, &mut cx.a, &mut cx.b, &m)?;
+            o.vm(&r);
         }
         _ => panic!("unknown command {cmd}"),
     }

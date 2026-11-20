@@ -68,3 +68,44 @@ fn fix_differs_only_with_a_notice() {
         assert!(r == f || !ids.is_empty(), "{line}");
     }
 }
+
+/// The matrix square root's stream (`check.py --family sqrtm`: `schur`, `sqrtm`), recorded
+/// 2026-11-20 from f6dd961a (3.2-02 part 2: `MatrixSqrt`, `SchurComplex`, LAPACK 3.10.0's `ZGEES`
+/// with the decided `cabs` and `csqrt` linked into the official code too): 1,200 cases, 1,187 lines
+/// identical, 13 hashed as `NOTPORTED` (LAPACK's `ZLAQR0`, where `ZLAHQR` does not converge on a
+/// matrix with an infinite or NaN element: FS-969).
+const N_SQRTM: usize = 1200;
+const OFFICIAL_SQRTM_SHA256: &str =
+    "42dd17ef0dda71dd610e75d35615262066e7e2c719fe6e124ca19ad4c12e1d42";
+const NOTPORTED_SQRTM: usize = 13;
+
+#[test]
+fn reproduce_gives_the_official_square_roots() {
+    let mut h = Sha256::new();
+    let mut notported = 0;
+    for line in cases::generate_sqrtm(1, N_SQRTM) {
+        let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
+        if out.contains("is not ported yet") {
+            notported += 1;
+            h.update(b"NOTPORTED\n");
+        } else if ids.iter().any(|x| SKIP.contains(x)) {
+            h.update(b"SKIP\n");
+        } else {
+            h.update(out.as_bytes());
+            h.update(b"\n");
+        }
+    }
+    assert_eq!(notported, NOTPORTED_SQRTM);
+    let hex: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    assert_eq!(hex, OFFICIAL_SQRTM_SHA256);
+}
+
+/// The square roots' default differs from `reproduce` only where a defect it corrects is noted.
+#[test]
+fn square_roots_fix_differs_only_with_a_notice() {
+    for line in cases::generate_sqrtm(1, N_SQRTM) {
+        let (r, _) = cases::run_line(&line, UpstreamDefects::Reproduce);
+        let (f, ids) = cases::run_line(&line, UpstreamDefects::Fix);
+        assert!(r == f || !ids.is_empty(), "{line}");
+    }
+}

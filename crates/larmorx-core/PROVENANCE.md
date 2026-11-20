@@ -836,3 +836,49 @@ through FreeSurfer's robust-registration helpers against the official code (`val
 an infinite entry, where the official code hangs); it returns the decomposition reached, `info` and the
 notice. `vnl_svd_info` is unchanged on every matrix where VNL returns (`algo/vnl_svd.hxx`,
 `378746d23eb0`).
+
+## Reference LAPACK 3.10.0's complex Schur factorization (`src/lapack_zgees.rs`; queue item 3.2-02, 2026-11-20)
+
+**Ported** from Reference-LAPACK v3.10.0 (GitHub's tag archive, SHA-256
+`328c1bea493a32cac5257d84157dc686cc3ab0b004e2bea22044e0a59f6f8a19`, `<workspace>/tags/lapack-3.10.0`;
+modified BSD licence, the copyright of the University of Tennessee, the University of California
+Berkeley, the University of Colorado Denver and NAG Ltd.; the file's SPDX header is `Apache-2.0 AND
+BSD-3-Clause`, NOTICE lists it), the source of Ubuntu 22.04's `liblapack-dev` and `libblas-dev`
+3.10.0-2ubuntu1, whose gfortran 11 build is the reference. SHA-256 prefixes: `SRC/zgees.f`
+(`6a94b06c0390`), `zgebal.f` (`6dade3069e31`), `zgehrd.f` (`e72637192d40`), `zgehd2.f` (`7d1603106bbd`),
+`zlarfg.f` (`073d5c85d4a7`), `zlarf.f` (`88814047cfb7`), `ilazlc.f` (`2fbc1906b8ed`), `ilazlr.f`
+(`57d4c2d469c8`), `zlacpy.f` (`19ddb77491cb`), `zunghr.f` (`4bccc54c23ca`), `zungqr.f` (`89812e9dffa0`),
+`zung2r.f` (`885fdc53c1e7`), `zhseqr.f` (`7c75cd167e3b`), `zlahqr.f` (`472ba5fe3bc1`), `zgebak.f`
+(`ba0178a5bd9b`), `zlange.f` (`0a1c698c66be`), `zlascl.f` (`774cf267aee4`), `zladiv.f` (`7c979e413d4f`),
+`dladiv.f` (`009773890074`), `dlapy3.f` (`b3917026a7ac`), `INSTALL/dlamch.f` (`05994d41a426`);
+`BLAS/SRC/zgemv.f` (`6a92c8ee4e3c`), `zgerc.f` (`b26061a1567d`), `zscal.f` (`0c51b7fc797a`), `zdscal.f`
+(`d4b8a6bb3f41`), `zcopy.f` (`7f67038a50ce`), `zswap.f` (`bf9268d99afb`), `dznrm2.f90` (`4df80b30496e`).
+`ILAENV`'s and `IPARMQ`'s integers are constants here (`ZGEHRD`'s and `ZUNGQR`'s block size 32 and
+crossover 128, `ZHSEQR`'s `NMIN` 75): the unblocked paths are ported (`ZGEHRD` up to 128 rows, `ZUNGQR` up
+to 128 reflectors, `ZHSEQR` with `ZLAHQR` up to 75 rows); `ZLAQR0` (above 75 rows, and `ZHSEQR`'s second
+attempt where `ZLAHQR` does not converge: a matrix with a NaN or an infinite element) and the blocked
+paths return `Zgees::NotPorted`. `XERBLA`'s line is the Fortran one (` ** On entry to ...`, then `STOP`).
+gfortran's complex arithmetic is `crate::cplx`'s (below); `ABS` and `SQRT` of a complex number are the
+decided `cabs` and `csqrt`.
+
+## The C, C++ and Fortran runtimes' complex arithmetic (`src/cplx.rs`; queue item 3.2-02, 2026-11-20)
+
+**Written** from published algorithms and black-box measurements (Apache-2.0; no runtime's code read):
+the plain product and GCC's wide division under Fortran's rules (`-fcx-fortran-rules`: Smith, "Algorithm
+116: Complex division", CACM 5(8), 1962), a real promoted to complex as `(x, +0)` (GCC honours signed
+zeros); C99's and C++'s product (the plain product, C11 Annex G.5.1's `_Cmultd` where both parts are NaN)
+and quotient (Smith's with Annex G's recovery); `cabs` as the correctly rounded `hypot` (`math::hypot`,
+CORE-MATH's) and `csqrt` as Kahan's square root ("Branch Cuts for Complex Elementary Functions", 1987)
+with that `hypot`, in the form glibc 2.35's `csqrt` was measured to take
+(`validation/investigations/complex-runtime/`, "csqrt's form"): the project's decision D4 (`hypot`
+correctly rounded in both modes), applied to the C library's complex functions (GLIBC-07). Measured
+divergences from the system's functions: `csqrt` near overflow with a much smaller other part (47 of 4.2
+million random bit patterns), and wherever glibc's `hypot` misses the last bit; libgcc's (GCC 12)
+`__divdc3` where a divisor's part is zero, subnormal or huge (1,825 of 50,625 special combinations beyond
+the NaNs' bits) and both functions' NaN bits (the investigation's "libgcc's division"): an open item.
+
+**`vnl_matrix`'s complex matrices** (the same item): `VnlCMatrix` (`vnl_matrix<std::complex<double>>`:
+`vnl_complexify.h`, `vnl_real.h`, `vnl_imag.h`, `vnl_matrix.hxx`'s `conjugate_transpose`, product and
+`operator_one_norm`, `vnl_diag_matrix.h`'s product), and `vnl_matlab_print`'s long format of `double`
+and `std::complex<double>` matrices (`vnl_matlab_print.hxx`, `vnl_matlab_print_scalar.cxx`), ITK 4.13.2's
+VXL (BSD-3-Clause).

@@ -6,8 +6,10 @@
 // CMA label tests and segmentation functions; part 6a: resolution, planes, fills, resampling by whole
 // factors, changes of type; part 6b: frame-range samplers, the trilinear kernel and splatting,
 // derivatives, gradients, neighbour counts, linear transforms; part 6c: resampling onto a template,
-// replacing a value; part 7a: statistics, orientation strings, voxel-to-RAS matrices; fs.bspline: the B-spline coefficients, their sampling, transforms and
-// factor-of-two pyramids, specs/freesurfer-bspline.md), linked against the unit oracle's libutils.a (GCC 8.4.0,
+// replacing a value; part 7a: statistics, orientation strings, voxel-to-RAS matrices; part 7b: slices
+// as 2-D images, neighbourhoods and labels; a transform array's change of type (§54); fs.bspline: the
+// B-spline coefficients, their sampling, transforms and factor-of-two pyramids,
+// specs/freesurfer-bspline.md), linked against the unit oracle's libutils.a (GCC 8.4.0,
 // FreeSurfer's flags). It holds only calls of FreeSurfer's functions (and of the C library's) by name
 // and the reading and printing of their arguments, results and the structures' fields: no FreeSurfer
 // code. The commands and encodings are in README.md beside this file (the volume, geometry and header
@@ -36,6 +38,8 @@
 
 #include "cma.h"
 #include "mriBSpline.h"
+#include "image.h"
+#include "mri_circulars.h"
 #include "colortab.h"
 #include "diag.h"
 #include "error.h"
@@ -643,7 +647,21 @@ static MRI *getw()
 {
   MRI *m = getv();
   const std::string &f = tok();
-  if (!f.empty() && f[0] == 't') {
+  if (!f.empty() && f[0] == 'i') {
+    // i<a>,<b>,...: the buffer's 32-bit words from the list in order, repeated
+    std::vector<uint32_t> w;
+    for (const char *q = f.c_str() + 1; *q;) {
+      char *e;
+      w.push_back((uint32_t)strtoll(q, &e, 10));
+      q = *e == ',' ? e + 1 : e;
+      if (e == q && *e) bad("a bad i fill");
+    }
+    if (has_voxels(m) && !w.empty()) {
+      unsigned char *b = (unsigned char *)m->chunk;
+      for (size_t i = 0; i + 4 <= m->bytes_total; i += 4) memcpy(b + i, &w[(i / 4) % w.size()], 4);
+    }
+  }
+  else if (!f.empty() && f[0] == 't') {
     unsigned seed = (unsigned)strtoul(f.c_str() + 1, NULL, 10);
     if (has_voxels(m) && m->type == MRI_FLOAT) {
       unsigned char *b = (unsigned char *)m->chunk;
@@ -783,6 +801,62 @@ static MRI_REGION *getreg(MRI_REGION *r)
 
 static const float UNSET = 7.0f;  // an output the call may leave
 static const double UNSETD = 7.0;
+
+// images (README.md, "I"): null, or <rows> <cols> <format> <frames> (ImageAlloc), <xsize> <ysize>,
+// a fill (a seed: byte i of the pixels is (seed + 101 i) mod 256; -1 as allocated; t<seed>: float i
+// is TABLE[(7 i + seed) mod 34]), then <orows> <ocols> <rows> <cols> <num_frame> written over the
+// header (-1 keeps the allocation's). A given image is marked in a field the image functions do not
+// use, so that a new image allocated where a freed given one was is not taken for it.
+static const int GIVEN_MARK = 0x5a17;
+static size_t img_bytes(const IMAGE *I)
+{
+  return I->image ? (size_t)I->sizeimage * (size_t)(I->num_frame > 0 ? I->num_frame : 0) : 0;
+}
+static void putimg(const IMAGE *I, size_t bytes)
+{
+  for (int v : {I->orows, I->ocols, I->rows, I->cols, I->pixel_format, I->num_frame}) puti(v);
+  putf(I->xsize);
+  putf(I->ysize);
+  out(I->image ? hexbytes((const char *)I->image, bytes) : "null");
+}
+// the result of a call that may return the given image, a new one or none
+static void putimg_res(const IMAGE *r, const IMAGE *given, size_t given_bytes)
+{
+  if (!r) {
+    out("null");
+    return;
+  }
+  bool g = given && r == given && r->numcolor == GIVEN_MARK;
+  out(g ? "given" : "new");
+  putimg(r, g ? given_bytes : img_bytes(r));
+}
+static IMAGE *getimg(size_t *bytes)
+{
+  *bytes = 0;
+  if (take("null")) return NULL;
+  int rows = geti(), cols = geti(), fmt = geti(), nf = geti();
+  IMAGE *I = ImageAlloc(rows, cols, fmt, nf);
+  *bytes = img_bytes(I);
+  I->xsize = getf();
+  I->ysize = getf();
+  const std::string &f = tok();
+  unsigned char *b = I->image;
+  if (b && !f.empty() && f[0] == 't') {
+    unsigned seed = (unsigned)strtoul(f.c_str() + 1, NULL, 10);
+    for (size_t i = 0; i + 4 <= *bytes; i += 4) memcpy(b + i, &TABLE[(7 * (i / 4) + seed) % NTABLE], 4);
+  }
+  else if (b) {
+    long seed = strtol(f.c_str(), NULL, 10);
+    if (seed >= 0)
+      for (size_t i = 0; i < *bytes; i++) b[i] = (unsigned char)((seed + 101u * i) & 0xffu);
+  }
+  for (int *x : {&I->orows, &I->ocols, &I->rows, &I->cols, &I->num_frame}) {
+    int v = geti();
+    if (v != -1) *x = v;
+  }
+  I->numcolor = GIVEN_MARK;
+  return I;
+}
 
 // ---- the commands (README.md, "Commands") ------------------------------------------------------
 
@@ -1695,6 +1769,178 @@ static void call(const std::string &c)
     int r = MRIfreeBSpline(&b);
     puti(r);
     out(b ? "kept" : "none");
+  }
+  // ---- part 7b (specs/freesurfer-volume.md §34, §35) and §54's change of a transform array's type ----
+  else if (c == "toimgv" || c == "toimg") {
+    MRI *a = getw();
+    paint(a);
+    size_t gb = 0;
+    IMAGE *I = getimg(&gb);
+    int slice = geti();
+    IMAGE *r;
+    if (c == "toimgv") {
+      int view = geti(), frame = geti();
+      r = MRItoImageView(a, I, slice, view, frame);
+    }
+    else
+      r = MRItoImage(a, I, slice);
+    fflush(stdout);
+    putimg_res(r, I, gb);
+  }
+  else if (c == "img2mri") {
+    size_t gb = 0;
+    IMAGE *I = getimg(&gb);
+    if (!I) bad("img2mri needs an image");
+    MRI *m = ImageToMRI(I);
+    fflush(stdout);
+    putf(I->xsize);
+    putf(I->ysize);
+    putv(m);
+  }
+  else if (c == "smpar") {
+    MRI *a = getw();
+    paint(a);
+    int k = geti();
+    putres(MRIsmoothParcellation(a, k), a, NULL, NULL);
+  }
+  else if (c == "erasebp") {
+    MRI *a = getw();
+    int b = geti();
+    puti(MRIeraseBorderPlanes(a, b));
+    putv(a);
+  }
+  else if (c == "nbhd") {
+    MRI *a = getw();
+    paint(a);
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int k = geti(), ws = geti(), x = geti(), y = geti(), z = geti(), fr = geti();
+      float th = getf();
+      int v = k == 0   ? MRImaxInNbhd(a, ws, x, y, z, fr)
+              : k == 1 ? MRIcountNonzeroInNbhd(a, ws, x, y, z)
+              : k == 2 ? MRIcountThreshInNbhd(a, ws, x, y, z, th)
+                       : MRIareNonzeroInNbhd(a, ws, x, y, z);
+      puti(v);
+    }
+  }
+  else if (c == "nearnz") {
+    MRI *a = getw();
+    paint(a);
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int ws = geti();
+      double x = getd(), y = getd(), z = getd();
+      int wp = geti();
+      int xv = -7, yv = -7, zv = -7;
+      float v = MRIfindNearestNonzeroLocation(a, ws, x, y, z, wp ? &xv : NULL, wp ? &yv : NULL, wp ? &zv : NULL);
+      putf(v);
+      puti(xv);
+      puti(yv);
+      puti(zv);
+    }
+  }
+  else if (c == "lmeans") {
+    int k = geti();
+    MRI *a = getw(), *l = getw();
+    paint(l);
+    int label = geti(), x0 = geti(), y0 = geti(), z0 = geti(), wh = geti(), p = geti();
+    double sd = UNSETD;
+    if (k == 0) {
+      VECTOR *v = MRImeanInLabelMultispectral(a, l, label);
+      putm(v);
+    }
+    else if (k == 1)
+      putd(MRImeanInLabel(a, l, label));
+    else if (k == 2) {
+      putd(MRImeanAndStdInLabel(a, l, label, p ? &sd : NULL));
+      putd(sd);
+    }
+    else if (k == 3) {
+      putd(MRImeanInLabelInRegion(a, l, label, x0, y0, z0, wh, p ? &sd : NULL));
+      putd(sd);
+    }
+    else
+      putd(MRImaxInLabelInRegion(a, l, label, x0, y0, z0, wh));
+  }
+  else if (c == "mkpos") {
+    MRI *a = getw(), *d = getdst(a);
+    MRI *r = MRImakePositive(a, d);
+    putres(r, a, NULL, d);
+  }
+  else if (c == "mlbv") {
+    MRI *a = getw();
+    paint(a);
+    MRI *d = getdst(a);
+    int label = geti(), mark = geti(), six = geti();
+    MRI *r = MRImarkLabelBorderVoxels(a, d, label, mark, six);
+    putres(r, a, NULL, d);
+  }
+  else if (c == "lnbhd") {
+    MRI *l = getw();
+    paint(l);
+    MRI *v = take("null") ? NULL : getw();
+    int x = geti(), y = geti(), z = geti(), wh = geti(), ml = geti(), wm = geti();
+    // arrays of exactly max_labels entries (one when it is 0), so that a write past them is a write
+    // past the allocation (the guard runs)
+    size_t na = ml > 0 ? (size_t)ml : 1;
+    int *counts = (int *)malloc(na * sizeof(int));
+    float *means = (float *)malloc(na * sizeof(float));
+    for (size_t i = 0; i < na; i++) {
+      counts[i] = -7;
+      means[i] = UNSET;
+    }
+    puti(MRIcomputeLabelNbhd(l, v, x, y, z, counts, wm ? means : NULL, wh, ml));
+    for (int i = 0; i < ml; i++) puti(counts[i]);
+    if (wm)
+      for (int i = 0; i < ml; i++) putf(means[i]);
+  }
+  else if (c == "linbhd") {
+    MRI *a = getw();
+    paint(a);
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int k = geti(), x = geti(), y = geti(), z = geti(), wh = geti(), label = geti(), which = geti();
+      puti(k == 0 ? MRIlabelsInNbhd(a, x, y, z, wh, label) : MRIlabelsInPlanarNbhd(a, x, y, z, wh, label, which));
+    }
+  }
+  else if (c == "lbbox") {
+    MRI *a = getw();
+    paint(a);
+    int label = geti();
+    MRI_REGION b;
+    b.x = b.y = b.z = b.dx = b.dy = b.dz = -7;
+    puti(MRIlabelBoundingBox(a, label, &b));
+    for (int v : {b.x, b.y, b.z, b.dx, b.dy, b.dz}) puti(v);
+  }
+  else if (c == "fillbox") {
+    MRI *a = getw();
+    MRI_REGION b;
+    if (!getreg(&b)) bad("fillbox needs a box");
+    float v = getf();
+    puti(MRIfillBox(a, &b, v));
+    putv(a);
+  }
+  else if (c == "mskz") {
+    MRI *a = getw(), *m = getw();
+    paint(m);
+    MRI *d = getdst(a, m);
+    MRI *r = MRImaskZero(a, m, d);
+    putres(r, a, m, d);
+  }
+  else if (c == "clipwm") {
+    MRI *t = getw(), *w = getw();
+    paint(w);
+    puti(MRIclipBrightWM(t, w));
+    fflush(stdout);
+    putv(t);
+  }
+  else if (c == "ltachg") {
+    LTA *lta = getlta();
+    int type = geti();
+    LTA *r = LTAchangeType(lta, type);
+    fflush(stdout);
+    out(r == lta ? "self" : "other");
+    putlta(r);
   }
   else
     bad("unknown command");

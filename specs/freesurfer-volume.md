@@ -1515,8 +1515,12 @@ text: FS-327's error and FS-461's default on a two-frame byte volume.
   gets both computed and kept; the point times the cached voxel-to-RAS matrix in `float` (per output: `((x
   m0 + y m4) + z m8) + m12`, each product with the coordinate first), widened to `double`. With `Gdiag &
   DIAG_SHOW` and `DIAG_VERBOSE`: `c_ras for sample volume is (<r>, <a>, <s>) compared with the src (<c_r>,
-  <c_a>, <c_s>)` (`%f`) on standard error. FS-462: an extent of 0 in the destination (or a division that
-  overflows) ends FreeSurfer (a crash); an error here in both modes. **(observed)**: `vstat7`, `vrules8`
+  <c_a>, <c_s>)` (`%f`) on standard error. FS-462: an extent of 0 in the destination (or a quotient that
+  overflows, `-2147483648 / -1`) makes FreeSurfer's integer division crash; here, in both modes, the three
+  factors are checked first and such a one ends the program (`ERROR_BADPARM`, status 252) with the error
+  `MRIcalcCRASforSampledVolume(): an extent of the sampled volume is 0 (FreeSurfer crashes here)` (its text
+  ending in `\n`), FS-462 noted, before the cache is made or anything written (the function returns
+  nothing). **(observed)**: `vstat7`, `vrules8`
   (factors that do not divide; a destination larger than the source: factor 0, the point `-0.5`).
 - `MRIcheckOrientationString(ostr)`: the first three characters, any case; NULL when they name each axis
   once (L or R; P or A; I or S). Otherwise the errors' text, built in this order: for each character that
@@ -1561,7 +1565,11 @@ text: FS-327's error and FS-461's default on a two-frame byte volume.
   scales (as `float`s). Then `x_r = M11 / xsize`, `y_r = M12 / ysize`, `z_r = M13 / zsize`, the same for rows
   2 (a) and 3 (s), in `float`; `ci = width / 2.0` (and cj, ck) as `float`s; `c_r = ((M11 ci + M12 cj) +
   M13 ck) + M14` in `float`, in that operand order (two NaNs: the sum's wins; rows 2, 3 for `c_a`, `c_s`); `ras_good_flag = 1`; the cached matrices recomputed;
-  `NO_ERROR`. FS-464: a matrix smaller than 3 x 4 is read past its elements in FreeSurfer; an error here.
+  `NO_ERROR`. FS-464: a matrix with fewer than 3 rows or fewer than 4 columns is read past its elements in
+  FreeSurfer (memory; no matrix at all: a crash); here, in both modes and before anything is read or printed,
+  the program ends (`ERROR_BADPARM`, status 252) with the error `MRIsetVoxelToRasXform(): the matrix is
+  smaller than 3 x 4 (FreeSurfer reads past it)` (its text ending in `\n`), FS-464 noted, the volume
+  unchanged.
   The variable's value is read by `sscanf` even when it holds no number (`abc`, empty: the threshold stays
   0.001), and the sizes change whenever the variable is set (**(observed)**: `vstat7`, `abc`:
   `  changing voxel size to scale`; scales printed `nan`, `inf`, `-nan` for matrices with NaNs and
@@ -1674,8 +1682,9 @@ Section 33 (part 7a, made ready by the spec finisher's relay 11): §69's groups 
 open probe's commands `stats`, `pstats`, `type2s`, `cropbb`, `crass`, `chkostr`, `o2dc`, `s44`, `vx2rx`,
 `v2v`, `setv2r`; §69.2 says what each covers and gives its hash), identical with `reproduce` but where
 FreeSurfer reads memory it does not own (FS-330, FS-463) or crashes, lines the loop allows; the default
-differs only with a notice (FS-329, FS-330, FS-463). Not in the probe: FS-462's and FS-464's errors (a
-crash and reads past a matrix in FreeSurfer): the implementations' own tests, against §33's text.
+differs only with a notice (FS-329, FS-330, FS-463). Not in the probe: FS-462's and FS-464's ends (a
+crash and reads past a matrix in FreeSurfer): the implementations' own tests, against §33's text (the
+message, status 252, the notice, nothing written before).
 
 Sections 34 and 35 (not yet read through for the clean room: their plan below names the replica's closed
 probe, which the implementer does not open; §69.5 says what to do meanwhile): the replica's probe's

@@ -297,11 +297,19 @@ as the source's, `dst`'s as the destination's, the coefficients' when there is n
    matrices recomputed; else `INFO: Transform dst volume info is not used (valid flag = 0).` on standard
    error and that volume with no Talairach file name.
 3. By the array's type: `LINEAR_RAS_TO_RAS` (1): §5.2 with the matrix. `LINEAR_VOX_TO_VOX` (0): the RAS
-   matrix `i2r · M · r2i` (in `float`, `i2r · M` first, then times `r2i`), `i2r` the destination
-   geometry's voxel-to-RAS matrix when valid, else (with `INFO: LTA dst geometry information missing!`,
-   `      We assume that the dst volume passed is the`, `      same as the dst for the transform.` on
-   standard error) `dst`'s; `r2i` the source geometry's RAS-to-voxel matrix when valid, else (the same
-   three lines with `src`) the coefficients'; then §5.2 with it. `LINEAR_PHYSVOX_TO_PHYSVOX` (2): the
+   matrix `i2r · M · r2i` (in `float`: `i2r · M` first into a new matrix, then that times `r2i` into
+   itself; `specs/freesurfer-maths.md` §8.1's products, their messages and ends of the program included),
+   in this order: `i2r` the transform's destination geometry's voxel-to-RAS matrix when that geometry is
+   valid, else (with `INFO: LTA dst geometry information missing!`, `      We assume that the dst volume
+   passed is the`, `      same as the dst for the transform.` on standard error) `dst`'s; the first
+   product; `r2i` the transform's source geometry's RAS-to-voxel matrix when valid, else (the same three
+   lines with `src`, so printed after the first product) the coefficients'; the second product. Every one
+   of these four matrices is made from the geometry's fields, never from a volume's cached matrices: a
+   transform's geometry's with `vg_i_to_r`, `vg_r_to_i` (`specs/freesurfer-volume.md` §4), a volume's with
+   `extract_i_to_r`, `extract_r_to_i` (`specs/freesurfer-mri.md` §3); a RAS-to-voxel matrix that does not
+   invert is none, which the second product's `m2 is null` end answers (**(observed)**: `vbspline`'s
+   `bslta` lines with type 0, every line identical with the implementation that follows this). Then §5.2
+   with it. `LINEAR_PHYSVOX_TO_PHYSVOX` (2): the
    array changed to `LINEAR_RAS_TO_RAS` (`LTAchangeType`, `specs/freesurfer-volume.md` §54, its errors and
    ends of the program included: **(observed)** `LTAchangeType: src geometry must be valid` + `\n`, status
    252, for an invalid source geometry), then §5.2 with its matrix. Any other type (`REGISTER_DAT` (14)

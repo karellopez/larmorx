@@ -780,3 +780,99 @@ fn fs505_fs506_a_physical_voxel_array_changed_to_ras() {
     assert!(rep.contains(inv), "{rep}");
     assert!(!fix.contains(inv), "{fix}");
 }
+
+// ---- part 7b (§34, §35)
+
+/// FS-465: a slice of 3 x 2 floats copied into a given image of one byte (`MRItoImage`): only the
+/// byte inside is written, in both modes (FreeSurfer writes past the image's pixels), noted.
+#[test]
+fn fs465_an_image_too_small_for_the_slice() {
+    let line = format!(
+        "toimg {} 0 1 1 0 1 3f800000 3f800000 -1 -1 -1 -1 -1 -1 0",
+        w("3 2 1 3 1 0", "t3")
+    );
+    check("FS-465", false, &line);
+    let (fix, _) = run(&line, UpstreamDefects::Fix);
+    assert!(
+        fix.starts_with("given 1 1 1 1 0 1 3f800000 3f800000 x"),
+        "{fix}"
+    );
+}
+
+/// FS-466: an RGB image of two frames read into a volume (`ImageToMRI`): by default the second
+/// frame from its own pixels, with `reproduce` one byte per pixel from the start, noted in both
+/// modes.
+#[test]
+fn fs466_the_frames_of_an_rgb_image() {
+    check(
+        "FS-466",
+        true,
+        "img2mri 2 3 35 2 3f800000 3f800000 17 -1 -1 -1 -1 -1",
+    );
+}
+
+/// FS-467: negative labels among the neighbours of the parcellation's smoothing: counted like any
+/// other label in both modes (FreeSurfer counts them outside its array), noted.
+#[test]
+fn fs467_negative_labels_in_the_smoothing() {
+    for k in [1, 2, 25] {
+        let line = format!(
+            "smpar {} 3 1 1 1 bf800000 0 0 0 bf800000 2 2 2 c0000000 {k}",
+            w("3 3 3 4 1 0", "-1")
+        );
+        check("FS-467", false, &line);
+    }
+}
+
+/// FS-468: T1 voxels outside 0 to 255 and NaN clipped as bytes (`MRIclipBrightWM`): by default
+/// clamped, with `reproduce` the low byte of their truncation, noted in both modes.
+#[test]
+fn fs468_values_outside_the_byte_range() {
+    let line = format!(
+        "clipwm {} {} 0",
+        w("8 1 1 3 1 0", "t0"),
+        w("8 1 1 0 1 0", "-1")
+    );
+    check("FS-468", true, &line);
+}
+
+/// §35: `MRIcomputeLabelNbhd` with values and no means counts the labels and reads no value
+/// (FreeSurfer crashes there); its label count is the arrays' (FreeSurfer's negative count
+/// clears an enormous array).
+#[test]
+fn label_nbhd_values_without_means() {
+    let mut p = Process::silent(Environment::new(), UpstreamDefects::Fix);
+    let labels = bytes(&mut p, 1, |_| 2.0);
+    let vals = bytes(&mut p, 1, |_| 5.0);
+    let mut counts = [-7i32; 4];
+    let r = p
+        .mri_compute_label_nbhd(&labels, Some(&vals), (0, 0, 0), &mut counts, None, 1)
+        .expect("counted");
+    assert_eq!(r, 0);
+    // the 27 places of the window all clamp to the one voxel, of label 2
+    assert_eq!(counts, [0, 0, 27, 0]);
+    let mut means = [7.0f32; 4];
+    let mut none: [i32; 0] = [];
+    p.mri_compute_label_nbhd(
+        &labels,
+        Some(&vals),
+        (0, 0, 0),
+        &mut none,
+        Some(&mut means),
+        1,
+    )
+    .expect("counted");
+    // no label is counted with an empty array; the means past it are untouched
+    assert_eq!(means, [7.0; 4]);
+    p.mri_compute_label_nbhd(
+        &labels,
+        Some(&vals),
+        (0, 0, 0),
+        &mut counts,
+        Some(&mut means),
+        0,
+    )
+    .expect("counted");
+    assert_eq!(counts, [0, 0, 1, 0]);
+    assert_eq!(means, [0.0, 0.0, 5.0, 0.0]);
+}

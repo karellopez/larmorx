@@ -185,6 +185,11 @@ different; `fix` different only with notices. Seed 1's hash
 `42dd17ef0dda71dd610e75d35615262066e7e2c719fe6e124ca19ad4c12e1d42` (13 `NOTPORTED`) is
 `tests/fs_robust_official.rs`'s `reproduce_gives_the_official_square_roots`.
 
+**Speed and memory** (`bench sqrtm 200000` against the example `fs_robust_bench sqrtm 200000`: 200,000
+square roots of 4 x 4 transforms, a rotation by atan(4/3), a scale and translations; one thread, three
+runs each, identical hashes `d0170ae026edfaed`): FreeSurfer's code 0.73-0.75 s (peak 4.6-5.1 MB), the port
+0.27-0.28 s (peak 2.3 MB).
+
 ## 5. Open items
 
 - `MatrixSqrt` (§4): LAPACK's `zlaqr0` (non-finite matrices, FS-969's `reproduce`; and `zhseqr` above 75

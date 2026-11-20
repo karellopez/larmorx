@@ -60,8 +60,9 @@ lapack=(/usr/lib/x86_64-linux-gnu/lapack/liblapack.a /usr/lib/x86_64-linux-gnu/b
   /lib/x86_64-linux-gnu/libpthread.a -lcrypt -lrt -ldl
 # the speed and memory bench (bench.cpp), with the same objects and libraries
 "$gcc" "${flags[@]}" -c "$here/bench.cpp" -o "$out/bench.o"
-"$gcc" -fopenmp -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl,-z,muldefs -O3 \
-  "$out/bench.o" "${objs[@]}" -o "$out/bench" \
+"$gcc" -fopenmp -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl,-z,muldefs \
+  -Wl,--wrap=cabs,--wrap=csqrt -O3 \
+  "$out/bench.o" "${objs[@]}" "$out/complexrt.o" "$out/crhypot.o" -o "$out/bench" \
   "${libs[@]}" "${lapack[@]}" /usr/lib/x86_64-linux-gnu/libz.so -lm \
   "$ws/oracles/toolchains/gcc-8.4-ubuntu/usr/lib/gcc/x86_64-linux-gnu/8/libgomp.so" \
   /lib/x86_64-linux-gnu/libpthread.a -lcrypt -lrt -ldl

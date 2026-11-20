@@ -525,7 +525,8 @@ impl Process {
                 _ => return Ok(VolOut::Nothing),
             }
         }
-        if !(lo >= 0.0) {
+        // "unless min >= 0" (a NaN minimum shifts too)
+        if lo < 0.0 || lo.is_nan() {
             let g = v.a().geom.clone();
             for f in 0..v.a().nframes {
                 for x in 0..g.width {
@@ -618,7 +619,7 @@ impl Process {
                 m[l as usize] = sse::add32(x, m[l as usize]);
             }
         }
-        if let (Some(_), Some(m)) = (vals, means.as_deref_mut()) {
+        if let (Some(_), Some(m)) = (vals, means) {
             for (l, &c) in counts.iter().enumerate() {
                 if c > 0 && l < m.len() {
                     m[l] = sse::div32(m[l], c as f32);

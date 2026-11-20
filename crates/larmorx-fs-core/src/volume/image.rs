@@ -84,25 +84,25 @@ pub fn image_alloc(rows: i32, cols: i32, format: i32, frames: i32) -> Image {
 #[derive(Clone, Copy)]
 enum ViewMap {
     /// `(x', y', slice)`
-    XYS,
+    Xys,
     /// `(slice, y', x')`
-    SYX,
+    Syx,
     /// `(x', slice, y')`
-    XSY,
+    Xsy,
     /// `(y', slice, x')`
-    YSX,
+    Ysx,
     /// `(slice, x', y')`
-    SXY,
+    Sxy,
 }
 
 impl ViewMap {
     fn voxel(self, x: i32, y: i32, s: i32) -> (i32, i32, i32) {
         match self {
-            ViewMap::XYS => (x, y, s),
-            ViewMap::SYX => (s, y, x),
-            ViewMap::XSY => (x, s, y),
-            ViewMap::YSX => (y, s, x),
-            ViewMap::SXY => (s, x, y),
+            ViewMap::Xys => (x, y, s),
+            ViewMap::Syx => (s, y, x),
+            ViewMap::Xsy => (x, s, y),
+            ViewMap::Ysx => (y, s, x),
+            ViewMap::Sxy => (s, x, y),
         }
     }
 }
@@ -118,6 +118,11 @@ struct View {
     map: ViewMap,
 }
 
+/// "Not `v > 0`" (§34 step 2's table): true for 0, a negative cosine and a NaN.
+fn not_above_zero(v: f32) -> bool {
+    v.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater)
+}
+
 fn view_of(m: &Mri, dir: i32, view: i32) -> View {
     let g = &m.geom;
     let (wd, ht, dp) = (g.width, g.height, g.depth);
@@ -126,16 +131,16 @@ fn view_of(m: &Mri, dir: i32, view: i32) -> View {
     let (z_r, z_a, z_s) = (g.z[0], g.z[1], g.z[2]);
     use ViewMap::*;
     let (w, h, d, ca, ra, map) = match (dir, view) {
-        (MRI_CORONAL, MRI_CORONAL) => (wd, ht, dp, x_r > 0.0, y_s > 0.0, XYS),
-        (MRI_CORONAL, MRI_SAGITTAL) => (dp, ht, wd, !(z_a > 0.0), y_s > 0.0, SYX),
-        (MRI_CORONAL, MRI_AXIAL) => (wd, dp, ht, x_r > 0.0, !(z_a > 0.0), XSY),
-        (MRI_SAGITTAL, MRI_CORONAL) => (dp, ht, wd, z_r > 0.0, y_s > 0.0, SYX),
-        (MRI_SAGITTAL, MRI_SAGITTAL) => (wd, ht, dp, !(x_a > 0.0), y_s > 0.0, XYS),
-        (MRI_SAGITTAL, MRI_AXIAL) => (dp, wd, ht, z_r > 0.0, !(x_a > 0.0), YSX),
-        (MRI_AXIAL, MRI_CORONAL) => (wd, dp, ht, x_r > 0.0, z_s > 0.0, XSY),
-        (MRI_AXIAL, MRI_SAGITTAL) => (ht, dp, wd, !(y_a > 0.0), z_s > 0.0, SXY),
-        (MRI_AXIAL, MRI_AXIAL) => (wd, ht, dp, x_r > 0.0, !(y_a > 0.0), XYS),
-        _ => (0, 0, 0, false, false, XYS),
+        (MRI_CORONAL, MRI_CORONAL) => (wd, ht, dp, x_r > 0.0, y_s > 0.0, Xys),
+        (MRI_CORONAL, MRI_SAGITTAL) => (dp, ht, wd, not_above_zero(z_a), y_s > 0.0, Syx),
+        (MRI_CORONAL, MRI_AXIAL) => (wd, dp, ht, x_r > 0.0, not_above_zero(z_a), Xsy),
+        (MRI_SAGITTAL, MRI_CORONAL) => (dp, ht, wd, z_r > 0.0, y_s > 0.0, Syx),
+        (MRI_SAGITTAL, MRI_SAGITTAL) => (wd, ht, dp, not_above_zero(x_a), y_s > 0.0, Xys),
+        (MRI_SAGITTAL, MRI_AXIAL) => (dp, wd, ht, z_r > 0.0, not_above_zero(x_a), Ysx),
+        (MRI_AXIAL, MRI_CORONAL) => (wd, dp, ht, x_r > 0.0, z_s > 0.0, Xsy),
+        (MRI_AXIAL, MRI_SAGITTAL) => (ht, dp, wd, not_above_zero(y_a), z_s > 0.0, Sxy),
+        (MRI_AXIAL, MRI_AXIAL) => (wd, ht, dp, x_r > 0.0, not_above_zero(y_a), Xys),
+        _ => (0, 0, 0, false, false, Xys),
     };
     View {
         w,

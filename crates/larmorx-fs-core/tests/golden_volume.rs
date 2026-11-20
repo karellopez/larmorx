@@ -2069,7 +2069,7 @@ fn img(g: &mut G, fmts: &[&str]) -> String {
     } else {
         g.int(-1, 255).to_string()
     };
-    let mut ov = vec!["-1"; 5];
+    let mut ov = ["-1"; 5];
     if g.one_in(6) {
         ov[g.below(5) as usize] = g.pick(&["0", "1", "2", "3"]);
     }

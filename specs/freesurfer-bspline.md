@@ -310,9 +310,18 @@ as the source's, `dst`'s as the destination's, the coefficients' when there is n
    invert is none, which the second product's `m2 is null` end answers (**(observed)**: `vbspline`'s
    `bslta` lines with type 0, every line identical with the implementation that follows this). Then §5.2
    with it. `LINEAR_PHYSVOX_TO_PHYSVOX` (2): the
-   array changed to `LINEAR_RAS_TO_RAS` (`LTAchangeType`, `specs/freesurfer-volume.md` §54, its errors and
-   ends of the program included: **(observed)** `LTAchangeType: src geometry must be valid` + `\n`, status
-   252, for an invalid source geometry), then §5.2 with its matrix. Any other type (`REGISTER_DAT` (14)
+   array changed to `LINEAR_RAS_TO_RAS` (`LTAchangeType`, `specs/freesurfer-volume.md` §54: the geometries'
+   validity, the change from physical-voxel to RAS-to-RAS (FS-506: FreeSurfer's products under `reproduce`,
+   the RAS transform by default, noted in both modes) and `LTAfillInverse` (FS-505), their errors and ends
+   of the program included: **(observed)** `LTAchangeType: src geometry must be valid` + `\n`, status 252,
+   for an invalid source geometry; `TransformInvert: xform noninvertible`, status 252, where the changed
+   matrix does not invert), then §5.2 with its matrix (its own ends included: `MatrixMultiply: m1 is
+   null` where the destination's voxel-to-RAS matrix does not invert). **(observed)**: `vbspline`'s two
+   `bslta` lines of this type with valid geometries end so, the first where the changed matrix (with an
+   infinite element) does not invert, the second at §5.2's product (its destination's matrix does not
+   invert, whatever the array's type); the volume probe's group `vltapv` holds 25 more
+   (`specs/freesurfer-volume.md` §69.2) and its `ltachg` lines the change itself (`models.py physvox`: the
+   `reproduce` products bit for bit). Any other type (`REGISTER_DAT` (14)
    included): the error `LTAtransformBSpline: unknown linear transform` + `\n` and the program's end
    (status 252), after step 2's volume and its messages.
 

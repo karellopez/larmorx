@@ -2346,10 +2346,15 @@ A transform array (LTA) holds `n` transforms and as many inverse transforms; eac
 label, a 4 x 4 `float` matrix and two geometries (source, destination). Products are the matrix product of section 6
 (`float` sums), inverses the matrix inverse of fs.maths. A transform's assignment copies its numbers and matrices and
 assigns its geometries as geometries assign (the cached matrices: section 1).
-- **`LTAfillInverse(lta)`**: for each transform, its matrix's inverse into the inverse transform's matrix; a matrix that
-  cannot be inverted ends the program with the error `TransformInvert: xform noninvertible` (`ERROR_BADPARM`); the
-  inverse's source is the transform's destination and its destination the transform's source. An inverse without a
-  matrix: FreeSurfer computes the inverse and loses it (FS-505; by default it is kept).
+- **`LTAfillInverse(lta)`** (made ready for the clean room by the spec finisher's relay 12: §69.2's group `vltapv`): for
+  each transform in order, `MatrixInverse(M, the inverse transform's matrix)` (`specs/freesurfer-maths.md` §8.8: into
+  that matrix, its messages included); when it returns nothing the program ends (status 252) with the error
+  `TransformInvert: xform noninvertible` (the text without a final newline); then the inverse transform's source
+  geometry is assigned the transform's destination and its destination the transform's source (`VOL_GEOM`'s
+  assignment, `specs/freesurfer-mri.md` §2). Nothing else of the inverse transform changes (its centre, spread, type,
+  label and other matrices). FS-505: an inverse transform without a matrix gets a new one from `MatrixInverse`, which
+  FreeSurfer drops: with `reproduce` the inverse stays without a matrix (**(observed)**: `vltapv`), by default it
+  keeps the new one; noted in both modes.
 - **`LTAinvert(lta, ltainv)`**: `ltainv` new (`NULL`), another array of the same size (copied into: `LTAcopy`, whose
   messages and `NULL` apply when the sizes differ), or `lta` itself; then its inverses filled, the order of the
   transforms reversed in both lists (the first exchanged with the last, ...), and the two lists exchanged: the inverse
@@ -2370,17 +2375,34 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
   geometry`) its inverse's matrix, else `ERROR: LTAreduce(): LTs <k-1> and <k> do not match` and `NULL`; the reduced
   matrix becomes `M * reduced`. Its destination becomes the last transform's destination (its source when that one was
   inverted). The new array's inverse is not filled.
-- **`LTAchangeType(lta, type)`**: nothing when the array has the type. Otherwise every transform's source and destination
-  must be valid (`LTAchangeType: src geometry must be valid` / `dst`, `ERROR_BADPARM`). Writing `V(g)` for a geometry's
-  scanner vox2ras (section 13), `S(g)` for the diagonal of its voxel sizes (and 1), `S'(g)` for the reciprocals (`1/size`
-  in `double` stored as `float`), `M` for a transform's matrix, src/dst its geometries:
+- **`LTAchangeType(lta, type)`**: nothing at all when the array has the type (its inverses not filled either). Otherwise,
+  for each transform in order, its source then its destination must be valid: the first that is not ends the program
+  (status 252) with the error `LTAchangeType: src geometry must be valid` + `\n` (`dst` for the destination) before
+  anything changes (**(observed)**: `vltapv`). Writing `V(g)` for a geometry's scanner voxel-to-RAS matrix (`vg_i_to_r`,
+  §4: always made), `inv(V(g))` for its RAS-to-voxel matrix (`vg_r_to_i`, §4: none when the inverse fails), `S(g)` for a
+  new 4 x 4 identity with the geometry's `xsize`, `ysize`, `zsize` at (1, 1), (2, 2), (3, 3), `S'(g)` for the same with
+  their reciprocals (`1 / size` in `double` stored as `float`: 0 gives an infinity, a NaN stays NaN), `M` for a
+  transform's matrix, src/dst its geometries, and `A · B` for `MatrixMultiply(A, B, ...)` (`specs/freesurfer-maths.md`
+  §8.1: an inner product into a new matrix, an outer one into `M` itself; their messages and ends of the program
+  included, so a matrix of another size than 4 x 4 prints their errors and ends at the first absent operand):
   - RAS to vox: `inv(V(dst)) (M V(src))`; an inverse that fails ends the program (`LTAgetV2V: passed volumes did not
     have the info on i_to_r or r_to_i.`).
   - vox to RAS: `V(dst) (M inv(V(src)))` (`LTAgetR2R: passed volumes did not have the info on r_to_i or i_to_r`).
   - RAS to physvox: the vox matrix, then `S(dst) (vox S'(src))`; vox to physvox: `S(dst) (M S'(src))`; physvox to vox:
     `S'(dst) (M S(src))`.
-  - physvox to RAS: by default the vox matrix `S'(dst) (M S(src))` made RAS; FreeSurfer converts `M` as if it were RAS to
-    vox first and scales after (FS-506).
+  - physvox to RAS (made ready for the clean room by the spec finisher's relay 12; `specs/freesurfer-bspline.md` §5.3 uses
+    it): for each transform in order, FS-506 noted (both modes, when the array holds a transform):
+    - `reproduce` (FreeSurfer's): `V(src)` and `inv(V(dst))` made; no `inv(V(dst))` ends the program (status 252) with the
+      error `LTAgetV2V: passed volumes did not have the info on i_to_r or r_to_i.` (the text without a final newline);
+      then `M = inv(V(dst)) · (M · V(src))`, then `M = S'(dst) · (M · S(src))`: the matrix converted as if it were RAS to
+      RAS, then scaled (**(observed)**: `vltapv`, every finite case bit for bit with these products; a size of 0 in the
+      source makes the result singular, so the inverses' fill ends the program; a NaN size in the destination leaves
+      `inv(V(dst))` none);
+    - by default (rule A: the result is the transform in RAS): `M = S'(dst) · (M · S(src))` (the voxel-to-voxel matrix),
+      then `inv(V(src))` and `V(dst)` made; no `inv(V(src))` ends the program (status 252) with the error `LTAgetR2R: passed
+      volumes did not have the info on r_to_i or i_to_r` (the text without a final newline); then `M = V(dst) · (M ·
+      inv(V(src)))`.
+    Then the array's type is `LINEAR_RAS_TO_RAS` (1) and its inverses are filled (`LTAfillInverse` above).
   - RAS to REGISTER_DAT: tkregister's registration of section 15b with the destination as reference and the source as
     moving (`MRItkRegMtx(dst, src, M)`); REGISTER_DAT to RAS: its inverse conversion (`MRItkReg2Native` of headers of the
     two geometries); FreeSurfer converts the first transform once per transform (FS-507; by default each once).
@@ -2505,6 +2527,12 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
   FreeSurfer decides it backwards (FS-516). An orientation that names an axis twice or is unknown: FS-515.
 
 ## 58. Validation plan (sections 54 to 57)
+§54's `LTAfillInverse` and its change from physical-voxel to RAS-to-RAS (made ready by the spec finisher's relay
+12): §69's group `vltapv` (the open probe's `ltachg`; and `bslta`, `specs/freesurfer-bspline.md` §5.3), identical
+with `reproduce` but where FreeSurfer crashes; the default differs only with a notice (FS-505, FS-506); `models.py
+physvox` checks the `reproduce` products bit for bit. The rest of §54 to §57 is not yet read through for the clean
+room; until it is, the plan below names the replica's closed probe, which the implementer does not open.
+
 The probe's `ltafill`, `ltainv`, `ltachg`, `ltacat`, `ltared`, `ltasrc`, `ltaprt` (arrays of 0 to 3 transforms along a
 pool of scanner-like geometries, chained, inverted and mismatched; all types, FSL output types, `Gdiag_no`), `a2v`,
 `a2vmu`, `spmw`, `icode`, `vvtk`, `sbound`, `sborder`, `idxno`, `ssrob`, `sfavg`, `zcat`, `aedit`, `shdim`, `fento`,

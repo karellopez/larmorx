@@ -172,10 +172,20 @@ Returns `NO_ERROR` (0) always.
 5. A source without a negative voxel (`srcneg` 0) clips a negative `sum` to 0 (NaN and -0 are kept);
    `val = sum`.
 
-A B-spline whose degree is not 2 to 9 (one allocated and never computed): with an axis longer than one
-voxel the weights end the program (`Invalid spline degree`, status 1) before any index is used, unless
-the degree is above 9; on a volume of one voxel degrees 0 and 1 read its coefficient. The other cases
-are FS-964 (§7).
+A B-spline whose degree is not 2 to 9 (one allocated and never computed), sampled at a point that step 1
+does not answer (§4.2 likewise), in both modes but where said:
+- an axis longer than one voxel (the width, height or depth above 1) and a degree below 2 (1, 0 or
+  negative): the weights end the program (`Invalid spline degree`, status 1) before any index is used;
+- an axis longer than one voxel and a degree above 9: FS-964 (§7). FreeSurfer first stores indices past
+  its arrays, then ends the same way, **(observed)** on 3 x 3 x 3 coefficients for degrees 10 to 64, 99,
+  100, 500, 1,000, 5,000, 10,000, 20,000 and 2,147,483,647 (`Invalid spline degree` + `\n` on standard
+  output, nothing on standard error, status 1, the same in every run), while degrees 30,000, 50,000,
+  70,000, 100,000 and 1,000,000 crash (`SIGSEGV`: those stores reach past the memory it owns; where that
+  begins depends on the process's stack; no probe line asks for such a degree, and a line where FreeSurfer
+  crashes is not compared: §9). Under `reproduce` every degree above 9 ends as `Invalid spline degree`,
+  status 1 (the crash is not reproduced), FS-964 noted; by default FS-964's end;
+- a volume of one voxel: degrees 0 and 1 read its coefficient (the single weight 1); a degree above 9 or
+  below 0 is FS-964's end in both modes (FreeSurfer reads indices it never set: memory).
 
 ### 4.2 `MRIsampleSeqBSpline(b, x, y, z, valvect, first, last)`
 
@@ -376,9 +386,13 @@ status 1). All passes write into `dst` itself (§3.4), so each pass reads the pr
   voxel size of an axis of one voxel, which they do not resample (and §6.3's centre moves that voxel by
   half a source voxel). Both modes give FreeSurfer's geometry, noted.
 - **FS-964** (memory): sampling (§4.1, §4.2) a B-spline whose degree is above 9, or below 0 on a volume of
-  one voxel: FreeSurfer writes indices past its arrays or reads indices it never set. An error in both
-  modes (`<function>: a B-spline of degree <d> (FreeSurfer reads or writes memory it does not own here)`,
-  `ERROR_BADPARM`).
+  one voxel: FreeSurfer writes indices past its arrays or reads indices it never set. FS-964's end: the
+  program's end after the error `<function>: a B-spline of degree <d> (FreeSurfer reads or writes memory it
+  does not own here)` + `\n` (`<function>` `MRIsampleBSpline` or `MRIsampleSeqBSpline`, `<d>` the degree in
+  decimal; status 252, nothing on standard output), noted. By default every such case; under `reproduce`
+  only a volume of one voxel, while a degree above 9 with an axis longer than one voxel ends as FreeSurfer
+  does (§4.1: `Invalid spline degree`, status 1, noted; FreeSurfer's stray stores before it are memory it
+  does not own, and the crash where they reach too far is not reproduced).
 
 ## 8. What is not part of the module
 
@@ -443,7 +457,9 @@ of §5 is independent, so any thread count gives the same result.
   | `vbsrules` | 71 | 3 | 8 | 0 | `713d7bb825ce469535a36d88d3537882127b0d32a16f0504c2b0a10ab1738a90` |
 
   The memory lines: the upsampling's axes of one voxel (FS-962's reads past the source), a frame-range
-  sample one frame past the volume's, FS-964's degrees above 9; the crashes: sources without their
+  sample one frame past the volume's, FS-964's degrees above 9 on coefficients of one voxel (on larger
+  coefficients those degrees end as §4.1 says, the same in every run: `EXIT 1` lines, compared under
+  `reproduce`); the crashes: sources without their
   cached matrices, whose header copy crashes (`specs/freesurfer-volume.md`'s FS-252), a source without
   voxels, and transforms into a given destination with fewer frames than the source (written past its
   voxels, `specs/freesurfer-mri.md`). The exits are FreeSurfer's own: `Invalid spline degree`, the

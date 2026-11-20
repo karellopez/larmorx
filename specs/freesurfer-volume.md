@@ -1540,9 +1540,15 @@ text: FS-327's error and FS-461's default on a two-frame byte volume.
   size than 4 x 4: `stuff_four_by_four(): matrix is not four-by-four` (both `ERROR_BADPARM`, returned);
   otherwise the values row by row into the real element places (`MATRIX_RELT`: for a complex matrix the
   floats at those offsets of its storage), `NO_ERROR`.
-- `MRIvoxelXformToRasXform(src, dst, m_vox, m_ras)`: `vox2ras(dst or src) * (m_vox * ras2vox(src))`, the two
-  products with `MatrixMultiply` (into `m_ras` when given). `MRIgetVoxelToVoxelXform(src, dst)`:
-  `ras2vox(dst) * vox2ras(src)`.
+- `MRIvoxelXformToRasXform(src, dst, m_vox, m_ras)`: `extract_i_to_r(dst or src) * (m_vox *
+  extract_r_to_i(src))`, the two products with `MatrixMultiply` (`specs/freesurfer-maths.md` §8.1: the inner
+  one first, into a new matrix; the outer one into `m_ras` when given, else a new matrix; their messages and
+  ends of the program included). `MRIgetVoxelToVoxelXform(src, dst)`: `extract_r_to_i(dst) *
+  extract_i_to_r(src)`, one product into a new matrix. In both the two matrices are those
+  `specs/freesurfer-mri.md` §3 makes from the geometry fields, not the cached ones (as §29's
+  `MRIrasXformToVoxelXform`): a volume whose cached matrices are as the allocation left them (stale once its
+  fields change) gives the same result (**(observed)**: every `vx2rx` and `v2v` line of `vstat7`, volumes
+  with their cache as allocated included).
 - `MRIsetVoxelToRasXform(mri, M)`: the column scales `sqrt(M1c^2 + M2c^2 + M3c^2)` (each square in `float`,
   summed in `double` from 0 in row order, `sqrt` in `double`; each addition is `square + sum`, the new square
   the first operand, so where two NaNs meet the LATER row's wins: **(observed)** `vstat7`'s `setv2r 3 2 4 2 2 0

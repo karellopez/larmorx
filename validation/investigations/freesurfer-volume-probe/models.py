@@ -22,6 +22,25 @@ nothing else).
         numbers, ranges or a combination, compared in the value's own type, a NaN equal to nothing),
         ``IS_CLASS``, ``IsSubCorticalGray`` and ``MRIasegContraLatLabel`` with its message.
 
+    python -P models.py view --probe P --scratch DIR
+        every ``toimgv`` line of the groups vimage and vrules9 without a given image and with the
+        frame inside, of the types the nearest sample reads, against §34's steps: the slice
+        direction, the view's table, the slice, the extremes from 1e7 and -1e7, the range's check,
+        the bytes and the image's voxel sizes.
+
+    python -P models.py smooth --probe P --scratch DIR
+        every ``smpar`` line of the groups vnbhd and vrules9 on shorts against §35's statement of
+        MRIsmoothParcellation (negative labels counted like any other: FS-467 as the default and
+        ``reproduce`` give it).
+
+    python -P models.py nearest --probe P --scratch DIR
+        every ``nearnz`` line of the group vnbhd against §35's MRIfindNearestNonzeroLocation.
+
+    python -P models.py physvox --probe P --scratch DIR
+        60 transform arrays changed from physical-voxel to RAS-to-RAS (``ltachg``) against §54's
+        ``reproduce`` products, with the geometries' matrices taken from the probe's ``vgi2r`` and
+        ``vgr2i`` (the arrays: seeded, valid geometries, general 4 x 4 matrices).
+
 The probe runs through the oracle-output cache (one thread, the family ``freesurfer``) when the
 validation package is importable (``PYTHONPATH=validation/src``), else directly. Exit status 1 when a
 line differs from its model.
@@ -519,11 +538,388 @@ def cma(runner, scratch: Path) -> int:
     return 1 if bad else 0
 
 
+# ---- part 7b (§34, §35) and §54 ------------------------------------------------------------------
+
+FMT = {0: "<B", 1: "<i", 2: "<q", 3: "<f", 4: "<h", 10: "<H"}
+F32 = np.float32
+
+
+def hexf(h: str) -> float:
+    return struct.unpack(">f", bytes.fromhex(h))[0]
+
+
+def fbits(x: float) -> str:
+    return f"{struct.unpack('<I', struct.pack('<f', x))[0]:08x}"
+
+
+@dataclass
+class WVol:
+    """A W of a probe line (README.md) with its paint: the voxels, the sizes and the cosines."""
+
+    w: int
+    h: int
+    d: int
+    t: int
+    f: int
+    hdr: int
+    sizes: tuple[float, float, float]
+    ras_good: int
+    cos: tuple[float, ...]
+    buf: bytearray
+
+    def off(self, x: int, y: int, z: int, fr: int = 0) -> int:
+        return (((fr * self.d + z) * self.h + y) * self.w + x) * BPV[self.t]
+
+    def get(self, x: int, y: int, z: int, fr: int = 0) -> float:
+        """MRIgetVoxVal of a voxel inside (as a float)."""
+        return float(F32(struct.unpack_from(FMT[self.t], self.buf, self.off(x, y, z, fr))[0]))
+
+    def set(self, x: int, y: int, z: int, v: float) -> None:
+        """MRIsetVoxVal of frame 0 (the type's clipping and nint)."""
+        o = self.off(x, y, z)
+        if self.t == 3:
+            struct.pack_into("<f", self.buf, o, v)
+            return
+        lo, hi = {0: (0, 255), 1: (-(2.0**31), 2.0**31), 2: (-(2.0**63), 2.0**63)}.get(
+            self.t, {4: (-32768, 32767), 10: (0, 65535)}.get(self.t, (0, 0))
+        )
+        iv = nint(max(lo, min(hi, v)))
+        if self.t in (0, 10):
+            iv &= 0xFF if self.t == 0 else 0xFFFF
+        struct.pack_into(FMT[self.t], self.buf, o, iv)
+
+
+def read_w(tok: list[str], k: int, tab: list[int], paint: bool = True) -> tuple[WVol, int]:
+    """The W at token k (and its paint P when ``paint``); the index after them."""
+    w, h, d, t, f, hdr = map(int, tok[k : k + 6])
+    fill = tok[k + 6]
+    sizes = tuple(hexf(x) for x in tok[k + 7 : k + 10])
+    ras_good = int(tok[k + 10])
+    cos = tuple(hexf(x) for x in tok[k + 11 : k + 20])
+    k += 7 + 19 + 18 + 1
+    if tok[k] == "null":
+        k += 1
+    else:
+        k += 2 + int(tok[k]) * int(tok[k + 1])
+    if tok[k] != "null":
+        raise ValueError("a W with a colour table")
+    k += 1
+    n = 0 if hdr else w * h * d * f * BPV.get(t, 0)
+    if fill.startswith("t") and t == 3:
+        s = int(fill[1:])
+        buf = bytearray(
+            b"".join(struct.pack("<I", tab[(7 * i + s) % len(tab)]) for i in range(n // 4))
+        )
+    elif fill.startswith("i"):
+        ws = [int(x) for x in fill[1:].split(",")]
+        buf = bytearray(b"".join(struct.pack("<i", ws[i % len(ws)]) for i in range(n // 4)))
+    else:
+        s = int(fill[1:]) if fill.startswith("t") else int(fill)
+        buf = bytearray(n) if s < 0 else bytearray((s + 101 * i) % 256 for i in range(n))
+    v = WVol(w, h, d, t, f, hdr, sizes, ras_good, cos, buf)
+    if paint:
+        np_ = int(tok[k])
+        k += 1
+        for _ in range(np_):
+            v.set(int(tok[k]), int(tok[k + 1]), int(tok[k + 2]), hexf(tok[k + 3]))
+            k += 4
+    return v, k
+
+
+def lines_of(groups: list[str], cmd: str) -> list[C.Batch]:
+    out = []
+    for b in C.all_batches(C.Gen(7), groups):
+        ls = [ln for ln in b.lines if ln.startswith(cmd + " ")]
+        if ls:
+            out.append(C.Batch(b.group, f"{b.name}-{cmd}", ls))
+    return out
+
+
+def run_model(runner, scratch: Path, name: str, groups: list[str], cmd: str, model) -> int:
+    """Runs the lines of ``cmd`` and compares each with ``model(tokens, tab)`` (None: left out)."""
+    tab = table()
+    tally: Counter[str] = Counter()
+    bad = 0
+    for b in lines_of(groups, cmd):
+        path = C.write_batch(scratch, b)
+        plain, memory = runner.probe_runs(b, path)
+        for line, out, mem in zip(b.lines, plain, memory, strict=True):
+            got = out.decode("latin-1").rpartition(" | ")[0]
+            head = got.split(" ", 1)[0]
+            if mem or head in ("CRASH", "TIMEOUT"):
+                tally["memory or crash"] += 1
+                continue
+            want = model(line.split(), tab)
+            if want is None:
+                tally["outside the model"] += 1
+            elif got == want:
+                tally["as the model"] += 1
+            else:
+                bad += 1
+                if bad <= 3:
+                    print(f"DIFFERS: {line[:100]}\n  probe {got[:200]}\n  model {want[:200]}")
+    for k, v in sorted(tally.items()):
+        print(f"{name}: {k}: {v}")
+    print(f"{name}: differ from the model: {bad}")
+    return 1 if bad else 0
+
+
+def view_model(tok: list[str], tab: list[int]) -> str | None:
+    """§34's MRItoImageView, steps 1 to 8, without a given image and with the frame inside."""
+    v, k = read_w(tok, 1, tab)
+    if tok[k] != "null":
+        return None
+    sl, view, fr = int(tok[k + 1]), int(tok[k + 2]), int(tok[k + 3])
+    xr, xa, _xs, _yr, ya, ys, zr, za, zs = v.cos
+    if not v.ras_good:
+        return "null"
+    az = [abs(F32(c)) for c in (zr, za, zs)]
+    dirn = 1 if az[0] > az[1] and az[0] > az[2] else 0 if az[1] > az[2] else 2
+    W, H, D = v.w, v.h, v.d
+    tab9 = {
+        (0, 0): (W, H, D, xr > 0, ys > 0, "c"),
+        (0, 1): (D, H, W, not za > 0, ys > 0, "s"),
+        (0, 2): (W, D, H, xr > 0, not za > 0, "h"),
+        (1, 0): (D, H, W, zr > 0, ys > 0, "s"),
+        (1, 1): (W, H, D, not xa > 0, ys > 0, "c"),
+        (1, 2): (D, W, H, zr > 0, not xa > 0, "q"),
+        (2, 0): (W, D, H, xr > 0, zs > 0, "h"),
+        (2, 1): (H, D, W, not ya > 0, zs > 0, "r"),
+        (2, 2): (W, H, D, xr > 0, not ya > 0, "c"),
+    }
+    w, h, d, xa_, ya_, kind = tab9.get((dirn, view), (0, 0, 0, False, False, None))
+    frac = F32(0.4) if view == dirn else F32(0.6)
+    if sl < 0:
+        sl = nint(float(F32(frac * F32(d))))
+    elif sl >= d:
+        return "null"
+    if v.hdr or not 0 <= fr < v.f or v.t not in (0, 1, 3, 4, 10):
+        return None
+
+    def at(x: int, y: int) -> tuple[int, int, int]:
+        xx = w - 1 - x if xa_ else x
+        yy = h - 1 - y if ya_ else y
+        return {
+            "c": (xx, yy, sl),
+            "s": (sl, yy, xx),
+            "h": (xx, sl, yy),
+            "q": (yy, sl, xx),
+            "r": (sl, xx, yy),
+        }[kind]
+
+    fmin, fmax = F32(1e7), F32(-1e7)
+    for y in range(h):
+        for x in range(w):
+            val = v.get(*at(x, y), fr)
+            if val > fmax:
+                fmax = F32(val)
+            if val < fmin:
+                fmin = F32(val)
+    rng = F32(fmax - fmin)
+    pix = bytearray(w * h)
+    if not abs(float(rng)) < 1.1920928955078125e-07:
+        for y in range(h):
+            for x in range(w):
+                q = 255.0 * (v.get(*at(x, y), fr) - float(fmin)) / float(rng)
+                iv = int(q) if q == q and -(2.0**31) - 1 < q < 2.0**31 else -(2**31)
+                pix[(h - 1 - y) * w + x] = iv & 0xFF
+    sx, sy = 1.0, 1.0
+    if dirn == 0 and kind is not None:
+        xsz, ysz, zsz = v.sizes
+        sx, sy = {0: (xsz, ysz), 1: (zsz, ysz), 2: (xsz, zsz)}[view]
+    px = "x" + pix.hex() if w * h else "null"
+    return f"new {h} {w} {h} {w} 0 1 {fbits(sx)} {fbits(sy)} {px}"
+
+
+def smooth_model(tok: list[str], tab: list[int]) -> str | None:
+    """§35's MRIsmoothParcellation on shorts: the copy's voxels (the printed volume's last field)."""
+    v, k = read_w(tok, 1, tab)
+    count = int(tok[k])
+    if v.t != 4 or v.hdr:
+        return None
+    out = bytearray(v.buf)
+    order = [
+        (a, b, c)
+        for a in (1, 0, -1)
+        for b in (1, 0, -1)
+        for c in (1, 0, -1)
+        if (a, b, c) != (0, 0, 0)
+    ]
+    for i in range(1, v.w - 1):
+        for j in range(1, v.h - 1):
+            for z in range(1, v.d - 1):
+                vals = [int(v.get(i + a, j + b, z + c)) for a, b, c in order]
+                counts = Counter(vals)
+                for x in vals:
+                    if counts[x] >= count:
+                        struct.pack_into("<h", out, v.off(i, j, z), x)
+    return "x" + bytes(out).hex()
+
+
+def smooth(runner, scratch: Path) -> int:
+    def model(tok, tab):
+        return smooth_model(tok, tab)
+
+    tab = table()
+    tally: Counter[str] = Counter()
+    bad = 0
+    for b in lines_of(["vnbhd", "vrules9"], "smpar"):
+        path = C.write_batch(scratch, b)
+        plain, memory = runner.probe_runs(b, path)
+        for line, out, mem in zip(b.lines, plain, memory, strict=True):
+            got = out.decode("latin-1").rpartition(" | ")[0]
+            if mem or got.split(" ", 1)[0] in ("CRASH", "TIMEOUT"):
+                tally["memory or crash"] += 1
+                continue
+            want = model(line.split(), tab)
+            if want is None:
+                tally["outside the model"] += 1
+            elif got.split(" ")[-1] == want:
+                tally["as the model"] += 1
+            else:
+                bad += 1
+                if bad <= 3:
+                    print(f"DIFFERS: {line[:100]}")
+    for k, v in sorted(tally.items()):
+        print(f"smooth: {k}: {v}")
+    print(f"smooth: differ from the model: {bad}")
+    return 1 if bad else 0
+
+
+def nearest_model(tok: list[str], tab: list[int]) -> str | None:
+    """§35's MRIfindNearestNonzeroLocation at points whose rounding is inside the volume."""
+    v, k = read_w(tok, 1, tab)
+    if v.hdr:
+        return None
+    n = int(tok[k])
+    k += 1
+    b = BPV[v.t]
+
+    def byte(x: int, y: int, z: int) -> int:
+        return v.buf[(z * v.h + y) * v.w * b + x]
+
+    def clamp(c: int, e: int) -> int:
+        return min(max(c, 0), e - 1)
+
+    res = []
+    for _ in range(n):
+        ws = int(tok[k])
+        xr, yr, zr = (struct.unpack(">d", bytes.fromhex(t))[0] for t in tok[k + 1 : k + 4])
+        wp = int(tok[k + 4])
+        k += 5
+        x, y, z = nint(xr), nint(yr), nint(zr)
+        if not (0 <= x < v.w and 0 <= y < v.h and 0 <= z < v.d):
+            return None
+        if byte(x, y, z) > 0:
+            res += [fbits(float(byte(x, y, z))), "-7", "-7", "-7"]
+            continue
+        md, mv, place = F32(100000), 0.0, ("-7", "-7", "-7")
+        wh = int((ws - 1) / 2)
+        for zk in range(-wh, wh + 1):
+            zi = clamp(z + zk, v.d)
+            dz = F32(zi - zr)
+            for yk in range(-wh, wh + 1):
+                yi = clamp(y + yk, v.h)
+                dy = F32(yi - yr)
+                for xk in range(-wh, wh + 1):
+                    xi = clamp(x + xk, v.w)
+                    dx = F32(xi - xr)
+                    if byte(xi, yi, zi) > 0:
+                        sq = F32(F32(F32(dx * dx) + F32(dy * dy)) + F32(dz * dz))
+                        dist = F32(np.sqrt(np.float64(sq)))
+                        if dist < md:
+                            md, mv = dist, float(byte(xi, yi, zi))
+                            if wp:
+                                place = (str(xi), str(yi), str(zi))
+        res += [fbits(mv), *place]
+    return " ".join(res)
+
+
+def view(runner, scratch: Path) -> int:
+    return run_model(runner, scratch, "view", ["vimage", "vrules9"], "toimgv", view_model)
+
+
+def nearest(runner, scratch: Path) -> int:
+    return run_model(runner, scratch, "nearest", ["vnbhd"], "nearnz", nearest_model)
+
+
+def mprod(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """``specs/freesurfer-maths.md`` §8.1's float product."""
+    o = np.zeros((a.shape[0], b.shape[1]), dtype=np.float32)
+    for i in range(a.shape[0]):
+        for j in range(b.shape[1]):
+            acc = F32(0)
+            for q in range(a.shape[1]):
+                acc = F32(acc + F32(a[i, q] * b[q, j]))
+            o[i, j] = acc
+    return o
+
+
+def read_m(tok: list[str], k: int) -> tuple[np.ndarray, int]:
+    r, c = int(tok[k]), int(tok[k + 1])
+    v = np.array([hexf(x) for x in tok[k + 2 : k + 2 + r * c]], dtype=np.float32)
+    return v.reshape(r, c), k + 2 + r * c
+
+
+def physvox(runner, scratch: Path) -> int:
+    """§54's physical-voxel to RAS-to-RAS under ``reproduce``: ``S'(dst) ((inv(V(dst)) (M V(src)))
+    S(src))`` bit for bit, V and inv(V) the probe's own ``vgi2r`` and ``vgr2i`` of the geometries."""
+    import random
+
+    gen = C.Gen10(7)
+    r = random.Random("7:physvox")
+    lines, cases = [], []
+    for _ in range(60):
+        src, dst = (gen.geom(r, ext=(1, 5)).split(" ") for _ in range(2))
+        src[0] = dst[0] = "1"
+        m = gen.affine(r)
+        zero = C.f32(0.0)
+        lt = " ".join([zero] * 4 + [m, "null", "null", "0", "0", " ".join(src), "1", "null"])
+        lt += " " + " ".join(dst) + " 1 null"
+        inv = " ".join([zero] * 4 + [gen.affine(r), "null", "null", "0", "0", " ".join(dst), "1"])
+        inv += " null " + " ".join(src) + " 1 null"
+        lines.append(f"ltachg 1 2 {C.f32(1.0)} x {lt} {inv} 1")
+        lines.append(f"vgi2r {' '.join(src)}")
+        lines.append(f"vgr2i {' '.join(dst)}")
+        cases.append((m, src, dst))
+    b = C.Batch("physvox", "physvox", lines)
+    path = C.write_batch(scratch, b)
+    plain, memory = runner.probe_runs(b, path)
+    tally: Counter[str] = Counter()
+    bad = 0
+    for i, (m, src, dst) in enumerate(cases):
+        outs = [
+            plain[3 * i + j].decode("latin-1").rpartition(" | ")[0].split(" ") for j in range(3)
+        ]
+        if any(memory[3 * i : 3 * i + 3]) or outs[0][0] != "self" or outs[2][0] == "null":
+            tally["outside the model"] += 1
+            continue
+        got, _ = read_m(outs[0], 1 + 4 + 4)
+        vs, _ = read_m(outs[1], 0)
+        ivd, _ = read_m(outs[2], 0)
+        m0, _ = read_m(m.split(" "), 0)
+        s, si = np.eye(4, dtype=np.float32), np.eye(4, dtype=np.float32)
+        for q in range(3):
+            s[q, q] = F32(hexf(src[4 + q]))
+            si[q, q] = F32(1.0 / np.float64(F32(hexf(dst[4 + q]))))
+        want = mprod(si, mprod(mprod(ivd, mprod(m0, vs)), s))
+        if np.array_equal(want.view(np.uint32), got.view(np.uint32)):
+            tally["as the model"] += 1
+        else:
+            bad += 1
+    for k, v in sorted(tally.items()):
+        print(f"physvox: {k}: {v}")
+    print(f"physvox: differ from the model: {bad}")
+    return 1 if bad else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("command", choices=["fs291", "skull", "cma"])
+    ap.add_argument(
+        "command", choices=["fs291", "skull", "cma", "view", "smooth", "nearest", "physvox"]
+    )
     ap.add_argument("--probe", type=Path, required=True)
     ap.add_argument("--scratch", type=Path, required=True)
     ap.add_argument("--no-cache", action="store_true")
@@ -531,7 +927,15 @@ def main() -> int:
     scratch = a.scratch.resolve()
     scratch.mkdir(parents=True, exist_ok=True)
     runner = C.Runner(a.probe.resolve(), scratch, not a.no_cache)
-    return {"fs291": fs291, "skull": skull, "cma": cma}[a.command](runner, scratch)
+    return {
+        "fs291": fs291,
+        "skull": skull,
+        "cma": cma,
+        "view": view,
+        "smooth": smooth,
+        "nearest": nearest,
+        "physvox": physvox,
+    }[a.command](runner, scratch)
 
 
 if __name__ == "__main__":

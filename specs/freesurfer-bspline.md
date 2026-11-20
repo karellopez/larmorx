@@ -269,8 +269,9 @@ a * b / c` does: `x = x * ((a * b) / c)`.)
    matrix!` and end); a singular `A`: the error `MRIlinearTransformSpline: xform is singular`,
    `ERROR_BADPARM`, the result none.
 2. No `dst`: a volume of the source's type with the coefficients' extent, frames and header
-   (`MRIcloneDifferentType(coefficients, source type)`: its `outside_val` 0); a given `dst` is cleared
-   (`MRIclear`).
+   (`MRIcloneDifferentType(coefficients, source type)`, `specs/freesurfer-volume.md` §38: the
+   coefficients' clone when the source type is `float`, else a new volume of that type with their header;
+   its `outside_val` 0 either way); a given `dst` is cleared (`MRIclear`).
 3. For each destination voxel, slices outermost, then rows, columns innermost: the point `A^-1 (y1, y2,
    y3, 1)` with the voxel's indices as `float`s and the product in `float` (`MatrixMultiply`), widened;
    for each frame of the coefficients, `MRIsampleBSpline` there (§4.1) stored into `dst` with

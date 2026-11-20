@@ -1748,8 +1748,10 @@ FS-463, FS-465, FS-467), counted and not compared; the default differs only with
   as `float`s, a signalling NaN kept); new b-value (frames x 1) and b-vector (frames x 3) tables when `in` has them,
   copied row by row (FS-473: a table of fewer rows than frames: FreeSurfer reads past it, a crash; both modes leave
   those entries 0); `in`'s b-vector space. In place: `ERROR: MRIreverseSliceOrder: cannot be done in-place`,
-  `NULL`. `MRIcloneDifferentType(src, type)`: `MRIclone` for the same type, else a new volume of `type` with the
-  header.
+  `NULL`. `MRIcloneDifferentType(src, type)`: `MRIclone` (§7) for the same type, else a new volume of the source's
+  extent and frames and of `type` (`MRIallocSequence`) with the source's header (`MRIcopyHeader`,
+  `specs/freesurfer-mri.md`: its colour table too); its `outside_val` the allocation's 0 either way (the header
+  copy does not copy it) (**(observed)**: fs.bspline's `vbspline`, §69.2).
 - `MRIorderIndices(mri, xs, ys, zs)`: voxels (x outermost) sorted by their frame-0 value as a byte by `qsort`
   (equal values keep their order); FS-474: coordinates and values kept in bytes (wrapping past 255, a value's low
   byte of its 32-bit truncation) with `reproduce`; by default whole coordinates and values clamped (NaN 0).

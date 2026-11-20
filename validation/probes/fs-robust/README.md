@@ -31,6 +31,16 @@ Commands (queue 3.2-02, `fs.robust` 1 of 2; volumes are fs-volume's `get_vol` wi
 `orient` (`CostFunctions::orientation`), `v2m`, `vv2m`, `m2v` (the conversions), `getvnl`, `isdiag`,
 `polar`, `polar2`, `adist`, `rdist` (the `vnl_matrix` distances), `fdiff`, `rlog`.
 
+Commands of 3.2-02's second part (relay 41): `schur` (`MyMatrix::SchurComplex`: `U` and `T`, each
+`rows cols` and the elements' real and imaginary parts) and `sqrtm` (`MyMatrix::MatrixSqrt`), in a seeded
+stream of their own (`check.py --family sqrtm`; the example's `cases-sqrtm <seed> <n>`). `cabs` and
+`csqrt` are linked in the official code with `--wrap` to `complexrt.c`'s, the project's decision
+(CORE-MATH's correctly rounded `hypot` inside both, compiled from `tags/core-math` beside it; the same
+functions as `larmorx_core::cplx`), so the comparison checks LAPACK's chain, C++'s complex arithmetic
+(the system's `__divdc3` and `__muldc3`, unwrapped) and VNL's products bit for bit. The port's lines that
+stop at a path not ported (LAPACK's `ZLAQR0`, where `ZLAHQR` does not converge on a matrix with an
+infinite or NaN element: FS-969) are counted and hashed as `NOTPORTED`.
+
 ```bash
 bash validation/probes/fs-robust/build.sh <workspace>
 scripts/orchestration/boxed.sh 20 python -P validation/probes/fs-robust/check.py --seed 1 --n 2300 --jobs 12
@@ -41,3 +51,9 @@ comparable, 0 different, hash `afdca92c06265190e0ff1f7a897995758181c306a471e510b
 `NANBITS`); seed 7, 4,600: 4,500 identical, 100 not comparable, 0 different; seed 13, 9,200: 8,989
 identical, 211 not comparable, 0 different. `fix` differs only with notices. The bench at 256^3 (one
 thread, identical hashes): `docs/findings/freesurfer-robust.md` §5.
+
+Measured 2026-11-20 (track C, relay 41), `--family sqrtm`: seed 1, 1,200 cases: 1,187 identical, 13
+`NOTPORTED`, 0 different, hash `42dd17ef0dda71dd610e75d35615262066e7e2c719fe6e124ca19ad4c12e1d42` (the
+test's `reproduce_gives_the_official_square_roots`); seed 7, 3,000: 2,961 identical, 39 `NOTPORTED`, 0
+different; seed 13, 6,000: 5,913 identical, 87 `NOTPORTED`, 0 different. `fix` differs only with
+notices (FS-969, FS-970).

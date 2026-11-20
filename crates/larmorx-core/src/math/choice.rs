@@ -27,6 +27,13 @@
 //! (one function per call). Their API pages say that `reproduce` gives glibc's (the
 //! original's) maths and that the default's correctly rounded functions can move a result's
 //! last bits.
+//!
+//! **Correctly rounded in both modes** (no `*_glibc` choice here): `tan`, `asin`, `acos`, `atan`
+//! (the user's decision of 2026-11-04: glibc's tables for them are fitted data no definition
+//! reproduces), and `atan2` and `hypot` (D4, the confounds' part), `hypot` also inside the C
+//! library's complex `cabs` and `csqrt` (`crate::cplx`: the decision applied to them on
+//! 2026-11-18, for the matrix square roots built on LAPACK's complex Schur form); `reproduce`
+//! there is an expected divergence of the last bit (GLIBC-07).
 
 use std::sync::atomic::{AtomicBool, Ordering};
 

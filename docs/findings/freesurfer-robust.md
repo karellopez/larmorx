@@ -98,7 +98,7 @@ in debug and release, and on Windows x64 (the cross-check tool).
   256); its `assert(s > 0)` is compiled out. `RotMatrixLogNorm`'s and `RigidTransDistSq`'s assertions
   are compiled out (`-DNDEBUG`): only the `There is streching!` line remains.
 
-## 4. The matrix square root (`MatrixSqrt`): what it needs (relay 41)
+## 4. The matrix square root (`MatrixSqrt`): what it needs, and its port (relays 40 and 41)
 
 `MyMatrix::MatrixSqrt` (`MyMatrix.cpp` 1287-1431) takes the complex Schur form `A = U T U*` from LAPACK's
 `zgees_("V", "N", ...)` (`SchurComplex`, 1731-1805: the matrix transposed for Fortran, `lwork = 10 n`),
@@ -124,15 +124,73 @@ to square root!`). Its runtime dependencies, measured as black boxes
   measured (0 differences in 12.6 million, random bit patterns included); `__muldc3` (only when a product's two parts are NaN): the
   plain product on finite arguments.
 
-So the square root can be bit for bit `reproduce` only with the project's choice for `hypot` applied
-inside `cabs` and `csqrt` (D4: correctly rounded in both modes; then glibc's `csqrt` structure with that
-`hypot`): **a decision for the orchestrator** (the precedent: `acos`, 2026-11-18, the user's decision of
-2026-11-04). Until it lands, `MatrixSqrt` and the registration's symmetric half-way maps wait.
+The decision (the orchestrator, 2026-11-18, by the user's D4): `cabs` and `csqrt` take the correctly
+rounded `hypot` in both modes, `csqrt` keeping glibc's form, the division Smith's; at
+`mri_robust_register`'s and `mri_robust_template`'s replays (3.2-13 to 3.2-16) measure whether glibc's
+`hypot` would change a recorded output, and only then a glibc `hypot` (spec writer and clean room, as
+`atan2_glibc`).
+
+Where it is reached: `RegRobust.h` (`computeIterativeRegistrationFull`'s symmetric update, line 358: at
+every step of both programs' default registration, the step's transform split into two halves),
+`Registration.cpp` 4588 (the half-way maps of the result) and `RegPowell.cpp` (110, 429, 576);
+`MatrixSqrtAffine` (1578) only through code no program reaches (its caller is commented out at 4575).
+
+**Ported (relay 41, 2026-11-20).** `larmorx_core::lapack_zgees` (`zgees_vn`: the chain above, the
+unblocked paths of `zgehrd` and `zungqr`, `zhseqr` with `zlahqr` up to 75 rows), `larmorx_core::cplx`
+(the runtimes' complex arithmetic, `cabs`, `csqrt`, `__divdc3`, `__muldc3`), `VnlCMatrix` in
+`larmorx_core::vnl_matrix` (VNL's complex products, conjugate transpose, one-norm and `vnl_matlab_print`),
+and `MyMatrix::SchurComplex` and `MatrixSqrt` in `crates-freesurfer/larmorx-freesurfer-robust/src/mymatrix.rs`.
+What the bits depend on:
+
+- **gfortran's complex arithmetic.** GCC honours signed zeros, so a real promoted to complex (`T2*H(K+1,J)`,
+  `S + H(I,I)`, `H11S / S`, `DCMPLX(DA, 0)*ZX(I)` in `zdscal`) is a complex number with a `+0` imaginary
+  part and every such operation the full one: the plain product `(ar br - ai bi, ar bi + ai br)` and GCC's
+  wide (Smith's) division, whose comparison `|br| < |bi|` is always false for a real divisor. Zero signs
+  follow from it (`0 + hi` is `+0` for `hi = -0`), and the probe's identical zero bits confirm it.
+- **`csqrt`'s form.** Kahan's formula alone misses glibc on a zero real part (glibc takes `sqrt(|y| / 2)`
+  for both parts: the purely imaginary eigenvalues of rotations by a right angle) and near overflow; the
+  form measured is in the investigation's README ("csqrt's form"): 0 differences on 4.2 million arguments
+  of each ordinary family, 47 of 4.2 million random bit patterns and 10,616 of 4.0 million near overflow or
+  the subnormals (a part above `DBL_MAX / 4` with a much smaller other part).
+- **`__divdc3`** is GCC 12's, not Smith's, where a divisor's part is zero or subnormal or near overflow
+  (1,825 of 50,625 special combinations differ beyond the NaNs' bits; the README's "libgcc's division"):
+  the square root's divisors `R(i,i) + R(j,j)` have parts of magnitude about 1 or exactly zero imaginary
+  parts, where the two agree. An open item (§5).
+- **The arguments.** `SchurComplex` passes `long` variables where `zgees_` takes Fortran `INTEGER`s (32
+  bits): `n`, `lwork` read their low halves, and `sdim`, `info` are written into the low halves of
+  variables set to 0, so a negative `info` would print as `2^32 - i` and "unknown error"; unreachable,
+  because `XERBLA` stops the program first.
+- **Non-finite matrices (FS-969).** `zlange` takes the NaN; `zlahqr` never converges on a NaN or infinite
+  element (an infinite one becomes NaN in `zlascl`'s scaling) and `zhseqr` retries with `zlaqr0` on a
+  49 x 49 copy (`NL`): the official code then prints `<MyMatrix.cpp>: info = 2, something went wrong:` and
+  `the QR iteration failed, but the last 0 eigenvalues may be correct` and returns NaN factors, its
+  `assert(info == 0)` compiled out; `MatrixSqrt`'s two checks never fail on NaNs, so a NaN matrix comes
+  back. Where the NaN is isolated by `zgebal`'s permutations (a diagonal or triangular matrix) `zlahqr` is
+  never called and the port's `reproduce` gives FreeSurfer's NaNs. `zlaqr0` (with `zlaqr3`, `zlaqr4`,
+  `zlaqr5`, `ztrexc`, about 3,000 lines) is not ported: `reproduce` stops there with an error (the
+  probe's `NOTPORTED` lines); rule B, by default an error.
+- **An empty matrix (FS-970).** `zgees_` refuses `LDA = 0` (`XERBLA`: ` ** On entry to ZGEES parameter
+  number  6 had an illegal value` on standard output, then Fortran's `STOP`, status 0): the program ends
+  there with status 0. Rule B, by default an error and status 1.
+
+**Results** (`validation/probes/fs-robust`, `check.py --family sqrtm`, `schur` and `sqrtm` alternating:
+4 x 4 registration transforms, 3 x 3 rotations, rotations by right and straight angles, Jordan blocks,
+diagonal, triangular and sparse matrices for the balancing, other sizes (1 to 12), tiny and huge
+matrices for the scaling, columns of tiny numbers for the reflectors' rescaling and the norm's small sums,
+negative and zero eigenvalues, empty matrices, special elements): seeds 1 (1,200), 7 (3,000) and 13
+(6,000): 10,200 cases, 10,061 lines identical with `reproduce` (the official lines: 4,780 Schur forms and 3,735 square roots
+returned, 906 `Result too imaginary to ignore!` and 128 `Result not close enough to square root!` ends
+with their diagnostics, 516 empty matrices ending in `XERBLA`, 135 `zlaqr0` failures), 139 `NOTPORTED` (`zlaqr0`), 0
+different; `fix` different only with notices. Seed 1's hash
+`42dd17ef0dda71dd610e75d35615262066e7e2c719fe6e124ca19ad4c12e1d42` (13 `NOTPORTED`) is
+`tests/fs_robust_official.rs`'s `reproduce_gives_the_official_square_roots`.
 
 ## 5. Open items
 
-- `MatrixSqrt` (§4): LAPACK 3.10.0's `zgees` chain in `larmorx-core` (permissive, track C) and the
-  runtime's complex functions; relay 41.
+- `MatrixSqrt` (§4): LAPACK's `zlaqr0` (non-finite matrices, FS-969's `reproduce`; and `zhseqr` above 75
+  rows), the blocked `zgehrd` and `zungqr` (above 128 rows); GCC 12's `__divdc3` on divisors with a zero,
+  subnormal or huge part and the NaN bits of `__divdc3` and `__muldc3`, as black boxes (the
+  investigation's "libgcc's division"); none of them reached by finite registration matrices.
 - The double SVD's NaN operand orders (FS-968's NaN bits; `vnl_matrix_inverse` and `PolarDecomposition`
   on non-finite matrices), as `vnl_svd_f32` got them.
 - Speed and memory (`validation/probes/fs-robust/bench.cpp` against the example `fs_robust_bench`, one

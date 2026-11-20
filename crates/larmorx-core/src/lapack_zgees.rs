@@ -3,8 +3,7 @@
 //! `LDA = LDVS = N`), translated from the release's Fortran (`<workspace>/tags/lapack-3.10.0`,
 //! BSD-3-Clause: the University of Tennessee, the University of California Berkeley, the
 //! University of Colorado Denver and NAG Ltd.) as Ubuntu 22.04's `liblapack.a` and `libblas.a`
-//! (3.10.0-2ubuntu1, gfortran 11) compute it, for the FreeSurfer replica's matrix square root
-//! (`fs.robust`). The routines reached: `ZGEES`, `ZLANGE ('M')`, `ZLASCL ('G', 'U')`, `ZGEBAL
+//! (3.10.0-2ubuntu1, gfortran 11) compute it. The routines reached: `ZGEES`, `ZLANGE ('M')`, `ZLASCL ('G', 'U')`, `ZGEBAL
 //! ('P')`, `ZGEHRD` (its unblocked path, `ZGEHD2`), `ZLARFG`, `ZLARF`, `ILAZLC`, `ILAZLR`,
 //! `ZLACPY ('L')`, `ZUNGHR` (`ZUNGQR`'s unblocked path, `ZUNG2R`), `ZHSEQR` with `ZLAHQR` (the
 //! double-shift QR of up to 75 rows), `ZGEBAK ('P', 'R')`, `ZLADIV`/`DLADIV`, `DLAPY3`,

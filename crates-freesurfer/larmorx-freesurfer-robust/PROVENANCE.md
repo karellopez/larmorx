@@ -31,9 +31,14 @@ no live caller).
 - VNL's arithmetic (ITK 4.13.2, BSD) is the main package's: `larmorx_core::vnl_matrix` (new in this
   item), `vnl_svd` (its double SVD gained ITK-116's stop), `vnl_eigen`, `vnl_fixed`.
 
-Not yet: `MyMatrix::MatrixSqrt` and `SchurComplex` (LAPACK 3.10.0's `zgees` as Ubuntu 22.04's static
-library computes it, glibc's `cabs` and `csqrt`, libgcc's `__divdc3`: the findings' §4, relay 41);
-`RegRobust.cpp`/`.h` and `Registration.cpp` 77-678 (`clear`, `computeIterativeRegistration`,
+Queue item 3.2-02's second part (track C, relay 41, 2026-11-20): `MyMatrix::SchurComplex` and
+`MatrixSqrt` (`MyMatrix.cpp`, the same file) in `src/mymatrix.rs`: LAPACK 3.10.0's `zgees_` as Ubuntu
+22.04's static library computes it (the official binary holds it: the findings' §2) is the main
+package's `larmorx_core::lapack_zgees`, C++'s complex arithmetic `larmorx_core::cplx` (`__divdc3`,
+`__muldc3`, `cabs` and `csqrt` on the correctly rounded `hypot`, the project's decision D4), VNL's complex
+matrices and `vnl_matlab_print` `larmorx_core::vnl_matrix` (the findings' §4).
+
+Not yet: `RegRobust.cpp`/`.h` and `Registration.cpp` 77-678 (`clear`, `computeIterativeRegistration`,
 `computeMultiresRegistration`), which call item 3.2-03's templates and are ported with them; the
 functions only one program reaches (its item).
 
@@ -47,6 +52,15 @@ functions only one program reaches (its item).
 - **FS-968** (`mymatrix::rigid_trans_dist_sq` through `matrix_inverse`): an SVD that did not converge:
   an error and status 1 by default; `reproduce` the distance from the decomposition reached (its NaNs'
   bits are not yet the official build's: the double SVD's operand orders are an open item).
+- **FS-969** (`mymatrix::schur_complex`, `matrix_sqrt`): a matrix with an infinite or NaN element: an
+  error and status 1 by default; `reproduce` computes as FreeSurfer does where LAPACK's `zlahqr`
+  converges (`zlaqr0`, its retry where it does not, is not ported: an error).
+- **FS-970** (the same): an empty matrix: an error and status 1 by default; `reproduce` LAPACK's
+  `XERBLA` line on standard output and status 0, as FreeSurfer.
+- `cabs` and `csqrt` take the correctly rounded `hypot` in both modes (the project's decision D4; glibc's
+  `hypot` misses the last bit on about 0.5 % of arguments, GLIBC-07); whether glibc's would change a
+  recorded output is measured at `mri_robust_register`'s and `mri_robust_template`'s replays (3.2-13 to
+  3.2-16).
 - **ITK-115**, **ITK-116** (VNL's eigensystem and SVD never returning, where FreeSurfer hangs): an error
   in both modes.
 - `get_rand` with a negative position (FreeSurfer reads before its table; no caller passes one): a panic

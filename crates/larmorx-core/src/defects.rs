@@ -3022,9 +3022,9 @@ defects! {
     FS_968 = "FS-968", "FreeSurfer", true,
         "the distance between two rigid transforms (the robust registration's convergence test) inverts the first with a singular value decomposition; on a matrix with an infinite or NaN entry the decomposition can stop without converging (a warning on standard error), and the distance is computed from the decomposition reached all the same (an arbitrary number); refused with a clear error by default";
     FS_969 = "FS-969", "FreeSurfer", true,
-        "the matrix square root of the robust registration (and the complex Schur form it is computed from) of a matrix with an infinite or NaN element: LAPACK's QR iteration does not converge (its failure printed on standard error) or the result is NaN, and the NaN matrix is returned all the same, the checks of the result never failing on NaNs; refused with a clear error by default";
+        "the matrix square root of the robust registration (and the complex Schur form it is computed from) of a matrix with an infinite or NaN element: the Schur form's QR iteration does not converge (`info = 2, something went wrong` and `the QR iteration failed` on standard error) or the result is NaN, and the NaN matrix is returned all the same, the checks of the result never failing on NaNs; refused with a clear error by default";
     FS_970 = "FS-970", "FreeSurfer", true,
-        "the matrix square root of the robust registration of an empty (0 x 0) matrix: LAPACK refuses its leading dimension (` ** On entry to ZGEES parameter number  6 had an illegal value` on standard output) and ends the program with status 0; refused with a clear error and status 1 by default";
+        "the matrix square root of the robust registration of an empty (0 x 0) matrix: ` ** On entry to ZGEES parameter number  6 had an illegal value` on standard output and the end of the program with status 0; refused with a clear error and status 1 by default";
 }
 
 /// The register entry with ID `id`.

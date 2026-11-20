@@ -31,3 +31,64 @@ sqrt(0.5 (hypot(x, y) + |x|))`, `(t, 0.5 (y / t))` for `x >= 0`, else `(0.5 (|y|
   (`validation/probes/coremath-hypot`); the project decided the correctly rounded `hypot` in both modes
   (D4). How FreeSurfer's replica takes these functions: the replica's findings (closed to its clean-room
   implementers).
+
+## csqrt's form (2026-11-20, track C relay 41)
+
+`csqrt_form.c` (Apache-2.0): `gcc -O2 -fno-builtin -o csqrt_form csqrt_form.c -lm && ./csqrt_form
+<log2 n>` compares glibc 2.35's `csqrt` with the form `larmorx_core::cplx::csqrt` takes (glibc's own
+`hypot` inside the form, so only the form is compared), on five families of SplitMix64 arguments in
+three modes (both parts drawn, the real part zero, the imaginary part zero). The form, read from the
+measurements:
+
+- the special values of C11's Annex G, with glibc's NaN `0x7ff8000000000000` wherever a part is NaN
+  without an infinity to keep (an infinite imaginary part gives `(+inf, y)`; an infinite real part
+  `(+inf, ±0)` for `+inf`, `(+0, ±inf)` for `-inf`, the other part the default NaN for a NaN `y`);
+  `(±0, ±0)` gives `(+0, y)` (the measured table is in the unit test `csqrt_special_values_are_glibcs`
+  of `crates/larmorx-core/src/cplx.rs`);
+- a part above `DBL_MAX / 4`: both parts times 1/4, the result doubled; both parts below `2 DBL_MIN`:
+  both times 2^108, the result times 2^-54;
+- then a zero real part: `r = sqrt(|y| / 2)` in both parts (`(r, copysign(r, y))`; Kahan's formula
+  would round `y / (2 t)` differently on about half of the arguments); a zero imaginary part:
+  `(sqrt(x), y)` for `x > 0`, `(+0, copysign(sqrt(-x), y))` for `x < 0`; otherwise Kahan's `t =
+  sqrt((hypot(x, y) + |x|) / 2)`, `(t, (y / t) / 2)` for `x >= 0`, `((|y| / t) / 2, copysign(t, y))`
+  for `x < 0`.
+
+| Mode | Family | Cases (2^22 drawn) | Differ |
+|---|---|---|---|
+| both parts | 0 uniform | 4,194,304 | 0 |
+| both parts | 1 log-uniform | 4,194,304 | 0 |
+| both parts | 2 random bits | 4,190,301 | 47 |
+| both parts | 3 log-uniform over the whole range | 4,194,285 | 0 |
+| both parts | 4 near overflow or subnormal | 4,023,978 | 10,616 |
+| real part zero | 0 to 4 | 20.4 million | 0 |
+| imaginary part zero | 0 to 4 | 20.4 million | 0 |
+
+The differences are all arguments with a part above `DBL_MAX / 4` whose result has a part much
+smaller than the other (glibc keeps more bits of it there); FreeSurfer's matrix square roots never
+reach them (the eigenvalues of registration matrices). With the correctly rounded `hypot` in place
+of glibc's (the project's decision), the replica's `csqrt` differs from glibc's also where glibc's
+`hypot` misses the last bit (about 0.5 % of the general arguments: GLIBC-07's `hypot`).
+
+## libgcc's division and product on special values (2026-11-20, track C relay 41)
+
+`annexg.c` (Apache-2.0): `gcc -O2 -fno-builtin -o annexg annexg.c -lm && ./annexg` compares the
+system's `__divdc3` and `__muldc3` (Ubuntu 22.04's `libgcc_s.so.1`, GCC 12) with Smith's division
+and the plain product with C11 Annex G.5.1's recovery (the algorithms of
+`larmorx_core::cplx::divdc3` and `muldc3`) on every combination of 15 values for the four parts
+(zeros of both signs, ±1, -2, ±inf, quiet and signalling NaNs with payloads, the smallest
+subnormal, the largest number, 0.1, 1e20, -2^63, the smallest normal): 50,625 cases each.
+
+| | bits differ | beyond the NaNs' bits |
+|---|---|---|
+| `__divdc3` | 5,545 | 1,825 |
+| `__muldc3` | 2,346 | 0 |
+
+So the families above (random numbers, where every pair of NaNs was counted as equal) hid two
+things: the system's `__divdc3` is not plain Smith where a part of the divisor is zero or
+subnormal or near overflow (GCC 12's division scales its operands and changes its formula when the
+ratio of the divisor's parts underflows; for example `(0 + 1i) / (0 + 2^-1074 i)` gives `(inf,
+-nan)`, Smith `(inf, +0)`), and both pick other NaN bits than the Annex G algorithms written in
+source order. The matrix square root divides sums of square roots of eigenvalues (parts of
+magnitude about 1, or exactly zero imaginary parts, where the two agree: the fs-robust probe's
+9,400 square roots are identical); the extreme operands are an open item of the replica (GCC 12's
+scaled division and the NaN bits, measured as a black box).

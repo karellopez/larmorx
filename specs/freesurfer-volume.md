@@ -1544,7 +1544,10 @@ text: FS-327's error and FS-461's default on a two-frame byte volume.
   products with `MatrixMultiply` (into `m_ras` when given). `MRIgetVoxelToVoxelXform(src, dst)`:
   `ras2vox(dst) * vox2ras(src)`.
 - `MRIsetVoxelToRasXform(mri, M)`: the column scales `sqrt(M1c^2 + M2c^2 + M3c^2)` (each square in `float`,
-  summed in `double` from 0 in row order, `sqrt` in `double`); `thresh` 0.001 or the value `sscanf("%lf")`
+  summed in `double` from 0 in row order, `sqrt` in `double`; each addition is `square + sum`, the new square
+  the first operand, so where two NaNs meet the LATER row's wins: **(observed)** `vstat7`'s `setv2r 3 2 4 2 2 0
+  210 ...`, whose column 1 holds `42c7eae6`, `7fc12345`, `ffc00000`, prints `scale -nan ...` and takes `xsize`
+  `ffc00000`, row 3's NaN; finite sums are the same either way); `thresh` 0.001 or the value `sscanf("%lf")`
   reads from the environment variable `FS_SetVoxToRasXform_Change_VoxSize` (unchanged when it reads
   nothing). When `|size - scale| > thresh` on any axis (`double`): `WARNING: MRIsetVoxelToRasXform(): voxel
   size is inconsistent with scale (thresh=<g>)`, `  scale <g> <g> <g>`, `  vs <g> <g> <g>` on standard

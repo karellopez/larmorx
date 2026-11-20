@@ -68,6 +68,26 @@ impl Process {
         self.rounded(y)
     }
 
+    /// C's `(int) x` under FS-12's rules (`specs/freesurfer-volume.md` §35): truncation; beyond
+    /// the int range or NaN, -2147483648 with `reproduce`, saturated (NaN 0) by default.
+    pub(crate) fn int_fs12(&mut self, x: f64) -> i32 {
+        let (v, differs) = double_to_int(x, self.mode.reproduce());
+        if differs {
+            if self.mode.reproduce() {
+                self.note(
+                    &FS_12,
+                    "a conversion to int beyond its range or of NaN gave -2147483648",
+                );
+            } else {
+                self.note(
+                    &FS_12,
+                    "a conversion to int beyond its range saturated (NaN 0)",
+                );
+            }
+        }
+        v
+    }
+
     fn rounded(&mut self, y: f64) -> i32 {
         let (v, differs) = double_to_int(y, self.mode.reproduce());
         if differs {

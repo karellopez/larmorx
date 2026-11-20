@@ -8,8 +8,9 @@
 //! frame-range samplers, the trilinear kernel and splatting (§27, `frames`), derivatives,
 //! gradients and neighbour counts (§28, `deriv`), linear transforms of a volume (§29, `linear`)
 //! and resampling onto a template's grid and replacing a value (§31, `regrid`); statistics,
-//! orientation strings and voxel-to-RAS matrices (§33, `info`); and of §54's parts ready for the
-//! clean room, the inverses' fill and the change from physical-voxel to RAS-to-RAS (`ltaops`).
+//! orientation strings and voxel-to-RAS matrices (§33, `info`); slices as 2-D images (§34,
+//! `image`), neighbourhoods and labels (§35, `nbhd`); and of §54's parts ready for the clean
+//! room, the inverses' fill and the change from physical-voxel to RAS-to-RAS (`ltaops`).
 //!
 //! Functions that take a destination (§6) take a [`Dst`]: none (the function makes one), the
 //! first source itself, the second source itself, or the caller's volume; they return a
@@ -23,11 +24,13 @@ pub mod extract;
 pub mod frames;
 pub mod geomblock;
 pub mod geometry;
+pub mod image;
 pub mod info;
 pub mod linear;
 pub mod ltaops;
 pub mod ltaread;
 pub mod moves;
+pub mod nbhd;
 pub mod regrid;
 pub mod resample;
 pub mod sample;

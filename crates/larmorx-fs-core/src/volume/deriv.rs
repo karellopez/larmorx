@@ -314,7 +314,7 @@ impl Process {
     /// One index through the volume's boundary index table of an axis of extent `e`
     /// (`specs/freesurfer-mri.md` §4 step 7); FS-323 (both modes): an index outside the table
     /// ends the program.
-    fn table_index(&mut self, e: i32, i: i32, name: &str) -> Result<i32, Stop> {
+    pub(crate) fn table_index(&mut self, e: i32, i: i32, name: &str) -> Result<i32, Stop> {
         let (e64, i64v) = (i64::from(e), i64::from(i));
         if i64v < -500 || i64v > e64 + 499 {
             self.note(

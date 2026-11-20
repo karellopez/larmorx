@@ -99,7 +99,16 @@ impl Process {
 
     /// Frame 0's voxel at a place (`MRIgetVoxVal`).
     fn v0(&mut self, m: &Mri, (x, y, z): (i32, i32, i32)) -> Result<f32, Stop> {
-        self.mri_get_vox_val(m, x, y, z, 0, 0)
+        self.vf(m, (x, y, z), 0)
+    }
+
+    /// Frame `f`'s voxel at a place (`MRIgetVoxVal`; inside the volume through the flat reader,
+    /// where no message or defect can arise).
+    fn vf(&mut self, m: &Mri, (x, y, z): (i32, i32, i32), f: i32) -> Result<f32, Stop> {
+        match m.inside_vox_val(x, y, z, f) {
+            Some(v) => Ok(v),
+            None => self.mri_get_vox_val(m, x, y, z, f, 0),
+        }
     }
 
     /// `MRIsmoothParcellation(mri, count)` (§35): shorts only; a copy in which each inner voxel
@@ -213,7 +222,7 @@ impl Process {
     ) -> Result<i32, Stop> {
         let mut max = -1e10f64;
         for (x, y, z) in self.window_zyx(m, half(wsize), p, "MRImaxInNbhd")? {
-            let v = sse::widen(self.mri_get_vox_val(m, x, y, z, frame, 0)?);
+            let v = sse::widen(self.vf(m, (x, y, z), frame)?);
             if v > max {
                 max = v;
             }
@@ -287,7 +296,7 @@ impl Process {
     /// volume's type (§35).
     fn row_byte(&mut self, m: &Mri, (x, y, z): (i32, i32, i32), name: &str) -> u8 {
         let place = self.row_place(m, i64::from(x), i64::from(y), i64::from(z), 0, 1);
-        self.direct_read(m, place, 1, name)[0]
+        self.direct_read8(m, place, 1, name)[0]
     }
 
     /// `MRIfindNearestNonzeroLocation(mri, wsize, xr, yr, zr, &xv, &yv, &zv)` (§35): the rounded
@@ -360,9 +369,9 @@ impl Process {
         let (mut sum, mut sq, mut n) = (0.0f64, 0.0f64, 0i32);
         for &p in places {
             if self.label_at(lab, p)? == label {
-                let v = self.mri_get_vox_val(src, p.0, p.1, p.2, f, 0)?;
-                sum = sse::add64(sum, sse::widen(v));
-                sq = sse::add64(sq, sse::widen(sse::mul32(v, v)));
+                let v = self.vf(src, p, f)?;
+                sum = sse::add64(sse::widen(v), sum);
+                sq = sse::add64(sse::widen(sse::mul32(v, v)), sq);
                 n += 1;
             }
         }
@@ -522,7 +531,7 @@ impl Process {
                 for x in 0..g.width {
                     for y in 0..g.height {
                         for z in 0..g.depth {
-                            let s = self.mri_get_vox_val(v.a(), x, y, z, f, 0)?;
+                            let s = self.vf(v.a(), (x, y, z), f)?;
                             self.mri_set_vox_val(v.d_mut(), x, y, z, f, sse::sub32(s, lo), 0)?;
                         }
                     }
@@ -798,7 +807,7 @@ impl Process {
         for z in 0..g.depth {
             for y in 0..g.height {
                 for x in 0..g.width {
-                    let v = self.mri_get_vox_val(t1, x, y, z, 0, 0)?;
+                    let v = self.v0(t1, (x, y, z))?;
                     let mut b = self.clip_byte(v);
                     let wb = self.row_byte(wm, (x, y, z), "MRIclipBrightWM");
                     if wb >= 5 && b > 110 {

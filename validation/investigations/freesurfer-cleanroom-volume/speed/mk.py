@@ -101,7 +101,8 @@ bs.append(f"@60 rsfill {W(32, 0, 9)} {W(40, 0, 0, '3f4ccccd')} 5 {zero} 0")
 # part 7b (relay 13): the parcellation's smoothing, the window counts, the label means, the label
 # borders, the mask, the clipping of bright white matter and a slice as an image
 p7 = [
-    f"@60 smpar {W(64, 4, 9)} 0 13",
+    # labels 0 to 5 (a seeded fill of shorts holds negative labels: FS-467's memory case)
+    f"@60 smpar {W(64, 4, 'i65536,131073,196610,262147,327684')} 0 13",
     f"@60 lmeans 2 {W(64, 3, 't3')} {W(64, 0, 9)} 0 9 0 0 0 0 1",
     f"@60 mlbv {W(48, 0, 9)} 0 new 9 255 0",
     f"@60 mskz {W(64, 3, 't3')} {W(64, 0, 9)} 0 new",

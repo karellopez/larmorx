@@ -51,7 +51,10 @@
 //! - **FS-964** (memory): sampling a B-spline whose degree is not 2 to 9 (one that was allocated
 //!   and never computed: `MRItoBSpline` refuses other degrees) reads indices never set or writes
 //!   past the index arrays where FreeSurfer would not stop first with `Invalid spline degree`; an
-//!   error in both modes.
+//!   error in both modes, but for degrees above 9 on coefficients with an axis longer than one
+//!   voxel: FreeSurfer stores a few indices past its arrays and then ends with `Invalid spline
+//!   degree`, status 1 (deterministic while those bytes are inside the stack; a crash for degrees
+//!   large enough to reach past its top), which `reproduce` gives, noted.
 
 use std::io::Write;
 
@@ -922,6 +925,20 @@ fn window(
         // written past their arrays first); on a single voxel degrees 0 and 1 read it, a degree
         // below 0 reads indices never set
         if degree <= 9 && (w > 1 || h > 1 || d > 1) {
+            let _ = writeln!(out, "Invalid spline degree");
+            return Err(Fatal::Exit(1));
+        }
+        // above 9 FreeSurfer stores a few indices past its arrays, then ends the same way
+        // (deterministic where those bytes are inside the stack; a crash for degrees large
+        // enough to reach past its top, 100,000 in the probe): `reproduce` gives the end, noted
+        if degree > 9 && (w > 1 || h > 1 || d > 1) && g.notices.reproduce() {
+            g.notices.add(
+                &FS_964,
+                format!(
+                    "{what} on a B-spline of degree {degree}: FreeSurfer writes past its index \
+                     arrays before ending with Invalid spline degree"
+                ),
+            );
             let _ = writeln!(out, "Invalid spline degree");
             return Err(Fatal::Exit(1));
         }
@@ -1821,6 +1838,55 @@ mod tests {
         convert_to_interpolation_coefficients(&libm, &mut c, &poles);
         for v in c {
             assert!((v - 2.5).abs() < 1e-12);
+        }
+    }
+
+    /// FS-964 above degree 9 on coefficients with an axis longer than one voxel: `reproduce` ends
+    /// as FreeSurfer does (`Invalid spline degree` on standard output, status 1), noted; the
+    /// default refuses the degree with FS-964's error; on one voxel both modes refuse.
+    #[test]
+    fn degrees_above_nine_end_as_freesurfer_under_reproduce() {
+        for (shape, degree) in [
+            ((3, 3, 3), 10),
+            ((3, 3, 3), 11),
+            ((3, 1, 1), 64),
+            ((3, 4, 3), 2_147_483_647),
+        ] {
+            for mode in [UpstreamDefects::Reproduce, UpstreamDefects::Fix] {
+                let mut g = Globals::new(mode);
+                let (mut out, mut err) = (Vec::new(), Vec::new());
+                let mut b =
+                    mri_alloc_bspline(&mut g, &mut out, &mut err, shape.0, shape.1, shape.2, 1)
+                        .unwrap();
+                b.degree = degree;
+                out.clear();
+                let mut v = 7.0;
+                let r =
+                    mri_sample_bspline(&mut g, &mut out, &mut err, &b, 1.5, 0.25, 0.0, 0, &mut v);
+                let noted = g.notices.contains(&FS_964);
+                assert!(noted, "{shape:?} {degree} {mode:?}");
+                if mode == UpstreamDefects::Reproduce {
+                    assert!(matches!(r, Err(Fatal::Exit(1))), "{shape:?} {degree}");
+                    assert_eq!(out, b"Invalid spline degree\n");
+                    assert!(err.is_empty());
+                } else {
+                    assert!(
+                        matches!(r, Err(Fatal::Exit(ERROR_BADPARM))),
+                        "{shape:?} {degree}"
+                    );
+                    assert!(out.is_empty());
+                }
+            }
+        }
+        for mode in [UpstreamDefects::Reproduce, UpstreamDefects::Fix] {
+            let mut g = Globals::new(mode);
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let mut b = mri_alloc_bspline(&mut g, &mut out, &mut err, 1, 1, 1, 1).unwrap();
+            b.degree = 10;
+            out.clear();
+            let mut v = 7.0;
+            let r = mri_sample_bspline(&mut g, &mut out, &mut err, &b, 0.0, 0.0, 0.0, 0, &mut v);
+            assert!(matches!(r, Err(Fatal::Exit(ERROR_BADPARM))), "{mode:?}");
         }
     }
 

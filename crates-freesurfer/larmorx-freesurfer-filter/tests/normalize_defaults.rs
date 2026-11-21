@@ -11,7 +11,7 @@ use larmorx_freesurfer_core::diag::{DIAG_VERBOSE, DIAG_WRITE};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_filter::normalize as nz;
-use larmorx_freesurfer_mri::mri::{MGH_VERSION, MRI_FLOAT, MRI_UCHAR, Mri, mri_alloc};
+use larmorx_freesurfer_mri::mri::{MRI_FLOAT, MRI_UCHAR, Mri, mri_alloc};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
 fn noted(g: &Globals, id: &str) -> bool {
@@ -214,8 +214,10 @@ fn fs599_the_eleventh_pass_counts() {
 }
 
 /// With `DIAG_WRITE` and `DIAG_VERBOSE`, the grey-matter pruning writes its diagnostic volumes,
-/// `orig<n>.mgz` among them: the caller's original volume itself, whose version the write sets
-/// (FreeSurfer's `MRIwrite` of an `.mgz`: the MGH version with the volume's intent).
+/// `orig<n>.mgz` among them: the caller's original volume itself. FreeSurfer calls `MRIwrite(mri,
+/// name)` with its default intent (`MGZ_INTENT_UNKNOWN`), which writes the volume's version as it
+/// is and leaves it (relay 48 of track D: the port passed intent 0 before, which set the MGH
+/// version).
 #[test]
 fn pruning_diagnostics_write_the_original() {
     let mut g = Globals::new(UpstreamDefects::Fix);
@@ -258,5 +260,5 @@ fn pruning_diagnostics_write_the_original() {
         "{}",
         String::from_utf8_lossy(&o)
     );
-    assert_eq!(src.version, MGH_VERSION, "{}", String::from_utf8_lossy(&e));
+    assert_eq!(src.version, 0x7777, "{}", String::from_utf8_lossy(&e));
 }

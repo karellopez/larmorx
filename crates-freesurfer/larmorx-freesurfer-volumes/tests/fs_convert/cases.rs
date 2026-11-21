@@ -2758,7 +2758,10 @@ fn otl_outline(g: &mut Gen, fw: i32, fh: i32, leak: bool) -> Outline {
     let (points, seed) = match g.below(if leak { 8 } else { 5 }) {
         0..=3 => (otl_rect(x0, y0, x1, y1), inside),
         4 => (otl_rect(x0, y0, x1, y1), (x0, y0)),
-        5 => (otl_rect(x0, y0, x1, y1), (g.int(0, 511) as i32, g.int(0, 511) as i32)),
+        5 => (
+            otl_rect(x0, y0, x1, y1),
+            (g.int(0, 511) as i32, g.int(0, 511) as i32),
+        ),
         6 => {
             let r = g.int(2, 6) as i32;
             (otl_diamond(x0 + r, y0 + r, r), (x0 + r, y0 + r))
@@ -2766,7 +2769,12 @@ fn otl_outline(g: &mut Gen, fw: i32, fh: i32, leak: bool) -> Outline {
         _ => {
             let n = g.int(0, 6);
             let pts = (0..n)
-                .map(|_| (g.int(0, i64::from(fw - 1)) as i32, g.int(0, i64::from(fh - 1)) as i32))
+                .map(|_| {
+                    (
+                        g.int(0, i64::from(fw - 1)) as i32,
+                        g.int(0, i64::from(fh - 1)) as i32,
+                    )
+                })
                 .collect();
             (pts, inside)
         }
@@ -2789,17 +2797,32 @@ fn otl_damage(g: &mut Gen, b: &mut Vec<u8>) {
         }
         1 => {
             let lines: Vec<usize> = std::iter::once(0)
-                .chain(b.iter().enumerate().filter(|&(_, &c)| c == b'\n').map(|(i, _)| i + 1))
+                .chain(
+                    b.iter()
+                        .enumerate()
+                        .filter(|&(_, &c)| c == b'\n')
+                        .map(|(i, _)| i + 1),
+                )
                 .filter(|&i| i < b.len())
                 .collect();
             let a = g.pick(&lines);
-            let e = b[a..].iter().position(|&c| c == b'\n').map_or(b.len(), |p| a + p + 1);
+            let e = b[a..]
+                .iter()
+                .position(|&c| c == b'\n')
+                .map_or(b.len(), |p| a + p + 1);
             b.drain(a..e);
         }
         _ => {
             let keys: [&[u8]; 9] = [
-                b"ROW_NUM", b"SEED", b"LABEL", b"END POINTS", b"START POINTS", b"END GDF",
-                b"COL_NUM", b"ONUM", b"TYPE",
+                b"ROW_NUM",
+                b"SEED",
+                b"LABEL",
+                b"END POINTS",
+                b"START POINTS",
+                b"END GDF",
+                b"COL_NUM",
+                b"ONUM",
+                b"TYPE",
             ];
             let k = g.pick(&keys);
             if let Some(p) = b.windows(k.len()).position(|w| w == k) {
@@ -2827,7 +2850,12 @@ fn otl_case(g: &mut Gen) -> String {
     let (fw, fh) = (2 * w, 2 * h);
     // a fill of the whole field is deep enough to crash FreeSurfer from 209 x 209 voxels on
     let leak = w <= 208 && h <= 208;
-    let gt = g.pick(&[Some("ascii short"), Some("ascii short"), Some("short"), None]);
+    let gt = g.pick(&[
+        Some("ascii short"),
+        Some("ascii short"),
+        Some("short"),
+        None,
+    ]);
     let mut files: Vec<(String, Vec<u8>)> = Vec::new();
     for s in 1..=k {
         if k > 1 && g.chance(5) {
@@ -2901,44 +2929,111 @@ fn otl_prelude() -> Vec<String> {
     };
     let file = |o: &[Outline]| otl_bytes(o, Some("ascii short"), None);
     let mut out = Vec::new();
-    let mut push = |files: Vec<(String, Vec<u8>)>, args: Vec<String>| out.push(cnv_line(&files, &args));
+    let mut push =
+        |files: Vec<(String, Vec<u8>)>, args: Vec<String>| out.push(cnv_line(&files, &args));
     // the plain read: two slices, a volume of 200 x 190, and the default size (512)
     push(
-        vec![("in_1.otl".into(), file(&two())), ("in_2.otl".into(), file(&[rect("Mystery", 5, 5, 9, 9)])), lut(), like(200, 190, 2)],
+        vec![
+            ("in_1.otl".into(), file(&two())),
+            ("in_2.otl".into(), file(&[rect("Mystery", 5, 5, 9, 9)])),
+            lut(),
+            like(200, 190, 2),
+        ],
         std_args(&[]),
     );
     push(
         vec![("in_1.otl".into(), file(&two())), lut()],
-        a(&["--in_k_count", "1", "-cf", "in_lut.txt", "in_1.otl", "o.mgz"]),
+        a(&[
+            "--in_k_count",
+            "1",
+            "-cf",
+            "in_lut.txt",
+            "in_1.otl",
+            "o.mgz",
+        ]),
     );
     // the read's options
-    for opts in [&["-zo"][..], &["-nt"], &["-fp"], &["-sp", "14"], &["-zo", "-nt", "-fp", "-sp", "26"]] {
+    for opts in [
+        &["-zo"][..],
+        &["-nt"],
+        &["-fp"],
+        &["-sp", "14"],
+        &["-zo", "-nt", "-fp", "-sp", "26"],
+    ] {
         let o = vec![
             rect("Left-Cerebral-Exterior", 20, 20, 80, 70),
             rect("Left-Cerebral-Cortex", 40, 30, 60, 50),
         ];
-        push(vec![("in_1.otl".into(), file(&o)), lut(), like(180, 180, 1)], std_args(opts));
+        push(
+            vec![("in_1.otl".into(), file(&o)), lut(), like(180, 180, 1)],
+            std_args(opts),
+        );
     }
     // the header only (-ro with --in_info)
-    push(vec![("in_1.otl".into(), file(&two())), lut(), like(180, 180, 1)], std_args(&["-ro", "-ii"]));
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut(), like(180, 180, 1)],
+        std_args(&["-ro", "-ii"]),
+    );
     // types: binary points, a global type with an outline's own, none, an unsupported one
     let mut o = two();
     o[1].otype = Some("short");
-    push(vec![("in_1.otl".into(), otl_bytes(&o, Some("ascii short"), None)), lut(), like(180, 180, 1)], std_args(&[]));
-    push(vec![("in_1.otl".into(), otl_bytes(&two(), Some("short"), None)), lut(), like(180, 180, 1)], std_args(&[]));
-    push(vec![("in_1.otl".into(), otl_bytes(&two(), None, None)), lut(), like(180, 180, 1)], std_args(&[]));
+    push(
+        vec![
+            ("in_1.otl".into(), otl_bytes(&o, Some("ascii short"), None)),
+            lut(),
+            like(180, 180, 1),
+        ],
+        std_args(&[]),
+    );
+    push(
+        vec![
+            ("in_1.otl".into(), otl_bytes(&two(), Some("short"), None)),
+            lut(),
+            like(180, 180, 1),
+        ],
+        std_args(&[]),
+    );
+    push(
+        vec![
+            ("in_1.otl".into(), otl_bytes(&two(), None, None)),
+            lut(),
+            like(180, 180, 1),
+        ],
+        std_args(&[]),
+    );
     let mut o = two();
     o[0].otype = Some("float");
-    push(vec![("in_1.otl".into(), otl_bytes(&o, None, None)), lut(), like(180, 180, 1)], std_args(&[]));
+    push(
+        vec![
+            ("in_1.otl".into(), otl_bytes(&o, None, None)),
+            lut(),
+            like(180, 180, 1),
+        ],
+        std_args(&[]),
+    );
     // the labels' names: each of the table's spellings, the unknown ones (more than 100: the list's
     // end), an empty label, entry 0, 5307 (FS-1055) and one past the claims' range
     let names: Vec<Outline> = OTL_LABELS
         .iter()
         .enumerate()
-        .map(|(k, l)| rect(l, 10 + 16 * (k as i32 % 20), 10 + 40 * (k as i32 / 20), 20 + 16 * (k as i32 % 20), 40 + 40 * (k as i32 / 20)))
+        .map(|(k, l)| {
+            rect(
+                l,
+                10 + 16 * (k as i32 % 20),
+                10 + 40 * (k as i32 / 20),
+                20 + 16 * (k as i32 % 20),
+                40 + 40 * (k as i32 / 20),
+            )
+        })
         .collect();
-    push(vec![("in_1.otl".into(), file(&names)), lut(), like(200, 200, 1)], std_args(&[]));
-    push(vec![("in_1.otl".into(), file(&names)), lut(), like(200, 200, 1)], std_args(&["-nt"]));
+    push(
+        vec![("in_1.otl".into(), file(&names)), lut(), like(200, 200, 1)],
+        std_args(&[]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&names)), lut(), like(200, 200, 1)],
+        std_args(&["-nt"]),
+    );
     let many: Vec<Outline> = (0..105)
         .map(|k| Outline {
             label: Some(format!("Unknown-{}", k % 103)),
@@ -2948,37 +3043,80 @@ fn otl_prelude() -> Vec<String> {
             extra: String::new(),
         })
         .collect();
-    push(vec![("in_1.otl".into(), file(&many)), lut(), like(180, 180, 1)], std_args(&[]));
+    push(
+        vec![("in_1.otl".into(), file(&many)), lut(), like(180, 180, 1)],
+        std_args(&[]),
+    );
     let mut o = two();
     o[0].label = None;
-    push(vec![("in_1.otl".into(), file(&o)), lut(), like(180, 180, 1)], std_args(&[]));
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(180, 180, 1)],
+        std_args(&[]),
+    );
     let o = vec![
         rect("Test-Unc", 10, 10, 30, 30),
         rect("Left-Cerebral-Cortex", 100, 100, 120, 130),
         rect("Beyond-Max", 200, 200, 220, 220),
     ];
-    push(vec![("in_1.otl".into(), file(&o)), ("in_2.otl".into(), file(&o)), lut(), like(180, 180, 2)], std_args(&[]));
+    push(
+        vec![
+            ("in_1.otl".into(), file(&o)),
+            ("in_2.otl".into(), file(&o)),
+            lut(),
+            like(180, 180, 2),
+        ],
+        std_args(&[]),
+    );
     // more than ten claims on one place, an outline sharing points with another, entry 0
-    let o: Vec<Outline> = (0..12).map(|k| rect(OTL_LABELS[k % 4], 50, 50, 60 + k as i32, 70)).collect();
-    push(vec![("in_1.otl".into(), file(&o)), lut(), like(180, 180, 1)], std_args(&[]));
+    let o: Vec<Outline> = (0..12)
+        .map(|k| rect(OTL_LABELS[k % 4], 50, 50, 60 + k as i32, 70))
+        .collect();
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(180, 180, 1)],
+        std_args(&[]),
+    );
     // fills: a seed on the outline, outside it (the whole field but the outline), a leaking
     // diamond, no points, scattered points, a seed past the field, points past it and outside 512
     let mut o = two();
     o[0].seed = (30, 30);
     o[1].seed = (5, 300);
-    push(vec![("in_1.otl".into(), file(&o)), lut(), like(190, 180, 1)], std_args(&[]));
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(190, 180, 1)],
+        std_args(&[]),
+    );
     let o = vec![
-        Outline { label: Some("CSF".into()), seed: (20, 20), points: otl_diamond(20, 20, 5), otype: None, extra: String::new() },
-        Outline { label: Some("Left-Hippocampus".into()), seed: (0, 0), points: Vec::new(), otype: None, extra: String::new() },
+        Outline {
+            label: Some("CSF".into()),
+            seed: (20, 20),
+            points: otl_diamond(20, 20, 5),
+            otype: None,
+            extra: String::new(),
+        },
+        Outline {
+            label: Some("Left-Hippocampus".into()),
+            seed: (0, 0),
+            points: Vec::new(),
+            otype: None,
+            extra: String::new(),
+        },
     ];
-    push(vec![("in_1.otl".into(), file(&o)), lut(), like(171, 171, 1)], std_args(&[]));
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(171, 171, 1)],
+        std_args(&[]),
+    );
     let mut o = two();
     o[0].seed = (400, 10);
     o[1].points.push((380, 10));
-    push(vec![("in_1.otl".into(), file(&o)), lut(), like(171, 171, 1)], std_args(&[]));
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(171, 171, 1)],
+        std_args(&[]),
+    );
     let mut o = two();
     o[1].points.push((600, 10));
-    push(vec![("in_1.otl".into(), file(&o)), lut(), like(256, 256, 1)], std_args(&[]));
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(256, 256, 1)],
+        std_args(&[]),
+    );
     // a fill of the whole field of 420 x 420 places, deeper than the stack (FS-1144: FreeSurfer
     // crashes), and a field past the machine's memory (FS-1145)
     let none = |label: &str| Outline {
@@ -2988,33 +3126,124 @@ fn otl_prelude() -> Vec<String> {
         otype: None,
         extra: String::new(),
     };
-    push(vec![("in_1.otl".into(), file(&[none("Left-Cerebral-Cortex")])), lut(), like(210, 210, 1)], std_args(&[]));
-    push(vec![("in_1.otl".into(), file(&[none("CSF")])), lut(), like(10000, 10000, 1)], std_args(&[]));
+    push(
+        vec![
+            ("in_1.otl".into(), file(&[none("Left-Cerebral-Cortex")])),
+            lut(),
+            like(210, 210, 1),
+        ],
+        std_args(&[]),
+    );
+    push(
+        vec![
+            ("in_1.otl".into(), file(&[none("CSF")])),
+            lut(),
+            like(10000, 10000, 1),
+        ],
+        std_args(&[]),
+    );
     // sizes: a width that does not divide 512, one below 171 (FS-1057), above 512
-    push(vec![("in_1.otl".into(), file(&two())), lut(), like(300, 200, 1)], std_args(&[]));
-    push(vec![("in_1.otl".into(), file(&two())), lut(), like(100, 128, 1)], std_args(&[]));
-    push(vec![("in_1.otl".into(), file(&two())), lut(), like(600, 180, 1)], std_args(&[]));
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut(), like(300, 200, 1)],
+        std_args(&[]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut(), like(100, 128, 1)],
+        std_args(&[]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut(), like(600, 180, 1)],
+        std_args(&[]),
+    );
     // the series: a missing slice, none found, a count of 0 (FS-1142), names without digits or
     // with digits only, no colour table, a colour table that cannot be read
-    push(vec![("in_1.otl".into(), file(&two())), ("in_3.otl".into(), file(&two())), lut(), like(180, 180, 3)], std_args(&[]));
-    push(vec![("in_5.otl".into(), file(&two())), lut(), like(180, 180, 2)], a(&["--in_like", "in_l.mgh", "-cf", "in_lut.txt", "in_5.otl", "o.mgh"]));
-    push(vec![("in_1.otl".into(), file(&two())), lut()], a(&["--in_k_count", "0", "-cf", "in_lut.txt", "in_1.otl", "o.mgh"]));
-    push(vec![("in_x.otl".into(), file(&two())), ("in_x1.otl".into(), file(&two())), lut(), like(180, 180, 1)], a(&["--in_like", "in_l.mgh", "-cf", "in_lut.txt", "in_x.otl", "o.mgh"]));
-    push(vec![("12.otl".into(), file(&two())), lut(), like(180, 180, 1)], a(&["--in_like", "in_l.mgh", "-cf", "in_lut.txt", "12.otl", "o.mgh"]));
-    push(vec![("in_1.otl".into(), file(&two())), like(180, 180, 1)], a(&["--in_like", "in_l.mgh", "in_1.otl", "o.mgh"]));
-    push(vec![("in_1.otl".into(), file(&two())), like(180, 180, 1)], std_args(&[]));
-    push(vec![("in_1.otl".into(), file(&two())), lut()], a(&["-cf", "in_lut.txt", "in_1.otl", "o.mgh"]));
+    push(
+        vec![
+            ("in_1.otl".into(), file(&two())),
+            ("in_3.otl".into(), file(&two())),
+            lut(),
+            like(180, 180, 3),
+        ],
+        std_args(&[]),
+    );
+    push(
+        vec![("in_5.otl".into(), file(&two())), lut(), like(180, 180, 2)],
+        a(&[
+            "--in_like",
+            "in_l.mgh",
+            "-cf",
+            "in_lut.txt",
+            "in_5.otl",
+            "o.mgh",
+        ]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut()],
+        a(&[
+            "--in_k_count",
+            "0",
+            "-cf",
+            "in_lut.txt",
+            "in_1.otl",
+            "o.mgh",
+        ]),
+    );
+    push(
+        vec![
+            ("in_x.otl".into(), file(&two())),
+            ("in_x1.otl".into(), file(&two())),
+            lut(),
+            like(180, 180, 1),
+        ],
+        a(&[
+            "--in_like",
+            "in_l.mgh",
+            "-cf",
+            "in_lut.txt",
+            "in_x.otl",
+            "o.mgh",
+        ]),
+    );
+    push(
+        vec![("12.otl".into(), file(&two())), lut(), like(180, 180, 1)],
+        a(&[
+            "--in_like",
+            "in_l.mgh",
+            "-cf",
+            "in_lut.txt",
+            "12.otl",
+            "o.mgh",
+        ]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&two())), like(180, 180, 1)],
+        a(&["--in_like", "in_l.mgh", "in_1.otl", "o.mgh"]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&two())), like(180, 180, 1)],
+        std_args(&[]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut()],
+        a(&["-cf", "in_lut.txt", "in_1.otl", "o.mgh"]),
+    );
     // the files' errors: not a GDF file (FS-1054), an empty one, each premature end, ONUM missing
     // or negative, ROW_NUM missing, COL_NUM not 2, a SEED of one number, START POINTS missing, a
     // point line short of numbers (FS-1141), numbers past a short, END POINTS missing, binary
     // points cut short, a line past the buffer, a LABEL line at the end of the file
     let good = file(&two());
     let cut_at = |key: &[u8]| -> Vec<u8> {
-        let p = good.windows(key.len()).position(|w| w == key).expect("the key");
+        let p = good
+            .windows(key.len())
+            .position(|w| w == key)
+            .expect("the key");
         good[..p + key.len()].to_vec()
     };
     let replace = |from: &str, to: &str| -> Vec<u8> {
-        String::from_utf8(good.clone()).expect("ascii").replacen(from, to, 1).into_bytes()
+        String::from_utf8(good.clone())
+            .expect("ascii")
+            .replacen(from, to, 1)
+            .into_bytes()
     };
     let bad: Vec<Vec<u8>> = vec![
         b"hello\n".to_vec(),
@@ -3054,14 +3283,23 @@ fn otl_prelude() -> Vec<String> {
         replace("COL_NUM 2\n", "COL_NUM 2\nTYPE\n"),
     ];
     for b in bad {
-        push(vec![("in_1.otl".into(), b), lut(), like(180, 180, 1)], std_args(&[]));
+        push(
+            vec![("in_1.otl".into(), b), lut(), like(180, 180, 1)],
+            std_args(&[]),
+        );
     }
     let mut o = two();
     o[1].otype = Some("short");
     let mut b = otl_bytes(&o, Some("ascii short"), None);
-    let p = b.windows(10).rposition(|w| w == b"END POINTS").expect("the end");
+    let p = b
+        .windows(10)
+        .rposition(|w| w == b"END POINTS")
+        .expect("the end");
     b.drain(p - 7..p);
-    push(vec![("in_1.otl".into(), b), lut(), like(180, 180, 1)], std_args(&[]));
+    push(
+        vec![("in_1.otl".into(), b), lut(), like(180, 180, 1)],
+        std_args(&[]),
+    );
     // the warning of an exterior label after others (FS-1060) and the translation's cut
     let o = vec![
         rect("Left-Hippocampus", 10, 10, 20, 20),
@@ -3069,11 +3307,23 @@ fn otl_prelude() -> Vec<String> {
         rect("Exterior and cortex, Cortex and exterior", 60, 60, 70, 70),
         rect("CSF", 80, 80, 90, 90),
     ];
-    push(vec![("in_1.otl".into(), file(&o)), lut(), like(180, 180, 1)], std_args(&[]));
-    push(vec![("in_1.otl".into(), file(&o)), lut(), like(180, 180, 1)], std_args(&["-nt"]));
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(180, 180, 1)],
+        std_args(&[]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(180, 180, 1)],
+        std_args(&["-nt"]),
+    );
     // the read through mri_convert's later steps: a type and a resampling
-    push(vec![("in_1.otl".into(), file(&two())), lut(), like(180, 180, 1)], std_args(&["-odt", "uchar"]));
-    push(vec![("in_1.otl".into(), file(&two())), lut(), like(180, 180, 1)], std_args(&["-vs", "2", "2", "2"]));
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut(), like(180, 180, 1)],
+        std_args(&["-odt", "uchar"]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut(), like(180, 180, 1)],
+        std_args(&["-vs", "2", "2", "2"]),
+    );
     out
 }
 

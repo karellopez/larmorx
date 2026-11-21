@@ -36,7 +36,11 @@ pub const ENOMEM: i32 = 12;
 pub fn zeroed<T: Clone + Default>(n: usize) -> Option<Vec<T>> {
     let mut probe: Vec<T> = Vec::new();
     let size = std::mem::size_of::<T>().max(1);
-    let at_least = if n == 0 { 0 } else { n.max(PROBE_BYTES.div_ceil(size)) };
+    let at_least = if n == 0 {
+        0
+    } else {
+        n.max(PROBE_BYTES.div_ceil(size))
+    };
     probe.try_reserve_exact(at_least).ok()?;
     drop(probe);
     Some(vec![T::default(); n])

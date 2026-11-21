@@ -243,8 +243,7 @@ impl Field {
             return ERROR_BADPARM;
         }
         self.clear_fill();
-        for p in points.chunks_exact(2) {
-            let (x, y) = (p[0], p[1]);
+        for &[x, y] in points.as_chunks::<2>().0 {
             if x < 0 || i32::from(x) >= self.width {
                 log::error_printf(
                     g,
@@ -354,25 +353,25 @@ impl Field {
         };
         let claim = |cx: i32, cy: i32| &self.claim[cy as usize * w as usize + cx as usize];
         add(claim(x, y), WEIGHT_CENTER);
-        if x - 1 >= 0 {
+        if x >= 1 {
             add(claim(x - 1, y), WEIGHT_SIDE);
         }
         if x + 1 < w {
             add(claim(x + 1, y), WEIGHT_SIDE);
         }
-        if y - 1 >= 0 {
+        if y >= 1 {
             add(claim(x, y - 1), WEIGHT_SIDE);
         }
         if y + 1 < h {
             add(claim(x, y + 1), WEIGHT_SIDE);
         }
-        if x - 1 >= 0 && y - 1 >= 0 {
+        if x >= 1 && y >= 1 {
             add(claim(x - 1, y - 1), diag);
         }
-        if x - 1 >= 0 && y + 1 < h {
+        if x >= 1 && y + 1 < h {
             add(claim(x - 1, y + 1), diag);
         }
-        if x + 1 < w && y - 1 >= 0 {
+        if x + 1 < w && y >= 1 {
             add(claim(x + 1, y - 1), diag);
         }
         if x + 1 < w && y + 1 < h {
@@ -898,10 +897,8 @@ fn read_otl_file(
                         g,
                         err,
                         ERROR_BADFILE,
-                        format!(
-                            "premature end of file while reading points from otl file {slice}"
-                        )
-                        .as_bytes(),
+                        format!("premature end of file while reading points from otl file {slice}")
+                            .as_bytes(),
                     );
                 }
                 let (x, y) = line.two_shorts(g);
@@ -944,8 +941,10 @@ fn read_otl_file(
             }
             // big-endian shorts (swab)
             points = bytes
-                .chunks_exact(2)
-                .map(|b| i16::from_be_bytes([b[0], b[1]]))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|&b| i16::from_be_bytes(b))
                 .collect();
         }
         line.gets(g, err, fp);
@@ -961,7 +960,16 @@ fn read_otl_file(
             );
         }
         if !empty_label {
-            claim_outline(g, err, &mut of, s, &label, &points, (seed_x, seed_y), unknown);
+            claim_outline(
+                g,
+                err,
+                &mut of,
+                s,
+                &label,
+                &points,
+                (seed_x, seed_y),
+                unknown,
+            );
         }
     }
     let scan = of.assign_labels(reproduce);
@@ -1043,7 +1051,9 @@ fn claim_outline(
         return;
     }
     let outside = points
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .filter(|p| !(0..512).contains(&p[0]) || !(0..512).contains(&p[1]))
         .count();
     if outside > 0 {
@@ -1215,9 +1225,7 @@ pub fn mri_read_otl(
             g,
             r.err,
             ERROR_BADPARM,
-            &format!(
-                "MRIreadOtl(): couldn't find any file between {first_name} and {last_name}"
-            ),
+            &format!("MRIreadOtl(): couldn't find any file between {first_name} and {last_name}"),
         );
         return Ok(None);
     }
@@ -1335,7 +1343,10 @@ mod tests {
                 }
             }
         }
-        assert_eq!(f.claim_points(&mut g, &mut Vec::new(), 3, &pts, 2, 2, 1), NO_ERROR);
+        assert_eq!(
+            f.claim_points(&mut g, &mut Vec::new(), 3, &pts, 2, 2, 1),
+            NO_ERROR
+        );
         let scan = f.assign_labels(false);
         assert_eq!(scan.claimed_5307, 0);
         // the interior (2, 2) is label 3; an outline corner has more unlabelled neighbours

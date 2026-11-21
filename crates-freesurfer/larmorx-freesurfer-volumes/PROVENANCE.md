@@ -28,7 +28,7 @@ ported file is audited for third-party code first).
 | `mri_convert/mri_convert.help.xml` | the help text `usage` renders (FreeSurfer's file, copied unchanged) | `src/mri_convert/mri_convert.help.xml` |
 | `mri_convert/mri_convert.cpp` 1876-3848, 3860-3888 (3.2-05, second half; track A relay 47) | `main` after the GDF stem check (the input reads, the steps on the input, the header overrides, the reports, the transform and template, the transform applied, the type change, the reslice, the steps after it, the colour table, the outputs; FS-1043 to FS-1053), `applyGaussianFilter`; the in-place `MRIhalfCosBias` (`utils/mri.cpp`'s loop, `MRIcopy` of a volume onto itself a no-op) | `src/mri_convert/main.rs` |
 | `utils/transform.cpp` 4182-4218, 4239-4277 (3.2-07's lines, taken with 3.2-05) | `LTAtransformTypeName`, `LTAdumpLinearTransform`, `LTAdump` | `src/mri_convert/lta_dump.rs` |
-| `include/mri.h` 1931-1934 (3.2-06) | `READ_OTL_*` flags; `MRIreadOtl` itself waits for relay 48 (a not-ported message) | `src/mri_convert/otl.rs` |
+| `include/mri.h` 1931-1934, `utils/mriio.cpp` 194-198, 6521-6914, 7144-7271, `utils/cma.cpp` 48-366, `include/cma.h` 576-625 (3.2-06, track A relay 48) | `READ_OTL_*` flags; `MAX_UNKNOWN_LABELS`, `unknown_labels`, `register_unknown_label`, `clear_unknown_labels`, `print_unknown_labels`, `read_otl_file`, `MRIreadOtl`; `CMAoutlineClaim`, `CMAoutlineField`, `CMAfreeOutlineField`, `CMAoutlineFieldAlloc`, `CMAclearFillField`, `CMAfill` (an explicit stack in the recursion's order), `CMAclaimPoints`, `CMAvalueClaims`, `CMAvalueAllClaims`, `CMAaddWeightedTotals`, `CMAtotalClaims` (the sums kept sparse), `CMAassignLabels`, `CMAzeroOutlines` (FS-1054 to FS-1060, FS-1141 to FS-1145) | `src/mri_convert/otl.rs` |
 | `mri_binarize/mri_binarize.cpp` 207-290, 712-1269, 1519-1612 (queue item 3.2-19, track D relay 48) | the file statics (`Options`), `parse_commandline` with its stand-alone options `--ohe`, `--crop-around-ras`, `--dilate-vertex(-sum)` (FS-1023, FS-1024, FS-1026), `usage_exit`, `print_version`, `check_options`, `dump_options` | `src/mri_binarize/options.rs` |
 | `mri_binarize/mri_binarize.cpp` 1275-1355, 1357-1517 (3.2-19) | `print_usage`'s and `print_help`'s texts (their `printf` literals, made by `validation/probes/fs-binarize/help_text.py`) | `src/mri_binarize/help.rs` |
 | `mri_binarize/mri_binarize.cpp` 292-709 (3.2-19) | `main` (FS-1018 to FS-1022, FS-1025): the in-place `MRIframeSum(InVol, InVol)` and `MRImultiplyConst(InVol, -1, InVol)` as their loops on the input (`utils/fmriutils.cpp` 1745-1765, `utils/mri2.cpp` 1866-1888); the program `mri_binarize` of `larmorx-freesurfer` | `src/mri_binarize/main.rs` |
@@ -69,6 +69,12 @@ reader, file names, format identification and `MRIwrite`; `-core`'s matrices, ve
   `strtof` and `%f` share the conversion).
 - FS-948 (the item count's read past the line: the count kept, no notice), FS-949 and FS-950 (rule
   A), FS-1031 to FS-1042 (crashes and memory: both modes as `specs/mri_convert.md` says).
+- The outline reader (relay 48): FS-1054 (a crash in an error message), FS-1055 (entry 5307's
+  never-reset score: rule A, `reproduce` sums from 0 per slice as the official build does,
+  observed), FS-1056 (writes outside a never-read array the official build leaves out), FS-1057
+  (reads past the outline field), FS-1058 and FS-1059 (kept, rule D), FS-1060 (the inverted
+  warning: rule A), FS-1141 to FS-1145 (memory, files, the fill's stack, the field's size);
+  `docs/findings/freesurfer-convert.md` Part 4.
 - Relay 47: `main`'s volumes are owned values (a step's result replaces the volume; FreeSurfer's
   `MRIfree`s are drops); its NULL checks follow FreeSurfer's, the unchecked ones FS-1052; the
   float arithmetic the output and messages show through fs.core's `sse` helpers (C's operand

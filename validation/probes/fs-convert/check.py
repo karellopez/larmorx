@@ -15,11 +15,13 @@ hash the port's recorded test checks (``tests/fs_convert_official.rs``).
 
     python -P validation/probes/fs-convert/check.py --seed 1 --n 500 [--json out.json]
     python -P validation/probes/fs-convert/check.py --kind cnv --seed 1 --n 300
+    python -P validation/probes/fs-convert/check.py --kind otl --seed 1 --n 120
 
 ``--kind cnv-heavy``: the conformed conversions (outputs of 256 voxels per axis), not in the
-recorded test. ``--kind cnv``: whole conversions (``cnv`` cases: small MGH inputs, options with arguments they
-accept, every written file compared through ``gzread`` with the command lines' time stamps
-masked).
+recorded test. ``--kind otl`` (relay 48): outline (.otl) series read and converted
+(``SKIP_OTL``). ``--kind cnv``: whole conversions (``cnv`` cases: small MGH inputs, options with
+arguments they accept, every written file compared through ``gzread`` with the command lines' time
+stamps masked).
 """
 
 from __future__ import annotations
@@ -81,6 +83,23 @@ SKIP_CNV = (
 )
 
 
+# outline (.otl) series: also the reader's crashes and memory reads (FS-1054: a file that is not
+# a GDF file; FS-1057: labels read past the outline field; FS-1141: point coordinates never read;
+# FS-1142: a slice count below 1; FS-1143: slice files past the open-file limit; FS-1144: a fill
+# deeper than the stack; FS-1145: a field past the machine's memory). FS-1056's writes outside the
+# 512 x 512 array are compared: the official build leaves that never-read array out.
+SKIP_OTL = (
+    *SKIP_CNV,
+    "FS-1054",
+    "FS-1057",
+    "FS-1141",
+    "FS-1142",
+    "FS-1143",
+    "FS-1144",
+    "FS-1145",
+)
+
+
 # FreeSurfer prints memory contents in a line the case otherwise compares: FS-1053 (a new
 # volume's printed validity flag); both sides' lines are compared with that line masked
 MASK = {"FS-1053": (re.compile(r"valid   : -?[0-9]+"), "valid   : ?")}
@@ -126,7 +145,7 @@ def port_binary(jobs: int) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--kind", choices=("opt", "cnv", "cnv-heavy"), default="opt")
+    ap.add_argument("--kind", choices=("opt", "cnv", "cnv-heavy", "otl"), default="opt")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--n", type=int, default=500)
     ap.add_argument("--jobs", type=int, default=6)
@@ -191,7 +210,8 @@ def main(argv: list[str] | None = None) -> int:
         cmd = case.split()[0]
         for x in ids:
             rep_ids[x] += 1
-        if any(x in ids for x in (SKIP if a.kind == "opt" else SKIP_CNV)):
+        skip = {"opt": SKIP, "otl": SKIP_OTL}.get(a.kind, SKIP_CNV)
+        if any(x in ids for x in skip):
             skipped[cmd] += 1
             if c == r:
                 skipped_same[cmd] += 1

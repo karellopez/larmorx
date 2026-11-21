@@ -2623,3 +2623,717 @@ fn written_full(dir: &Path) -> String {
     }
     s.trim_end().to_owned()
 }
+
+// ----- outline (.otl) series (`otl`, relay 48) -----
+
+/// The outline cases' colour table: FreeSurfer's names of a few structures (an exterior one for
+/// the translation), a name in lower case and one without its hemisphere (the second names a
+/// label is compared with), entry 5307 (FS-1055) and one past it (refused by the claims).
+const OTL_LUT: &[u8] = b"0 Unknown 0 0 0 0\n1 Left-Cerebral-Exterior 70 130 180 0\n2 Left-Cerebral-White-Matter 245 245 245 0\n3 Left-Cerebral-Cortex 205 62 78 0\n4 Left-Lateral-Ventricle 120 18 134 0\n17 Left-Hippocampus 220 216 20 0\n24 CSF 60 60 60 0\n41 Right-Cerebral-White-Matter 0 225 0 0\n42 Right-Cerebral-Cortex 205 62 78 0\n53 Right-Hippocampus 220 216 20 0\n98 csf 1 2 3 0\n120 Hippocampus 5 6 7 0\n5307 Test-Unc 1 2 3 0\n6000 Beyond-Max 4 5 6 0\n";
+
+/// The labels an outline names: the table's, written as CMA outlines write them (spaces for
+/// dashes, a hemisphere prefix, leading and trailing blanks, another case), exterior labels,
+/// unknown ones and the two past the claims' range.
+const OTL_LABELS: &[&str] = &[
+    "Left-Cerebral-Cortex",
+    "Left Cerebral Cortex",
+    "Right-Cerebral-White-Matter",
+    "Right Cerebral Cortex",
+    "Left-Cerebral-Exterior",
+    "Right Cerebral Exterior",
+    "Left-Hippocampus",
+    "Right-Hippocampus",
+    "left-Hippocampus",
+    "  Left-Lateral-Ventricle  ",
+    "Left-Lateral-Ventricle--",
+    "CSF",
+    "csf",
+    "Unknown",
+    "Test-Unc",
+    "Test Unc",
+    "Beyond-Max",
+    "Mystery",
+    "Another Mystery",
+    "---",
+    "Exterior and cortex, Cortex and exterior",
+];
+
+/// One outline of an `.otl` file: its label line's text, seed, points, type (`None`: the main
+/// header's) and the header lines added (another `COL_NUM`, a repeated line).
+struct Outline {
+    label: Option<String>,
+    seed: (i32, i32),
+    points: Vec<(i32, i32)>,
+    otype: Option<&'static str>,
+    extra: String,
+}
+
+/// The rectangle from (`x0`, `y0`) to (`x1`, `y1`): its boundary, 4-connected.
+fn otl_rect(x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
+    let mut p = Vec::new();
+    for x in x0..=x1 {
+        p.push((x, y0));
+        p.push((x, y1));
+    }
+    for y in y0 + 1..y1 {
+        p.push((x0, y));
+        p.push((x1, y));
+    }
+    p
+}
+
+/// A diamond around (`cx`, `cy`): a boundary of diagonal steps, which a 4-connected fill crosses.
+fn otl_diamond(cx: i32, cy: i32, r: i32) -> Vec<(i32, i32)> {
+    let mut p = Vec::new();
+    for k in 0..r {
+        p.push((cx + k, cy - r + k));
+        p.push((cx + r - k, cy + k));
+        p.push((cx - k, cy + r - k));
+        p.push((cx - r + k, cy - k));
+    }
+    p
+}
+
+/// An `.otl` file's bytes: the version line, the main header (`ONUM` the outlines' count unless
+/// `onum` says otherwise, `COL_NUM 2`, the global `TYPE` when given), each outline's header and
+/// points (ascii lines, or big-endian shorts for `short`).
+fn otl_bytes(outlines: &[Outline], global_type: Option<&str>, onum: Option<&str>) -> Vec<u8> {
+    let mut s = b"GDF FILE VERSION 1\nSTART MAIN HEADER\n".to_vec();
+    match onum {
+        Some(o) => s.extend_from_slice(o.as_bytes()),
+        None => s.extend_from_slice(format!("ONUM {}\n", outlines.len()).as_bytes()),
+    }
+    s.extend_from_slice(b"COL_NUM 2\n");
+    if let Some(t) = global_type {
+        s.extend_from_slice(format!("TYPE {t}\n").as_bytes());
+    }
+    s.extend_from_slice(b"END MAIN HEADER\n");
+    for o in outlines {
+        s.extend_from_slice(b"START GDF HEADER\n");
+        s.extend_from_slice(format!("ROW_NUM {}\n", o.points.len()).as_bytes());
+        s.extend_from_slice(format!("SEED {} {}\n", o.seed.0, o.seed.1).as_bytes());
+        if let Some(l) = &o.label {
+            s.extend_from_slice(format!("LABEL {l}\n").as_bytes());
+        }
+        if let Some(t) = o.otype {
+            s.extend_from_slice(format!("TYPE {t}\n").as_bytes());
+        }
+        s.extend_from_slice(o.extra.as_bytes());
+        s.extend_from_slice(b"END GDF HEADER\nSTART POINTS\n");
+        let binary = o.otype.or(global_type) == Some("short");
+        for &(x, y) in &o.points {
+            if binary {
+                s.extend_from_slice(&(x as i16).to_be_bytes());
+                s.extend_from_slice(&(y as i16).to_be_bytes());
+            } else {
+                s.extend_from_slice(format!("{x} {y}\n").as_bytes());
+            }
+        }
+        s.extend_from_slice(b"END POINTS\n");
+    }
+    s
+}
+
+/// A header-only `.mgh` file (no voxels) of `w` x `h` x `d`: `--in_like`'s size for the series.
+fn otl_like(w: i32, h: i32, d: i32) -> Vec<u8> {
+    let mut b = Vec::new();
+    for x in [1, w, h, d, 1, 0, 0] {
+        b.extend_from_slice(&x.to_be_bytes());
+    }
+    b.extend_from_slice(&0i16.to_be_bytes());
+    b.resize(284, 0);
+    b
+}
+
+/// An outline inside the outline field of `fw` x `fh` places (at most 512 each): a closed
+/// rectangle with its seed inside (most), the seed outside or on the outline, a diamond (the fill
+/// leaks through it), scattered points, or none.
+fn otl_outline(g: &mut Gen, fw: i32, fh: i32, leak: bool) -> Outline {
+    let (fw, fh) = (fw.min(512), fh.min(512));
+    let x0 = g.int(0, i64::from(fw - 12)) as i32;
+    let y0 = g.int(0, i64::from(fh - 12)) as i32;
+    let x1 = (x0 + g.int(2, 40) as i32).min(fw - 1);
+    let y1 = (y0 + g.int(2, 40) as i32).min(fh - 1);
+    let inside = ((x0 + x1) / 2, (y0 + y1) / 2);
+    let (points, seed) = match g.below(if leak { 8 } else { 5 }) {
+        0..=3 => (otl_rect(x0, y0, x1, y1), inside),
+        4 => (otl_rect(x0, y0, x1, y1), (x0, y0)),
+        5 => (
+            otl_rect(x0, y0, x1, y1),
+            (g.int(0, 511) as i32, g.int(0, 511) as i32),
+        ),
+        6 => {
+            let r = g.int(2, 6) as i32;
+            (otl_diamond(x0 + r, y0 + r, r), (x0 + r, y0 + r))
+        }
+        _ => {
+            let n = g.int(0, 6);
+            let pts = (0..n)
+                .map(|_| {
+                    (
+                        g.int(0, i64::from(fw - 1)) as i32,
+                        g.int(0, i64::from(fh - 1)) as i32,
+                    )
+                })
+                .collect();
+            (pts, inside)
+        }
+    };
+    Outline {
+        label: Some(g.pick(OTL_LABELS).to_owned()),
+        seed,
+        points,
+        otype: None,
+        extra: String::new(),
+    }
+}
+
+/// An `.otl` file's bytes damaged: cut at a random byte, a line dropped, or a keyword changed.
+fn otl_damage(g: &mut Gen, b: &mut Vec<u8>) {
+    match g.below(3) {
+        0 => {
+            let at = g.below(b.len() as u64) as usize;
+            b.truncate(at);
+        }
+        1 => {
+            let lines: Vec<usize> = std::iter::once(0)
+                .chain(
+                    b.iter()
+                        .enumerate()
+                        .filter(|&(_, &c)| c == b'\n')
+                        .map(|(i, _)| i + 1),
+                )
+                .filter(|&i| i < b.len())
+                .collect();
+            let a = g.pick(&lines);
+            let e = b[a..]
+                .iter()
+                .position(|&c| c == b'\n')
+                .map_or(b.len(), |p| a + p + 1);
+            b.drain(a..e);
+        }
+        _ => {
+            let keys: [&[u8]; 9] = [
+                b"ROW_NUM",
+                b"SEED",
+                b"LABEL",
+                b"END POINTS",
+                b"START POINTS",
+                b"END GDF",
+                b"COL_NUM",
+                b"ONUM",
+                b"TYPE",
+            ];
+            let k = g.pick(&keys);
+            if let Some(p) = b.windows(k.len()).position(|w| w == k) {
+                b[p] = b'X';
+            }
+        }
+    }
+}
+
+/// One seeded outline series: 1 to 3 slices (a slice's file sometimes missing or damaged), the
+/// volume's size from a header-only `--in_like` (171 to 208 voxels and 256, a size below 171 or
+/// above 512 now and then) or the default 512, outlines of every kind, the options of the read
+/// (`-zo`, `-nt`, `-fp`, `-sp`) and an output format.
+fn otl_case(g: &mut Gen) -> String {
+    let k = g.int(1, 3) as i32;
+    let (w, h, like) = match g.below(12) {
+        0 => (512, 512, false),
+        1 => {
+            let s = g.pick(&[100, 128, 600]);
+            (s, s, true)
+        }
+        2 | 3 => (256, 256, true),
+        _ => (g.int(171, 208) as i32, g.int(171, 208) as i32, true),
+    };
+    let (fw, fh) = (2 * w, 2 * h);
+    // a fill of the whole field is deep enough to crash FreeSurfer from 209 x 209 voxels on
+    let leak = w <= 208 && h <= 208;
+    let gt = g.pick(&[
+        Some("ascii short"),
+        Some("ascii short"),
+        Some("short"),
+        None,
+    ]);
+    let mut files: Vec<(String, Vec<u8>)> = Vec::new();
+    for s in 1..=k {
+        if k > 1 && g.chance(5) {
+            continue;
+        }
+        let n = g.int(0, 3);
+        let mut outlines: Vec<Outline> = (0..n).map(|_| otl_outline(g, fw, fh, leak)).collect();
+        for o in &mut outlines {
+            if gt.is_none() || g.chance(6) {
+                o.otype = Some(g.pick(&["ascii short", "short"]));
+            }
+            if g.chance(12) {
+                o.label = None;
+            }
+        }
+        let mut b = otl_bytes(&outlines, gt, None);
+        if g.chance(6) {
+            otl_damage(g, &mut b);
+        }
+        files.push((format!("in_{s}.otl"), b));
+    }
+    if files.is_empty() {
+        files.push(("in_1.otl".into(), otl_bytes(&[], Some("ascii short"), None)));
+    }
+    let first = files[0].0.clone();
+    files.push(("in_lut.txt".into(), OTL_LUT.to_vec()));
+    let mut args: Vec<String> = Vec::new();
+    if like {
+        files.push(("in_l.mgh".into(), otl_like(w, h, k)));
+        args.extend(["--in_like".into(), "in_l.mgh".into()]);
+    } else {
+        args.extend(["--in_k_count".into(), k.to_string()]);
+    }
+    args.extend(["-cf".into(), "in_lut.txt".into()]);
+    for (o, p) in [("-zo", 4), ("-nt", 4), ("-fp", 3)] {
+        if g.chance(p) {
+            args.push(o.into());
+        }
+    }
+    if g.chance(8) {
+        args.extend(["-sp".into(), g.int(14, 26).to_string()]);
+    }
+    args.push(first);
+    args.push(g.pick(&["o.mgh", "o.mgh", "o.mgz", "o.nii"]).into());
+    cnv_line(&files, &args)
+}
+
+/// The outline conversions every seed starts with: each path of the reader once.
+fn otl_prelude() -> Vec<String> {
+    let lut = || ("in_lut.txt".to_owned(), OTL_LUT.to_vec());
+    let like = |w: i32, h: i32, d: i32| ("in_l.mgh".to_owned(), otl_like(w, h, d));
+    let rect = |label: &str, x0: i32, y0: i32, x1: i32, y1: i32| Outline {
+        label: Some(label.to_owned()),
+        seed: ((x0 + x1) / 2, (y0 + y1) / 2),
+        points: otl_rect(x0, y0, x1, y1),
+        otype: None,
+        extra: String::new(),
+    };
+    let a = |xs: &[&str]| -> Vec<String> { xs.iter().map(|s| (*s).to_owned()).collect() };
+    let std_args = |extra: &[&str]| -> Vec<String> {
+        let mut v = a(&["--in_like", "in_l.mgh", "-cf", "in_lut.txt"]);
+        v.extend(a(extra));
+        v.extend(a(&["in_1.otl", "o.mgh"]));
+        v
+    };
+    let two = || {
+        vec![
+            rect("Left Cerebral Cortex", 30, 30, 60, 50),
+            rect("Right-Cerebral-White-Matter", 100, 120, 140, 150),
+        ]
+    };
+    let file = |o: &[Outline]| otl_bytes(o, Some("ascii short"), None);
+    let mut out = Vec::new();
+    let mut push =
+        |files: Vec<(String, Vec<u8>)>, args: Vec<String>| out.push(cnv_line(&files, &args));
+    // the plain read: two slices, a volume of 200 x 190, and the default size (512)
+    push(
+        vec![
+            ("in_1.otl".into(), file(&two())),
+            ("in_2.otl".into(), file(&[rect("Mystery", 5, 5, 9, 9)])),
+            lut(),
+            like(200, 190, 2),
+        ],
+        std_args(&[]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut()],
+        a(&[
+            "--in_k_count",
+            "1",
+            "-cf",
+            "in_lut.txt",
+            "in_1.otl",
+            "o.mgz",
+        ]),
+    );
+    // the read's options
+    for opts in [
+        &["-zo"][..],
+        &["-nt"],
+        &["-fp"],
+        &["-sp", "14"],
+        &["-zo", "-nt", "-fp", "-sp", "26"],
+    ] {
+        let o = vec![
+            rect("Left-Cerebral-Exterior", 20, 20, 80, 70),
+            rect("Left-Cerebral-Cortex", 40, 30, 60, 50),
+        ];
+        push(
+            vec![("in_1.otl".into(), file(&o)), lut(), like(180, 180, 1)],
+            std_args(opts),
+        );
+    }
+    // the header only (-ro with --in_info)
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut(), like(180, 180, 1)],
+        std_args(&["-ro", "-ii"]),
+    );
+    // types: binary points, a global type with an outline's own, none, an unsupported one
+    let mut o = two();
+    o[1].otype = Some("short");
+    push(
+        vec![
+            ("in_1.otl".into(), otl_bytes(&o, Some("ascii short"), None)),
+            lut(),
+            like(180, 180, 1),
+        ],
+        std_args(&[]),
+    );
+    push(
+        vec![
+            ("in_1.otl".into(), otl_bytes(&two(), Some("short"), None)),
+            lut(),
+            like(180, 180, 1),
+        ],
+        std_args(&[]),
+    );
+    push(
+        vec![
+            ("in_1.otl".into(), otl_bytes(&two(), None, None)),
+            lut(),
+            like(180, 180, 1),
+        ],
+        std_args(&[]),
+    );
+    let mut o = two();
+    o[0].otype = Some("float");
+    push(
+        vec![
+            ("in_1.otl".into(), otl_bytes(&o, None, None)),
+            lut(),
+            like(180, 180, 1),
+        ],
+        std_args(&[]),
+    );
+    // the labels' names: each of the table's spellings, the unknown ones (more than 100: the list's
+    // end), an empty label, entry 0, 5307 (FS-1055) and one past the claims' range
+    let names: Vec<Outline> = OTL_LABELS
+        .iter()
+        .enumerate()
+        .map(|(k, l)| {
+            rect(
+                l,
+                10 + 16 * (k as i32 % 20),
+                10 + 40 * (k as i32 / 20),
+                20 + 16 * (k as i32 % 20),
+                40 + 40 * (k as i32 / 20),
+            )
+        })
+        .collect();
+    push(
+        vec![("in_1.otl".into(), file(&names)), lut(), like(200, 200, 1)],
+        std_args(&[]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&names)), lut(), like(200, 200, 1)],
+        std_args(&["-nt"]),
+    );
+    let many: Vec<Outline> = (0..105)
+        .map(|k| Outline {
+            label: Some(format!("Unknown-{}", k % 103)),
+            seed: (1, 1),
+            points: vec![(0, 0)],
+            otype: None,
+            extra: String::new(),
+        })
+        .collect();
+    push(
+        vec![("in_1.otl".into(), file(&many)), lut(), like(180, 180, 1)],
+        std_args(&[]),
+    );
+    let mut o = two();
+    o[0].label = None;
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(180, 180, 1)],
+        std_args(&[]),
+    );
+    let o = vec![
+        rect("Test-Unc", 10, 10, 30, 30),
+        rect("Left-Cerebral-Cortex", 100, 100, 120, 130),
+        rect("Beyond-Max", 200, 200, 220, 220),
+    ];
+    push(
+        vec![
+            ("in_1.otl".into(), file(&o)),
+            ("in_2.otl".into(), file(&o)),
+            lut(),
+            like(180, 180, 2),
+        ],
+        std_args(&[]),
+    );
+    // more than ten claims on one place, an outline sharing points with another, entry 0
+    let o: Vec<Outline> = (0..12)
+        .map(|k| rect(OTL_LABELS[k % 4], 50, 50, 60 + k as i32, 70))
+        .collect();
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(180, 180, 1)],
+        std_args(&[]),
+    );
+    // fills: a seed on the outline, outside it (the whole field but the outline), a leaking
+    // diamond, no points, scattered points, a seed past the field, points past it and outside 512
+    let mut o = two();
+    o[0].seed = (30, 30);
+    o[1].seed = (5, 300);
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(190, 180, 1)],
+        std_args(&[]),
+    );
+    let o = vec![
+        Outline {
+            label: Some("CSF".into()),
+            seed: (20, 20),
+            points: otl_diamond(20, 20, 5),
+            otype: None,
+            extra: String::new(),
+        },
+        Outline {
+            label: Some("Left-Hippocampus".into()),
+            seed: (0, 0),
+            points: Vec::new(),
+            otype: None,
+            extra: String::new(),
+        },
+    ];
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(171, 171, 1)],
+        std_args(&[]),
+    );
+    let mut o = two();
+    o[0].seed = (400, 10);
+    o[1].points.push((380, 10));
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(171, 171, 1)],
+        std_args(&[]),
+    );
+    let mut o = two();
+    o[1].points.push((600, 10));
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(256, 256, 1)],
+        std_args(&[]),
+    );
+    // a fill of the whole field of 420 x 420 places, deeper than the stack (FS-1144: FreeSurfer
+    // crashes), and a field past the machine's memory (FS-1145)
+    let none = |label: &str| Outline {
+        label: Some(label.to_owned()),
+        seed: (0, 0),
+        points: Vec::new(),
+        otype: None,
+        extra: String::new(),
+    };
+    push(
+        vec![
+            ("in_1.otl".into(), file(&[none("Left-Cerebral-Cortex")])),
+            lut(),
+            like(210, 210, 1),
+        ],
+        std_args(&[]),
+    );
+    push(
+        vec![
+            ("in_1.otl".into(), file(&[none("CSF")])),
+            lut(),
+            like(10000, 10000, 1),
+        ],
+        std_args(&[]),
+    );
+    // sizes: a width that does not divide 512, one below 171 (FS-1057), above 512
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut(), like(300, 200, 1)],
+        std_args(&[]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut(), like(100, 128, 1)],
+        std_args(&[]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut(), like(600, 180, 1)],
+        std_args(&[]),
+    );
+    // the series: a missing slice, none found, a count of 0 (FS-1142), names without digits or
+    // with digits only, no colour table, a colour table that cannot be read
+    push(
+        vec![
+            ("in_1.otl".into(), file(&two())),
+            ("in_3.otl".into(), file(&two())),
+            lut(),
+            like(180, 180, 3),
+        ],
+        std_args(&[]),
+    );
+    push(
+        vec![("in_5.otl".into(), file(&two())), lut(), like(180, 180, 2)],
+        a(&[
+            "--in_like",
+            "in_l.mgh",
+            "-cf",
+            "in_lut.txt",
+            "in_5.otl",
+            "o.mgh",
+        ]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut()],
+        a(&[
+            "--in_k_count",
+            "0",
+            "-cf",
+            "in_lut.txt",
+            "in_1.otl",
+            "o.mgh",
+        ]),
+    );
+    push(
+        vec![
+            ("in_x.otl".into(), file(&two())),
+            ("in_x1.otl".into(), file(&two())),
+            lut(),
+            like(180, 180, 1),
+        ],
+        a(&[
+            "--in_like",
+            "in_l.mgh",
+            "-cf",
+            "in_lut.txt",
+            "in_x.otl",
+            "o.mgh",
+        ]),
+    );
+    push(
+        vec![("12.otl".into(), file(&two())), lut(), like(180, 180, 1)],
+        a(&[
+            "--in_like",
+            "in_l.mgh",
+            "-cf",
+            "in_lut.txt",
+            "12.otl",
+            "o.mgh",
+        ]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&two())), like(180, 180, 1)],
+        a(&["--in_like", "in_l.mgh", "in_1.otl", "o.mgh"]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&two())), like(180, 180, 1)],
+        std_args(&[]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut()],
+        a(&["-cf", "in_lut.txt", "in_1.otl", "o.mgh"]),
+    );
+    // the files' errors: not a GDF file (FS-1054), an empty one, each premature end, ONUM missing
+    // or negative, ROW_NUM missing, COL_NUM not 2, a SEED of one number, START POINTS missing, a
+    // point line short of numbers (FS-1141), numbers past a short, END POINTS missing, binary
+    // points cut short, a line past the buffer, a LABEL line at the end of the file
+    let good = file(&two());
+    let cut_at = |key: &[u8]| -> Vec<u8> {
+        let p = good
+            .windows(key.len())
+            .position(|w| w == key)
+            .expect("the key");
+        good[..p + key.len()].to_vec()
+    };
+    let replace = |from: &str, to: &str| -> Vec<u8> {
+        String::from_utf8(good.clone())
+            .expect("ascii")
+            .replacen(from, to, 1)
+            .into_bytes()
+    };
+    let bad: Vec<Vec<u8>> = vec![
+        b"hello\n".to_vec(),
+        Vec::new(),
+        b"GDF FILE VERSION 1\n".to_vec(),
+        cut_at(b"START MAIN HEADER\n"),
+        cut_at(b"END MAIN HEADER\n"),
+        cut_at(b"START GDF HEADER\n"),
+        cut_at(b"SEED"),
+        cut_at(b"START POINTS\n"),
+        cut_at(b"START POINTS"),
+        cut_at(b"30 50\n"),
+        cut_at(b"END POINTS"),
+        replace("ONUM 2\n", ""),
+        replace("ONUM 2\n", "ONUM -3\n"),
+        replace("ONUM 2\n", "ONUM 3\n"),
+        replace("ONUM 2\n", "ONUM 1\n"),
+        replace("ROW_NUM", "ROW_NUMBER_X"),
+        replace("ROW_NUM 100", "ROW_NUM -1"),
+        replace("COL_NUM 2\n", "COL_NUM 3\n"),
+        replace("SEED 45 40", "SEED 45"),
+        replace("SEED 45 40", "SEED 45 512"),
+        replace("START POINTS", "START PTS"),
+        replace("30 30\n", "30\n"),
+        replace("30 30\n", "x y\n"),
+        replace("30 30\n", "65566 -65506\n"),
+        replace("END POINTS", "END PTS"),
+        replace(
+            "LABEL Left Cerebral Cortex\n",
+            &format!("LABEL {}\n", "L".repeat(1500)),
+        ),
+        {
+            let mut b = good.clone();
+            b.extend_from_slice(b"START GDF HEADER\nROW_NUM 1\nLABEL");
+            b
+        },
+        replace("COL_NUM 2\n", "COL_NUM 2\nTYPE\n"),
+    ];
+    for b in bad {
+        push(
+            vec![("in_1.otl".into(), b), lut(), like(180, 180, 1)],
+            std_args(&[]),
+        );
+    }
+    let mut o = two();
+    o[1].otype = Some("short");
+    let mut b = otl_bytes(&o, Some("ascii short"), None);
+    let p = b
+        .windows(10)
+        .rposition(|w| w == b"END POINTS")
+        .expect("the end");
+    b.drain(p - 7..p);
+    push(
+        vec![("in_1.otl".into(), b), lut(), like(180, 180, 1)],
+        std_args(&[]),
+    );
+    // the warning of an exterior label after others (FS-1060) and the translation's cut
+    let o = vec![
+        rect("Left-Hippocampus", 10, 10, 20, 20),
+        rect("Left-Cerebral-Exterior-Extra", 30, 30, 50, 50),
+        rect("Exterior and cortex, Cortex and exterior", 60, 60, 70, 70),
+        rect("CSF", 80, 80, 90, 90),
+    ];
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(180, 180, 1)],
+        std_args(&[]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&o)), lut(), like(180, 180, 1)],
+        std_args(&["-nt"]),
+    );
+    // the read through mri_convert's later steps: a type and a resampling
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut(), like(180, 180, 1)],
+        std_args(&["-odt", "uchar"]),
+    );
+    push(
+        vec![("in_1.otl".into(), file(&two())), lut(), like(180, 180, 1)],
+        std_args(&["-vs", "2", "2", "2"]),
+    );
+    out
+}
+
+/// `n` outline conversions of seed `seed`: the [`otl_prelude`], then seeded ones.
+pub fn generate_otl(seed: u64, n: usize) -> Vec<String> {
+    let mut v = otl_prelude();
+    v.truncate(n);
+    let mut g = Gen::new(seed ^ 0x6f74_6c00);
+    while v.len() < n {
+        v.push(otl_case(&mut g));
+    }
+    v
+}

@@ -1,0 +1,158 @@
+{
+ "name": "freesurfer-mri-convert",
+ "tool": "mri_convert (FreeSurfer 8.2.0)",
+ "status": "experimental",
+ "larmorx_commit": "1f4318e4d889",
+ "generated": "2026-11-22",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_convert/), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's recon-all runs (oracles/freesurfer-8.2.0/runs/), its official program ($FREESURFER_HOME/bin/mri_convert) and the fs-convert probe (mri_convert.cpp compiled against the unit oracle's build)",
+ "replay": {
+  "reproduce": {
+   "steps": 24,
+   "reproduced": 24,
+   "runs": [
+    "ds000005-sub-01-classic",
+    "ds000005-sub-01-v8",
+    "ds000228-sub-pixar008-classic",
+    "ds000228-sub-pixar008-v8",
+    "ds002422-sub-02-classic",
+    "ds002422-sub-02-v8",
+    "ds004173-sub-603309-classic",
+    "ds004173-sub-603309-v8",
+    "ds005003-sub-RS001-classic",
+    "ds005003-sub-RS001-v8",
+    "ds005454-sub-16-classic",
+    "ds005454-sub-16-v8"
+   ],
+   "seconds_replayed": 69.8,
+   "seconds_recorded": 46.3
+  },
+  "fix": {
+   "steps": 24,
+   "reproduced": 24,
+   "runs": [
+    "ds000005-sub-01-classic",
+    "ds000005-sub-01-v8",
+    "ds000228-sub-pixar008-classic",
+    "ds000228-sub-pixar008-v8",
+    "ds002422-sub-02-classic",
+    "ds002422-sub-02-v8",
+    "ds004173-sub-603309-classic",
+    "ds004173-sub-603309-v8",
+    "ds005003-sub-RS001-classic",
+    "ds005003-sub-RS001-v8",
+    "ds005454-sub-16-classic",
+    "ds005454-sub-16-v8"
+   ],
+   "seconds_replayed": 66.0,
+   "seconds_recorded": 46.3
+  }
+ },
+ "probe": [
+  {
+   "kind": "opt",
+   "seed": 1,
+   "cases": 1000,
+   "identical": 947,
+   "different": 0,
+   "skipped": 53,
+   "fix_different_with_notice": 117,
+   "fix_different_without_notice": 0
+  },
+  {
+   "kind": "cnv",
+   "seed": 1,
+   "cases": 400,
+   "identical": 382,
+   "different": 0,
+   "skipped": 18,
+   "fix_different_with_notice": 130,
+   "fix_different_without_notice": 0
+  },
+  {
+   "kind": "cnv",
+   "seed": 3,
+   "cases": 1000,
+   "identical": 952,
+   "different": 0,
+   "skipped": 48,
+   "fix_different_with_notice": 251,
+   "fix_different_without_notice": 0
+  },
+  {
+   "kind": "otl",
+   "seed": 1,
+   "cases": 120,
+   "identical": 104,
+   "different": 0,
+   "skipped": 16,
+   "fix_different_with_notice": 58,
+   "fix_different_without_notice": 0
+  },
+  {
+   "kind": "otl",
+   "seed": 3,
+   "cases": 250,
+   "identical": 221,
+   "different": 0,
+   "skipped": 29,
+   "fix_different_with_notice": 120,
+   "fix_different_without_notice": 0
+  },
+  {
+   "kind": "otl",
+   "seed": 7,
+   "cases": 150,
+   "identical": 137,
+   "different": 0,
+   "skipped": 13,
+   "fix_different_with_notice": 78,
+   "fix_different_without_notice": 0
+  }
+ ],
+ "fmriprep_call": {
+  "call": "mri_convert <niworkflows' sentinel.nii.gz> out.mgz",
+  "modes": {
+   "reproduce": {
+    "status_same": true,
+    "stdout_same": true,
+    "stderr_same": true,
+    "volume": "identical"
+   },
+   "fix": {
+    "status_same": true,
+    "stdout_same": true,
+    "stderr_same": true,
+    "volume": "identical"
+   }
+  }
+ },
+ "golden_sha256": "23e3bed1089a014580c8354ee2e47c312a15493fd1b8870525864efc0e51ec8d",
+ "memory": [
+  {
+   "case": "conform",
+   "mode": "reproduce",
+   "larmorx_mib": 26.1,
+   "freesurfer_mib": 28.4
+  },
+  {
+   "case": "conform",
+   "mode": "fix",
+   "larmorx_mib": 27.3,
+   "freesurfer_mib": 28.4
+  },
+  {
+   "case": "nifti",
+   "mode": "reproduce",
+   "larmorx_mib": 21.5,
+   "freesurfer_mib": 23.2
+  },
+  {
+   "case": "nifti",
+   "mode": "fix",
+   "larmorx_mib": 21.5,
+   "freesurfer_mib": 23.2
+  }
+ ]
+}

@@ -1591,7 +1591,8 @@ Image row `h - (y + 1)` holds the volume's row `y` (the image runs upwards).
 - `MRItoImageView(mri, I, slice, view, frame)`, in order:
   1. The volume's slice direction `D` (§14's `getSliceDirection`: coronal 0, sagittal 1, horizontal 2) must
      be known: `MRI_UNDEFINED` (a volume with `ras_good_flag` 0) gives the error `MRItoImageView(<slice>,
-     <view>): unsupported view/slice direction -1` (no final newline) and returns NULL.
+     <view>): unsupported view/slice direction -1` (no final newline; its code, `ERROR_UNSUPPORTED`, is not
+     seen by a caller) and returns NULL.
   2. For `D` and the view `V` (0 coronal, 1 sagittal, 2 horizontal), the image is `w x h` (columns x rows)
      with the slices along `d`, and each image pixel `(x, y)` reads the volume at the place below, where
      `x' = w - 1 - x` when the columns run against the volume (the condition given), else `x`, and `y' = h
@@ -1638,7 +1639,8 @@ Image row `h - (y + 1)` holds the volume's row `y` (the image runs upwards).
      extremes taken from the samples that is 0 to 255 (the extremes' rounding to `float` can put the
      quotient a little outside, which the truncation brings back), and 0 for a NaN sample or an infinite
      extreme. FS-465: a given image of the right `rows` and `cols` but a smaller `ocols` or buffer is
-     written past its pixels in FreeSurfer; here only the bytes inside are written, noted.
+     written past its pixels in FreeSurfer; here only the bytes inside are written, noted where a byte
+     written falls outside the buffer (and only there).
   8. Returns the image (the given one or the new one).
   **(observed)**: §69's `vimage` and `vrules9`, every finite line as a model of these steps (no given
   image, the frame inside, the four types sampled).
@@ -1675,7 +1677,9 @@ Image row `h - (y + 1)` holds the volume's row `y` (the image runs upwards).
   cols` bytes past the pixel, not `3 f rows cols` (`reproduce`; frames after the first overlap the first);
   the default reads the frame's own pixels; noted. FS-465: an image whose header counts more frames,
   rows or columns than its buffer holds is read past its pixels in FreeSurfer; here those bytes read 0,
-  noted. Returns the volume.
+  noted where a byte read falls outside the buffer (a header that counts more but whose reads all stay
+  inside, FS-466's overlapping frames among them, reads its own pixels and is not noted). Returns the
+  volume.
 
 ## 35. Neighbourhoods and labels (3.1-37, piece b)
 A window of half-width `whalf` around `(x, y, z)` visits `-whalf..=whalf` on each axis (none when `whalf`

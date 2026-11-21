@@ -299,7 +299,7 @@ pub(crate) fn axis_weights(degree: i32, t: f64, n: i32) -> AxisWeights {
 enum DegreeCase {
     /// Sampled (degrees 2 to 9, or 0 and 1 on a volume of one voxel).
     Sample,
-    /// FS-964: refused with its error.
+    /// FS-964's end: its error, then the end of the program (status 252).
     Fs964,
     /// FS-964 under `reproduce`, FreeSurfer's end: `Invalid spline degree`.
     Fs964Ends,
@@ -326,8 +326,8 @@ fn degree_case(degree: i32, c: &Mri, reproduce: bool) -> DegreeCase {
 }
 
 impl Process {
-    /// The weights of the three axes for a sampler, or its refusal (FS-964: `Err(None)`, after the
-    /// error) or the end of the program.
+    /// The weights of the three axes for a sampler, or the end of the program (FS-964's end after
+    /// its error, or `Invalid spline degree`).
     fn sampler_weights(
         &mut self,
         b: &BSpline,
@@ -351,18 +351,18 @@ impl Process {
                 self.note(
                     &FS_964,
                     format!(
-                        "{function}: a B-spline of degree {} refused (FreeSurfer reads or writes memory it does not own)",
+                        "{function}: a B-spline of degree {} ended the program (FreeSurfer reads or writes memory it does not own)",
                         b.degree
                     ),
                 );
-                self.error_printf(
+                self.error_exit(
                     codes::BAD_PARM,
                     format!(
-                        "{function}: a B-spline of degree {} (FreeSurfer reads or writes memory it does not own here)",
+                        "{function}: a B-spline of degree {} (FreeSurfer reads or writes memory it does not own here)\n",
                         b.degree
                     )
                     .as_bytes(),
-                );
+                )?;
                 Ok(None)
             }
             DegreeCase::Invalid => Err(self.bspline_end("Invalid spline degree")),

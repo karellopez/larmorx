@@ -230,8 +230,9 @@ impl Process {
 
     /// `MRIcalcCRASforSampledVolume(src, dst, &r, &a, &s)` (§33): the source point of the
     /// destination's centre for whole sampling factors, through the source's cached voxel-to-RAS
-    /// matrix (computed and kept when absent). FS-462: a destination extent of 0 (or a division
-    /// that overflows) ends the program here (code -4) in both modes.
+    /// matrix (computed and kept when absent). FS-462: a destination extent of 0 (or a quotient
+    /// that overflows) ends the program here (`ERROR_BADPARM`, status 252) in both modes, the
+    /// three factors checked before anything is made or written.
     pub fn mri_calc_cras_for_sampled_volume(
         &mut self,
         src: &mut Mri,
@@ -239,19 +240,24 @@ impl Process {
     ) -> Result<[f64; 3], Stop> {
         let se = [src.geom.width, src.geom.height, src.geom.depth];
         let de = [dst.geom.width, dst.geom.height, dst.geom.depth];
-        let mut q = [0.0f64; 3];
+        let mut fac = [0i32; 3];
         for k in 0..3 {
             let Some(f) = se[k].checked_div(de[k]) else {
                 self.note(
                     &FS_462,
-                    "MRIcalcCRASforSampledVolume: a sampled volume's extent of 0 refused (FreeSurfer crashes)",
+                    "MRIcalcCRASforSampledVolume: a sampled volume's extent of 0 (or an overflowing quotient) ended the program (FreeSurfer crashes)",
                 );
                 self.error_exit(
                     codes::BAD_PARM,
-                    b"MRIcalcCRASforSampledVolume: the sampling factor is not defined (an extent of 0)",
+                    b"MRIcalcCRASforSampledVolume(): an extent of the sampled volume is 0 (FreeSurfer crashes here)\n",
                 )?;
                 return Ok([0.0; 3]);
             };
+            fac[k] = f;
+        }
+        let mut q = [0.0f64; 3];
+        for k in 0..3 {
+            let f = fac[k];
             let c = de[k] / 2;
             q[k] = sse::add64(
                 f64::from(c.wrapping_mul(f)),
@@ -405,7 +411,9 @@ impl Process {
     /// `MRIsetVoxelToRasXform(mri, M)` (§33): the direction cosines and the centre from the
     /// matrix's first three rows, after the voxel sizes' check against the columns' scales (the
     /// threshold and the change of sizes from `FS_SetVoxToRasXform_Change_VoxSize`); the cached
-    /// matrices recomputed. FS-464: a matrix smaller than 3 x 4 is refused (`ERROR_BADPARM`).
+    /// matrices recomputed. FS-464: a matrix with fewer than 3 rows or 4 columns (or none) ends
+    /// the program (`ERROR_BADPARM`, status 252) in both modes, before anything is read or
+    /// printed, the volume unchanged.
     pub fn mri_set_voxel_to_ras_xform(
         &mut self,
         m: &mut Mri,
@@ -414,13 +422,13 @@ impl Process {
         let Some(mat) = mat.filter(|x| x.rows >= 3 && x.cols >= 4) else {
             self.note(
                 &FS_464,
-                "MRIsetVoxelToRasXform: a matrix smaller than 3 x 4 refused (FreeSurfer reads past its elements)",
+                "MRIsetVoxelToRasXform: a matrix smaller than 3 x 4 (or none) ended the program (FreeSurfer reads past its elements)",
             );
-            return Ok(self.error_return(
+            self.error_exit(
                 codes::BAD_PARM,
-                codes::BAD_PARM,
-                b"MRIsetVoxelToRasXform: the matrix is smaller than 3 x 4",
-            ));
+                b"MRIsetVoxelToRasXform(): the matrix is smaller than 3 x 4 (FreeSurfer reads past it)\n",
+            )?;
+            return Ok(codes::BAD_PARM);
         };
         let e = |r: i32, c: i32| mat.at(r, c);
         let mut scale = [0.0f64; 3];

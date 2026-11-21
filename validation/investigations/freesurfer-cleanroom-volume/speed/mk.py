@@ -3,7 +3,9 @@
 part 4's samplers and head box (relay 8), part 6a's flood fill, downsamplers, upsampler, change of type
 and limits (relay 10), and parts 6b and 6c's frame-range sampler, splatting, derivative, linear transform and
 resampling onto a template (relay 11); fs.bspline's coefficients, sampling, transform and pyramids and
-fs.volume's cubic B-spline paths (relay 12: `python -P mk.py bspline` writes only those). Run with
+fs.volume's cubic B-spline paths (relay 12: `python -P mk.py bspline` writes only those), and part 7b's
+smoothing, window counts, label means and borders, mask, clipping and image view (relay 13: `python -P mk.py
+part7b`). Run with
 `python -P mk.py` in a scratch folder, then `run.sh`."""
 
 import random
@@ -96,10 +98,28 @@ bs.append(f"@60 bsdown {W(64, 0, 9)} new")
 bs.append(f"@60 bsup {W(32, 0, 9)} new")
 bs.append(f"@60 lxf 0 {W(32, 0, 9)} {f64(0.0)} new 4 4 {' '.join(rot)} 5")
 bs.append(f"@60 rsfill {W(32, 0, 9)} {W(40, 0, 0, '3f4ccccd')} 5 {zero} 0")
+# part 7b (relay 13): the parcellation's smoothing, the window counts, the label means, the label
+# borders, the mask, the clipping of bright white matter and a slice as an image
+p7 = [
+    # labels 0 to 5 (a seeded fill of shorts holds negative labels: FS-467's memory case)
+    f"@60 smpar {W(64, 4, 'i65536,131073,196610,262147,327684')} 0 13",
+    f"@60 lmeans 2 {W(64, 3, 't3')} {W(64, 0, 9)} 0 9 0 0 0 0 1",
+    f"@60 mlbv {W(48, 0, 9)} 0 new 9 255 0",
+    f"@60 mskz {W(64, 3, 't3')} {W(64, 0, 9)} 0 new",
+    f"@60 clipwm {W(64, 0, 9)} {W(64, 0, 7)} 0",
+    f"@60 toimgv {W(256, 0, 9)} 0 null 128 2 0",
+]
+pts = []
+for _ in range(5000):
+    x, y, z = (r.randrange(0, 64) for _ in range(3))
+    pts.append(f"1 7 {x} {y} {z} 0 {zero}")
+p7.append(f"@60 nbhd {W(64, 0, 9)} 0 {len(pts)} {' '.join(pts)}")
 if sys.argv[1:] == ["bspline"]:
     lines = bs
+elif sys.argv[1:] == ["part7b"]:
+    lines = p7
 else:
-    lines += bs
+    lines += bs + p7
 for i, line in enumerate(lines):
     with open(f"b{i}.txt", "w", encoding="utf-8") as f:
         f.write(line + "\n")

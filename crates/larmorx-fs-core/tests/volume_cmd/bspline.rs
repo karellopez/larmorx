@@ -207,6 +207,14 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
             l.puti(i64::from(r));
             l.out(if b.is_some() { "kept" } else { "none" });
         }
+        // §54's change of a transform array's type (the array itself is the result)
+        "ltachg" => {
+            let mut lta = getlta(p, l)?;
+            let kind = l.geti();
+            p.lta_change_type(&mut lta, kind)?;
+            l.out("self");
+            super::putlta(l, Some(&lta));
+        }
         _ => return Ok(false),
     }
     Ok(true)

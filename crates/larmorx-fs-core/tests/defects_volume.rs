@@ -655,6 +655,16 @@ fn fs462_a_sampled_extent_of_zero() {
         assert!(matches!(r, Err(s) if s.status() == 252), "{r:?}");
         assert!(noted(&mut p, "FS-462"));
     }
+    // the probe's command (a destination of width 0: its allocation's message on standard output)
+    let line = format!("crass {} {}", w("2 2 2 0 1 0", "5"), w("0 2 2 0 1 0", "5"));
+    let (fix, _) = run(&line, UpstreamDefects::Fix);
+    assert!(fix.starts_with("EXIT 252 | x"), "{fix}");
+    assert!(
+        fix.contains(
+            "error: MRIcalcCRASforSampledVolume(): an extent of the sampled volume is 0 (FreeSurfer crashes here)\n\n"
+        ),
+        "{fix}"
+    );
 }
 
 /// FS-463: an orientation string of one character: the places past its end read as NUL in both
@@ -671,18 +681,30 @@ fn fs463_a_string_of_one_character() {
     assert!(fix.starts_with(&format!("x{want} |")), "{fix}");
 }
 
-/// FS-464: a voxel-to-RAS matrix of 2 x 2: refused in both modes (`ERROR_BADPARM`, the volume
-/// unchanged; FreeSurfer reads past the matrix).
+/// FS-464: a voxel-to-RAS matrix of 2 x 2, of 3 x 3 and none: the program's end in both modes
+/// (`ERROR_BADPARM`, status 252, before anything is read or printed; FreeSurfer reads past the
+/// matrix, or crashes without one).
 #[test]
 fn fs464_a_matrix_smaller_than_3_by_4() {
-    let line = format!(
-        "setv2r {} 2 2 3f800000 00000000 00000000 3f800000 unset",
-        w("2 2 2 0 1 0", "5")
-    );
-    // the modes differ only by FS-01's NUL in the error
-    check("FS-464", true, &line);
-    let (fix, _) = run(&line, UpstreamDefects::Fix);
-    assert!(fix.starts_with("-4 2 2 2 "), "{fix}");
+    let v = w("2 2 2 0 1 0", "5");
+    let nine = ["3f800000"; 9].join(" ");
+    for m in [
+        "2 2 3f800000 00000000 00000000 3f800000".to_owned(),
+        format!("3 3 {nine}"),
+        "null".to_owned(),
+    ] {
+        let line = format!("setv2r {v} {m} unset");
+        // the modes differ only by FS-01's NUL in the error
+        check("FS-464", true, &line);
+        let (fix, _) = run(&line, UpstreamDefects::Fix);
+        assert!(fix.starts_with("EXIT 252 | x "), "{fix}");
+        assert!(
+            fix.ends_with(
+                " error: MRIsetVoxelToRasXform(): the matrix is smaller than 3 x 4 (FreeSurfer reads past it)\n\n"
+            ),
+            "{fix}"
+        );
+    }
 }
 
 // ---- fs.bspline (specs/freesurfer-bspline.md §7)
@@ -704,13 +726,18 @@ fn fs963_an_axis_of_one_voxel_halved() {
     check("FS-963", false, &line);
 }
 
-/// FS-964: sampling coefficients of degree 10 or -1 on one voxel: refused in both modes with its
-/// error (`ERROR_BADPARM`, no sample); degree 10 on 3 x 3 x 3: refused by default, FreeSurfer's end
-/// (`Invalid spline degree`, status 1) with `reproduce`.
+/// FS-964: sampling coefficients of degree 10 or -1 on one voxel: FS-964's end in both modes (its
+/// error, status 252, nothing on standard output); degree 10 on 3 x 3 x 3: FS-964's end by
+/// default, FreeSurfer's (`Invalid spline degree` on standard output, status 1) with `reproduce`.
 #[test]
 fn fs964_degrees_past_the_arrays() {
     let mid = "3ff8000000000000 3fd0000000000000 0000000000000000";
     let at0 = "0000000000000000 0000000000000000 0000000000000000";
+    let end = |deg: &str| {
+        format!(
+            " error: MRIsampleBSpline: a B-spline of degree {deg} (FreeSurfer reads or writes memory it does not own here)\n\n"
+        )
+    };
     for deg in ["10", "-1"] {
         let line = format!(
             "bsraw {deg} 0 {} 0000000000000000 1 {at0} 0",
@@ -719,7 +746,8 @@ fn fs964_degrees_past_the_arrays() {
         // the modes differ only by FS-01's NUL in the error
         check("FS-964", true, &line);
         let (fix, _) = run(&line, UpstreamDefects::Fix);
-        assert!(fix.starts_with("-4 401c000000000000 |"), "{fix}");
+        assert!(fix.starts_with("EXIT 252 | x "), "{fix}");
+        assert!(fix.ends_with(&end(deg)), "{fix}");
     }
     let line = format!(
         "bsraw 10 0 {} 0000000000000000 1 {mid} 0",
@@ -728,6 +756,123 @@ fn fs964_degrees_past_the_arrays() {
     check("FS-964", true, &line);
     let (fix, _) = run(&line, UpstreamDefects::Fix);
     let (rep, _) = run(&line, UpstreamDefects::Reproduce);
-    assert!(fix.starts_with("-4 401c000000000000 |"), "{fix}");
+    assert!(fix.starts_with("EXIT 252 | x "), "{fix}");
+    assert!(fix.ends_with(&end("10")), "{fix}");
     assert!(rep.starts_with("EXIT 1 |"), "{rep}");
+}
+
+/// A physical-voxel transform array changed to RAS-to-RAS (§54; a line of the probe's `vltapv`):
+/// FS-506 (by default the voxel-to-voxel matrix made RAS-to-RAS, with `reproduce` FreeSurfer's
+/// products) and FS-505 (its inverse without a matrix: kept by default, none with `reproduce`),
+/// both noted in both modes.
+const LTACHG_PHYSVOX: &str = "ltachg 1 2 3f800000 x 00000000 00000000 00000000 00000000 4 4 bfa24831 3fa0b602 3e07183b c2cfd969 bdad9c1b 3e7b6ae0 3eb5071a c026f0ff bf8a65a9 3eb7f858 3f4eed0c c21c60e8 00000000 00000000 00000000 3f800000 null null 0 0 1 5 1 3 3f800000 3fc00000 3f000000 1 3e67b509 3f3cb479 bf04ee6a be5dc2c7 3e0e4064 3f107d9d bf2f67ee bec1f57c bd109066 41c80000 42c60000 42240000 358637bd 3e4ccccd 3c23d70a x612062 0 null 1 3 3 2 3f800000 40400000 40000000 0 00000000 3f800000 00000000 bf800000 00000000 00000000 00000000 00000000 3f800000 426e0746 42100000 4173d041 00000000 00000000 00000000 x 0 null 00000000 00000000 00000000 00000000 null null null 0 0 1 3 3 2 3f800000 40400000 40000000 0 00000000 3f800000 00000000 bf800000 00000000 00000000 00000000 00000000 3f800000 426e0746 42100000 4173d041 00000000 00000000 00000000 x 0 null 1 5 1 3 3f800000 3fc00000 3f000000 1 3e67b509 3f3cb479 bf04ee6a be5dc2c7 3e0e4064 3f107d9d bf2f67ee bec1f57c bd109066 41c80000 42c60000 42240000 358637bd 3e4ccccd 3c23d70a x612062 0 null 1";
+
+#[test]
+fn fs505_fs506_a_physical_voxel_array_changed_to_ras() {
+    check("FS-506", true, LTACHG_PHYSVOX);
+    check("FS-505", true, LTACHG_PHYSVOX);
+    let (fix, _) = run(LTACHG_PHYSVOX, UpstreamDefects::Fix);
+    let (rep, _) = run(LTACHG_PHYSVOX, UpstreamDefects::Reproduce);
+    // the array of type 1; the inverse's matrix (after its centre and spread) none with reproduce
+    assert!(fix.starts_with("self 1 1 3f800000 x "), "{fix}");
+    assert!(rep.starts_with("self 1 1 3f800000 x "), "{rep}");
+    let inv = " 00000000 00000000 00000000 00000000 null null null 0 0 ";
+    assert!(rep.contains(inv), "{rep}");
+    assert!(!fix.contains(inv), "{fix}");
+}
+
+// ---- part 7b (§34, §35)
+
+/// FS-465: a slice of 3 x 2 floats copied into a given image of one byte (`MRItoImage`): only the
+/// byte inside is written, in both modes (FreeSurfer writes past the image's pixels), noted.
+#[test]
+fn fs465_an_image_too_small_for_the_slice() {
+    let line = format!(
+        "toimg {} 0 1 1 0 1 3f800000 3f800000 -1 -1 -1 -1 -1 -1 0",
+        w("3 2 1 3 1 0", "t3")
+    );
+    check("FS-465", false, &line);
+    let (fix, _) = run(&line, UpstreamDefects::Fix);
+    assert!(
+        fix.starts_with("given 1 1 1 1 0 1 3f800000 3f800000 x"),
+        "{fix}"
+    );
+}
+
+/// FS-466: an RGB image of two frames read into a volume (`ImageToMRI`): by default the second
+/// frame from its own pixels, with `reproduce` one byte per pixel from the start, noted in both
+/// modes.
+#[test]
+fn fs466_the_frames_of_an_rgb_image() {
+    check(
+        "FS-466",
+        true,
+        "img2mri 2 3 35 2 3f800000 3f800000 17 -1 -1 -1 -1 -1",
+    );
+}
+
+/// FS-467: negative labels among the neighbours of the parcellation's smoothing: counted like any
+/// other label in both modes (FreeSurfer counts them outside its array), noted.
+#[test]
+fn fs467_negative_labels_in_the_smoothing() {
+    for k in [1, 2, 25] {
+        let line = format!(
+            "smpar {} 3 1 1 1 bf800000 0 0 0 bf800000 2 2 2 c0000000 {k}",
+            w("3 3 3 4 1 0", "-1")
+        );
+        check("FS-467", false, &line);
+    }
+}
+
+/// FS-468: T1 voxels outside 0 to 255 and NaN clipped as bytes (`MRIclipBrightWM`): by default
+/// clamped, with `reproduce` the low byte of their truncation, noted in both modes.
+#[test]
+fn fs468_values_outside_the_byte_range() {
+    let line = format!(
+        "clipwm {} {} 0",
+        w("8 1 1 3 1 0", "t0"),
+        w("8 1 1 0 1 0", "-1")
+    );
+    check("FS-468", true, &line);
+}
+
+/// §35: `MRIcomputeLabelNbhd` with values and no means counts the labels and reads no value
+/// (FreeSurfer crashes there); its label count is the arrays' (FreeSurfer's negative count
+/// clears an enormous array).
+#[test]
+fn label_nbhd_values_without_means() {
+    let mut p = Process::silent(Environment::new(), UpstreamDefects::Fix);
+    let labels = bytes(&mut p, 1, |_| 2.0);
+    let vals = bytes(&mut p, 1, |_| 5.0);
+    let mut counts = [-7i32; 4];
+    let r = p
+        .mri_compute_label_nbhd(&labels, Some(&vals), (0, 0, 0), &mut counts, None, 1)
+        .expect("counted");
+    assert_eq!(r, 0);
+    // the 27 places of the window all clamp to the one voxel, of label 2
+    assert_eq!(counts, [0, 0, 27, 0]);
+    let mut means = [7.0f32; 4];
+    let mut none: [i32; 0] = [];
+    p.mri_compute_label_nbhd(
+        &labels,
+        Some(&vals),
+        (0, 0, 0),
+        &mut none,
+        Some(&mut means),
+        1,
+    )
+    .expect("counted");
+    // no label is counted with an empty array; the means past it are untouched
+    assert_eq!(means, [7.0; 4]);
+    p.mri_compute_label_nbhd(
+        &labels,
+        Some(&vals),
+        (0, 0, 0),
+        &mut counts,
+        Some(&mut means),
+        0,
+    )
+    .expect("counted");
+    assert_eq!(counts, [0, 0, 1, 0]);
+    assert_eq!(means, [0.0, 0.0, 5.0, 0.0]);
 }

@@ -15,6 +15,7 @@
 pub mod args;
 
 mod bspline;
+mod part7b;
 
 use std::io::Write;
 use std::sync::{Arc, Mutex};
@@ -70,7 +71,21 @@ fn getg(l: &mut Line) -> VolGeom {
 fn getw(p: &mut Process, l: &mut Line) -> Result<Mri, Stop> {
     let mut m = l.getv(p)?;
     let fill = l.tok().to_owned();
-    if let Some(seed) = fill.strip_prefix('t') {
+    if let Some(list) = fill.strip_prefix('i') {
+        // the buffer's 32-bit words from the list in order, repeated
+        let words: Vec<u32> = list
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| args::strtol(s) as u32)
+            .collect();
+        if let Some(v) = m.voxels.as_mut()
+            && !words.is_empty()
+        {
+            for i in 0..v.len() / 4 {
+                v[4 * i..4 * i + 4].copy_from_slice(&words[i % words.len()].to_le_bytes());
+            }
+        }
+    } else if let Some(seed) = fill.strip_prefix('t') {
         let seed: u64 = seed
             .chars()
             .take_while(char::is_ascii_digit)
@@ -1312,7 +1327,7 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
             l.putg(&a.geom, false);
         }
         _ => {
-            if !bspline::call(p, l, &c)? {
+            if !bspline::call(p, l, &c)? && !part7b::call(p, l, &c)? {
                 args::bad("unknown command")
             }
         }

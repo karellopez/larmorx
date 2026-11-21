@@ -2,7 +2,8 @@
 //! Golden cases of fs.volume's clean room (`specs/freesurfer-volume.md` §69.5, CLAUDE.md rule
 //! 10): every command of the black-box probe's grammar (`tests/volume_cmd/`, the comparison's
 //! candidate commands) on seeded arguments, in both defect modes, one SHA-256 per group of the
-//! spec's parts 1 to 7a and of fs.bspline (`specs/freesurfer-bspline.md`) over every result line (the printed values, both streams and the notices;
+//! spec's parts 1 to 7b, of §54's change of a transform array's type and of fs.bspline
+//! (`specs/freesurfer-bspline.md`) over every result line (the printed values, both streams and the notices;
 //! NaN bits included), recorded on Linux x86-64 and checked on every platform. The arguments
 //! come from a seeded generator and plain arithmetic (special values written as their bits); no
 //! file system (the transform reader reads an in-memory file, `ltamem`), no clock; volumes of at
@@ -182,11 +183,11 @@ const GOLDEN: &[(&str, &str)] = &[
     ),
     (
         "bspline.fix",
-        "95378741724e25165a8edb8e8dc4da3b6df5cf5b35d6e4a61660d4bbd01dccaf",
+        "21c898491f6aed35f86d925c22490801e1e4084b75992a47828732f167f93e52",
     ),
     (
         "bspline.reproduce",
-        "547f266687ddf96763c8170ff9e8e126fb43a477696002fa1b0f2763498756ae",
+        "affbe200de469b9e60a05c0e57834a8930e3618bdc76de6f83345073b240dded",
     ),
     (
         "bsvol.fix",
@@ -198,11 +199,35 @@ const GOLDEN: &[(&str, &str)] = &[
     ),
     (
         "info.fix",
-        "d65d8cc2f282a4b212edac697402b1c7d064e6ab49505ef635709104f6682022",
+        "45094de4e58042c463941a205be23adab83705ae5c13d5dbd3f11fe12d330318",
     ),
     (
         "info.reproduce",
-        "817b8b62fe02a52fdb072204841ff3646f11b24b8e301e2d0416e236496b640e",
+        "1948f6ffc67df060955b7fbee088894926114571929e42dbf544fbe671f47793",
+    ),
+    (
+        "image.fix",
+        "f01c640e5c3fcecac2e5ac8634fbea2930eb4309c73d37b6e9337a9bd411d402",
+    ),
+    (
+        "image.reproduce",
+        "cf9f477daf76bd4dd6568eaec0866341e3de05ec30ad2ab3517e589c5f8685e6",
+    ),
+    (
+        "nbhd.fix",
+        "9a47cd3c257e73a85406088f7f0b5cd5c71401fe52ee808c3e97b0fbb6d74a81",
+    ),
+    (
+        "nbhd.reproduce",
+        "9cf501836aef91a56c196c40474c0ae58337110e7d67a3e787ce50e671156550",
+    ),
+    (
+        "ltapv.fix",
+        "20fa987393d707a6c45de7a3b731a9b1e1acd7977a8b5ec24c0a4738ba66cd07",
+    ),
+    (
+        "ltapv.reproduce",
+        "39efdf79eb4a39d4353631d0fc2f208da784b394840efc9007358eb6554e7745",
     ),
 ];
 
@@ -2027,6 +2052,308 @@ const BSVOL: &[(&str, Make)] = &[
     }),
 ];
 
+// ---- part 7b (§34, §35) and §54's change of type
+
+/// I, an image: rows cols format frames, the sizes, a fill and the header's overrides.
+fn img(g: &mut G, fmts: &[&str]) -> String {
+    let (rows, cols) = (g.int(0, 3), g.int(0, 3));
+    let fmt = g.pick(fmts).to_owned();
+    let nf = g.pick(&["1", "1", "1", "2", "0"]).to_owned();
+    let sizes = [
+        g.pick(&["3f800000", "40000000", "00000000", "1e3ce508", "7fc00000"])
+            .to_owned(),
+        g.pick(&["3f800000", "3f000000", "00000000"]).to_owned(),
+    ];
+    let fill = if fmt == "3" && !g.one_in(3) {
+        format!("t{}", g.int(0, 33))
+    } else {
+        g.int(-1, 255).to_string()
+    };
+    let mut ov = ["-1"; 5];
+    if g.one_in(6) {
+        ov[g.below(5) as usize] = g.pick(&["0", "1", "2", "3"]);
+    }
+    format!(
+        "{rows} {cols} {fmt} {nf} {} {} {fill} {}",
+        sizes[0],
+        sizes[1],
+        ov.join(" ")
+    )
+}
+
+/// A painting with labels 0 to 3 mostly (and the special labels of [`G::label`]).
+fn lpaint(g: &mut G, shape: &str) -> String {
+    if g.one_in(3) {
+        return g.paint(shape);
+    }
+    let (w, h, d) = ext3(shape);
+    let n = g.int(0, 6);
+    let mut v = vec![n.to_string()];
+    for _ in 0..n {
+        let (x, y, z) = (g.int(0, w - 1), g.int(0, h - 1), g.int(0, d - 1));
+        v.push(format!(
+            "{x} {y} {z} {:08x}",
+            (g.int(0, 3) as f32).to_bits()
+        ));
+    }
+    v.join(" ")
+}
+
+/// A shape's frame count.
+fn frames_of(shape: &str) -> i64 {
+    shape
+        .split(' ')
+        .nth(4)
+        .and_then(|x| x.parse().ok())
+        .unwrap_or(1)
+}
+
+const IMAGE: &[(&str, Make)] = &[
+    ("toimgv", |g| {
+        let s = g.shape(NUMERIC);
+        let a = g.w_of(&s);
+        let p = lpaint(g, &s);
+        let i = if g.one_in(3) {
+            img(g, &["0", "0", "3"])
+        } else {
+            "null".to_owned()
+        };
+        let slice = g.pick(&["-1", "-1", "0", "1", "2", "5"]);
+        let view = g.pick(&["0", "1", "2", "0", "1", "2", "3"]);
+        let frame = g.int(0, (frames_of(&s) - 1).max(0));
+        format!("{a} {p} {i} {slice} {view} {frame}")
+    }),
+    ("toimg", |g| {
+        let a = g.w(&[0, 0, 1, 3, 3, 2, 4]);
+        let i = if g.one_in(3) {
+            img(g, &["0", "2", "3", "1"])
+        } else {
+            "null".to_owned()
+        };
+        format!("{a} 0 {i} {}", g.int(-1, 3))
+    }),
+    ("img2mri", |g| {
+        if g.one_in(4) {
+            img(g, &["4", "6", "36"])
+        } else {
+            img(g, &["0", "1", "2", "3", "35"])
+        }
+    }),
+];
+
+const NBHD: &[(&str, Make)] = &[
+    ("smpar", |g| {
+        let t = if g.one_in(6) { 0 } else { 4 };
+        let s = format!("3 3 {} {t} 1 0", g.int(3, 4));
+        let a = g.w_of(&s);
+        format!(
+            "{a} {} {}",
+            lpaint(g, &s),
+            g.pick(&["0", "1", "2", "3", "9", "26"])
+        )
+    }),
+    ("erasebp", |g| {
+        let a = g.w(NUMERIC);
+        format!("{a} {}", g.int(-1, 2))
+    }),
+    ("nbhd", |g| {
+        let s = g.shape(NUMERIC);
+        let (w, h, d) = ext3(&s);
+        let a = g.w_of(&s);
+        let n = g.int(1, 4);
+        let mut v = vec![format!("{a} {} {n}", lpaint(g, &s))];
+        for _ in 0..n {
+            let (k, ws) = (g.int(0, 3), g.int(-1, 5));
+            let (x, y, z) = (g.int(-1, w), g.int(-1, h), g.int(-1, d));
+            let fr = g.int(0, (frames_of(&s) - 1).max(0));
+            v.push(format!("{k} {ws} {x} {y} {z} {fr} {}", g.f(true)));
+        }
+        v.join(" ")
+    }),
+    ("nearnz", |g| {
+        let s = g.shape(&[0, 0, 0, 3, 4]);
+        let (w, h, d) = ext3(&s);
+        let a = g.w_of(&s);
+        let n = g.int(1, 3);
+        let mut v = vec![format!("{a} {} {n}", lpaint(g, &s))];
+        for _ in 0..n {
+            let c: Vec<String> = [w, h, d]
+                .iter()
+                .map(|&e| {
+                    let x = g.int(0, e - 1) as f64 + [0.0, 0.4, -0.4, 0.5][g.below(4) as usize];
+                    format!("{:016x}", x.to_bits())
+                })
+                .collect();
+            v.push(format!("{} {} {}", g.int(-1, 5), c.join(" "), g.int(0, 1)));
+        }
+        v.join(" ")
+    }),
+    ("lmeans", |g| {
+        let s = g.shape(NUMERIC);
+        let (w, h, d) = ext3(&s);
+        let a = g.w_of(&s);
+        let ls = format!("{w} {h} {d} {} 1 0", g.pick(&["0", "1", "3"]));
+        let lab = g.w_of(&ls);
+        format!(
+            "{} {a} {lab} {} {} {} {} {} {} {}",
+            g.int(0, 4),
+            lpaint(g, &ls),
+            g.int(0, 3),
+            g.int(-1, w),
+            g.int(-1, h),
+            g.int(-1, d),
+            g.int(-1, 2),
+            g.int(0, 1)
+        )
+    }),
+    ("mkpos", |g| {
+        let s = g.shape(NUMERIC);
+        let a = g.w_of(&s);
+        format!("{a} {}", g.dst(&s, false))
+    }),
+    ("mlbv", |g| {
+        let s = g.shape(&[0, 0, 1, 3, 4]);
+        let a = g.w_of(&s);
+        let p = lpaint(g, &s);
+        format!(
+            "{a} {p} {} {} {} {}",
+            g.dst(&s, false),
+            g.int(0, 3),
+            g.pick(&["0", "1", "7", "300", "-1"]),
+            g.int(0, 1)
+        )
+    }),
+    ("lnbhd", |g| {
+        let s = g.shape(&[0, 0, 1, 3]);
+        let (w, h, d) = ext3(&s);
+        let a = g.w_of(&s);
+        let p = lpaint(g, &s);
+        let vals = if g.one_in(3) {
+            "null".to_owned()
+        } else {
+            g.w_of(&format!("{w} {h} {d} 3 1 0"))
+        };
+        format!(
+            "{a} {p} {vals} {} {} {} {} {} {}",
+            g.int(0, w - 1),
+            g.int(0, h - 1),
+            g.int(0, d - 1),
+            g.int(0, 2),
+            g.int(0, 5),
+            g.int(0, 1)
+        )
+    }),
+    ("linbhd", |g| {
+        let s = g.shape(&[0, 0, 1, 3]);
+        let (w, h, d) = ext3(&s);
+        let a = g.w_of(&s);
+        let n = g.int(1, 4);
+        let mut v = vec![format!("{a} {} {n}", lpaint(g, &s))];
+        for _ in 0..n {
+            v.push(format!(
+                "{} {} {} {} {} {} {}",
+                g.int(0, 1),
+                g.int(-1, w),
+                g.int(-1, h),
+                g.int(-1, d),
+                g.int(-1, 2),
+                g.int(0, 3),
+                g.int(-1, 3)
+            ));
+        }
+        v.join(" ")
+    }),
+    ("lbbox", |g| {
+        let s = g.shape(&[0, 1, 3, 4]);
+        let a = g.w_of(&s);
+        format!("{a} {} {}", lpaint(g, &s), g.int(0, 4))
+    }),
+    ("fillbox", |g| {
+        let a = g.w(NUMERIC);
+        let b: Vec<String> = (0..6)
+            .map(|k| {
+                if k < 3 {
+                    g.int(-3, 4).to_string()
+                } else {
+                    g.int(-1, 5).to_string()
+                }
+            })
+            .collect();
+        format!("{a} {} {}", b.join(" "), g.f(true))
+    }),
+    ("mskz", |g| {
+        let s = g.shape(NUMERIC);
+        let a = g.w_of(&s);
+        let ms = if g.one_in(5) {
+            g.shape(NUMERIC)
+        } else {
+            s.clone()
+        };
+        let m = g.w_of(&ms);
+        let p = lpaint(g, &ms);
+        format!("{a} {m} {p} {}", g.dst(&s, true))
+    }),
+    ("clipwm", |g| {
+        let s = g.shape(&[0, 0, 0, 3, 1]);
+        let (w, h, d) = ext3(&s);
+        let t = g.w_of(&s);
+        let ws = format!("{w} {h} {d} {} 1 0", g.pick(&["0", "0", "3"]));
+        let wm = g.w_of(&ws);
+        format!("{t} {wm} {}", lpaint(g, &ws))
+    }),
+];
+
+/// An LT of a transform array for `ltachg`: geometries valid mostly; an inverse without a matrix
+/// sometimes (FS-505).
+fn chlt(g: &mut G, inverse: bool) -> String {
+    let m = if inverse && g.one_in(5) {
+        "null".to_owned()
+    } else {
+        let mut m = g.mat4();
+        while m == "null" {
+            m = g.mat4();
+        }
+        m
+    };
+    let geo = |g: &mut G| {
+        let special = g.one_in(4);
+        let s = g.geom(special);
+        let s = if g.one_in(8) {
+            s
+        } else {
+            format!("1{}", &s[1..])
+        };
+        format!("{s} {} null", g.int(0, 1))
+    };
+    let (gs, gd) = (geo(g), geo(g));
+    format!(
+        "{} {} {} {} {m} null null {} 0 {gs} {gd}",
+        g.f(false),
+        g.f(false),
+        g.f(false),
+        g.f(false),
+        g.int(0, 2)
+    )
+}
+
+const LTAPV: &[(&str, Make)] = &[("ltachg", |g| {
+    let n = g.pick(&["1", "1", "1", "2", "0"]).to_owned();
+    let k: usize = n.parse().unwrap_or(1);
+    let ty = g.pick(&["2", "2", "2", "1"]).to_owned();
+    let target = if ty == "1" {
+        "1"
+    } else {
+        g.pick(&["1", "1", "1", "2"])
+    };
+    let fw: Vec<String> = (0..k).map(|_| chlt(g, false)).collect();
+    let inv: Vec<String> = (0..k).map(|_| chlt(g, true)).collect();
+    format!(
+        "{n} {ty} 3f800000 x {} {} {target}",
+        fw.join(" "),
+        inv.join(" ")
+    )
+})];
+
 fn group(name: &str, table: &[(&str, Make)], per: usize) {
     let seed = name.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
         (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
@@ -2167,4 +2494,19 @@ fn bsplines() {
 #[test]
 fn bspline_paths() {
     group("bsvol", BSVOL, 8);
+}
+
+#[test]
+fn slices_as_images() {
+    group("image", IMAGE, 12);
+}
+
+#[test]
+fn neighbourhoods_and_labels() {
+    group("nbhd", NBHD, 6);
+}
+
+#[test]
+fn transform_arrays_changed_to_ras() {
+    group("ltapv", LTAPV, 16);
 }

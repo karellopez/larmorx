@@ -154,7 +154,7 @@ impl Process {
     }
 
     /// The destination of a function that maps the first source (§9: a clone without one).
-    fn clone_dst(&mut self, v: &mut Vols) -> Result<(), Stop> {
+    pub(crate) fn clone_dst(&mut self, v: &mut Vols) -> Result<(), Stop> {
         if !v.has_dst() {
             let c = self.mri_clone_new(v.a())?;
             v.set_dst(c);

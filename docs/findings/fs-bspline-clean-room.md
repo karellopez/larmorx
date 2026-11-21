@@ -18,43 +18,43 @@ The comparisons and the tools are in
   transform-array transforms; both pyramids) and `vbsrules` (71 fixed calls), and fs.volume's cubic
   B-spline paths (`specs/freesurfer-volume.md` §29 step 5, §31 step 4: group `vbsvol`, 70 calls), on
   the probe (plainly, again, and in two guard runs; every reference hash the spec's, the probe of
-  commit `5d35ae1f`) and on the clean room's candidate, in both modes.
-  - `reproduce`: `vbspline` 375 identical, 24 where FreeSurfer did not finish (sources without their
+  commit `0b5c7bb6`) and on the clean room's candidate, in both modes.
+  - `reproduce`: `vbspline` 377 identical, 24 where FreeSurfer did not finish (sources without their
     cached matrices, whose header copy crashes, FS-252; a source without voxels; transforms into a
-    destination with fewer frames than the source), 9 memory lines (FS-962's reads past the source, a
-    frame-range sample one frame past the volume's, degrees above 9 on one voxel), and 2 lines not yet
-    implemented (below); `vbsrules` 68 identical and 3 memory lines; `vbsvol` 66 identical and 4 where
-    FreeSurfer did not finish.
+    destination with fewer frames than the source) and 9 memory lines (FS-962's reads past the source,
+    a frame-range sample one frame past the volume's, degrees above 9 on one voxel); `vbsrules` 69
+    identical and 2 memory lines; `vbsvol` 66 identical and 4 where FreeSurfer did not finish.
   - `fix`: none unexplained (`vbspline` 318 identical, 58 corrected by a noted defect; `vbsrules` 64 and
     4; `vbsvol` 29 and 36: FS-962, FS-964 and the volume access's FS-52 to FS-58, FS-252).
+  - The volume probe's group `vltapv` adds 25 `LTAtransformBSpline` calls with physical-voxel arrays
+    (`docs/findings/fs-volume-clean-room.md`, §54).
 - **How we know:** *validated* (`compare.py compare --groups vbspline,vbsrules,vbsvol`, both modes,
-  2026-11-19, relay 12; with every other group of the volume probe in the same runs, log
-  `oracles/logs/fs-cleanroom-2-relay12-full.log`).
+  2026-11-21, relay 13; with every other group of the volume probe in the same runs, log
+  `oracles/logs/fs-cleanroom-2-relay13-full.log`).
 
-## FS-964 above degree 9: FreeSurfer's end is deterministic
+## FS-964 above degree 9: FreeSurfer's end is deterministic (now in the spec)
 
 - **What:** sampling coefficients of degree 10 or 11 whose volume has an axis longer than one voxel
   (§4.1: FreeSurfer writes the interpolation indices past their arrays) ends the program in FreeSurfer
   with `Invalid spline degree` and status 1, the same in all four of the probe's runs (plain, again in
   another process, both guard allocators): its weights refuse the degree right after the indices, so
-  the past-array writes never show. The spec states FS-964 as an error in both modes. The clean room
-  follows D13 (`reproduce` gives the original's result wherever it is deterministic): `reproduce` ends
-  with FreeSurfer's message and status, noting FS-964; the default refuses the degree with FS-964's
-  error (`ERROR_BADPARM`, no sample). On a volume of one voxel (degrees above 9, or below 0) the probe's
-  runs differ (memory lines): both modes refuse it. Lines: `vbsrules`' `bsraw` of degrees 10 and 11 on
-  3 x 3 x 3 coefficients and one `vbspline` `bsraw` of degree 10 on 3 x 4 x 3.
-- **How we know:** *measured* (`vbsrules`, `vbspline`, 2026-11-19); reported to the spec writer.
+  the past-array writes never show. Reported by relay 12; the spec (§4.1, §7, commit `9d43ec64`) now
+  states it: under `reproduce` every degree above 9 on such coefficients ends as FreeSurfer does (its
+  crash at very large degrees not reproduced), FS-964 noted; by default, and on a volume of one voxel in
+  both modes, FS-964's end (its error and status 252, nothing on standard output). Lines: `vbsrules`'
+  `bsraw` of degrees 10 and 11 on 3 x 3 x 3 coefficients and one `vbspline` `bsraw` of degree 10 on 3 x
+  4 x 3, identical under `reproduce`.
+- **How we know:** *validated* (`vbsrules`, `vbspline`, both modes, 2026-11-21, relay 13).
 
-## Not yet implemented: physical-voxel transform arrays
+## Physical-voxel transform arrays (through §54's ready part)
 
 - **What:** `LTAtransformBSpline` (§5.3) with an array of type `LINEAR_PHYSVOX_TO_PHYSVOX` (2) changes it
-  to RAS with `LTAchangeType` (`specs/freesurfer-volume.md` §54), whose text is not yet read through for
-  the clean room (it also holds FS-506). The clean room implements its first step, every source and
-  destination geometry valid (`LTAchangeType: src geometry must be valid` / `dst`, status 252; observed
-  in `vbspline`), and ends the program there for valid geometries (code -3, `not yet ported`). Two
-  `vbspline` lines reach it; FreeSurfer ends both later in that chain (`TransformInvert: xform
-  noninvertible`, and the matrix product's `m1 is null`, status 252).
-- **How we know:** *measured* (`vbspline`, 2026-11-19).
+  to RAS-to-RAS with `LTAchangeType` (`specs/freesurfer-volume.md` §54, made ready by commit `6dac42e7`):
+  the geometries' checks, FS-506's change (FreeSurfer's products under `reproduce`) and `LTAfillInverse`
+  (FS-505), their ends of the program included. The two `vbspline` lines relay 12 left unexplained are
+  identical now (FreeSurfer ends them in that chain: `TransformInvert: xform noninvertible`, and the
+  matrix product's `m1 is null`, status 252), as are the 25 `bslta` lines of `vltapv`.
+- **How we know:** *validated* (`vbspline`, `vltapv`, both modes, 2026-11-21, relay 13).
 
 ## Arithmetic: plain operations first
 
@@ -97,6 +97,7 @@ The comparisons and the tools are in
 
 - **What:** `tests/golden_volume.rs`'s groups `bspline` (every fs.bspline command of the probe's grammar
   on seeded arguments, the transform arrays on clean geometries too) and `bsvol` (the cubic B-spline
-  paths), in both modes; `tests/defects_volume.rs`'s cases of FS-962, FS-963 and FS-964. Identical in
-  debug and release builds on x86-64 and under the AArch64 NaN emulation of both.
-- **How we know:** *measured* (2026-11-19, relay 12).
+  paths), in both modes, and `ltapv` (§54's change of type that the transform arrays use);
+  `tests/defects_volume.rs`'s cases of FS-962, FS-963, FS-964 (its two ends), FS-505 and FS-506.
+  Identical in debug and release builds on x86-64 and under the AArch64 NaN emulation of both.
+- **How we know:** *measured* (2026-11-21, relays 12 and 13).

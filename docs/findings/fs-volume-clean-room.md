@@ -1,8 +1,9 @@
 # fs.volume's clean room: what black-box runs showed (unrestricted)
 
-The clean room of FreeSurfer 8.2.0's volume functions, parts 1 to 7a of the spec
-(`crates/larmorx-fs-core/src/volume/`, the rest of queue item C3.1-05), was written from
-[`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) §1 to §33 and checked only against
+The clean room of FreeSurfer 8.2.0's volume functions, parts 1 to 7b of the spec and §54's two parts
+made ready (`crates/larmorx-fs-core/src/volume/`, the rest of queue item C3.1-05), was written from
+[`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) §1 to §36 and §54's `LTAfillInverse`
+and change from physical-voxel to RAS-to-RAS, and checked only against
 black boxes: the prebuilt probe `fs_volume_probe` (FreeSurfer's compiled library and the C library,
 glibc 2.35) run through the open folder
 [`validation/investigations/freesurfer-volume-probe/`](../../validation/investigations/freesurfer-volume-probe/README.md).
@@ -14,22 +15,23 @@ fs.bspline's clean room, which the cubic B-spline paths of §29 and §31 use, ha
 
 ## The comparison
 
-- **What:** the 30 groups of the spec's §69.2 and of `specs/freesurfer-bspline.md` §9 (13,346 calls,
-  seed 7: parts 1 to 3's ten, the fixed groups `vrules` and `vrules4` to `vrules8`, part 4's
+- **What:** the 34 groups of the spec's §69.2 and of `specs/freesurfer-bspline.md` §9 (14,246 calls,
+  seed 7: parts 1 to 3's ten, the fixed groups `vrules` and `vrules4` to `vrules9`, part 4's
   `vsample`, `vmove`, `vskull`, `vltaread`, part 5's `vcma`, part 6a's `vres`, part 6b's `vframes`,
-  `vderiv`, `vlinear`, part 6c's `vresamp`, the cubic B-spline paths' `vbsvol`, part 7a's `vstat7` and
-  fs.bspline's `vbspline` and `vbsrules`), on the probe (plainly, again, and in two guard runs; every
-  reference hash the spec's, the probe of commit `5d35ae1f`) and on the clean room's candidate, in both
-  modes. `reproduce`: 12,336 identical, 827 where FreeSurfer did not finish (9 of them FS-314's aborts,
-  which the candidate gives too and the loop checks), 172 memory lines, 9 lines noting a defect whose
-  value in FreeSurfer is memory it never wrote (§69.3: FS-300 in `vsample` and `vresamp`, FS-325 in
-  `vlinear`), and 2 fs.bspline lines not yet implemented (its findings). `fix`: 9,201 identical, 827 not
-  finished, 532 memory, 2,786 corrected by a noted defect, none other. Every line of `vgblock`,
-  `vgcopy`, `vcoords`, `vheader`, `vskull`, `vrules4` and `vrules7` is identical in `reproduce`.
-  fs.mri (16 groups, 9,511 calls) was run again after relay 12's in-range voxel reader: none
-  unexplained in either mode; fs.maths was not touched.
-- **How we know:** *validated* (`compare.py compare`, both modes, 2026-11-19, relay 12; log
-  `oracles/logs/fs-cleanroom-2-relay12-full.log`).
+  `vderiv`, `vlinear`, part 6c's `vresamp`, the cubic B-spline paths' `vbsvol`, part 7a's `vstat7`, part
+  7b's `vimage` and `vnbhd`, §54's `vltapv` and fs.bspline's `vbspline` and `vbsrules`), on the probe
+  (plainly, again, and in two guard runs; every reference hash the spec's, the probe of commit
+  `0b5c7bb6`) and on the clean room's candidate, in both modes. `reproduce`: 13,199 identical, 854 where
+  FreeSurfer did not finish (9 of them FS-314's aborts, which the candidate gives too and the loop
+  checks), 177 memory lines, 9 lines noting a defect whose value in FreeSurfer is memory it never wrote
+  (§69.3: FS-300 in `vsample` and `vresamp`, FS-325 in `vlinear`), and 7 `vltapv` lines of type changes
+  whose text in §54 is not yet ready (below). `fix`: 9,779 identical, 854 not finished, 541 memory,
+  3,072 corrected by a noted defect, none other. Every line of `vgblock`, `vgcopy`, `vcoords`, `vheader`,
+  `vskull`, `vrules4` and `vrules7` is identical in `reproduce`. fs.mri (16 groups, 9,511 calls) was run
+  again: none unexplained in either mode; fs.maths was not touched.
+- **How we know:** *validated* (`compare.py compare`, both modes, 2026-11-21, relay 13; log
+  `oracles/logs/fs-cleanroom-2-relay13-full.log`; part 7b's groups again after the label sums' order,
+  unchanged).
 
 ## FS-291 on volumes of other types (resolved by the spec's tensor rows)
 
@@ -256,10 +258,46 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
     every `vx2rx` and `v2v` line identical, among them volumes whose cache was left as allocated.
   - **`stuff_four_by_four` into a complex 4 x 4 matrix** writes the floats at the real elements'
     places of its storage, the probe printing its 32 floats after the two unused ones.
-  - The defects the probe cannot show: FS-462 (a sampled volume's extent of 0) ends the program in
-    both modes (code -4) and FS-464 (a matrix smaller than 3 x 4) returns `ERROR_BADPARM` after its
-    error, the volume unchanged (the crate's own tests).
+  - The defects the probe cannot show, as the spec now states them (relay 13): FS-462 (a sampled
+    volume's extent of 0, or an overflowing quotient) and FS-464 (a matrix of fewer than 3 rows or 4
+    columns, or none) end the program in both modes (status 252) with their errors, before anything is
+    made, read or printed (the crate's own tests).
 - **How we know:** *validated* (`vstat7`, `vrules8`, both modes, 2026-11-19, relay 12).
+
+## Part 7b: slices as 2-D images, neighbourhoods and labels (§34, §35)
+
+- **What:** `vimage` (290 calls), `vnbhd` (441) and `vrules9` (34) are identical with `reproduce` but
+  their memory and crash lines (frames outside the volume, FS-290; given images without pixels or too
+  small, FS-465; negative labels whose stack counts FreeSurfer's runs see differently, FS-467; FS-323's
+  windows; second volumes read outside, FS-53); in `fix` 199 lines are corrected by a noted defect
+  (FS-01, FS-12, FS-52 to FS-56, FS-289, FS-465, FS-466, FS-468). Measured beyond the text:
+  - **The label sums keep the LATER value's NaN where two NaNs meet**: `MRIcomputeLabelNbhd`'s `float`
+    sums of the values and the label means' `double` sums (`MRImeanInLabel`, `MRImeanAndStdInLabel` and
+    their squares) take each new value as the first operand of the addition (`v + sum`). Four `vnbhd`
+    lines (an infinity's sum with the opposite infinity, then a NaN payload) and a 64^3 timing line
+    differed with the running sum first; a discriminating check on 2 x 2 x 1 volumes of chosen payloads
+    (`validation/investigations/freesurfer-cleanroom-volume/nan-order/`, 12 lines, every one identical)
+    tells the two orders and the two loop orders apart: the spec's loop order (x outermost) with the new
+    value first. Finite sums are the same either way.
+  - **`MRIlabelsInNbhd` and `MRIlabelsInPlanarNbhd` take a voxel's label by `nint`** (the spec's "the
+    label of a voxel in the means and counts"); every `linbhd` line identical, labels 2.5 and 1.4999
+    among them.
+  - The cases the probe does not reach, the implementation's choices (the crate's own tests):
+    `MRIcomputeLabelNbhd` with values and no means counts the labels and reads no value; its label count
+    is the counts array's length (FreeSurfer's negative count clears an enormous array).
+- **How we know:** *validated* (`vimage`, `vnbhd`, `vrules9`, both modes, 2026-11-21, relay 13;
+  `nan-order/`, the same day).
+
+## §54: the inverses' fill and the change from physical-voxel to RAS-to-RAS
+
+- **What:** `vltapv` (135 calls: 110 `LTAchangeType`, 25 `LTAtransformBSpline` with physical-voxel
+  arrays) is identical with `reproduce` but one line where FreeSurfer did not finish and 7 lines of type
+  changes other than physical-voxel to RAS-to-RAS (voxel to RAS 4, one of them an empty array; voxel to
+  physical-voxel 2; RAS to physical-voxel 1), whose text in §54 is not yet ready: the clean room ends
+  them with an interim error (status 253) until it is. In `fix` every line is identical or corrected by
+  a noted defect (FS-505 8, FS-506 75, FS-01). The products of FS-506's `reproduce` (the matrix converted
+  as if it were RAS-to-RAS, then scaled) are FreeSurfer's bit for bit in every finite case.
+- **How we know:** *validated* (`vltapv`, both modes, 2026-11-21, relay 13).
 
 ## The cubic B-spline paths (§29 step 5, §31 step 4)
 
@@ -310,13 +348,28 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
   walk of the buffers, the nearest resampling's one corner, the stores straight into the buffer.
 - **How we know:** *measured* (2026-11-18, relay 11).
 
+## Speed (part 7b)
+
+- **What:** §36 names no speed measure; measured anyway, one batch line each end to end (process start,
+  parsing and printing included; best of 3, the probe at one OpenMP thread, the reference machine;
+  `speed/mk.py part7b`, every result line identical): `MRIsmoothParcellation` of a 64^3 volume of shorts
+  (labels 0 to 5, count 13) 0.037 s against FreeSurfer's 0.230 s (6.2x); `MRImaskZero` of 64^3 floats
+  0.038 s against 0.055 s (1.45x); `MRIclipBrightWM` of 64^3 bytes 0.0148 s against 0.0174 s (1.17x); a
+  256 x 256 slice as an image 0.0152 s against 0.0193 s (1.27x); `MRImeanAndStdInLabel` of 64^3 floats
+  0.0060 s against 0.0055 s (0.92x); 5,000 non-zero counts in windows of 7^3 0.0132 s against 0.0106 s
+  (0.80x); `MRImarkLabelBorderVoxels` of 48^3 bytes 0.026 s against 0.016 s (0.61x). The in-range
+  reads through `Mri::inside_vox_val` and the byte reads without allocation brought the last four up
+  from 0.8x, 0.46x, 0.9x and 0.44x (results unchanged); the label borders and window counts still
+  walk every neighbour through the index tables and the `(int)` checks.
+- **How we know:** *measured* (2026-11-21, relay 13).
+
 ## Golden cases and platforms
 
 - **What:** `tests/golden_volume.rs`, every command of the probe's grammar on seeded arguments in
-  both modes (46 SHA-256 over 23 groups: part 4's samplers, moves, head's box and transform reader,
+  both modes (52 SHA-256 over 26 groups: part 4's samplers, moves, head's box and transform reader,
   the transform files in memory, several in one process; part 5's labels, segmentation functions
   and the statistics cache's text and reading in memory; part 6a's 11 commands; part 6b's and 6c's
   13, the diagnostic bits' prints included; part 7a's 11, fs.bspline's 10 and the cubic B-spline
-  paths; 0.06 s in a debug build), identical in debug and release builds on x86-64 and under the
+  paths; part 7b's 16 commands and §54's change of type; 0.06 s in a debug build), identical in debug and release builds on x86-64 and under the
   AArch64 NaN emulation of both (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`).
-- **How we know:** *measured* (2026-11-19, relays 10 to 12).
+- **How we know:** *measured* (2026-11-21, relays 10 to 13).

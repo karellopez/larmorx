@@ -10,8 +10,11 @@
 //! separate process (`docs/licensing.md`). `PROVENANCE.md` lists what each item translates; the
 //! first pieces (queue item 3.4-06, `utils/mrisurf_deform.cpp`) were taken early in relay 44 of
 //! track D: [`project`] (the projection of a surface back onto its kind, the flattening of a
-//! patch) and [`intersect`] (`MRISremoveIntersections`).
+//! patch) and [`intersect`] (`MRISremoveIntersections`); relay 48 added [`tess`] (the
+//! tessellation of a volume, `utils/mrisurf_timeStep.cpp`, and `MRIvolTopoFix`, for
+//! `mri_binarize`).
 #![forbid(unsafe_code)]
 
 pub mod intersect;
 pub mod project;
+pub mod tess;

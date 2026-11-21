@@ -1947,6 +1947,26 @@ defects! {
         "mri_normalize given an option with fewer arguments than it takes (the option last on the command line) crashes when the missing argument is a number or a file it opens (-sigma, -seed, -atlas, -label, ...), and for an option of two or three arguments given none takes the missing ones after the first from the process's environment (printed, or read as numbers)";
     FS_1017 = "FS-1017", "FreeSurfer", true,
         "mri_normalize crashes when a step it relies on gives no volume: -conform's conforming or a resampling of -aseg's or -renorm's volume that fails, -mask_orig's volume that cannot be read, -no1d with -surface_interior after a one-dimensional normalisation that failed, or -r and -l without their volume names";
+    FS_1018 = "FS-1018", "FreeSurfer", true,
+        "mri_binarize --match (and its preset lists: --wm, --gm, --ventricles, ...) on more than one thread (--threads above 1, or OMP_NUM_THREADS above 1 or unset) shares one counter of the match values between its threads: voxels can be matched or missed at random";
+    FS_1019 = "FS-1019", "FreeSurfer", true,
+        "mri_binarize --rmax prints `Setting max thresh to` with the minimum threshold instead of the maximum it sets";
+    FS_1020 = "FS-1020", "FreeSurfer", true,
+        "mri_binarize --fdr goes on when no false-discovery-rate threshold can be computed (an input that is not float, no voxel in the mask or of the sign asked for): it prints and thresholds with a number it never set (memory contents)";
+    FS_1021 = "FS-1021", "FreeSurfer", true,
+        "mri_binarize --fix-vol-topo crashes when the binarised volume is already topologically correct (its surface's Euler number is 2): the volume it then writes has been freed";
+    FS_1022 = "FS-1022", "FreeSurfer", true,
+        "mri_binarize --fix-vol-topo can remove the binarised volume's first voxel (in column, row, slice order) while it erodes the filled volume back: every other voxel of the binarisation is kept, as the fix intends";
+    FS_1023 = "FS-1023", "FreeSurfer", true,
+        "mri_binarize keeps at most 1,000 match values, replacements and nearest-neighbour replacements: more (--match-ctab with FreeSurfer's whole colour table, long --match lists) are written over its other settings: other options change, or the program crashes";
+    FS_1024 = "FS-1024", "FreeSurfer", true,
+        "mri_binarize --dilate-vertex with fewer than four arguments prints the usage line of --dilate-vertex-sum";
+    FS_1025 = "FS-1025", "FreeSurfer", true,
+        "mri_binarize crashes when a step gives no volume and the program goes on with it: --remove-islands or --fill-holes with a binary value of 0 (--inv, --gm, --binval 0), --fix-vol-topo after more dilations than it allows (a binarisation without any voxel)";
+    FS_1026 = "FS-1026", "FreeSurfer", true,
+        "mri_binarize --crop-around-ras, --dilate-vertex(-sum) and --match-ctab take a number that cannot be read (the centre, the field of view, a value kept or left out, the vertex, the radius or target) from memory contents";
+    FS_1027 = "FS-1027", "FreeSurfer", true,
+        "mri_binarize --surf and --fix-vol-topo keep about 1.25 GB of address space per tessellation of the volume that they never release: --fix-vol-topo, which tessellates at each of its steps, ends after some tens to hundreds of steps (the address space or the memory limit decides) with `Cannot calloc()` and exit status 0 without writing anything, or with a crash";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

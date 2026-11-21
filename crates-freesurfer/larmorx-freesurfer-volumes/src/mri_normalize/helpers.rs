@@ -123,7 +123,7 @@ pub struct Run<'a, 'b> {
 }
 
 fn write(g: &mut Globals, r: &mut Run, m: &mut Mri, fname: &str) -> Result<(), Fatal> {
-    mri_write(g, r.out, r.err, r.env, r.dir, m, fname, None, 0)?;
+    mri_write(g, r.out, r.err, r.env, r.dir, m, fname, None, -1)?;
     Ok(())
 }
 

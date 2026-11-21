@@ -10,6 +10,7 @@ repository.workspace = true
 [dependencies]
 larmorx-core.workspace = true
 larmorx-freesurfer-core.workspace = true
+larmorx-freesurfer-deform.workspace = true
 larmorx-freesurfer-filter.workspace = true
 larmorx-freesurfer-gca.workspace = true
 larmorx-freesurfer-io.workspace = true

@@ -143,7 +143,9 @@ impl Prog<'_> {
     }
 
     fn write(&mut self, g: &mut Globals, m: &mut Mri, fname: &str) -> Result<(), Fatal> {
-        mri_write(g, self.out, self.err, self.env, self.dir, m, fname, None, 0)?;
+        mri_write(
+            g, self.out, self.err, self.env, self.dir, m, fname, None, -1,
+        )?;
         Ok(())
     }
 

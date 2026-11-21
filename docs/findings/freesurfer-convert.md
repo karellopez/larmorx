@@ -218,8 +218,9 @@ and `cma.cpp`'s outline field (48-366), ported into
     keeps four `call`s), 48 bytes a level (the return address and `r14`, `r13`, `r12`, `rbp`,
     `rbx`). A fill of the whole field (no points, seed (0, 0)) recurses one level per place.
     Observed: `fsconvert` survives 416 x 416 places (173,056) and crashes at 420 x 420; the
-    official `mri_convert.bin` survives 416 x 416 and crashes at 418 x 418 (174,724 levels,
-    8,386,752 bytes) with an 8 MiB stack. The replica fills with an explicit stack in the
+    official 8.2.0 `mri_convert` (`$FREESURFER_HOME/bin`) survives 416 x 416 and crashes at
+    418 x 418 (174,724 levels, 8,386,752 bytes) with an 8 MiB stack (`ulimit -s 8192`; FreeSurfer
+    6.0's `mri_convert.bin` the same). The replica fills with an explicit stack in the
     recursion's order and notes a fill deeper than 8 MiB less 32 KiB.
 46. **FS-1145**: `CMAoutlineFieldAlloc` mallocs `height` rows of `width` claims (72 bytes), shorts
     and bytes; with overcommit the allocations succeed and the `memset`s touch them (the program

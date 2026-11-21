@@ -1,0 +1,128 @@
+{
+ "name": "freesurfer-mri-binarize",
+ "tool": "mri_binarize (FreeSurfer 8.2.0)",
+ "status": "experimental",
+ "larmorx_commit": "e19d329d159c",
+ "generated": "2026-11-21",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_binarize/) and larmorx-freesurfer-deform (src/tess.rs), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mri_binarize) and its recon-all runs' files (oracles/freesurfer-8.2.0/runs/)",
+ "real": {
+  "runs": [
+   "ds000005-sub-01-classic",
+   "ds000005-sub-01-v8",
+   "ds000228-sub-pixar008-classic",
+   "ds000228-sub-pixar008-v8",
+   "ds004173-sub-603309-classic",
+   "ds004173-sub-603309-v8"
+  ],
+  "calls": 81,
+  "kinds": {
+   "recon-all wm mask": 6,
+   "recon-all wm255": 6,
+   "recon-all wm1": 6,
+   "recon-all bgc": 6,
+   "nu_correct ones": 6,
+   "nu_correct mask": 6,
+   "mcadura ctx": 6,
+   "vsinus ctxmask": 6,
+   "vsinus crop": 6,
+   "seg2cc ccbin": 6,
+   "hippocampus surface": 6,
+   "hippocampus topology": 6,
+   "label-cortex lh ga": 3,
+   "label-cortex rh ga": 3,
+   "synthseg wm": 3
+  },
+  "verdicts": {
+   "identical": 78,
+   "fix-identical": 77,
+   "fix-explained": 1,
+   "reproduce-skip": 3,
+   "fix-skip": 3
+  },
+  "seconds": {
+   "reproduce": 207.2,
+   "fix": 216.3,
+   "official": 1.9
+  }
+ },
+ "program": [
+  {
+   "seed": 1,
+   "cases": 130,
+   "verdicts": {
+    "identical": 122,
+    "fix-identical": 107,
+    "fix-explained": 15,
+    "reproduce-skip": 8,
+    "fix-skip": 8
+   }
+  },
+  {
+   "seed": 2,
+   "cases": 130,
+   "verdicts": {
+    "identical": 122,
+    "fix-identical": 107,
+    "fix-explained": 15,
+    "reproduce-skip": 8,
+    "fix-skip": 8
+   }
+  }
+ ],
+ "golden_sha256": {
+  "reproduce": "42a367a2dc0faa347eb31e6a315b95ac3098e1dd3f50a5b8c25691cf04d7a5d5",
+  "fix": "e2cb236f9a1c5c592df596f988a37c38adea2a1b8fc919aa52268badc6da55a8"
+ },
+ "memory": [
+  {
+   "case": "wm-mask",
+   "mode": "reproduce",
+   "larmorx_mib": 133.7,
+   "freesurfer_mib": 139.5
+  },
+  {
+   "case": "wm-mask",
+   "mode": "fix",
+   "larmorx_mib": 134.5,
+   "freesurfer_mib": 139.5
+  },
+  {
+   "case": "ones",
+   "mode": "reproduce",
+   "larmorx_mib": 85.5,
+   "freesurfer_mib": 87.5
+  },
+  {
+   "case": "ones",
+   "mode": "fix",
+   "larmorx_mib": 86.0,
+   "freesurfer_mib": 87.5
+  },
+  {
+   "case": "wm255",
+   "mode": "reproduce",
+   "larmorx_mib": 85.8,
+   "freesurfer_mib": 88.0
+  },
+  {
+   "case": "wm255",
+   "mode": "fix",
+   "larmorx_mib": 86.0,
+   "freesurfer_mib": 88.0
+  },
+  {
+   "case": "surf",
+   "mode": "reproduce",
+   "larmorx_mib": 141.0,
+   "freesurfer_mib": 144.8
+  },
+  {
+   "case": "surf",
+   "mode": "fix",
+   "larmorx_mib": 140.5,
+   "freesurfer_mib": 144.8
+  }
+ ]
+}

@@ -108,4 +108,8 @@ first.
 
 `docs/validation/freesurfer-mri-binarize.md`: the open probe's 130 command lines (seeds 1 and 2),
 the real calls on the recorded heads (`validation/probes/fs-binarize/real.py`: 81 calls on 6 runs),
-the golden cases and the memory entry.
+the golden cases and the memory entry. Speed (`real.py`'s first run, nothing served from the
+cache, one thread): the 81 calls took FreeSurfer 177 s, the port 204 s (`reproduce`) and 212 s
+(`fix`): about 15 % slower, the per-voxel `MRIgetVoxVal`/`MRIsetVoxVal` paths (the speed relay
+planned in `freesurfer-mri-normalize.md` §2, fs.mri's in-extent fast path, would serve this program
+too). Memory: 2 to 4 % below FreeSurfer's peak on the four measured calls.

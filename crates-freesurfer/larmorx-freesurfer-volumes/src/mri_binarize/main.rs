@@ -843,8 +843,10 @@ fn replace_nn(
                                 if o.src_replace_nn.contains(&newsegid) {
                                     continue;
                                 }
-                                let sq = (dc as f32) * (dc as f32)
-                                    + (dr.wrapping_mul(dr) + ds.wrapping_mul(ds)) as f32;
+                                let dcf = dc as f32;
+                                let sq = dcf * dcf
+                                    + dr.wrapping_mul(dr) as f32
+                                    + ds.wrapping_mul(ds) as f32;
                                 let dist = sq.sqrt();
                                 if dist < min_dist {
                                     min_dist = dist;

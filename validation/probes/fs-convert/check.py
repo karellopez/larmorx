@@ -18,9 +18,10 @@ hash the port's recorded test checks (``tests/fs_convert_official.rs``).
     python -P validation/probes/fs-convert/check.py --kind otl --seed 1 --n 120
 
 ``--kind cnv-heavy``: the conformed conversions (outputs of 256 voxels per axis), not in the
-recorded test. ``--kind otl`` (relay 48): outline (.otl) series read and converted (``SKIP_OTL``). ``--kind cnv``: whole conversions (``cnv`` cases: small MGH inputs, options with arguments they
-accept, every written file compared through ``gzread`` with the command lines' time stamps
-masked).
+recorded test. ``--kind otl`` (relay 48): outline (.otl) series read and converted
+(``SKIP_OTL``). ``--kind cnv``: whole conversions (``cnv`` cases: small MGH inputs, options with
+arguments they accept, every written file compared through ``gzread`` with the command lines' time
+stamps masked).
 """
 
 from __future__ import annotations

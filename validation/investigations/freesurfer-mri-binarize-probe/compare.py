@@ -80,7 +80,9 @@ def segmentation(rng: np.random.Generator, shape: tuple[int, int, int]) -> np.nd
     hip = (np.abs(idx[1] - c[1]) < 2) & (np.abs(idx[2] - c[2] + 4) < 2) & (r < 0.45)
     seg[hip] = np.where(left, 17, 53)[hip]
     seg[(np.abs(idx[0] - c[0]) < 1) & (r < 0.3)] = 251
-    seg[(idx[2] < c[2] * 0.6) & (r < 0.5)] = np.where(left, 7, 46)[(idx[2] < c[2] * 0.6) & (r < 0.5)]
+    seg[(idx[2] < c[2] * 0.6) & (r < 0.5)] = np.where(left, 7, 46)[
+        (idx[2] < c[2] * 0.6) & (r < 0.5)
+    ]
     ctx = (seg == 3) & (rng.random(shape) < 0.3)
     seg[ctx] = 1000 + rng.integers(1, 35, shape)[ctx]
     seg[(seg == 2) & (rng.random(shape) < 0.03)] = 77
@@ -112,7 +114,9 @@ def inputs(ws: Path, seed: int) -> dict[str, Path]:
         d / "frames_u8_32x3.mgz", (rng.random((32, 32, 32, 3)) < 0.6).astype(np.uint8), aff
     )
     p = np.abs(rng.normal(0.0, 1.5, (32, 32, 32))) * np.where(seg == 2, 3.0, 1.0)
-    f["sig"] = save(d / "sig_f32_32.mgz", (p * np.sign(rng.normal(0, 1, p.shape))).astype(np.float32), aff)
+    f["sig"] = save(
+        d / "sig_f32_32.mgz", (p * np.sign(rng.normal(0, 1, p.shape))).astype(np.float32), aff
+    )
     f["mask"] = save(d / "mask_f32_32.mgz", rng.random((32, 32, 32)).astype(np.float32), aff)
     f["merge"] = save(d / "merge_32.mgz", rng.integers(0, 9, (32, 32, 32)).astype(np.int32), aff)
     aff2 = np.diag([1.2, 0.9, 1.1, 1.0])
@@ -224,8 +228,17 @@ def cases(f: dict[str, Path], fs_home: Path) -> list[list[str]]:
         ["--i", "@seg", "--match", "17", "--crop", "0", *o],
         ["--i", "@seg", "--match", "2", "--remove-islands", *o],
         ["--i", "@seg", "--match", "2", "--fill-holes", *o],
-        ["--i", "@seg", "--match", "2", "--remove-islands", "--no-remove-islands", "--fill-holes",
-         "--no-fill-holes", *o],  # fmt: skip
+        [
+            "--i",
+            "@seg",
+            "--match",
+            "2",
+            "--remove-islands",
+            "--no-remove-islands",
+            "--fill-holes",
+            "--no-fill-holes",
+            *o,
+        ],
         ["--i", "@seg", "--match", "2", "--inv", "--remove-islands", *o],
         ["--i", "@seg", "--match", "2", "--copy-ctab", *o],
         ["--i", "@seg", "--match", "2", "--ctab", "@lut", *o],
@@ -233,8 +246,18 @@ def cases(f: dict[str, Path], fs_home: Path) -> list[list[str]]:
         ["--i", "@seg", "--replace", "2", "5", *o],
         ["--i", "@seg", "--replace", "2", "41", "--replace", "41", "3", *o],
         ["--i", "@seg", "--replaceonly", "2", "41", "--replaceonly", "41", "3", *o],
-        ["--i", "@seg", "--replaceonly", "2", "41", "--replaceonly", "41", "3",
-         "--no-transitive-replace", *o],  # fmt: skip
+        [
+            "--i",
+            "@seg",
+            "--replaceonly",
+            "2",
+            "41",
+            "--replaceonly",
+            "41",
+            "3",
+            "--no-transitive-replace",
+            *o,
+        ],
         ["--i", "@seg", "--replace", "2", "5", "--mask", "@mask", *o],
         ["--i", "@seg", "--min", "1", "--replace", "2", "5", *o],
         ["--i", "@seg", "--replace-nn", "77", "3", *o],
@@ -276,8 +299,20 @@ def cases(f: dict[str, Path], fs_home: Path) -> list[list[str]]:
         ["--ohe", "@small", "ohe.mgz"],
         ["--ohe", "/nonexistent/s.mgz", "ohe.mgz", "1"],
         ["--crop-around-ras", "crop.mgz", "@u8", "nolta", "0", "0", "0", "10", "12", "14"],
-        ["--crop-around-ras", "crop.mgz", "@seg", "nolta", "2", "-3", "1", "16", "16", "16", "2",
-         "41"],  # fmt: skip
+        [
+            "--crop-around-ras",
+            "crop.mgz",
+            "@seg",
+            "nolta",
+            "2",
+            "-3",
+            "1",
+            "16",
+            "16",
+            "16",
+            "2",
+            "41",
+        ],
         ["--crop-around-ras", "crop.mgz", "@u8", "@lta", "0", "0", "0", "10", "10", "10"],
         ["--crop-around-ras", "crop.mgz", "@u8", "nolta", "cras", "@segb", "0", "8", "8", "8"],
         ["--crop-around-ras", "crop.mgz", "@u8", "nolta", "0", "0"],

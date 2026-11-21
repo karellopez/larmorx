@@ -46,9 +46,13 @@ def main() -> int:
     u = "".join(decode(m.group(1)) for m in LIT.finditer(usage))
     h = "".join(decode(m.group(1)) for m in LIT.finditer(help_))
     print("// SPDX-License-Identifier: LicenseRef-FreeSurfer")
-    print("// Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright")
+    print(
+        "// Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright"
+    )
     print("// 2026 Karel Lopez Vilaret.")
-    print("//! `mri_binarize`'s usage and help texts (`print_usage`, `print_help`), FreeSurfer 8.2.0's")
+    print(
+        "//! `mri_binarize`'s usage and help texts (`print_usage`, `print_help`), FreeSurfer 8.2.0's"
+    )
     print("//! `printf` literals in order (made by `validation/probes/fs-binarize/help_text.py`).")
     print()
     print("/// `print_usage`'s lines after `USAGE: <program> ` and before the version.")

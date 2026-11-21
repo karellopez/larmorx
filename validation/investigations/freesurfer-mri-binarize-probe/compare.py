@@ -10,7 +10,8 @@ the official program (``$FREESURFER_HOME/bin/mri_binarize``, found on the ``PATH
 the scripts run it) by the oracle-output cache at one thread, and through the candidate
 (``--candidate``, a command line whose ``{mode}`` becomes ``reproduce`` and then ``fix``), each in a
 folder of its own (outputs are written there). Compared: the exit status, standard output and
-error (the ``cwd`` line of the report and the candidate's ``larmorx:`` notices aside) and every file
+error (the ``cwd`` line of the report, ``--all-info``'s time and the candidate's ``larmorx:``
+notices aside) and every file
 written (FreeSurfer's provenance aside: ``larmorx_validation.freesurfer.files``). ``reproduce`` must
 give FreeSurfer's on every case but those whose reproduce run notes a defect of ``NOT_COMPARABLE``,
 which are counted; ``fix`` may differ only with a notice.
@@ -49,10 +50,14 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 NOT_COMPARABLE = frozenset(
     {"FS-53", "FS-58", "FS-1020", "FS-1021", "FS-1023", "FS-1025", "FS-1026", "FS-1027"}
 )
-#: FreeSurfer's runs compared with their entries.
-POLICY = oracle_cache.Policy(threads=1, family="freesurfer", formats="freesurfer")
+#: FreeSurfer's runs compared with their entries: ``--all-info``'s report holds the run's time.
+POLICY = oracle_cache.Policy(
+    threads=1, family="freesurfer", formats="freesurfer", volatile=(r"TimeStamp: \S+",)
+)
 #: The report's working folder, which differs between the sides.
 CWD = re.compile(r"(?m)^cwd .*$")
+#: ``--all-info``'s time of the run (UTC, to the second).
+STAMP = re.compile(r"TimeStamp: \S+")
 
 
 def head(rng: np.random.Generator, shape: tuple[int, int, int]) -> np.ndarray:
@@ -334,7 +339,7 @@ def cases(f: dict[str, Path], fs_home: Path) -> list[list[str]]:
 
 
 def mask(text: str, port: bool) -> str:
-    text = CWD.sub("cwd <cwd>", text)
+    text = STAMP.sub("TimeStamp: <time>", CWD.sub("cwd <cwd>", text))
     if port:
         text = "".join(x for x in text.splitlines(True) if not x.startswith("larmorx: "))
     return text

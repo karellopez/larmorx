@@ -47,8 +47,8 @@ areas, a measure, no measure, a target out of reach, too few arguments, a vertex
 surface); missing input, output folder, mask and merge files.
 
 Compared for each case and mode: the exit status; standard output and standard error (the
-report's `cwd` line, which names each side's folder, and the candidate's `larmorx:` lines
-masked); the names of the files written and each file (FreeSurfer's provenance, the command line
+report's `cwd` line, which names each side's folder, `--all-info`'s `TimeStamp` and the
+candidate's `larmorx:` lines masked); the names of the files written and each file (FreeSurfer's provenance, the command line
 and its time, a surface's `created by` stamp, the user, the machine and the directories, left
 out: `larmorx_validation.freesurfer.files`). A case whose `reproduce` run notes a defect of
 `NOT_COMPARABLE` (FreeSurfer reads memory it does not own or never wrote, writes past its lists,

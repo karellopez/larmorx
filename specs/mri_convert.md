@@ -1,9 +1,9 @@
 # `mri_convert` (FreeSurfer 8.2.0): behaviour spec
 
-Status: parts 1 and 2 of 3 (queue items 3.2-04 and 3.2-05: the stats tables, the CSV reader, the
-command line up to the checks before the input volume is read (part 1, §1-3), and the steps from
-reading the input to writing the output (part 2, §4-5)); the outline (`.otl`) input of §4.2
-(3.2-06) and part 3 (the replay of the recorded steps, 3.2-07) follow. Written by the replica's author
+Status: parts 1 to 3 (queue items 3.2-04 to 3.2-06: the stats tables, the CSV reader, the command
+line up to the checks before the input volume is read (part 1, §1-3), the steps from reading the
+input to writing the output (part 2, §4-5) and the outline (`.otl`) input (part 3, §4.2, §6));
+the replay of the recorded steps (3.2-07) follows. Written by the replica's author
 (track A) as the spec writer: behaviour, conventions and messages, for the clean room
 (`larmorx-fs-volumes`), which works from this file, the library modules' specs
 (`specs/freesurfer-*.md`) and black-box runs of the official program only.
@@ -389,8 +389,8 @@ implementers) compares the replica with FreeSurfer's code case by case: 1,000 ca
    the words run together as printed) and `--color_file` (else `parcellation read: must specify
    acolor file name`, status 1); without `--fill_parcellation`: `notice: unfilled parcellations
    currently unimplemented`, `notice: filling outlines` (the outlines are filled anyway); then the
-   reader of §4.2 (3.2-06; until it is ported, the replica prints `larmorx-freesurfer: reading
-   outline (.otl) volumes is not ported yet (<name>)` on standard error and ends with status 1).
+   reader of §4.2, with the size of `--in_like`'s volume (width, height, depth) or 0, 0 and
+   `--in_k_count`'s number; no volume: status 1.
    `--smooth_parcellation <n>`: `smoothing parcellation...` and the mode filter of
    `specs/freesurfer-volume.md` (a failure: status 1). The volume is then sampled nearest and
    changed in type without scaling.
@@ -404,7 +404,160 @@ implementers) compares the replica with FreeSurfer's code case by case: 1,000 ca
    input waits for the DICOM reader (queue 3.7-14): the replica prints `larmorx-freesurfer: reading
    DICOM volumes is not ported yet (<name>)`. No volume: status 1.
 
-### 4.2 The outline reader (3.2-06; to be written)
+### 4.2 The outline reader (part 3, 3.2-06)
+
+An outline series is a set of text files `<stem><n>.otl`, one per slice `n` = 1 to the slice count
+`k`, in the GDF format of CMA's outlining tool: each file holds outlines drawn in a 512 x 512 space,
+each outline a list of points, a seed point and a structure's name. The reader fills each outline,
+gives every place the label that claims it most, samples the result into the volume's slice `n - 1`
+and leaves the slices without a file at 0. Inputs: the name given (one file of the series), the
+width `w` and height `h` (512 for 0 or less), `k`, the colour table's name and four switches: read
+the voxels (off: the header only), translate exterior labels (on unless `--no_translate`), zero the
+outlines (`--zero_outlines`), fill (always on).
+
+1. The list of unknown labels is emptied.
+2. The stem: the name up to its last `.`, without the digits that end it there. No `.`: the error
+   line `MRIreadOtl(): bad file name: <name>` (status 1 in `mri_convert`); a name whose characters
+   before its last `.` are all digits (or none): the same error.
+3. Files `<stem>1.otl` to `<stem>k.otl` (`%d` numbers) are looked for (a file exists when it opens
+   for reading; `errno` is left as it was). None: the error line `MRIreadOtl(): couldn't find any
+   file between <stem>1.otl and <stem>k.otl` (FS-1142 for `k` < 1; with `k` < 1 the second name is
+   the name given).
+4. Without the voxels switch: a header of `w` x `h` x `k` shorts, one frame, as a new volume has
+   (the volume's defaults: `specs/freesurfer-mri.md`), and nothing else (no orientation, no
+   messages).
+5. Otherwise a volume of `w` x `h` x `k` shorts, all 0; the colour table read as text
+   (`specs/freesurfer-io.md`: its messages); none: `MRIreadOtl(): error reading color file <name>`
+   (`errno` cleared), status 1.
+6. For `n` = 1 to `k`: the file opened for reading (not there: skipped, `errno` = 2, `ENOENT`); a
+   file read as below; its error ends the read (status 1, no further message).
+7. No file opened at all: `MRIreadOtl(): found at least one file between <first> and <last> but
+   couldn't open it!`.
+8. On standard output: `no unknown labels`, or `unknown labels:` and each unknown label as
+   `  <label>` (two spaces), in the order first met, at most 100 (later ones are not listed), each
+   once (the label's text after the translation of step 12).
+9. The volume gets the coronal orientation of `specs/freesurfer-io.md` (direction cosines
+   x = (-1, 0, 0), y = (0, 0, -1), z = (0, 1, 0), centre 0).
+
+A file is read line by line, each line as C's `fgets` with a buffer of 1,024 bytes gives it (at most
+1,023 bytes, through a new line; a longer line comes as several). A line "is" a keyword when it
+starts with it. When a read gives nothing (the end of the file), the buffer keeps its last line and
+the checks below see it again; a read that fails prints the error line `read_otl_file(): could not
+read file` (`errno`'s text first, as every error line) and goes on. "At the end" below means the
+file's end-of-file flag is set: a read reached the end before a new line (a last line without a new
+line sets it while it gives that line). The messages of errors are FreeSurfer's error lines
+(`specs/freesurfer-core.md`) with `errno` cleared first, unless said, and each error ends the read.
+
+10. The first line must start with `GDF FILE VERSIO`; otherwise (an empty file included) the error
+    `otl slice <n> does not appear to be a GDF file` (FS-1054).
+11. Lines are read until one is `START MAIN HEADER` (at the end before it: `premature EOF () in
+    otl file <n>`), then until `END MAIN HEADER` (at the end before it: `premature EOF (in main
+    header) in otl file <n>`); on each main-header line (the `END` one included): `ONUM ` gives the
+    outline count (the second word read as `%d` by C's `sscanf`: a line without one keeps the
+    earlier value), `COL_NUM` the column count, `TYPE` the global type (the line's text from its
+    6th byte, cut at its last new line). No `ONUM` (or `ONUM -1`): `bad or undefined ONUM in otl
+    file <n>`. A negative count other than -1 reads no outline. The column count starts at -1 for
+    each file and keeps its value from one outline to the next.
+12. The outline field: `2w` x `2h` places, each with a list of up to 10 claims (a label each), a
+    flag "interior", a fill mark and an "outline point" mark (FS-1145 for a field past the machine's
+    memory). For each of the count's outlines:
+    - at the end: `premature EOF (ready for next outline) in otl file <n>`; lines until `START GDF
+      HEADER` (`premature EOF (searching for gdf header) in otl file <n>`), then until `END GDF
+      HEADER` (`premature EOF (in gdf header) in otl file <n>`). Its lines: `ROW_NUM` the point
+      count (starts at -1), `COL_NUM`, `TYPE` (the outline's type, starts empty), `SEED` two `%d`
+      numbers (the seed, starts at (-1, -1); each number read keeps its value), `LABEL` the label
+      (the text from the line's 7th byte, cut at its last new line). With the translation, the
+      label's first `Exterior` becomes `Cortex` and everything after it is dropped (else the first
+      `exterior`, `cortex`); then the warning of FS-1060 (on standard output, `WARNING: label
+      "<label>" following non-exterior labels in slice <n>`).
+    - Checks, in order: a point count below 0: `bad or undefined ROW_NUM in otl file <n>`; a column
+      count other than 2: `bad or undefined COL_NUM in otl file <n>`; an empty label: the error
+      line `empty LABEL in otl file <n> (outline <i>)` (`i` from 0) and the outline is read but not
+      used; a seed coordinate outside 0 to 511: `bad or undefined SEED in otl file <n>`. The type:
+      the outline's, else the global one; `ascii short` or `short`; empty: `undefined TYPE in otl
+      file <n>` (`ERROR_UNSUPPORTED`); another: `unsupported TYPE "<type>" in otl file <n>`.
+    - Lines until `START POINTS`, each read first and then the end checked (at the end:
+      `premature EOF (searching for points) in otl file <n>`, even when that last line is `START
+      POINTS`). A point count of 2^30 or more: `error allocating memory for points in otl file
+      <n>`.
+    - `ascii short`: one line per point (at the end, after reading it: `premature end of file while
+      reading points from otl file <n>`), read as `%hd %hd` (each number as `strtol` gives it,
+      kept in 16 bits two's complement; a number not read: FS-1141). `short`: the points as
+      big-endian 16-bit pairs (x, y) straight after the `START POINTS` line; fewer bytes than
+      `4 x count`: `error reading points from otl file <n>`.
+    - The next line must be `END POINTS`, else `error after points ("END POINTS" expected but not
+      found) in otl file <n>`.
+    - The label's name: its spaces become `-`; a second name is the name in lower case (ASCII), or,
+      when that starts with `left-` or `right-`, the name after those 5 or 6 characters in its
+      own case; then the name loses its leading dashes (unless it is all dashes) and its trailing
+      dashes. The label is the largest colour-table index whose name equals either name (`-1`
+      when none; the index kept in 16 bits). None: the label is listed as unknown (step 8) and the
+      outline does nothing more. Otherwise (FS-1056 for points outside 0 to 511) the outline
+      claims places:
+      - a label outside 0 to 5307: the error line `CMAclaimPoints(): label out of range (label is
+        <l>, MAX_CMA_LABEL is 5307)` (`errno` not cleared: its text first when set), no claim, the
+        read goes on; a seed outside the field: `CMAclaimPoints(): seed point out of range (seed_x
+        = <x>, field width = <2w>)` or `(seed_y = <y>, field height = <2h>)`, the same way.
+      - every fill mark cleared; each point in order: a coordinate outside the field: the error
+        line `CMAclaimPoints(): outline point out of range (x)` (or `(y)`) and the claim stops (the
+        earlier points keep their marks: they count as outline points for step 14, not as claims);
+        otherwise the place is marked "outline" and "outline point".
+      - the fill: from the seed, every unmarked place 4-connected to it (through unmarked places)
+        is marked "interior" (a seed on a marked place fills nothing; FS-1144).
+      - every interior place now has one claim, this label, and the interior flag (its earlier
+        claims dropped); every outline place gets this label added to its claims (when it has
+        fewer than 10) and loses the interior flag.
+13. After the outlines, every place's label: each place's claims are valued (`float`): no claim:
+    "no label" 0.5; one claim with the interior flag: 1.0; one claim without it: 0.5 and "no label"
+    0.5; n claims (2 to 10): each `1.0 / n` (computed in double, rounded to float); "no label"
+    stays 0 where it was never set. A place's score of label `l` is the sum, over the place and its
+    eight neighbours inside the field (in the order: the place, x - 1, x + 1, y - 1, y + 1, (x - 1,
+    y - 1), (x - 1, y + 1), (x + 1, y - 1), (x + 1, y + 1)), of the weight times each claim's value
+    for its label, and for label 0 also of the weight times "no label" (after the place's claims);
+    the weight is 1.0 for the place and 0.5 for every neighbour, diagonal ones included (FS-1059);
+    every sum is accumulated in `float`, term by term in that order. The place's label is the label
+    with the largest score, the smallest such label on a tie (label 0, and the labels no claim
+    names, score 0); FS-1055 for label 5307. The places are scored column by column (x
+    outer, y inner).
+14. With `--zero_outlines`, every place marked "outline point" (by any outline of the file) gets
+    label 0.
+15. Voxel (i, j) of slice `n - 1` takes the label of place (min(511, s_x i), min(511, s_y j)),
+    where `s_x` is 512 divided by `w` in integers (FS-1058; `s_y` the same with `h`); a place past
+    the field: FS-1057.
+
+### 4.2.1 Defects of the outline reader (both modes unless said)
+
+- FS-1054: a file that does not start with `GDF FILE VERSIO` (FreeSurfer crashes printing the
+  message): the message `otl slice <n> does not appear to be a GDF file` and status 1.
+- FS-1055: label 5307's score is never reset between places in FreeSurfer: it adds up over the
+  slice's scan (columns outer) and wins every place scanned after the sum passes the place's best
+  score. By default each place's score is its own; `reproduce` keeps the running sum, from 0 at
+  each slice's first place (FreeSurfer's start is memory never written; the official program
+  gives the sum from 0, observed).
+- FS-1056: a point of a known label with a coordinate outside 0 to 511 is written outside a
+  512 x 512 array in FreeSurfer's source (undefined behaviour; the array is never read and the
+  official program does not hold it: no effect, observed); nothing is written.
+- FS-1057: a voxel whose place (step 15) is past the field (widths or heights below 171) reads
+  memory FreeSurfer does not own; 0.
+- FS-1058 (kept): the integer step of step 15 (rule D).
+- FS-1059 (kept): the diagonal neighbours' weight 0.5 (FreeSurfer defines 0.707 and does not use
+  it; rule D).
+- FS-1060: FreeSurfer's warning condition is inverted: it warns for a label without all four words
+  `Exterior`, `exterior`, `Cortex` and `cortex` that follows a label holding all four. By default
+  the warning is printed for a label holding any of the four that follows a label holding none
+  (the flag "a label without them was seen" is set by a label holding none and cleared by one
+  holding any); `reproduce` prints FreeSurfer's.
+- FS-1141: a point line that does not give both numbers: the missing ones 0.
+- FS-1142: a slice count below 1: the error's first name printed empty.
+- FS-1143: FreeSurfer keeps every slice file open (past 1,024 open files its later slices are left
+  empty); every file is read.
+- FS-1144: FreeSurfer fills with a recursion one level (48 bytes of stack) per place on the way: a
+  fill reaching more than about 174,000 places deep overflows a default 8 MiB stack (a crash;
+  observed between 173,056 and 174,724 places, a whole field of 2 x 208 and 2 x 209 voxels
+  squared); the fill is done, with a notice past 8 MiB less 32 KiB.
+- FS-1145: an outline field of more than 16 GiB is refused as by a machine without that memory:
+  `CMAoutlineFieldAlloc(): error allocating claim field` with `errno` 12's text, status 1.
+- FS-249: names of 1,024 bytes or more are used whole.
 
 ### 4.3 The steps on the input, in order
 
@@ -656,3 +809,21 @@ geometries, a colour table, an auto-align matrix), written as `.mgh`, `.mgz`, `.
 compressed file decompressed; the command-line text in the files from its `TimeStamp: ` on
 differs from run to run and is left out). Each defect of §4.9 in both modes. The replica's probe
 (`validation/probes/fs-convert`, closed): `check.py --kind cnv` (observed results in its README).
+
+## 6. Validation plan for part 3 (for the clean room)
+
+Black box, the official `mri_convert` on outline series (`.otl` files written by the test, a small
+colour table with an exterior name, a lower-case name, a name without its hemisphere, entries 5307
+and 6000, and the volume's size from a header-only `.mgh` given to `--in_like`): every path of §4.2
+once (the plain read of one to three slices, a slice missing, `--zero_outlines`,
+`--no_translate`, `--fill_parcellation`, `--smooth_parcellation`, the header only with `--read_only
+--in_info`, ascii and binary points, a global and an outline type, every error message of steps 2
+to 12 by a file cut or changed there, every spelling of the labels' names, more than 100 unknown
+labels, more than 10 claims on a place, label 5307 and a label past it, seeds on, inside and
+outside their outlines, an outline the fill leaks through, points and seeds past the field, widths
+that divide 512 and widths that do not), then seeded series: compare standard output and error,
+the exit status and the written volume's bytes. Widths below 171, fills deeper than the stack, an
+empty file, a slice count below 1 and point lines without two numbers are FreeSurfer's crashes and
+memory reads (§4.2.1): the defaults only. The default size (512) takes the official program about
+3.5 seconds a slice (observed). The replica's probe (`validation/probes/fs-convert`, closed):
+`check.py --kind otl` (observed results in its README).

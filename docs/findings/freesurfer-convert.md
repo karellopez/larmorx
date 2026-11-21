@@ -164,6 +164,78 @@ The replica: `crates-freesurfer/larmorx-freesurfer-volumes/src/mri_convert/`; th
     on its first byte), `log::perror_errno` (fs.io's `label_read` and `registerio`'s `perror`); a
     program's `run` reads descriptor 2's access mode (`/proc/self/fdinfo/2`).
 
+## Part 4: the outline (`.otl`) reader (relay 48, queue item 3.2-06)
+
+`MRIreadOtl` (`utils/mriio.cpp` 7144) with `read_otl_file` (6556, inlined into it by GCC 8.4)
+and `cma.cpp`'s outline field (48-366), ported into
+`crates-freesurfer/larmorx-freesurfer-volumes/src/mri_convert/otl.rs`.
+
+35. **FS-1054**: `ErrorReturn(ERROR_BADFILE, (..., "otl slice %s does not appear to be a GDF file",
+    slice))` formats the `int` slice number with `%s`: `vfprintf` dereferences the address 1, 2, ...
+    (SIGSEGV, the probe's `CRASH 11`). An empty file reaches it too: `fgets` returns NULL and
+    leaves `line` (a stack array never written) as it was, so `strncmp` sees memory contents (the
+    replica's buffer starts at zero: never "GDF"). Both modes: the message with the number,
+    status 1.
+36. **FS-1055**: `CMAtotalClaims` declares `float claim_totals[MAX_CMA_LABEL + 1]` (5,308) and
+    clears `for (i = 0; i < MAX_CMA_LABEL; i++)`: entry 5307 is never written by the function.
+    GCC 8.4 inlines nothing of it into `CMAassignLabels` (`CMAtotalClaims` jumps to its
+    `.part.28` clone): the clone's frame (0x5318 bytes below six pushes) clears bytes 0x10 to
+    0x52ec of `rsp` with a `movaps` loop and two stores (`0x52f0` 8 bytes, `0x52f8` 4 bytes) and
+    leaves `rsp + 0x52fc` (entry 5307) alone; the same frame address on every call from
+    `CMAassignLabels`' loop, so `claim_totals[5307] += ...` adds up from place to place, and the
+    search `for (i = 1; i <= MAX_CMA_LABEL; i++)` reads it at every place. Its value before the
+    slice's first place: observed as 0 (four runs of two three-slice cases with entry 5307,
+    `fsconvert` under ASLR: identical outputs, equal to the replica's sum from 0; the other cases
+    never claim 5307, where any value under about 0.1 cannot win). Rule A by default; `reproduce`
+    sums from 0 at each slice.
+37. **FS-1056**: `cma_field[points[2 * j]][points[2 * j + 1]] = label_value;` writes a `static
+    short cma_field[512][512]` with unchecked `short` indices. The array is never read: GCC 8.4
+    removes it and its stores (`mriio.cpp.o` has no `cma_field` symbol and `MRIreadOtl` no
+    reference to it), so the official build's results do not change. Both modes: not written.
+38. **FS-1057**: the field is `CMAoutlineFieldAlloc(2 * mri->width, 2 * mri->height)` but the
+    slice is sampled at `of->fill_field[source_y][source_x]` with `source = (512 / width) * i`
+    clamped to 511: for `512 / width` of 3 or more (widths 1 to 170) `source` passes `2 * width`
+    (a row pointer read past `fill_field`'s array, or a row read past its `2 * width` shorts: heap
+    contents or SIGSEGV). Both modes: 0 there.
+39. **FS-1058**: `scale_x = 512 / mri->width;` divides integers (into a `float`). Rule D (no real
+    outline files to measure a correction with): kept.
+40. **FS-1059**: the four diagonal calls pass `OTL_CLAIM_WEIGHT_SIDE` (0.5);
+    `OTL_CLAIM_WEIGHT_DIAGONAL` (0.707, `include/cma.h` 619) is never used. Rule D: kept; the
+    notice when 0.707 would change a place's label.
+41. **FS-1060**: `if (strstr(label, "Exterior") == 0 || strstr(label, "exterior") == 0 ||
+    strstr(label, "Cortex") == 0 || strstr(label, "cortex") == 0) { if
+    (internal_structures_flag) printf("WARNING: ..."); internal_structures_flag = FALSE; } else
+    internal_structures_flag = TRUE;`: the comment ("warning if there's an "exterior" or "cortex"
+    after any other label") needs `!= 0`. Rule A: the meant condition by default.
+42. **FS-1141**: `sscanf(line, "%hd %hd", &points[2 * row], &points[2 * row + 1])` without a check;
+    `points` is `malloc`'s (heap contents, often the previous outline's freed points). Both modes: 0.
+43. **FS-1142**: `first_name` is written only by the loop's `if (i == 1)`; with `slices` < 1 the
+    error prints the stack array as it was (the probe: different bytes on every run). Both modes:
+    empty.
+44. **FS-1143**: each slice's `fopen` has no `fclose`. Both modes: each file closed; the notice past
+    1,021 slice files.
+45. **FS-1144**: `CMAfill` recurses (`CMAfill(x+1)`, `(x-1)`, `(y+1)`, `(y-1)`, no tail call: GCC 8.4
+    keeps four `call`s), 48 bytes a level (the return address and `r14`, `r13`, `r12`, `rbp`,
+    `rbx`). A fill of the whole field (no points, seed (0, 0)) recurses one level per place.
+    Observed: `fsconvert` survives 416 x 416 places (173,056) and crashes at 420 x 420; the
+    official `mri_convert.bin` survives 416 x 416 and crashes at 418 x 418 (174,724 levels,
+    8,386,752 bytes) with an 8 MiB stack. The replica fills with an explicit stack in the
+    recursion's order and notes a fill deeper than 8 MiB less 32 KiB.
+46. **FS-1145**: `CMAoutlineFieldAlloc` mallocs `height` rows of `width` claims (72 bytes), shorts
+    and bytes; with overcommit the allocations succeed and the `memset`s touch them (the program
+    killed past the memory). The replica refuses a field past 16 GiB (`MACHINE_BYTES`) with the
+    claim field's message and `errno` `ENOMEM`.
+47. The port's own forms (same results): `CMAtotalClaims`' 5,308 sums are kept sparse (the labels
+    the nine places claim, in first-met order, sorted before the search; every sum is a sum of
+    non-negative products, so an untouched label's 0 never wins and label 0 wins ties); the fill is
+    iterative. `1.0 / (float)n` is a double division rounded to float, as GCC computes it.
+48. Not defects, as FreeSurfer does: the translation `sprintf(translate_start, "Cortex")` drops the
+    rest of the label after the word; the second name (`alt_compare`) is the lower-cased name
+    unless it starts with `left-` or `right-`; the last matching colour-table index wins;
+    `label_value` is a `short` (index 65535 reads as -1, unknown); `MAX_UNKNOWN_LABELS` (100) caps
+    the list silently; `fill_flag` is unused (the outlines are always filled); `exec_progress_callback`
+    is not set by `mri_convert`.
+
 ## The probe's results (relay 46)
 
 `check.py --seed 1 --n 1000` (45 fixed cases, then seeded; 65 % of the seeded ones command lines,

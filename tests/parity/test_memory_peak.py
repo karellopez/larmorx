@@ -13,7 +13,8 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 (``ORIGINAL_PRELUDE_CASES``, 2026-11-06); tedana's t2smap against the ``larmorx-gpl`` replica
 (``T2SMAP_CASES``, 2026-11-08) and its clean-room original (``T2SMAP_ORIGINAL_CALLS``,
 2026-11-11); FreeSurfer's ``mri_normalize`` against the ``larmorx-freesurfer`` replica
-(``MRI_NORMALIZE_CASES``, 2026-11-19) and ``mri_binarize`` (``MRI_BINARIZE_CASES``, 2026-11-21).
+(``MRI_NORMALIZE_CASES``, 2026-11-19), ``mri_binarize`` (``MRI_BINARIZE_CASES``, 2026-11-21) and
+``mri_convert`` (``MRI_CONVERT_CASES``, 2026-11-21).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -2176,3 +2177,73 @@ def test_mri_binarize_replica_needs_no_more_memory_than_freesurfer(tmp_path, nam
                 o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out
             )
             assert c.same, f"mri_binarize {name} ({mode}): {out}: {c.verdict} {c.detail}"
+
+
+#: FreeSurfer 8.2.0's ``mri_convert`` (the official ``$FREESURFER_HOME/bin/mri_convert``, run by
+#: name as recon-all runs it) against the ``larmorx-freesurfer`` replica's standalone program
+#: (queue item 3.2-07, 2026-11-21): recon-all's conformed conversion (``rawavg.mgz`` to
+#: ``orig.mgz --conform``) and a conversion to NIfTI of the conformed volume, on a recorded head
+#: (ds000005 sub-01's classic run), one thread, both D13 modes; the output identical to
+#: FreeSurfer's (provenance aside).
+MRI_CONVERT_CASES = [
+    ("conform", ["{mri}/rawavg.mgz", "orig.mgz", "--conform"]),
+    ("nifti", ["{mri}/orig.mgz", "orig.nii.gz"]),
+]
+
+
+@pytest.mark.parametrize(("name", "args"), MRI_CONVERT_CASES)
+def test_mri_convert_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, args):
+    from larmorx_validation.freesurfer import files as fsfiles
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / "mri_convert" if ws else None
+    mri = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / "ds000005-sub-01-classic" / "subjects"
+        / "sub-01" / "mri"
+        if ws
+        else None
+    )  # fmt: skip
+    if exe is None or not exe.is_file() or not (mri / "rawavg.mgz").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    words = [a.format(mri=mri) for a in args]
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        **freesurfer_env(),
+    }
+    o_dir = tmp_path / "freesurfer"
+    o_dir.mkdir()
+    # FS-1053: the conformed volume's printed validity flag is memory contents
+    code, fs_mib = _original_peak(
+        ["mri_convert", *words],
+        env,
+        "freesurfer",
+        _emptier(o_dir),
+        o_dir,
+        (r"valid   : -?[0-9]+",),
+        "freesurfer",
+    )
+    assert code == 0
+    out = words[1]
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_convert", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(f"mri_convert {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"mri_convert {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        c = fsfiles.compare(o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out)
+        assert c.same, f"mri_convert {name} ({mode}): {c.verdict} {c.detail}"

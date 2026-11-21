@@ -396,6 +396,32 @@ impl Field {
     /// default's label, `acc` the label under `reproduce`. The diagonal weight FreeSurfer
     /// defines and does not use (FS-1059) is tried too, for the notice.
     fn total_claims(&self, x: i32, y: i32, acc: &mut f32, reproduce: bool, scan: &mut Scan) -> i16 {
+        // a place whose nine places hold no claim: label 0 scores 0.5 for the place and 0.25 for
+        // each neighbour inside the field (exact sums), every other label 0, with either weight
+        let (w, h) = (self.width, self.height);
+        let mut inside = 0u8;
+        let mut claimed = false;
+        for dy in -1..=1 {
+            for dx in -1..=1 {
+                let (cx, cy) = (x + dx, y + dy);
+                if cx >= 0 && cx < w && cy >= 0 && cy < h {
+                    inside += 1;
+                    claimed |= self.claim[self.at(cx, cy)].n_claims != 0;
+                }
+            }
+        }
+        if !claimed {
+            let best_claim = 0.5 + 0.25 * f32::from(inside - 1);
+            let kept = if *acc > best_claim {
+                MAX_CMA_LABEL as i16
+            } else {
+                0
+            };
+            if kept != 0 {
+                scan.differ_5307 += 1;
+            }
+            return if reproduce { kept } else { 0 };
+        }
         let mut c5307 = [0f32; 90];
         let (best_index, best_claim, n5307) = self.weighed(x, y, WEIGHT_SIDE, &mut c5307);
         let mut fresh_5307 = 0f32;
@@ -1024,7 +1050,7 @@ fn claim_outline(
         g.notices.add(
             &FS_1056,
             format!(
-                "MRIreadOtl: slice {}'s outline of label {label_value} has {outside} points outside 0 to 511, which FreeSurfer writes outside its 512 x 512 outline array (other memory); not written here",
+                "MRIreadOtl: slice {}'s outline of label {label_value} has {outside} points outside 0 to 511, which FreeSurfer's source writes outside a 512 x 512 array (undefined behaviour; the official build leaves that never-read array out); not written here",
                 s.slice
             ),
         );

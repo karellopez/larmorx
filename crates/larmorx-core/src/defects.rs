@@ -2560,7 +2560,7 @@ defects! {
     FS_1055 = "FS-1055", "FreeSurfer", true,
         "mri_convert reading an outline (.otl) series with an outline of the colour table's entry 5307 (rh-unc in FreeSurferColorLUT.txt): that entry's score is never reset from one voxel to the next, so it adds up over the slice (scanned column by column) and the label takes every voxel scanned after its sum passes their own scores; its value before the first voxel is memory never written (0 under reproduce); corrected: each voxel scored afresh";
     FS_1056 = "FS-1056", "FreeSurfer", true,
-        "mri_convert reading an outline (.otl) series: an outline point of a known label with a coordinate outside 0 to 511 is written outside the 512 x 512 array FreeSurfer keeps the outlines in, into other memory (undefined behaviour); not written in larmorx (the array is never read)";
+        "mri_convert reading an outline (.otl) series: an outline point of a known label with a coordinate outside 0 to 511 is written outside a 512 x 512 array of FreeSurfer's (undefined behaviour; the array is never read, and the official build leaves it and its writes out, so its results do not change); not written in larmorx";
     FS_1057 = "FS-1057", "FreeSurfer", true,
         "mri_convert reading an outline (.otl) series into a volume less than 171 voxels wide or high (its size from --in_like) reads the labels of the voxels whose place in the outlines' 512 x 512 space falls outside the outline field (twice the volume's width by twice its height) from memory FreeSurfer does not own (arbitrary labels or a crash); 0 there in larmorx";
     FS_1058 = "FS-1058", "FreeSurfer", false,

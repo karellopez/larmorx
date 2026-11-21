@@ -60,6 +60,24 @@ FS-950, FS-1033, FS-01). Seeds 3 (1,000) and 7 (200): 0 different. Recorded:
 release 0.3 s; the same under the AArch64 NaN emulation (`NAN_TRAP_ARM=1`, debug and release) and
 on Windows x64. 264 of the 266 option names are drawn in seed 1, 251 of them reach the dump.
 
+## Results (relay 48: the outline reader, the record)
+
+`--kind otl` (the outline (`.otl`) series: the reader's every path once, 68 fixed cases, then
+seeded series of one to three slices with header-only `--in_like` sizes and every kind of outline;
+`SKIP_OTL` adds FS-1054, FS-1057, FS-1141 to FS-1145): seed 1, 120 cases: 104 identical, 16 `SKIP`,
+0 different; `fix` differs on 58, each with a notice (FS-01, FS-1055, FS-1060). Seeds 3 (250) and 7
+(150): see `docs/validation/freesurfer-mri-convert.md`. Recorded: `tests/fs_convert_otl_official.rs`
+(seed 1, 120 cases, 16 `SKIP`, `8277c810...`, from the clean commit d510f6d1; debug 14 s, one pass
+in each mode). `--kind cnv` seed 3, 1,000 cases: 952 identical, 48 `SKIP`, 0 different (relay 47's
+three were the conformed templates since moved to `cnv-heavy` and an FS-1043 case, now in
+`SKIP_CNV`). Also: `golden.py` (the golden cases' official value, `tests/mri_convert_golden.rs`),
+`fmriprep_call.py` (fMRIPrep's licence-check call, official against the port), `record.py`
+(`docs/validation/freesurfer-mri-convert.{json,md}`).
+
+    scripts/orchestration/boxed.sh 20 python -P validation/probes/fs-convert/check.py --kind otl --seed 1 --n 120
+    scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-convert/golden.py
+    scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-convert/fmriprep_call.py --port <larmorx-freesurfer> --work <empty folder>
+
 ## Results (relay 47: whole conversions)
 
 `--kind cnv`: seed 1, 400 cases: 382 identical with `reproduce`, 18 `SKIP`, 0 different; `fix`

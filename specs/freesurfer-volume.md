@@ -1728,6 +1728,22 @@ first one's places; "direct" is §6's direct access (FS-289, FS-290, FS-58).
   outermost; places outside the source skipped), `sigma` as `std` when asked. `MRImaxInLabelInRegion(src,
   lab, label, x0, y0, z0, whalf)`: the largest of those voxels (`double`, from 0, `>`), so 0 when every one
   is below 0 or there is none.
+- **The order of the label sums' additions** (the fs.volume clean room's item 58, relay 13): every sum of §35
+  (the label means' `double` sums of the values and of their `float` squares, in each of the five label-mean
+  functions, and `MRIcomputeLabelNbhd`'s `float` sums of the values) adds the voxel just read as the **first**
+  operand: `sum = v + sum` (`v` widened to `double` first in the means). Finite sums are the same either way;
+  where both operands are NaN, x86-64's addition gives the first operand's NaN (quieted), so the last NaN
+  value met in the walk's order (x outermost, then y, then z) decides the result's bits, and a NaN made by
+  the sum itself (an infinity and the opposite one added: the default NaN, `fff8000000000000` in `double`,
+  `ffc00000` in `float`) gives way to the next NaN value. The divisions and the square root keep their
+  operand's NaN; in the spread, `sq / n` and `mean mean` hold the same NaN wherever both are NaN (the sum of
+  squares meets no infinity's opposite), so the subtraction's operand order is not seen. **(observed)**: the clean room's
+  black-box check `validation/investigations/freesurfer-cleanroom-volume/nan-order/mk.py` (2 x 2 x 1 volumes of
+  chosen NaN payloads, 12 lines: `lmeans 1`, `lmeans 2` and `lnbhd` with half-widths 0 and 1), whose results
+  only this order and x outermost give of the four combinations of the two loop orders and the two operand
+  orders; §69's `vrules11` (28 lines: the five label means and the window's means, half-widths 0 and 1, of
+  those volumes and of one holding an infinity, the opposite one, 1 and a NaN payload: that payload is the
+  result) holds them; `vnbhd`'s `lnbhd` lines that sum an infinity, the opposite one, then a NaN payload.
 - `MRImakePositive(src, dst)`: the smallest voxel `min` of the source (`MRIvalRange`, §8), then `MRIcopy(src,
   dst)`; unless `min >= 0` (so also for a NaN `min`), every voxel of every frame (frames outermost, then x,
   y, z) becomes the source's voxel minus `min` (`float`), written into the copy. Returns the copy.
@@ -1780,7 +1796,8 @@ and `vrules9` (the open probe's commands `toimgv`, `toimg`, `img2mri` (§34), `s
 says what each covers and gives its hash), identical with `reproduce` but where FreeSurfer reads or
 writes memory it does not own or crashes (FS-53, FS-58, FS-289's other voxels outside, FS-290, FS-323,
 FS-465, FS-467 where its four runs differ), lines the loop allows; the default differs only with a notice
-(FS-12, FS-52, FS-289, FS-465, FS-466, FS-468). `models.py view`, `smooth` and `nearest` check §34's and
+(FS-12, FS-52, FS-289, FS-465, FS-466, FS-468); `vrules11` (relay 13) the label sums' NaN order, identical in
+both modes. `models.py view`, `smooth` and `nearest` check §34's and
 §35's statements as models of the printed results (README.md, "The models"). Not in the probe: a
 `MRIcomputeLabelNbhd` with values and no means, and a negative `max_labels` (FreeSurfer crashes; no
 program calls it so): the implementations' own tests.
@@ -3089,7 +3106,8 @@ for `vresamp` after its sources were given a good RAS in most cases, `fs-volume-
 | `vltapv` | 54 | 135 | 1 | 13 | 0 | `bfed872aef31c28bf4a9f56bb3ec90bfdd72a56cb82ffb69fd5ff7d95309970e` |
 | `vrules9` | 34, 35 | 34 | 12 | 3 | 0 | `cb1d6e4736502d9f8a764afbccd94a8c394df884f7a3025a760acb4db1aebc12` |
 | `vrules10` | 54 | 65 | 0 | 37 | 0 | `ed97d91b7155228360504d70666db8ff29aff06e07b851b971b63b8a8fad3276` |
-| all | | 13,830 | 1,457 | 720 | 13 | |
+| `vrules11` | 35 | 28 | 0 | 0 | 0 | `0ac19e58db95e47e5c81e32d185f94a101dfd51d96fcf1223d77a86b6357e6f4` |
+| all | | 13,858 | 1,457 | 720 | 13 | |
 
 The probe's groups `vbspline` and `vbsrules` are fs.bspline's (`specs/freesurfer-bspline.md` §9).
 
@@ -3266,6 +3284,11 @@ bit (35 vox to RAS, 36 vox to physvox, 32 RAS to vox, 33 RAS to physvox, 34 phys
 RAS under `reproduce`), 19 ends of the program as the model (the validity checks and the absent inverses),
 17 at the inverses' fill where a result is not finite or singular, none different **(observed)**, from the
 cache and without it (log `oracles/logs/fs-volume-probe-r13-ltatypes-2026-11-22.log`).
+
+`vrules11` (relay 13, 2026-11-22, the same probe; the same hash cold, warm and in two runs without the cache,
+log `oracles/logs/fs-volume-probe-r13-vrules11-2026-11-22.log`) holds §35's NaN order of the label sums: the
+five label means (the spread where it is given) and `MRIcomputeLabelNbhd` with half-widths 0 and 1 of four
+2 x 2 x 1 float volumes of chosen NaN payloads (and one infinity with its opposite), all labelled 0.
 
 `vrules` (relay 7, 2026-11-17: the prebuilt probe unchanged; log
 `oracles/logs/fs-volume-probe-r7-refs-2026-11-17.log`, the same hash from the cache and without it,

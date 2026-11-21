@@ -2525,6 +2525,27 @@ class Gen10(Gen9):
         L.append(arr(2, [(m1, g1, g2)], 0, "+gdiag=1 "))
         return [Batch("vrules10", "vrules10", L)]
 
+    @staticmethod
+    def vrules11() -> list[Batch]:
+        """§35's NaN order of the label sums: the five label means and MRIcomputeLabelNbhd (half-widths
+        0 and 1) of 2 x 2 x 1 float volumes whose voxels are chosen NaN payloads, labels all 0: the
+        result's payload tells the walk's order and each addition's operand order apart."""
+        L = []
+        one, a, b, c, d = 0x3F800000, 0x7FC0000A, 0x7FC0000B, 0x7FC0000C, 0x7FC0000D
+        lab = fixed_w(2, 2, 1, 0, fill=-1)
+        for ws in (
+            [one, b, c, d],
+            [one, a, b, one],
+            [a, b, c, d],
+            [0x7F800000, 0xFF800000, one, a],
+        ):
+            src = fixed_w(2, 2, 1, 3, fill="i" + ",".join(str(x) for x in ws))
+            for k, whalf, spread in ((0, 0, 0), (1, 0, 0), (2, 0, 1), (3, 1, 1), (4, 1, 0)):
+                L.append(f"lmeans {k} {src} {lab} 0 0 0 0 0 {whalf} {spread}")
+            for whalf in (0, 1):
+                L.append(f"lnbhd {lab} 0 {src} 0 0 0 {whalf} 1 1")
+        return [Batch("vrules11", "vrules11", L)]
+
 
 GROUPS = [
     "vgblock",
@@ -2562,6 +2583,7 @@ GROUPS = [
     "vltapv",
     "vrules9",
     "vrules10",
+    "vrules11",
 ]
 
 # ---- running ------------------------------------------------------------------------------------

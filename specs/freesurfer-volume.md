@@ -1759,8 +1759,10 @@ first one's places; "direct" is §6's direct access (FS-289, FS-290, FS-58).
   divided by it (`float`). Returns `NO_ERROR`. `vals` comes with `means` (FreeSurfer writes the sums through
   `means`; without it it crashes, a call the programs never make); a negative `max_labels` makes FreeSurfer
   clear an array of an enormous size (a crash): an implementation takes `max_labels` from its arrays.
-- `MRIlabelsInNbhd(mri, x, y, z, whalf, label)`: how many window voxels carry `label`.
-  `MRIlabelsInPlanarNbhd(..., which)`: in one plane: horizontal (2: z outer, x inner, through the tables; y
+- `MRIlabelsInNbhd(mri, x, y, z, whalf, label)`: how many window voxels carry `label`: `nint` of the voxel
+  (frame 0, §6's `nint`, not `(int)`) equals `label` (**(observed)**: `vnbhd`'s `linbhd` lines, painted labels
+  2.5 and 1.4999 among them; the fs.volume clean room's item 59).
+  `MRIlabelsInPlanarNbhd(..., which)` (the same `nint` test): in one plane: horizontal (2: z outer, x inner, through the tables; y
   as given, not clamped), sagittal (1: z outer, y inner; x as given), coronal (0: x outer, y inner; z as
   given); another plane: the error `MRIlabelsInPlanarNbhd: which=<w> not supported yet` (no final newline,
   `ERROR_UNSUPPORTED`) and 0.

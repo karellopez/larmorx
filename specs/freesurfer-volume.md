@@ -2464,21 +2464,40 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
   geometry`) its inverse's matrix, else `ERROR: LTAreduce(): LTs <k-1> and <k> do not match` and `NULL`; the reduced
   matrix becomes `M * reduced`. Its destination becomes the last transform's destination (its source when that one was
   inverted). The new array's inverse is not filled.
-- **`LTAchangeType(lta, type)`**: nothing at all when the array has the type (its inverses not filled either). Otherwise,
-  for each transform in order, its source then its destination must be valid: the first that is not ends the program
-  (status 252) with the error `LTAchangeType: src geometry must be valid` + `\n` (`dst` for the destination) before
-  anything changes (**(observed)**: `vltapv`). Writing `V(g)` for a geometry's scanner voxel-to-RAS matrix (`vg_i_to_r`,
-  §4: always made), `inv(V(g))` for its RAS-to-voxel matrix (`vg_r_to_i`, §4: none when the inverse fails), `S(g)` for a
-  new 4 x 4 identity with the geometry's `xsize`, `ysize`, `zsize` at (1, 1), (2, 2), (3, 3), `S'(g)` for the same with
+- **`LTAchangeType(lta, type)`** (the six changes between the voxel (`LINEAR_VOX_TO_VOX`, 0), RAS-to-RAS
+  (`LINEAR_RAS_TO_RAS`, 1) and physical-voxel (`LINEAR_PHYSVOX_TO_PHYSVOX`, 2) types, the validity checks, the targets
+  these three types do not support and the arrays of another type: made ready for the clean room by the spec
+  finisher's relays 12 and 13, §69.2's groups `vltapv` and `vrules10`, `models.py physvox` and `ltatypes`; the changes to
+  and from REGISTER_DAT, FSL and coronal RAS, at the end of this bullet, are not ready yet): nothing at all
+  when the array has the type (no check; its inverses not filled either: **(observed)** with invalid geometries).
+  Otherwise, whatever the array's type and the target, first for each transform in order its source then its
+  destination must be valid: the first that is not ends the program (status 252) with the error `LTAchangeType: src
+  geometry must be valid` + `\n` (`dst` for the destination) before anything changes (**(observed)**: `vltapv`,
+  `vrules10`: a later transform's destination; before a target the type does not support; for an array of another
+  type). Writing `V(g)` for a geometry's scanner voxel-to-RAS matrix (`vg_i_to_r`, §4: always made, no message),
+  `inv(V(g))` for its RAS-to-voxel matrix (`vg_r_to_i`, §4: none when the inverse fails, no message), `S(g)` for a new
+  4 x 4 identity with the geometry's `xsize`, `ysize`, `zsize` at (1, 1), (2, 2), (3, 3), `S'(g)` for the same with
   their reciprocals (`1 / size` in `double` stored as `float`: 0 gives an infinity, a NaN stays NaN), `M` for a
   transform's matrix, src/dst its geometries, and `A · B` for `MatrixMultiply(A, B, ...)` (`specs/freesurfer-maths.md`
   §8.1: an inner product into a new matrix, an outer one into `M` itself; their messages and ends of the program
-  included, so a matrix of another size than 4 x 4 prints their errors and ends at the first absent operand):
-  - RAS to vox: `inv(V(dst)) (M V(src))`; an inverse that fails ends the program (`LTAgetV2V: passed volumes did not
-    have the info on i_to_r or r_to_i.`).
-  - vox to RAS: `V(dst) (M inv(V(src)))` (`LTAgetR2R: passed volumes did not have the info on r_to_i or i_to_r`).
-  - RAS to physvox: the vox matrix, then `S(dst) (vox S'(src))`; vox to physvox: `S(dst) (M S'(src))`; physvox to vox:
-    `S'(dst) (M S(src))`.
+  included, so a matrix of another size than 4 x 4 prints their errors and ends at the first absent operand), the
+  change is made for each transform in order, each transform's whole change before the next one's (an end of the
+  program at a later transform leaves nothing observable), as follows; none prints anything else, whatever
+  `Gdiag_no` (**(observed)**: `vrules10` with the diagnostic level 1):
+  - RAS to vox (1 to 0): `V(src)` made, then `inv(V(dst))`; no `inv(V(dst))` ends the program (status 252) with the error
+    `LTAgetV2V: passed volumes did not have the info on i_to_r or r_to_i.` (the text without a final newline); then `M
+    = inv(V(dst)) · (M · V(src))` (**(observed)**: `vrules10`, `models.py ltatypes`, every case bit for bit; a source
+    whose `V` is singular makes the result singular, so the inverses' fill below ends the program).
+  - RAS to physvox (1 to 2): the same as RAS to vox, its end included, then `M = S(dst) · (M · S'(src))`
+    (**(observed)**: as RAS to vox).
+  - vox to RAS (0 to 1): `inv(V(src))` made, then `V(dst)`; no `inv(V(src))` ends the program (status 252) with the error
+    `LTAgetR2R: passed volumes did not have the info on r_to_i or i_to_r` (the text without a final newline); then `M =
+    V(dst) · (M · inv(V(src)))` (**(observed)**: `vltapv`, `vrules10`, `models.py ltatypes`; a destination whose `V` is
+    singular: the fill ends the program).
+  - vox to physvox (0 to 2): `M = S(dst) · (M · S'(src))`; physvox to vox (2 to 0): `M = S'(dst) · (M · S(src))`; no
+    geometry's matrix is made, so a singular direction matrix changes nothing here (**(observed)**: `vltapv`,
+    `vrules10`, `models.py ltatypes`; a size of 0 or NaN gives a result that is not finite, so the fill ends the
+    program).
   - physvox to RAS (made ready for the clean room by the spec finisher's relay 12; `specs/freesurfer-bspline.md` §5.3 uses
     it): for each transform in order, FS-506 noted (both modes, when the array holds a transform):
     - `reproduce` (FreeSurfer's): `V(src)` and `inv(V(dst))` made; no `inv(V(dst))` ends the program (status 252) with the
@@ -2492,6 +2511,22 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
       volumes did not have the info on r_to_i or i_to_r` (the text without a final newline); then `M = V(dst) · (M ·
       inv(V(src)))`.
     Then the array's type is `LINEAR_RAS_TO_RAS` (1) and its inverses are filled (`LTAfillInverse` above).
+  - a target that the array's type (RAS, vox or physvox) does not support, any number but the type's own changes above
+    and REGISTER_DAT (14) and FSL (15) (coronal RAS, 21, among them; negative numbers too), ends the program (status
+    252) with the error `LTAchangeType: you are requesting ras-to-ras to <n> ` from RAS (`vox-to-vox` from vox,
+    `physvox-to-physvox` from physvox; `<n>` the target in decimal, then one space, the text without a final newline),
+    after the validity checks and before any change, also for an array of no transforms (**(observed)**: `vrules10`,
+    targets -1, 3, 5, 12, 21, 99).
+  - an array of a type none of 0, 1, 2, 14 (REGISTER_DAT), 15 (FSL) and 21 (coronal RAS), any other number, negative
+    ones included: after the validity checks, its matrices and its type are kept (the target is not taken), and its
+    inverses are filled (**(observed)**: `vrules10`, types -1, 3, 5, 10, 11, 12 and 99, the inverses' matrices given).
+  Every change above that does not end the program then sets the array's type to the target and fills its inverses
+  (`LTAfillInverse` above: a result that is not invertible, or not finite, ends the program there with its error;
+  FS-505 where an inverse has no matrix). An array of no transforms takes the target and nothing else (**(observed)**:
+  `vltapv`, `vrules10`, every one of the six changes).
+
+  **Not yet ready for the clean room** (the spec finisher's next relay): the changes to and from REGISTER_DAT, FSL and
+  coronal RAS, as track A wrote them:
   - RAS to REGISTER_DAT: tkregister's registration of section 15b with the destination as reference and the source as
     moving (`MRItkRegMtx(dst, src, M)`); REGISTER_DAT to RAS: its inverse conversion (`MRItkReg2Native` of headers of the
     two geometries); FreeSurfer converts the first transform once per transform (FS-507; by default each once).
@@ -2500,12 +2535,10 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
     REGISTER_DAT; vox and physvox to REGISTER_DAT or FSL through RAS; REGISTER_DAT to vox through RAS. An FSL conversion
     that gives no matrix: FS-508.
   - coronal RAS to RAS: `RASFromSurfaceRAS_(dst header) * M`; to REGISTER_DAT or FSL through RAS.
-  - another target ends the program: `LTAchangeType: you are requesting ras-to-ras to <n> ` (and `vox-to-vox`,
-    `physvox-to-physvox`; `LTAchangeType unsupported: you are requesting REGISTER_DAT to <n> `, `COR_RAS_TO_COR_RAS`,
-    `FSLREG_TYPE`), `ERROR_BADPARM`.
-  - an array of another type keeps its matrices and type.
-  The array takes the new type and its inverses are filled. From REGISTER_DAT, coronal RAS and FSL, with `Gdiag_no >
-  0`: `transformed matrix:` and the first matrix (`MatrixPrint`) on standard output.
+  - from REGISTER_DAT, coronal RAS and FSL, another target ends the program: `LTAchangeType unsupported: you are
+    requesting REGISTER_DAT to <n> ` (`COR_RAS_TO_COR_RAS`, `FSLREG_TYPE`), status 252.
+  These take the new type and fill the inverses as above. From REGISTER_DAT, coronal RAS and FSL, with `Gdiag_no > 0`:
+  `transformed matrix:` and the first matrix (`MatrixPrint`) on standard output.
 - **`LTAmriIsSource(lta, mri)`**, **`LTAmriIsTarget(lta, mri)`**: 1 when the volume's geometry (marked valid) equals the
   first transform's source (the last transform's destination), else 0 (`vg_isEqual`). FS-504 without transforms.
 - **`LTAprint(fp, lta)`**: `type      = <n> ` and `# LINEAR_VOX_TO_VOX`, `# LINEAR_RAS_TO_RAS` or `# REGISTER_DAT` for
@@ -2616,11 +2649,13 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
   FreeSurfer decides it backwards (FS-516). An orientation that names an axis twice or is unknown: FS-515.
 
 ## 58. Validation plan (sections 54 to 57)
-§54's `LTAfillInverse` and its change from physical-voxel to RAS-to-RAS (made ready by the spec finisher's relay
-12): §69's group `vltapv` (the open probe's `ltachg`; and `bslta`, `specs/freesurfer-bspline.md` §5.3), identical
-with `reproduce` but where FreeSurfer crashes; the default differs only with a notice (FS-505, FS-506); `models.py
-physvox` checks the `reproduce` products bit for bit. The rest of §54 to §57 is not yet read through for the clean
-room; until it is, the plan below names the replica's closed probe, which the implementer does not open.
+§54's `LTAfillInverse` and `LTAchangeType`'s changes between the voxel, RAS-to-RAS and physical-voxel types, its
+validity checks, unsupported targets and arrays of another type (made ready by the spec finisher's relays 12 and
+13): §69's groups `vltapv` and `vrules10` (the open probe's `ltachg`; and `bslta`, `specs/freesurfer-bspline.md`
+§5.3), identical with `reproduce` but where FreeSurfer crashes; the default differs only with a notice (FS-505,
+FS-506); `models.py physvox` and `ltatypes` check the products bit for bit. The rest of §54 to §57 (`LTAchangeType`'s
+changes to and from REGISTER_DAT, FSL and coronal RAS among them) is not yet read through for the clean room; until
+it is, the plan below names the replica's closed probe, which the implementer does not open.
 
 The probe's `ltafill`, `ltainv`, `ltachg`, `ltacat`, `ltared`, `ltasrc`, `ltaprt` (arrays of 0 to 3 transforms along a
 pool of scanner-like geometries, chained, inverted and mismatched; all types, FSL output types, `Gdiag_no`), `a2v`,
@@ -3053,7 +3088,8 @@ for `vresamp` after its sources were given a good RAS in most cases, `fs-volume-
 | `vnbhd` | 35 | 441 | 25 | 0 | 0 | `bab7fbd76b04b803e5f32428cebe154f75f5f395252275261f483bd5aeb14832` |
 | `vltapv` | 54 | 135 | 1 | 13 | 0 | `bfed872aef31c28bf4a9f56bb3ec90bfdd72a56cb82ffb69fd5ff7d95309970e` |
 | `vrules9` | 34, 35 | 34 | 12 | 3 | 0 | `cb1d6e4736502d9f8a764afbccd94a8c394df884f7a3025a760acb4db1aebc12` |
-| all | | 13,765 | 1,457 | 683 | 13 | |
+| `vrules10` | 54 | 65 | 0 | 37 | 0 | `ed97d91b7155228360504d70666db8ff29aff06e07b851b971b63b8a8fad3276` |
+| all | | 13,830 | 1,457 | 720 | 13 | |
 
 The probe's groups `vbspline` and `vbsrules` are fs.bspline's (`specs/freesurfer-bspline.md` §9).
 
@@ -3212,6 +3248,25 @@ four runs see differently (FS-467), the direct reads outside (FS-290) and FS-323
 `ImageToMRI`'s refused formats (status 252), `LTAchangeType`'s validity checks and its products' and
 inverses' ends of the program (status 252), §5.3's (`specs/freesurfer-bspline.md`).
 
+`vrules10` (relay 13, 2026-11-22: the prebuilt probe from 0b5c7bb6 unchanged; the same hash cold, warm and
+in two runs without the cache, log `oracles/logs/fs-volume-probe-r13-vrules10-2026-11-22.log`; every earlier
+hash unchanged) holds §54's fixed cases of `LTAchangeType` between the voxel, RAS-to-RAS and physical-voxel
+types: each of the six changes with two transforms along three geometries and with none; a geometry whose
+voxel-to-RAS matrix is singular as the source and as the destination of each change (where the change needs
+its inverse, the change's own end; where not, the inverses' fill ends the program); voxel sizes of 0 and NaN
+in the source and in the destination of the four changes that scale by the sizes; the validity checks (an
+invalid source, a later transform's invalid destination, an invalid geometry before a target the type does
+not support and in an array of another type, none for the same type); the targets -1, 3, 5, 12, 21 and 99
+that the three types do not support, one with an array of no transforms; arrays of the types -1, 3, 5, 10,
+11, 12 and 99 (their matrices and types kept, their inverses filled); two changes at the diagnostic level 1.
+Its 37 exits are those ends (status 252). `models.py ltatypes` (README.md, "The models") checks every
+`ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays (30 per change) against §54's products, with
+the geometries' matrices from the probe's own `vgi2r` and `vgr2i`: 282 changed arrays as the model, bit for
+bit (35 vox to RAS, 36 vox to physvox, 32 RAS to vox, 33 RAS to physvox, 34 physvox to vox, 112 physvox to
+RAS under `reproduce`), 19 ends of the program as the model (the validity checks and the absent inverses),
+17 at the inverses' fill where a result is not finite or singular, none different **(observed)**, from the
+cache and without it (log `oracles/logs/fs-volume-probe-r13-ltatypes-2026-11-22.log`).
+
 `vrules` (relay 7, 2026-11-17: the prebuilt probe unchanged; log
 `oracles/logs/fs-volume-probe-r7-refs-2026-11-17.log`, the same hash from the cache and without it,
 the other groups' hashes unchanged) holds fixed cases of single statements: FS-291 with tensor
@@ -3327,7 +3382,7 @@ cached matrices).
   when they are ported.
 - **Every platform:** the clean room's own golden checks (its results on the other five platforms
   are its Linux results; a NaN's bits as x86-64 gives them).
-- **§37 to §68** (but §54's `LTAfillInverse` and its change from physical-voxel to RAS-to-RAS, in
-  `vltapv`) are not yet in the open probe: until they are, their clean room checks them against the
+- **§37 to §68** (but §54's `LTAfillInverse` and `LTAchangeType`'s changes between the voxel, RAS-to-RAS
+  and physical-voxel types, in `vltapv` and `vrules10`) are not yet in the open probe: until they are, their clean room checks them against the
   official programs as black boxes and against the replays; their validation plans name the replica's
   probe, which the implementer does not open.

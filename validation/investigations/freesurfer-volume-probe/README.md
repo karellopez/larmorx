@@ -1,7 +1,7 @@
 # FreeSurfer 8.2.0's volume functions and B-splines, as a black box (fs.volume parts 1 to 7b, fs.bspline)
 
 The probe behind the **(observed)** marks and the validation plan (§69) of
-[`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 7b (§1 to §35, and §54's change of a transform array from physical-voxel to RAS-to-RAS:
+[`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 7b (§1 to §35, and §54's changes of a transform array between the voxel, RAS-to-RAS and physical-voxel types:
 the volume-geometry text block, its copies, matrices, comparison and printer; the voxel
 arithmetic; coordinates, orientation, the Talairach point, centre of mass, principal components,
 the running average, the header comparison, determinant and dump; the samplers, the moves, the
@@ -22,8 +22,8 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 |---|---|
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 26 groups of seeded cases and eight of fixed cases (`vrules`, `vrules4` to `vrules9`, `vbsrules`; 14,247 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
-| `models.py` | statements of the spec checked as models of the probe's printed results: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`) |
+| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 26 groups of seeded cases and nine of fixed cases (`vrules`, `vrules4` to `vrules10`, `vbsrules`; 14,312 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `models.py` | statements of the spec checked as models of the probe's printed results: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
 runs use the fs.maths probe's guard allocator, `guard_malloc.so` beside it
@@ -300,7 +300,10 @@ cases, voxel sizes 0 and NaN, matrices of every kind, inverses without a matrix;
 integers that a float cannot hold, RGB images of 1 to 3 frames, headers that count more than their pixels,
 the formats `ImageToMRI` refuses, a given image too small or too narrow for `MRItoImage`, negative labels
 in the smoothing, bright white matter of values outside 0 to 255, windows more than 500 voxels outside and
-the nearest non-zero voxel at points outside, on lines of their own, planes not supported), and fs.bspline's `vbspline` (the coefficients of volumes of the six numeric types, degrees 2
+the nearest non-zero voxel at points outside, on lines of their own, planes not supported), the fixed cases of
+`vrules10` (§54: `LTAchangeType`'s six changes between the voxel, RAS-to-RAS and physical-voxel types with two
+transforms and with none, singular geometries as source and destination, voxel sizes 0 and NaN, the validity
+checks, the targets the three types do not support, arrays of other types, a diagnostic level), and fs.bspline's `vbspline` (the coefficients of volumes of the six numeric types, degrees 2
 to 9 and 0, 1, 10, -1, given B-splines with fitting, other or no coefficients; sampling at points inside,
 at and past the edges, NaN and infinite, frames -1 to one past; the frame-range sampler; coefficients
 sampled as given with degrees -2 to 12; the linear, RAS and transform-array transforms; the pyramids into
@@ -388,3 +391,9 @@ cached matrices as allocated, recomputed or dropped.
   Label volumes are zeros with small labels painted (a seeded fill would make nearly every point's own
   voxel non-zero); the nearest non-zero voxel's points round inside the volume (its direct read of the
   point itself outside is on lines of their own, `vrules9`).
+- Relay 13 (2026-11-22): the prebuilt probe from `0b5c7bb6` unchanged; the new fixed group `vrules10` (65
+  calls: §54's `LTAchangeType` between the voxel, RAS-to-RAS and physical-voxel types) the same cold, warm and
+  twice without the cache, the probe as its own candidate identical in both modes (log
+  `oracles/logs/fs-volume-probe-r13-vrules10-2026-11-22.log`); `models.py ltatypes`: 282 changed arrays as the
+  model bit for bit, 19 ends of the program as the model, 17 at the inverses' fill, none different, from the
+  cache and without it (log `oracles/logs/fs-volume-probe-r13-ltatypes-2026-11-22.log`).

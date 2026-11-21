@@ -2436,6 +2436,95 @@ class Gen10(Gen9):
         L.append(f"lnbhd {v} 0 null 0 0 0 1 0 1")
         return [Batch("vrules9", "vrules9", L)]
 
+    @staticmethod
+    def vrules10() -> list[Batch]:
+        """§54's fixed cases of LTAchangeType between voxel, RAS-to-RAS and physical-voxel arrays:
+        each of the six changes with two transforms and with none; a geometry whose inverse fails
+        where the change needs that inverse and where it does not (the inverses' fill then ends the
+        program); voxel sizes of 0 and NaN; the validity checks (an invalid source, a later
+        transform's invalid destination, before an unsupported target, for an array of another
+        type, none for the same type); the unsupported targets; arrays of another type; a
+        diagnostic level."""
+        L = []
+        zero = f32(0.0)
+
+        def geo(
+            valid: int = 1,
+            dims: tuple = (3, 3, 3),
+            sizes: tuple = (f32(1.0), f32(1.0), f32(1.0)),
+            cos: tuple = (1, 0, 0, 0, 1, 0, 0, 0, 1),
+            c: tuple = (0.0, 0.0, 0.0),
+        ) -> str:
+            f = [str(valid), *map(str, dims), *sizes, "1", *(f32(v) for v in cos)]
+            f += [*(f32(v) for v in c), zero, zero, zero, xs("")]
+            return " ".join(f) + " 1 null"
+
+        def aff(a: tuple) -> str:
+            return "4 4 " + " ".join(f32(v) for v in (*a, 0.0, 0.0, 0.0, 1.0))
+
+        ident = aff((1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0))
+
+        def lt(m: str, a: str, b: str) -> str:
+            return " ".join([zero] * 4 + [m, "null", "null", "0", "0", a, b])
+
+        def arr(ty: int, items: list, target: int, pre: str = "") -> str:
+            fw = [lt(m, a, b) for m, a, b in items]
+            inv = [lt(ident, b, a) for _, a, b in items]
+            n = len(items)
+            return f"{pre}ltachg {n} {ty} {f32(1.0)} {xs('')} {' '.join(fw + inv)} {target}"
+
+        g1 = geo(
+            dims=(4, 3, 2),
+            sizes=(f32(2.0), f32(1.5), f32(0.5)),
+            cos=(0, 1, 0, -1, 0, 0, 0, 0, 1),
+            c=(10.0, -5.0, 3.0),
+        )
+        g2 = geo(dims=(3, 5, 2), sizes=(f32(1.0), f32(3.0), f32(1.0)), c=(-1.0, 2.0, 7.0))
+        g3 = geo(
+            dims=(2, 2, 6),
+            sizes=(f32(0.9375), f32(1.0), f32(1.25)),
+            cos=(0.6, 0.8, 0.0, -0.8, 0.6, 0.0, 0.0, 0.0, 1.0),
+            c=(0.5, 0.25, -3.0),
+        )
+        gs = geo(cos=(1, 0, 0, 1, 0, 0, 0, 0, 1))  # a singular voxel-to-RAS matrix
+        gz = geo(sizes=(zero, f32(1.0), f32(2.0)))
+        gn = geo(sizes=(f32(1.0), QNAN, f32(2.0)))
+        gbad = geo(valid=0)
+        m1 = aff((1.1, 0.2, 0.0, 5.0, -0.1, 0.9, 0.3, -2.0, 0.0, 0.1, 1.2, 4.0))
+        m2 = aff((0.0, -1.0, 0.0, 12.5, 1.0, 0.0, 0.0, -3.0, 0.0, 0.0, 2.0, 0.75))
+        pairs = [(0, 1), (0, 2), (1, 0), (1, 2), (2, 0), (2, 1)]
+        for ty, tg in pairs:
+            L.append(arr(ty, [(m1, g1, g2), (m2, g2, g3)], tg))
+            L.append(arr(ty, [], tg))
+        # a singular geometry as the source, then as the destination
+        for ty, tg in pairs:
+            L.append(arr(ty, [(m1, gs, g2)], tg))
+            L.append(arr(ty, [(m1, g1, gs)], tg))
+        # voxel sizes of 0 and NaN where the changes through physical voxels scale
+        for ty, tg in [(0, 2), (1, 2), (2, 0), (2, 1)]:
+            for g in (gz, gn):
+                L.append(arr(ty, [(m1, g, g2)], tg))
+                L.append(arr(ty, [(m1, g1, g)], tg))
+        # the validity checks
+        L.append(arr(1, [(m1, gbad, g2)], 0))
+        L.append(arr(0, [(m1, g1, g2), (m2, g2, gbad)], 2))
+        L.append(arr(1, [(m1, gbad, g2)], 5))
+        L.append(arr(10, [(m1, g1, gbad)], 1))
+        L.append(arr(1, [(m1, gbad, gbad)], 1))
+        L.append(arr(2, [(m1, g1, gbad)], 2))
+        # the unsupported targets
+        for ty, tg in [(1, 5), (1, 21), (0, 3), (0, 21), (2, 21), (2, 12), (0, -1), (1, 99)]:
+            L.append(arr(ty, [(m1, g1, g2)], tg))
+        L.append(arr(1, [], 5))
+        # arrays of another type: the matrices kept, the inverses filled
+        for ty, tg in [(10, 1), (5, 0), (99, 2), (-1, 1), (11, 0), (12, 1), (3, 2)]:
+            L.append(arr(ty, [(m1, g1, g2)], tg))
+        L.append(arr(10, [], 1))
+        # a diagnostic level prints nothing for these changes
+        L.append(arr(0, [(m1, g1, g2)], 1, "+gdiag=1 "))
+        L.append(arr(2, [(m1, g1, g2)], 0, "+gdiag=1 "))
+        return [Batch("vrules10", "vrules10", L)]
+
 
 GROUPS = [
     "vgblock",
@@ -2472,6 +2561,7 @@ GROUPS = [
     "vnbhd",
     "vltapv",
     "vrules9",
+    "vrules10",
 ]
 
 # ---- running ------------------------------------------------------------------------------------

@@ -13,7 +13,7 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 (``ORIGINAL_PRELUDE_CASES``, 2026-11-06); tedana's t2smap against the ``larmorx-gpl`` replica
 (``T2SMAP_CASES``, 2026-11-08) and its clean-room original (``T2SMAP_ORIGINAL_CALLS``,
 2026-11-11); FreeSurfer's ``mri_normalize`` against the ``larmorx-freesurfer`` replica
-(``MRI_NORMALIZE_CASES``, 2026-11-19).
+(``MRI_NORMALIZE_CASES``, 2026-11-19) and ``mri_binarize`` (``MRI_BINARIZE_CASES``, 2026-11-21).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -2093,3 +2093,86 @@ def test_mri_normalize_replica_needs_no_more_memory_than_freesurfer(tmp_path, na
         )
         c = fsfiles.compare(o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out)
         assert c.same, f"mri_normalize {name} ({mode}): {c.verdict} {c.detail}"
+
+
+#: FreeSurfer 8.2.0's ``mri_binarize`` (the official ``$FREESURFER_HOME/bin/mri_binarize``, run by
+#: name as the scripts run it) against the ``larmorx-freesurfer`` replica's standalone program
+#: (queue item 3.2-19, 2026-11-21): the calls of recon-all (the white matter's mask of the
+#: segmentation, the counts of the edited ``wm.mgz``), ``mri_nu_correct.mni`` (the volume of ones)
+#: and a tessellation (``--surf``) on a recorded head (ds000005 sub-01's classic run), one thread,
+#: both D13 modes; every file written identical to FreeSurfer's (provenance aside).
+MRI_BINARIZE_CASES = [
+    ("wm-mask", ["--i", "{mri}/aseg.presurf.mgz", "--match", "2", "41", "--o", "wm.mask.mgz"]),
+    ("ones", ["--i", "{mri}/nu.mgz", "--min", "-1", "--o", "ones.mgz"]),
+    (
+        "wm255",
+        [
+            "--i",
+            "{mri}/wm.mgz",
+            "--min",
+            "255",
+            "--max",
+            "255",
+            "--o",
+            "wm255.mgz",
+            "--count",
+            "wm255.txt",
+        ],
+    ),
+    ("surf", ["--i", "{mri}/aseg.mgz", "--match", "17", "--surf", "lh.hippo"]),
+]
+
+
+@pytest.mark.parametrize(("name", "args"), MRI_BINARIZE_CASES)
+def test_mri_binarize_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, args):
+    from larmorx_validation.freesurfer import files as fsfiles
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / "mri_binarize" if ws else None
+    mri = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / "ds000005-sub-01-classic" / "subjects"
+        / "sub-01" / "mri"
+        if ws
+        else None
+    )  # fmt: skip
+    if exe is None or not exe.is_file() or not (mri / "aseg.presurf.mgz").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    words = [a.format(mri=mri) for a in args]
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        **freesurfer_env(),
+    }
+    o_dir = tmp_path / "freesurfer"
+    o_dir.mkdir()
+    code, fs_mib = _original_peak(
+        ["mri_binarize", *words], env, "freesurfer", _emptier(o_dir), o_dir, (), "freesurfer"
+    )
+    assert code == 0
+    outs = sorted(p.name for p in o_dir.iterdir() if p.is_file())
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_binarize", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(f"mri_binarize {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"mri_binarize {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        assert sorted(p.name for p in r_dir.iterdir() if p.is_file()) == outs, name
+        for out in outs:
+            c = fsfiles.compare(
+                o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out
+            )
+            assert c.same, f"mri_binarize {name} ({mode}): {out}: {c.verdict} {c.detail}"

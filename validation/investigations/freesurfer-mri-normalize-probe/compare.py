@@ -12,8 +12,8 @@ oracle-output cache at one thread, and through the candidate (``--candidate``, a
 relative files). Compared: the exit status, standard output and error (the timing line's numbers,
 the ``VmPeak`` figure and the candidate's ``larmorx:`` notices aside) and every file written
 (FreeSurfer's provenance aside: ``larmorx_validation.freesurfer.files``). ``reproduce`` must give
-FreeSurfer's on every case but those whose reproduce run notes a defect of ``NOT_COMPARABLE`` (or
-``PE``), which are counted; ``fix`` may differ only with a notice.
+FreeSurfer's on every case but those whose reproduce run notes a defect of ``NOT_COMPARABLE``,
+which are counted; ``fix`` may differ only with a notice.
 
     python -P validation/investigations/freesurfer-mri-normalize-probe/compare.py --seed 1 \
         --candidate '<program> --upstream-defects {mode} freesurfer mri_normalize'
@@ -53,7 +53,6 @@ NOT_COMPARABLE = frozenset(
 )  # fmt: skip
 #: The number in the message on rejected control points is not the program's result (FS-596).
 REJECTED = re.compile(r"!!!!! -?[0-9]+ control points rejected")
-PERROR = re.compile(r"^No such file or directory\nerror: Invalid argument$", re.M)
 #: FreeSurfer's runs compared with their entries: the timing line and the memory figure vary, and
 #: its files' provenance (the command line with its time).
 POLICY = oracle_cache.Policy(
@@ -388,11 +387,6 @@ def run(
             ids = notices(pe)
             row[side] = {"exit": pc, "differ": diffs, "notices": ids}
             rep_ids = notices(sides[modes[0]][2])
-            # PE: after its first message of a failed open, FreeSurfer prints the error
-            # "Invalid argument" where the open's error ("No such file or directory") is expected,
-            # when its standard error is opened write-only (a pipe, a file): counted, not compared
-            if PERROR.search(oe) and diffs == ["stderr"]:
-                rep_ids = [*rep_ids, "PE"]
             if any(x in skip for x in rep_ids):
                 row[side]["skip"] = True
                 verdicts[f"{side}-skip"] += 1

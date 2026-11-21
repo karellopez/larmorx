@@ -62,9 +62,10 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # FS-53 (a volume read or written past its memory), FS-58 (a volume without voxels), FS-540 and
 # FS-541 (the distance transform's neighbours outside the volume's memory: memory contents or a
 # crash), FS-1016 (an option short of its arguments: FreeSurfer crashes or reads the environment),
-# FS-04 (random numbers seeded from the clock), PE (fs.io's LabelRead does not model the C library's first perror on a write-only standard
-# error, whose errno FreeSurfer then prints: relay 45 of track D)
-SKIP = ("FS-04", "FS-53", "FS-58", "FS-540", "FS-541", "FS-1016", "PE")
+# FS-04 (random numbers seeded from the clock); relay 48 of track D: a label that cannot be
+# opened is compared again (fs.core models the C library's first perror on a write-only standard
+# error)
+SKIP = ("FS-04", "FS-53", "FS-58", "FS-540", "FS-541", "FS-1016")
 
 # MRImaxsegment prints the process's heap usage (its VmData): the port's probe prints 1000
 HEAP = re.compile(r"heap usage = -?[0-9]+ Kbytes")

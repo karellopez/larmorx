@@ -6,7 +6,8 @@
 //! the 66 commands; `metric`'s through the probe built with a stub metric-properties step),
 //! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1980` on Linux x64 from the unit
 //! oracle's build (2026-11-18, relay 45 of track D, from the clean commit 92b6234c: 1,921 lines
-//! identical, 59 counted, not compared, where
+//! identical, 59 counted, not compared; the same hash and digests from the clean commit 2f7297d8,
+//! relay 48, where a label that cannot be opened is compared: seed 1 has none), where
 //! FreeSurfer reads memory it never wrote or does not own, writes past a buffer or loops for ever:
 //! `SKIP`), against the port's output with `reproduce` (a case the port marks
 //! with one of those defects hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread`,
@@ -26,14 +27,14 @@ use larmorx_freesurfer_surf::aaa::SurfGlobals;
 use sha2::{Digest, Sha256};
 
 /// `check.py`'s `SKIP` and `SKIP_WHEN_REFUSED`.
-const SKIP: [&str; 61] = [
+const SKIP: [&str; 60] = [
     "FS-121", "FS-123", "FS-06", "FS-167", "FS-49", "FS-140", "FS-144", "FS-151", "FS-154",
     "FS-157", "FS-158", "FS-160", "FS-346", "FS-352", "FS-354", "FS-356", "FS-357", "FS-358",
     "FS-359", "FS-360", "FS-361", "FS-362", "FS-367", "FS-370", "FS-371", "FS-372", "FS-373",
     "FS-76", "FS-376", "FS-379", "FS-380", "FS-48h", "FS-382", "FS-383", "FS-384", "FS-386",
     "FS-388", "FS-389", "FS-391", "FS-392", "FS-53", "FS-521", "FS-533", "FS-534", "FS-614",
     "FS-622", "FS-623", "NP", "FS-191", "FS-625u", "FS-634", "FS-913", "FS-991", "FS-992",
-    "FS-993", "FS-996", "FS-576", "FS-1002", "FS-1010", "FS-1012", "PE",
+    "FS-993", "FS-996", "FS-576", "FS-1002", "FS-1010", "FS-1012",
 ];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 

@@ -237,6 +237,7 @@ dependencies = [
  "larmorx-freesurfer-core",
  "larmorx-freesurfer-mri",
  "larmorx-freesurfer-surf",
+ "larmorx-freesurfer-volume",
  "tempfile",
 ]
 
@@ -373,6 +374,7 @@ version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-freesurfer-core",
+ "larmorx-freesurfer-deform",
  "larmorx-freesurfer-filter",
  "larmorx-freesurfer-gca",
  "larmorx-freesurfer-io",

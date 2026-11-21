@@ -144,8 +144,8 @@ def main(argv: list[str] | None = None) -> int:
         lines.append(
             f"- seed {p['seed']}: {p['cases']} cases; `reproduce` {v.get('identical', 0)} "
             f"identical, {v.get('different', 0)} different, {v.get('reproduce-skip', 0)} counted "
-            "(FreeSurfer reads memory it does not own or crashes there: FS-597, FS-601, FS-1016; "
-            f"or PE); `fix` {v.get('fix-identical', 0)} identical, {v.get('fix-explained', 0)} "
+            "(FreeSurfer reads memory it does not own or crashes there: FS-597, FS-601, FS-1016); "
+            f"`fix` {v.get('fix-identical', 0)} identical, {v.get('fix-explained', 0)} "
             f"different with a notice, {v.get('fix-unexplained', 0)} without."
         )
     lines += [

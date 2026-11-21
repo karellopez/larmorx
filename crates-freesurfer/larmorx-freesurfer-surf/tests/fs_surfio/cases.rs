@@ -11,6 +11,7 @@ use std::cell::RefCell;
 use std::io::Write;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use larmorx_core::defects::{
     FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, FS_138, FS_145, FS_150, FS_153, FS_159, FS_348,
@@ -1189,12 +1190,18 @@ impl Out {
     }
 }
 
-/// Standard output and error, one stream (the probe sends both to one file).
+/// Standard output and error, one stream (the probe sends both to one file). Standard error's
+/// handle carries its case's `Globals::stderr` flag, which its first byte sets (relay 48 of track
+/// D: the C library's first `perror` on a write-only standard error nothing has written to leaves
+/// `EINVAL` in `errno`, which fs.core models; the official probe's children write to a file).
 #[derive(Clone, Default)]
-struct Shared(Rc<RefCell<Vec<u8>>>);
+struct Shared(Rc<RefCell<Vec<u8>>>, Option<Arc<AtomicBool>>);
 
 impl Write for Shared {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if let Some(w) = self.1.as_ref().filter(|_| !buf.is_empty()) {
+            w.store(true, Ordering::Relaxed);
+        }
         self.0.borrow_mut().extend_from_slice(buf);
         Ok(buf.len())
     }
@@ -2908,11 +2915,13 @@ pub fn run_line_with(
     sg: SurfGlobals,
 ) -> (String, Vec<&'static str>) {
     let shared = Shared::default();
+    let g = Globals::new(mode);
+    let b = Shared(shared.0.clone(), Some(g.stderr.written.clone()));
     let mut cx = Ctx {
-        g: Globals::new(mode),
+        g,
         sg,
         a: shared.clone(),
-        b: shared.clone(),
+        b,
         work: None,
         extra: Vec::new(),
     };
@@ -3020,13 +3029,6 @@ pub fn run_line_with(
     // that CTN takes as a DICOM data set), its placeholder message: `NP`, counted, not compared
     if text.contains("is not ported yet") {
         ids.push("NP");
-    }
-    // relay 45 of track D: a label that cannot be opened. glibc's first `perror` on a standard
-    // error nothing has written to yet (a file, write-only) leaves `EINVAL` in `errno`, which
-    // fs.io's `LabelRead` does not model (the error after it prints its own `errno`): `PE`, counted,
-    // not compared
-    if text.contains("could not open label file") {
-        ids.push("PE");
     }
     ids.extend(cx.extra.iter().copied());
     ids.sort_unstable();

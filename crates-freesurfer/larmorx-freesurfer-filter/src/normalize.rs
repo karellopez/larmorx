@@ -1713,7 +1713,7 @@ fn write_vol(
     m: &mut Mri,
     fname: &str,
 ) -> Result<(), Fatal> {
-    mri_write(g, out, err, env, dir, m, fname, None, 0)?;
+    mri_write(g, out, err, env, dir, m, fname, None, -1)?;
     Ok(())
 }
 

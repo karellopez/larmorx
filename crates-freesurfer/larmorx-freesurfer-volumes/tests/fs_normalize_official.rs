@@ -22,9 +22,7 @@ const OFFICIAL_SHA256: &str = "173c9725504a566c42d59f4ef9f00b01ff894b182ef4c56ef
 const SKIPPED: usize = 21;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 7] = [
-    "FS-04", "FS-53", "FS-58", "FS-540", "FS-541", "FS-1016", "PE",
-];
+const SKIP: [&str; 6] = ["FS-04", "FS-53", "FS-58", "FS-540", "FS-541", "FS-1016"];
 
 #[test]
 fn reproduce_gives_the_official_outputs() {

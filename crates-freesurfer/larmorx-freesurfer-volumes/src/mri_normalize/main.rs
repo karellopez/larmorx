@@ -101,9 +101,14 @@ const WM: f32 = DEFAULT_DESIRED_WHITE_MATTER_VALUE as f32;
 /// (`larmorx: ...`).
 pub fn run(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
     let mut g = Globals::new(settings.mode);
-    let status = match main(&mut g, args, settings, out, err) {
-        Ok(()) => 0,
-        Err(f) => f.status(),
+    // the process's own standard error, as the C library's perror sees it
+    g.stderr.read_write = larmorx_freesurfer_core::system::stderr_read_write();
+    let status = {
+        let mut terr = log::TrackedErr::new(&g, &mut *err);
+        match main(&mut g, args, settings, out, &mut terr) {
+            Ok(()) => 0,
+            Err(f) => f.status(),
+        }
     };
     let _ = out.flush();
     g.notices.print(err);

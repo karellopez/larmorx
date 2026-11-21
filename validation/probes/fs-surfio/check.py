@@ -80,9 +80,9 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # reads outside a vertex's faces, FS-993, and the soap bubble's diagnostic vertex beyond the
 # surface, FS-996; relay 43 of track D, a closest search of the other kind of table reading a number
 # beyond the surface's vertices or faces, FS-576; relay 45 of track D, an ASCII patch's first
-# numbers FreeSurfer never read, FS-1010, a face number outside the faces sampled, FS-1012, and a
-# label that cannot be opened after glibc's first perror, PE, the runner's mark): counted, never
-# compared
+# numbers FreeSurfer never read, FS-1010, and a face number outside the faces sampled, FS-1012;
+# relay 48 of track D: a label that cannot be opened is compared again, fs.core modelling the C
+# library's first perror on a write-only standard error): counted, never compared
 SKIP: tuple[str, ...] = (
     "FS-121",
     "FS-123",
@@ -144,7 +144,6 @@ SKIP: tuple[str, ...] = (
     "FS-1002",
     "FS-1010",
     "FS-1012",
-    "PE",
 )
 # gifticlib's messages that print pointers (`** UPB: bad params (<buf>,<blen>,<n>)`, `** A2D: bad
 # setup (<da>,...`): the port

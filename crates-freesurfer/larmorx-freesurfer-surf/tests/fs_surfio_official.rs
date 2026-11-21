@@ -6,7 +6,8 @@
 //! the 66 commands; `metric`'s through the probe built with a stub metric-properties step),
 //! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 1980` on Linux x64 from the unit
 //! oracle's build (2026-11-18, relay 45 of track D, from the clean commit 92b6234c: 1,921 lines
-//! identical, 59 counted, not compared, where
+//! identical, 59 counted, not compared; the same hash and digests from the clean commit 2f7297d8,
+//! relay 48, where a label that cannot be opened is compared: seed 1 has none), where
 //! FreeSurfer reads memory it never wrote or does not own, writes past a buffer or loops for ever:
 //! `SKIP`), against the port's output with `reproduce` (a case the port marks
 //! with one of those defects hashed as `SKIP`, as `check.py` does). The `sfile`, `cfile`, `sread`,

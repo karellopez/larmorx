@@ -46,9 +46,10 @@ the command line and its time, the user, the machine and the directories, left o
 `larmorx_validation.freesurfer.files`). A case whose `reproduce` run notes a defect of
 `NOT_COMPARABLE` (FreeSurfer reads memory it does not own, crashes, never ends there, or seeds
 from the clock: their texts are in `crates/larmorx-core/src/defects.rs`) is counted, not
-compared; so is a case whose only difference is FreeSurfer's `error: Invalid argument` after the
-message of a failed open, where `No such file or directory` is expected (`PE`: FreeSurfer's
-standard error opened write-only, as a pipe or a file is).
+compared. A failed open of a label compares like any other case: FreeSurfer's standard error is
+opened write-only there (a pipe or a file), and after the first message of a failed open
+FreeSurfer then prints `error: Invalid argument` where `No such file or directory` might be
+expected (observed); a candidate must print the same.
 
 ## Commands
 

@@ -33,8 +33,9 @@ differs by default only where a defect it corrects is noted. Queue item 3.2-24 (
   `<workspace>/oracles/freesurfer-8.2.0-probes/fs-normalize/` with a `BUILD_INFO.txt`.
 - `check.py --seed <s> --n <n>`: the port's example `fs_normalize_probe` generates the cases; both
   sides run them (the official one through the oracle-output cache at one thread), compared line by
-  line; `SKIP`: FS-04, FS-53, FS-58, FS-540, FS-541, FS-1016 and `PE` (fs.io's `LabelRead` does not
-  model the C library's first `perror` on a write-only standard error).
+  line; `SKIP`: FS-04, FS-53, FS-58, FS-540, FS-541, FS-1016 (relay 48 of track D: a label that
+  cannot be opened is compared, no longer marked `PE`: fs.core models the C library's first
+  `perror` on a write-only standard error).
 - `real.py`: `bobmf` and `wmomf` on three recorded heads.
 - `prog.py --seed <s>`: the whole program, the unit oracle's `bin/mri_normalize` (run by name)
   against the port's `larmorx-freesurfer` in both modes, on the open probe's 82 command lines
@@ -52,7 +53,8 @@ differs by default only where a defect it corrects is noted. Queue item 3.2-24 (
 ## Results (relay 46)
 
 Seed 7 and seed 1, 450 cases each: 0 different with `reproduce`, `fix` only with notices.
-Recorded: `tests/fs_normalize_official.rs` (seed 1, 450 cases, 21 `SKIP`, `173c9725...`); debug
+Recorded: `tests/fs_normalize_official.rs` (seed 1, 450 cases, 17 `SKIP`, `7a01bc1b...`, from the
+clean commit 2f7297d8 of relay 48; relay 46's 21 `SKIP` and `173c9725...` counted four `PE` cases); debug
 10 s, release 1.4 s; the same under the AArch64 NaN emulation (`NAN_TRAP_ARM=1`) and on Windows
 x64. `real.py`: 12/12 identical in both modes (official 66 s, port 79 s).
 

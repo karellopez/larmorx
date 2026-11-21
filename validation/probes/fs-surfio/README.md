@@ -611,6 +611,10 @@ end each vertex's position and face). Seeds 7, 13 and 17, 500 cases of each comm
 `PE` (the runner's mark): a label that cannot be opened; glibc's first `perror` on a standard error
 nothing has written to yet (the probe's children: a file, write-only) leaves `EINVAL`, which fs.io's
 `LabelRead` does not model, so FreeSurfer's next message prints `Invalid argument` (track A's, reported).
+Relay 48 of track D: fs.core models it now (`Globals::stderr`; the runner's standard error marks it
+written), the mark is gone and those cases compare: `ptc` seeds 7, 13 and 17 (500 each), 36, 32 and
+30 labels that cannot be opened, every one identical in `reproduce`; seed 1's record (1,980 cases)
+has none (its hash unchanged).
 `flr smr` (`real.py --smr`: three heads, both hemispheres: the sampled energies on each sphere, the distance along the white surface's normals, the overlapping faces of `qsphere.nofix`): 6 of 6 identical in both modes. Official 22 s, port 20 s.
 
 `stack.py` (relay 38 of track D) measures FS-901, the depth at which the official cluster growth

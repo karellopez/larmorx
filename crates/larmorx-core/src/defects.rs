@@ -2555,6 +2555,30 @@ defects! {
         "mri_convert crashes when a step gives no volume and the program goes on with it (an upper threshold, upsampling, a label swap, a reduction, a crop, a downsampled template, a morph that cannot be applied, a frame copy)";
     FS_1053 = "FS-1053", "FreeSurfer", true,
         "mri_convert --upsample, --conform and --downsample (-ds, -dsold) print the new volume's geometry with a validity flag (valid) that FreeSurfer never sets: the printed value is memory contents";
+    FS_1054 = "FS-1054", "FreeSurfer", true,
+        "mri_convert reading an outline (.otl) series whose slice file does not start with GDF FILE VERSION (an empty file or a folder included) crashes while it prints its error message (a segmentation fault); corrected: the message otl slice <n> does not appear to be a GDF file and status 1";
+    FS_1055 = "FS-1055", "FreeSurfer", true,
+        "mri_convert reading an outline (.otl) series with an outline of the colour table's entry 5307 (rh-unc in FreeSurferColorLUT.txt): that entry's score is never reset from one voxel to the next, so it adds up over the slice (scanned column by column) and the label takes every voxel scanned after its sum passes their own scores; its value before the first voxel is memory never written (0 under reproduce); corrected: each voxel scored afresh";
+    FS_1056 = "FS-1056", "FreeSurfer", true,
+        "mri_convert reading an outline (.otl) series: an outline point of a known label with a coordinate outside 0 to 511 is written outside the 512 x 512 array FreeSurfer keeps the outlines in, into other memory (undefined behaviour); not written in larmorx (the array is never read)";
+    FS_1057 = "FS-1057", "FreeSurfer", true,
+        "mri_convert reading an outline (.otl) series into a volume less than 171 voxels wide or high (its size from --in_like) reads the labels of the voxels whose place in the outlines' 512 x 512 space falls outside the outline field (twice the volume's width by twice its height) from memory FreeSurfer does not own (arbitrary labels or a crash); 0 there in larmorx";
+    FS_1058 = "FS-1058", "FreeSurfer", false,
+        "mri_convert reading an outline (.otl) series into a volume whose width (height) does not divide 512 samples the outlines' 512 x 512 space at whole steps of 512 divided by the width, rounded down: a width of 300 samples the first 300 columns only, and a width above 512 samples the first column for every voxel; kept until measured on real outline files (rule D)";
+    FS_1059 = "FS-1059", "FreeSurfer", false,
+        "mri_convert reading an outline (.otl) series weighs a voxel's diagonal neighbours as its side neighbours (0.5) when it chooses the voxel's label from the outlines' claims, though FreeSurfer defines a diagonal weight of 0.707 for them; kept until measured on real outline files (rule D)";
+    FS_1060 = "FS-1060", "FreeSurfer", true,
+        "mri_convert reading an outline (.otl) series checks for an exterior or cortex label that follows other labels with an inverted condition: its warning (label ... following non-exterior labels in slice <n>) is printed for a label that follows one holding all four words Exterior, exterior, Cortex and cortex, never where it is meant; corrected: printed when a label holding Exterior, exterior, Cortex or cortex follows another label";
+    FS_1141 = "FS-1141", "FreeSurfer", true,
+        "mri_convert reading an outline (.otl) series of ascii points: a point line that does not hold two numbers leaves the coordinates it lacks as memory never written; 0 in larmorx";
+    FS_1142 = "FS-1142", "FreeSurfer", true,
+        "mri_convert reading an outline (.otl) series with a slice count below 1 (--in_k_count 0) prints its error couldn't find any file between <first> and <last> with a first name never written (memory contents); printed empty in larmorx";
+    FS_1143 = "FS-1143", "FreeSurfer", true,
+        "mri_convert reading an outline (.otl) series keeps every slice file open: past the process's limit of open files (1,024 by default) the later slices are left empty, without a message; every slice read in larmorx";
+    FS_1144 = "FS-1144", "FreeSurfer", true,
+        "mri_convert reading an outline (.otl) series fills each outline's region with a recursion as deep as the region is large: a region of more than about 170,000 places of the outline field (twice the volume's width by twice its height; an outline whose seed lies outside it, or an outline of no points, in a volume 256 voxels wide or more) overflows a default 8 MiB stack and the program crashes; filled in larmorx";
+    FS_1145 = "FS-1145", "FreeSurfer", true,
+        "mri_convert reading an outline (.otl) series into a volume whose outline field (twice its width by twice its height, 75 bytes a place) passes the machine's memory: FreeSurfer's outcome depends on the machine (an error, or the program killed); refused in larmorx as by a machine without that memory (error allocating claim field)";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

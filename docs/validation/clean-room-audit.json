@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-20-freesurfer-batch-71",
+ "dossier": "2026-11-21-freesurfer-batch-72",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 506282,
-  "agents": 542,
+  "accesses": 507048,
+  "agents": 543,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 882,
-  "archived_files": 882,
+  "archive_checksums_matched": 884,
+  "archived_files": 884,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -506,13 +506,17 @@
    "2026-11-20-session-transcripts-freesurfer-batch-71": {
     "files": 3,
     "sha256": "02e5527079e259c71cc5a70c513beec0a6f3f83200fb092bcfdce3e2e3aed52c"
+   },
+   "2026-11-21-session-transcripts-freesurfer-batch-72": {
+    "files": 3,
+    "sha256": "e9d72851dc8490d587d9695fb3b50ee46c577cae9c6b19f4c2e362cb55b20405"
    }
   },
-  "commits_printed": 5265,
-  "distinct_transcripts": 546,
+  "commits_printed": 5277,
+  "distinct_transcripts": 547,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 437,
+   "agents_without_worktree": 438,
    "bad_lines": 0,
    "calls_without_result": 119,
    "compaction_parent_missing": 9,
@@ -521,17 +525,17 @@
    "refused_calls_restricted_accesses": 743,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 9882
+   "unresolved_paths": 9883
   },
-  "last_record": "2026-11-20 21:13 UTC",
-  "live_files": 546,
-  "live_files_also_archived": 545,
+  "last_record": "2026-11-21 00:44 UTC",
+  "live_files": 547,
+  "live_files_also_archived": 546,
   "sessions": 4,
-  "tool_calls": 142838,
+  "tool_calls": 143116,
   "tool_calls_by_tool": [
    [
     "Agent",
-    544
+    545
    ],
    [
     "Artifact",
@@ -543,7 +547,7 @@
    ],
    [
     "Bash",
-    125614
+    125809
    ],
    [
     "CronCreate",
@@ -555,7 +559,7 @@
    ],
    [
     "Edit",
-    4673
+    4739
    ],
    [
     "EnterWorktree",
@@ -567,7 +571,7 @@
    ],
    [
     "Read",
-    3095
+    3105
    ],
    [
     "ReadNotifications",
@@ -587,7 +591,7 @@
    ],
    [
     "SubagentHandback",
-    574
+    575
    ],
    [
     "TaskOutput",
@@ -611,12 +615,12 @@
    ],
    [
     "Write",
-    7143
+    7148
    ]
   ],
-  "transcript_bytes": 27805925214,
-  "transcript_files": 1428,
-  "unique_paths": 93794
+  "transcript_bytes": 28049332469,
+  "transcript_files": 1431,
+  "unique_paths": 93873
  },
  "levels": [
   [
@@ -697,7 +701,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "8b5a85e2"
+  "verdicts_repository": "8d72bea9"
  },
  "overview": {
   "agents_by_role": [
@@ -707,7 +711,7 @@
    ],
    [
     "clean-room implementer",
-    102
+    103
    ],
    [
     "documentation",
@@ -733,18 +737,18 @@
   "attributed_by": [
    [
     "printed",
-    335
+    341
    ],
    [
     "subject",
     29
    ]
   ],
-  "commits": 364,
+  "commits": 370,
   "commits_by_role": [
    [
     "clean-room implementer",
-    360
+    366
    ],
    [
     "integration",
@@ -755,7 +759,7 @@
     3
    ]
   ],
-  "implementers": 102,
+  "implementers": 103,
   "register_restricted_lines": 1489,
   "single_file_scopes": {
    "checked": 72,
@@ -10967,38 +10971,38 @@
     {
      "group": "the behaviour specs (specs/)",
      "run": 0,
-     "seen": 221,
+     "seen": 236,
      "written": 0
     },
     {
      "group": "the clean-room code",
-     "run": 48,
-     "seen": 1686,
-     "written": 167
+     "run": 49,
+     "seen": 1922,
+     "written": 230
     },
     {
      "group": "larmorx's other files (records, documents, tests, permissive ports)",
-     "run": 365,
-     "seen": 1016,
-     "written": 119
+     "run": 388,
+     "seen": 1070,
+     "written": 129
     },
     {
      "group": "the original programs, run or named as black boxes",
-     "run": 112,
+     "run": 116,
      "seen": 1,
      "written": 0
     },
     {
      "group": "oracle outputs and inputs",
      "run": 0,
-     "seen": 97,
-     "written": 35
+     "seen": 108,
+     "written": 43
     },
     {
      "group": "the agent's own scratch notes, task outputs and memory",
-     "run": 1063,
-     "seen": 958,
-     "written": 300
+     "run": 1125,
+     "seen": 1070,
+     "written": 345
     },
     {
      "group": "the system, the home directory, the workspace and the archive",
@@ -11015,16 +11019,16 @@
    ],
    "cannot_see": {
     "compactions": 0,
-    "listings": 188,
-    "program_runs": 1247,
+    "listings": 203,
+    "program_runs": 1310,
     "unresolved": 261,
-    "without_worktree": 11
+    "without_worktree": 12
    },
-   "commits": 83,
+   "commits": 89,
    "commits_by_role": [
     [
      "clean-room implementer",
-     83
+     89
     ]
    ],
    "family": "FreeSurfer",
@@ -11139,9 +11143,16 @@
      "description": "Clean room relay 12",
      "first": "2026-11-19",
      "last": "2026-11-19"
+    },
+    {
+     "agent": "a650cbcba4c977735",
+     "commits": 6,
+     "description": "Clean room relay 13",
+     "first": "2026-11-20",
+     "last": "2026-11-20"
     }
    ],
-   "last": "2026-11-19",
+   "last": "2026-11-20",
    "name": "FreeSurfer's core services (larmorx-fs-core)",
    "other_roles": [],
    "restricted": [
@@ -11178,8 +11189,8 @@
      "scope": "this family"
     },
     {
-     "after": 14,
-     "agents": 6,
+     "after": 15,
+     "agents": 7,
      "before": 4,
      "level": "names",
      "rule": "R10",

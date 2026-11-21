@@ -70,6 +70,6 @@ binarisation runs until the address space or the box's limit ends it).
 ## Results (observed, relay 48 of track D, 2026-11-21)
 
 The replica as the candidate (`validation/probes/fs-binarize/prog.py`, which runs this file's
-cases), seed 1, 130 cases: 122 identical in `reproduce`, 8 counted (FS-53 twice, FS-1020, FS-1021,
-FS-1023, FS-1025 twice, FS-1026), 0 different; `fix` identical or explained by a notice on every
-compared case.
+cases), seeds 1 and 2, 130 cases each: 122 identical in `reproduce`, 8 counted (FS-53 twice,
+FS-1020, FS-1021, FS-1023, FS-1025 twice, FS-1026), 0 different; `fix` identical or explained by a
+notice on every compared case.

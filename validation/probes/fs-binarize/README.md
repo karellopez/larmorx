@@ -25,10 +25,11 @@ comparison is the open probe `validation/investigations/freesurfer-mri-binarize-
 
 ## Results (relay 48 of track D, 2026-11-21)
 
-The open probe's seed 1 (130 cases): 122 identical in `reproduce`, 8 counted, 0 different; `fix`
-identical or explained by a notice. `real.py`: 81 calls on 6 runs, 78 identical in both modes, 3
-counted (FS-1021: the hippocampus already correct in the v8 stream's segmentation; FreeSurfer
-then crashes, or fails with status 252, writing a freed volume), 1 differing in `fix` with FS-1022
-(ds000005's classic hippocampus: the fix keeps its first voxel). The golden cases: `42a367a2...`
+The open probe's seeds 1 and 2 (130 cases each): 122 identical in `reproduce`, 8 counted, 0
+different; `fix` identical or explained by a notice. `real.py`: 81 calls on 6 runs, 78 identical
+in `reproduce`, 3 counted (FS-1021: the hippocampus already correct in the v8 stream's
+segmentation; FreeSurfer then crashes, or fails with status 252, writing a freed volume), 0
+different; in `fix` 1 differing with FS-1022 (ds000005's classic hippocampus: the fix keeps its
+first voxel). Uncached, the 81 calls took FreeSurfer 177 s and the port 204 s. The golden cases: `42a367a2...`
 (`reproduce`, the official value), `e2cb236f...` (the default). Memory: 4 calls on ds000005, the
 port 2-4 % below FreeSurfer's peak, the files identical.

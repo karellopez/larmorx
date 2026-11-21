@@ -1759,6 +1759,13 @@ first one's places; "direct" is §6's direct access (FS-289, FS-290, FS-58).
   divided by it (`float`). Returns `NO_ERROR`. `vals` comes with `means` (FreeSurfer writes the sums through
   `means`; without it it crashes, a call the programs never make); a negative `max_labels` makes FreeSurfer
   clear an array of an enormous size (a crash): an implementation takes `max_labels` from its arrays.
+  Beyond the probe (the fs.volume clean room's item 60; FreeSurfer's own behaviour there is a crash or memory
+  it does not own, never reproduced, so these are the implementation's interface, not FreeSurfer's results):
+  `max_labels` is the length of the counts array, and the means, when given, have the same length
+  (FreeSurfer clears and writes `max_labels` entries of each; the probe's arrays hold exactly `max_labels`);
+  given values and no means, an implementation counts the labels and reads no value (or its interface does
+  not allow that call). A label of the window is `(int)` of the label volume's `float` voxel (FS-12 for a NaN
+  and values beyond the `int` range), and only labels in `[0, max_labels)` are counted.
 - `MRIlabelsInNbhd(mri, x, y, z, whalf, label)`: how many window voxels carry `label`: `nint` of the voxel
   (frame 0, §6's `nint`, not `(int)`) equals `label` (**(observed)**: `vnbhd`'s `linbhd` lines, painted labels
   2.5 and 1.4999 among them; the fs.volume clean room's item 59).

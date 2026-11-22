@@ -13,12 +13,15 @@
 //!   1,000 labels in one voxel, past its arrays: an error in both modes.
 //! - **FS-510** (rule A): the vote "no clear winner" tests the hits of the voxel's highest label
 //!   instead of the label with the most hits; by default the most hits.
+//! - **FS-267** (memory: the previous call's): a vote by tissue type with a tissue-type table of
+//!   no places compares no type: FreeSurfer takes the type its previous vote in the same process
+//!   chose (0 in its first); the port takes 0 at every call (FreeSurfer's first), noted.
 //! - **FS-511** (memory): `MRIapplySpmWarp`'s value where a sample fails before any succeeded:
 //!   never written; 0 in both modes.
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_504, FS_509, FS_510, FS_511};
+use larmorx_core::defects::{FS_267, FS_504, FS_509, FS_510, FS_511};
 use larmorx_core::glibc_qsort::qsort;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal, NO_ERROR};
@@ -174,6 +177,14 @@ fn most_hits(
         let ntt = ct.ctab_tissue_type.as_ref().map_or(0, |t| t.nentries());
         if ntt > 100 {
             past_arrays(g, err, &format!("{ntt} tissue types (more than 100)"))?;
+        }
+        if ntt <= 0 {
+            // FreeSurfer's winning type is kept between calls: a table of no places compares no
+            // type and takes the previous vote's (0 in a program's first, which the port takes)
+            g.notices.add(
+                &FS_267,
+                "MostHitsInVolVox: a tissue-type table of no places: FreeSurfer votes with the type its previous vote chose (0 in its first)",
+            );
         }
         let (mut max, mut ttmax) = (0usize, 0i32);
         for (k, &c) in per_ttype.iter().enumerate().take(ntt.max(0) as usize) {
@@ -609,4 +620,58 @@ pub fn mri_apply_spm_warp(
         Some(m) => Ret::New(m),
         None => Ret::Given,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+    use larmorx_freesurfer_mri::ctab::ColorTableEntry;
+
+    fn entry(tt: i32) -> Option<Box<ColorTableEntry>> {
+        Some(Box::new(ColorTableEntry {
+            name: b"x".to_vec(),
+            tissue_type: tt,
+            ..ColorTableEntry::default()
+        }))
+    }
+
+    fn hits(segs: &[i32]) -> Vec<AvIndex> {
+        segs.iter()
+            .map(|&segid| AvIndex {
+                asegindex: 0,
+                segid,
+                volindex: 0,
+                cv: 0,
+                rv: 0,
+                sv: 0,
+            })
+            .collect()
+    }
+
+    /// FS-267 (relay 44): a tissue-type table of no places votes with type 0 (FreeSurfer's first
+    /// call), noted; a table with places is not noted.
+    #[test]
+    fn a_tissue_table_of_no_places_votes_with_type_0_noted() {
+        // labels 1, 2, 3 of types 0, 1, 0: no clear winner (1 hit of 3 each)
+        let entries = vec![None, entry(0), entry(1), entry(0)];
+        for (places, want_seg, noted) in [(0usize, 3, true), (2, 3, false)] {
+            let ct = ColorTable {
+                entries: entries.clone(),
+                ctab_tissue_type: Some(Box::new(ColorTable {
+                    entries: (0..places).map(|_| entry(0)).collect(),
+                    ..ColorTable::default()
+                })),
+                ..ColorTable::default()
+            };
+            for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+                let mut g = Globals::new(mode);
+                let (mut out, mut err) = (Vec::new(), Vec::new());
+                let r = most_hits(&mut g, &mut out, &mut err, &hits(&[1, 2, 3]), Some(&ct));
+                assert_eq!(r.ok(), Some((1, want_seg)));
+                let ids: Vec<&str> = g.notices.as_slice().iter().map(|n| n.defect.id).collect();
+                assert_eq!(ids.contains(&"FS-267"), noted, "{places} {mode:?}");
+            }
+        }
+    }
 }

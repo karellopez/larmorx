@@ -17,7 +17,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_480, FS_481};
+use larmorx_core::defects::{FS_266, FS_480, FS_481};
 use larmorx_core::math::Libm;
 use larmorx_freesurfer_core::cstd::note_glibc07;
 use larmorx_freesurfer_core::globals::Globals;
@@ -62,7 +62,8 @@ fn ret(fresh: Option<Mri>) -> Ret<Mri> {
 /// `mri_framepower(vol, framepower)`: each frame's `float` voxels (read and written directly as
 /// `float`) raised to its power: unchanged within 0.00001 of 1, `sqrtf` within 0.00001 of 0.5,
 /// else `powf` (FreeSurfer's branch for 2 tests 0.5 again: never taken). `framepower` holds a
-/// power per frame (else an error: FreeSurfer reads past it). 0.
+/// power per frame (else FS-266, an error in both modes before any frame changes: FreeSurfer
+/// reads past it). 0.
 pub fn mri_framepower(
     g: &mut Globals,
     err: &mut dyn Write,
@@ -71,6 +72,14 @@ pub fn mri_framepower(
 ) -> Result<i32, Fatal> {
     const WHAT: &str = "mri_framepower";
     if (framepower.len() as i64) < i64::from(vol.nframes) {
+        g.notices.add(
+            &FS_266,
+            format!(
+                "mri_framepower: {} powers for {} frames (FreeSurfer reads past the powers given)",
+                framepower.len(),
+                vol.nframes
+            ),
+        );
         log::error_exit(
             g,
             err,
@@ -840,4 +849,29 @@ pub fn mri_half_cos_bias(
     }
     note_glibc07(g, &libm, "cos");
     Ok(ret(fresh))
+}
+
+#[cfg(test)]
+mod fs266_tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+    use larmorx_freesurfer_mri::mri::{MRI_FLOAT, mri_alloc_sequence};
+
+    /// FS-266 (relay 44): fewer powers than frames end the program before any frame changes, in
+    /// both modes, noted.
+    #[test]
+    fn fewer_powers_than_frames_end_noted() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let mut g = Globals::new(mode);
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let mut m = mri_alloc_sequence(&mut g, &mut out, &mut err, 2, 2, 1, MRI_FLOAT, 3)
+                .expect("a volume");
+            let r = mri_framepower(&mut g, &mut err, &mut m, &[2.0, 2.0]);
+            assert!(r.is_err());
+            let ids: Vec<&str> = g.notices.as_slice().iter().map(|n| n.defect.id).collect();
+            assert!(ids.contains(&"FS-266"), "{mode:?}");
+            let text = String::from_utf8_lossy(&err).into_owned();
+            assert!(text.contains("fewer powers than frames"), "{text}");
+        }
+    }
 }

@@ -306,3 +306,46 @@ fn tensor_rows_start_at_the_first_voxel() {
     assert!(ids.contains(&"FS-291"), "{ids:?}");
     assert!(f.contains("unsupported type 6"), "{f}");
 }
+
+/// Hand cases (relay 43, `validation/probes/fs-volume/hand_cases.py`): `nan`, the label sums'
+/// operand order (the five label means and `MRIcomputeLabelNbhd` of volumes holding two to four
+/// NaN payloads, infinities of both signs, a signalling NaN: FreeSurfer keeps the last NaN value
+/// met, the value just read being the first operand); `pv471`, FS-471's negative limits (-1 to -3
+/// with every counted voxel off the border finish; on the border and from -4 down FreeSurfer
+/// crashes, hashed as `SKIP`). The SHA-256s of the official lines, recorded by `check.py --cases`
+/// on Linux x64 from the unit oracle's build (`fsvolume` of relay 43): 72 of 72 and 8 of 15 lines
+/// identical with `reproduce`, the other 7 FS-471's crashes.
+#[test]
+fn hand_cases_give_the_official_outputs() {
+    let sets = [
+        (
+            include_str!("../../../validation/probes/fs-volume/nan_hand_cases.txt"),
+            "ffc1fb62c9b5d2ca3e8a2b1d405c78e1c3815ccc9fce0a9b2fd1280d9325f761",
+            0,
+        ),
+        (
+            include_str!("../../../validation/probes/fs-volume/pv471_hand_cases.txt"),
+            "c9cd41901a8674f0efeccd6f3a916c40b3e983467fefb362e5a1e0801444234e",
+            7,
+        ),
+    ];
+    for (text, want, want_skipped) in sets {
+        let mut h = Sha256::new();
+        let mut skipped = 0;
+        for line in text.lines() {
+            let (out, ids) = cases::run_line(line, UpstreamDefects::Reproduce);
+            if ids.iter().any(|x| SKIP.contains(x)) {
+                skipped += 1;
+                h.update(b"SKIP\n");
+            } else {
+                h.update(out.as_bytes());
+                h.update(b"\n");
+            }
+            let (f, fids) = cases::run_line(line, UpstreamDefects::Fix);
+            assert!(f == out || !fids.is_empty(), "{line}");
+        }
+        assert_eq!(skipped, want_skipped);
+        let hex: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(hex, want);
+    }
+}

@@ -17,6 +17,7 @@ pub mod mymatrix;
 pub mod mymri;
 pub mod quaternion;
 pub mod real;
+pub mod registration;
 pub mod regression;
 pub mod regstep;
 pub mod robust_gauss;

@@ -159,6 +159,10 @@ SKIP = (
     "FS-1067",
     # VNL's QR solve of one row whose entry is 0 leaves the solution unwritten
     "ITK-113",
+    # the registration's (3.2-03 part 2): the half-way maps before any iteration, a step of two
+    # images of different sizes (a crash or memory contents in FreeSurfer)
+    "FS-1068",
+    "FS-1069",
 )
 
 
@@ -239,10 +243,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument(
         "--family",
-        choices=("helpers", "sqrtm", "regstep"),
+        choices=("helpers", "sqrtm", "regstep", "reg"),
         default="helpers",
-        help="the seeded stream: the helpers (part 1), the matrix square root's (schur, sqrtm) or "
-        "the registration step's (3.2-03: rgauss, regress, trans, quat, rstep)",
+        help="the seeded stream: the helpers (part 1), the matrix square root's (schur, sqrtm), "
+        "the registration step's (3.2-03: rgauss, regress, trans, quat, rstep) or the "
+        "registration's (3.2-03 part 2: rreg)",
     )
     ap.add_argument(
         "--cases",

@@ -483,9 +483,15 @@ Source: `utils/mri.cpp` 14346-14583 (`MRIvoxelsInLabelWithPartialVolumeEffects`)
   hold), noted; the probe counts these cases.
 - **FS-470** (a, crash): `MRIgetVoxVal(mri_vals, ...)` with `mri_vals == NULL` at the first border voxel weighed.
 - **FS-471** (a, crash): `int nbr_label_counts[maxlabels], label_counts[maxlabels]; float label_means[maxlabels]`
-  are allocated (with stack-clash probes) at every voxel past the label and segborder checks: a negative
-  `maxlabels` probes pages without end (SIGSEGV); tables beyond the stack crash the same way. Negative: an error;
-  large: counted (the port's windows are sparse), noted.
+  are allocated (with stack-clash probes) at every voxel past the label and segborder checks. Each table's size,
+  `4 maxlabels` bytes, is rounded up to 16 (`(size + 15) & -16` on the unsigned size): for -1 to -3 that is 0 bytes,
+  so a voxel off the border is counted as usual and the program finishes; from -4 down the rounded size is huge and
+  the probes run off the stack (SIGSEGV); on the border `MRIcomputeLabelNbhd`'s `memset` of `maxlabels * 4` bytes
+  crashes for every negative number (track E's open group `vrules13`, relay 14, observed; the closed probe's
+  `pv471_hand_cases.txt`, relay 43: 8 of 15 lines identical, the other 7 those crashes). Tables beyond the stack crash
+  the same way. larmorx (both modes): the error at a counted voxel on the border or from -4 down, -1 to -3 off the
+  border counted (relay 43; relay 20 ended at every counted voxel); large: counted (the port's windows are sparse),
+  noted.
 - The MRIsegBorder path (`segborder`): a border voxel of another label is weighed only when one of frames 1.. holds
   `label` (`float ==`).
 - **FS-472** (c, rule A): `(BUFTYPE)nint(val)`, `(short)nint(val)`, `(unsigned short)nint(val)` in `MRIconst` and
@@ -502,6 +508,15 @@ Source: `utils/mri.cpp` 14346-14583 (`MRIvoxelsInLabelWithPartialVolumeEffects`)
 - **FS-478** (c, rule A): in place (`mri1 == mri2`), `CTABfree(&mri2->ct)` frees `mri1->ct` before
   `CTABdeepCopy(mri1->ct)`, which then prints `CTABdeepCopy: ct was NULL` and returns NULL.
 - **FS-479** (a, crash): `MatrixDeterminant(atlas_lta->xforms[0].m_L)` of an LTA with no transform.
+- **The label sums' operand order** (`MRImeanInLabelMultispectral`, `MRImeanInLabel`, `MRImeanAndStdInLabel`,
+  `MRImeanInLabelInRegion`, `MRIcomputeLabelNbhd`, and so the partial-volume count's windows): the value just read,
+  returned in `xmm0` by `MRIgetVoxVal`, is the destination of the `addss`/`addsd` (`sum = v + sum`, `v * v + sum`):
+  of two NaNs the last one met in the walk's order (x outermost) comes out, and a default NaN made by the sum (an
+  infinity and the opposite one) gives way to the next NaN value. Relays 19 and 20 had the running sum first; track
+  E's open group `vrules11` (relay 14) showed it; relay 43 fixed it (both modes: NaN bits, no defect) with the closed
+  probe's commands `lmeansp` and `lnbhdp` (`lmeans`, `lnbhd` with the source painted) and `nan_hand_cases.txt` (72
+  lines of two to four NaN payloads, infinities, a signalling NaN: 72 identical). In the partial-volume count a NaN
+  mean never reaches the result (its comparisons are false), so only the label means and the neighbourhood show it.
 - `MRIrms`: GCC splits the frame loop; in the last frame (when it is not the first) the sum is `vout + vin * vin`
   (`vout` the destination), else `vin * vin + vout`: only the NaN payload of two NaNs shows it.
 - `MRIrandn`: `PDFgaussian() * stddev + avg` (the draw the destination). `MRInormalizeFrames`: `mean += val`,

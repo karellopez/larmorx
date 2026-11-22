@@ -493,6 +493,8 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FS-1065 | FreeSurfer 8.2.0 `Regression<T>::getRobustEstWB` (the robust location; `mri_robust_template --average 2`) | the weights are written through an empty vector: a crash unless the first robust sigma is below `2e-6` | a (crash) | none (`--average 1`, the median, is the default) | the weights sized to the values in both modes, noted | – |
 | FS-1066 | FreeSurfer 8.2.0 `Regression<T>::getLSEst` without a design matrix | returns memory contents instead of the mean | a (out of bounds) | none (no program reaches it) | the mean in both modes, noted | – |
 | FS-1067 | FreeSurfer 8.2.0 `Regression<T>` (the robust registration's solvers) | fewer rows (usable voxels) than parameters: the robust solve gives memory contents; the least squares VNL's minimum-norm solution | a (out of bounds) and c | none | an error and status 1 by default (rule B, 2026-11-22), named; `reproduce` ends too (memory contents), the least squares "not ported yet" | the least squares of `rows < cols` under `reproduce` (LINPACK's `dsvdc` of a wide matrix) |
+| FS-1068 | FreeSurfer 8.2.0 `Registration::getHalfWayMaps` (`mri_robust_register`'s half-way outputs) | a registration that ran no iteration (`--highit 0` with images too small for a coarser level) reads its half-way maps from empty matrices | a (crash) | none | an error and status 1 in both modes, noted | – |
+| FS-1069 | FreeSurfer 8.2.0 `RegistrationStep::constructAb` (`--iscaleonly --nosym`) | a step of two images of different extents (intensity scaling only, without symmetry, of images of different sizes) reads past the smaller one (its size checks are compiled out) | a (out of bounds) | none | an error and status 1 in both modes, noted | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -4709,6 +4711,22 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
   (queue 3.2-03, its first part).
 - **D13 / gap:** FS-1063 to FS-1066 are memory contents or a crash (not reproduced); FS-1067's least
   squares of a wide matrix under `reproduce` (not ported).
+### FS-1068 and FS-1069 FreeSurfer 8.2.0's fs.robust: the registration — (a, crash; a, out of bounds)
+- **What:** (FS-1068) the half-way maps of a robust registration that ran no iteration (the finest level
+  skipped by `--highit 0` where the images are too small for a coarser level) are read from empty
+  matrices: a crash or memory contents. (FS-1069) a registration step of two images of different extents,
+  frames or types reads past the smaller one: an intensity-only registration without symmetry
+  (`--iscaleonly --nosym`) of images of different sizes reaches it (FreeSurfer's size checks of the step
+  are compiled out). The details: `docs/findings/freesurfer-robust.md` §7 (closed to FreeSurfer's
+  clean-room implementers).
+- **Evidence:** verified (the probe `validation/probes/fs-robust`, `check.py --family reg`: FreeSurfer's
+  `RegRobust` and `Registration` compiled with the official flags on 1,360 registrations of analytic
+  volume pairs, seeds 1, 7 and 13: FS-1069's cases abort in FreeSurfer, every other line but FS-1063's
+  reproduced bit for bit); FS-1068 from the source and the probe (the maps read before any iteration).
+- **fMRIPrep:** none. **FreeSurfer:** none on recon-all's default paths.
+- **larmorx:** both an error and status 1 in both modes, noted. Found 2026-11-22 (queue 3.2-03, its
+  second part).
+- **D13 / gap:** none (a crash and memory contents are not reproduced).
 
 ### FS-809 to FS-812 zlib 1.2.11 (Ubuntu 22.04's build): deflatePrime with bytes waiting, the stored window's hash count, the dictionary past the window — (a, memory and out of bounds; rules A and B)
 - **What:** `deflatePrime` called while compressed bytes wait behind some already handed out writes its bits at the

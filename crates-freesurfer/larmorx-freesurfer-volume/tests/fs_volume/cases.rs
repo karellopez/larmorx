@@ -4960,8 +4960,13 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                 o.i(i64::from(v));
             }
         }
-        "lmeans" => {
-            let src = get_vol(cx, t)?;
+        "lmeans" | "lmeansp" => {
+            // lmeansp: the source painted too (hand cases of NaN payloads, relay 43)
+            let src = if cmd == "lmeansp" {
+                painted(cx, t)?
+            } else {
+                get_vol(cx, t)?
+            };
             let lab = painted(cx, t)?;
             let (label, which, x0, y0, z0, whalf, want) =
                 (t.i(), t.i(), t.i(), t.i(), t.i(), t.i(), t.i() != 0);
@@ -5010,12 +5015,15 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             };
             o.ret(&r, dst.as_ref());
         }
-        "lnbhd" => {
+        "lnbhd" | "lnbhdp" => {
+            // lnbhdp: the values painted too (hand cases of NaN payloads, relay 43)
             let lab = painted(cx, t)?;
-            let vals = if t.i() != 0 {
-                Some(get_vol(cx, t)?)
-            } else {
+            let vals = if t.i() == 0 {
                 None
+            } else if cmd == "lnbhdp" {
+                Some(painted(cx, t)?)
+            } else {
+                Some(get_vol(cx, t)?)
             };
             let (x, y, z, whalf, maxl) = (t.i(), t.i(), t.i(), t.i(), t.i());
             let mut counts = vec![-5i32; maxl as usize];

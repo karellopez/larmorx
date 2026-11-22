@@ -1475,8 +1475,10 @@ void run_case()
     float r = MRIfindNearestNonzeroLocation(m, wsize, xr, yr, zr, want ? &xv : NULL, want ? &yv : NULL, want ? &zv : NULL);
     fflush(stdout);
     of(r); oi(xv); oi(yv); oi(zv);
-  } else if (cmd == "lmeans") {
+  } else if (cmd == "lmeans" || cmd == "lmeansp") {
+    // lmeansp: the source painted too (NaN payloads of the cases' own, relay 43)
     MRI *src = get_vol();
+    if (cmd == "lmeansp") paint(src);
     MRI *lab = get_vol();
     paint(lab);
     int label = geti(), which = geti();
@@ -1516,10 +1518,12 @@ void run_case()
     fflush(stdout);
     oi(r != NULL && r == dst);
     put_vol(r);
-  } else if (cmd == "lnbhd") {
+  } else if (cmd == "lnbhd" || cmd == "lnbhdp") {
+    // lnbhdp: the values painted too (NaN payloads of the cases' own, relay 43)
     MRI *lab = get_vol();
     paint(lab);
     MRI *vals = geti() ? get_vol() : NULL;
+    if (vals && cmd == "lnbhdp") paint(vals);
     int x = geti(), y = geti(), z = geti(), whalf = geti(), maxl = geti();
     std::vector<int> counts(maxl, -5);
     std::vector<float> means(maxl, -5.0f);

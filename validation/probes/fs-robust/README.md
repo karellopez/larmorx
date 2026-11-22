@@ -88,3 +88,14 @@ differs only with notices (GLIBC-07 for the correctly rounded `sin`, `cos` and `
 <n>` (one robust rigid step; affine with the intensity scale) at 128^3: FreeSurfer 0.45 s / 101 MB and
 0.76 s / 145 MB, the port 0.66 s / 98 MB and 1.06 s / 140 MB, identical hashes
 (`docs/findings/freesurfer-robust.md` §6).
+
+Measured 2026-11-22 (track C, relay 43), `--family reg` (3.2-03 part 2: `RegRobust` with `Registration`'s
+code): one command `rreg` (the set-up of `mri_robust_register`'s `initRegistration`, `setSourceAndTarget`,
+then `findSaturation` and `computeMultiresRegistration`, `computeIterativeRegistration` or
+`computeMultiresRegistration`; the images as set, `Rsrc`, `Rtrg`, the final and half-way maps, the scale,
+convergence, saturation, weight check, both weights and the centroids; 60 s per case) on analytic volume
+pairs (`get_blob`). Seed 1, 60 cases: 55 identical, 5 not comparable; seed 7, 300: 288 identical, 12 not
+comparable; seed 13, 1,000: 931 identical, 69 not comparable (FS-1063, FS-1069, FS-163); 0 different; `fix`
+differs only with notices. Seed 1's first 40: hash `5485548405ae9d5c608171b3bf6567e796903b3bf43f6614f114d2f8d9e5ecf3`
+(4 `SKIP`), the test's `reproduce_gives_the_official_registrations`. The probe built before relay 43 is in
+`<workspace>/archive/2026-11-22-fsrobust-probe-before-r43/`.

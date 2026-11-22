@@ -38,8 +38,8 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::sse::{DEFAULT_NAN64, add64, div64, mul64, sqrt64, sub64};
 use larmorx_freesurfer_mri::mri::{
-    MRI_FLOAT, MRI_INT, MRI_LONG, MRI_RGB, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri, mri_alloc_sequence,
-    mri_copy_header, mri_sizeof,
+    MRI_FLOAT, MRI_INT, MRI_LONG, MRI_RGB, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri,
+    mri_alloc_sequence, mri_copy_header, mri_sizeof,
 };
 use larmorx_freesurfer_mri::voxel::mri_get_vox_val;
 use larmorx_freesurfer_volume::arith::{Pair, Tri, mri_add, mri_scalar_mul, mri_subtract};
@@ -264,7 +264,11 @@ impl<T: Real> RegistrationStep<T> {
                 r.set_verbose(p.verbose);
                 r.set_float_svd(self.floatsvd);
                 if p.verbose > 1 {
-                    let _ = write!(out, "   - compute robust estimate ( sat {} )...", ostream(p.sat));
+                    let _ = write!(
+                        out,
+                        "   - compute robust estimate ( sat {} )...",
+                        ostream(p.sat)
+                    );
                 }
                 let sat = if p.sat < 0.0 { SAT_R } else { p.sat };
                 self.pvec = r.get_robust_est_w(g, out, err, &mut w, sat, SIG)?;
@@ -324,23 +328,38 @@ impl<T: Real> RegistrationStep<T> {
         mri_s: &Mri,
         w: &[T],
     ) -> Result<(), Fatal> {
-        let (width, height, depth, nframes) =
-            (mri_s.vg.width, mri_s.vg.height, mri_s.vg.depth, mri_s.nframes);
-        if let Some(m) = &self.mri_weights {
-            if m.vg.width != width || m.vg.height != height || m.vg.depth != depth {
-                self.mri_weights = None;
-            }
+        let (width, height, depth, nframes) = (
+            mri_s.vg.width,
+            mri_s.vg.height,
+            mri_s.vg.depth,
+            mri_s.nframes,
+        );
+        if let Some(m) = &self.mri_weights
+            && (m.vg.width != width || m.vg.height != height || m.vg.depth != depth)
+        {
+            self.mri_weights = None;
         }
         if self.mri_weights.is_none() {
             let mut m = mri_alloc_sequence(g, out, err, width, height, depth, MRI_FLOAT, nframes)?;
             mri_copy_header(g, out, err, mri_s, Some(&mut m))?;
             m.mtype = MRI_FLOAT;
-            mri_set_resolution(g, out, err, &mut m, mri_s.vg.xsize, mri_s.vg.ysize, mri_s.vg.zsize)?;
+            mri_set_resolution(
+                g,
+                out,
+                err,
+                &mut m,
+                mri_s.vg.xsize,
+                mri_s.vg.ysize,
+                mri_s.vg.zsize,
+            )?;
             m.outside_val = 1.0;
             self.mri_weights = Some(m);
         }
         let libm = Libm::new(g.mode());
-        let index = self.mri_indexing.as_ref().expect("the index image of the step's system");
+        let index = self
+            .mri_indexing
+            .as_ref()
+            .expect("the index image of the step's system");
         let weights = self.mri_weights.as_mut().expect("the weights image");
         let mut sigma = f64::from(width);
         if f64::from(height) > sigma {
@@ -376,7 +395,8 @@ impl<T: Real> RegistrationStep<T> {
                             let xx = sub64(f64::from(x), hw);
                             let yy = sub64(f64::from(y), hh);
                             let zz = sub64(f64::from(z), hd);
-                            let distance2 = add64(add64(mul64(xx, xx), mul64(yy, yy)), mul64(zz, zz));
+                            let distance2 =
+                                add64(add64(mul64(xx, xx), mul64(yy, yy)), mul64(zz, zz));
                             let arg = div64(-distance2, sigma22);
                             let e = libm.exp(arg);
                             let e = if e.is_nan() {
@@ -440,7 +460,12 @@ impl<T: Real> RegistrationStep<T> {
             }
             is2d = true;
         }
-        let (sw, sh, sd, snf) = (mri_s.vg.width, mri_s.vg.height, mri_s.vg.depth, mri_s.nframes);
+        let (sw, sh, sd, snf) = (
+            mri_s.vg.width,
+            mri_s.vg.height,
+            mri_s.vg.depth,
+            mri_s.nframes,
+        );
         let ss = i64::from(sw) * i64::from(sh) * i64::from(sd) * i64::from(snf);
         self.mri_indexing = None;
         let itype = if ss > i64::from(i32::MAX) {
@@ -451,14 +476,22 @@ impl<T: Real> RegistrationStep<T> {
             if verbose > 1 {
                 let _ = writeln!(out, "     -- using LONG for indexing ... ");
                 let mu = (ss as f64) * 8.0 / (1024.0 * 1024.0);
-                let _ = write!(out, "     -- allocating {}Mb mem for indexing ... ", ostream(mu));
+                let _ = write!(
+                    out,
+                    "     -- allocating {}Mb mem for indexing ... ",
+                    ostream(mu)
+                );
             }
             MRI_LONG
         } else {
             if verbose > 1 {
                 let _ = writeln!(out, "     -- using INT for indexing ... ");
                 let mu = div64(mul64(ss as f64, 4.0), 1024.0 * 1024.0);
-                let _ = write!(out, "     -- allocating {}Mb mem for indexing ... ", ostream(mu));
+                let _ = write!(
+                    out,
+                    "     -- allocating {}Mb mem for indexing ... ",
+                    ostream(mu)
+                );
             }
             MRI_INT
         };
@@ -497,9 +530,8 @@ impl<T: Real> RegistrationStep<T> {
                 let _ = write!(out, "     -- subsample ... ");
             }
             let sub = |g: &mut Globals, out: &mut dyn Write, err: &mut dyn Write, m: Mri| {
-                sub_sample(g, out, err, &m, None, false, 0).map(|r| {
-                    r.into_new().expect("subSample's new image")
-                })
+                sub_sample(g, out, err, &m, None, false, 0)
+                    .map(|r| r.into_new().expect("subSample's new image"))
             };
             let fx = sub(g, out, err, parts.fx)?;
             let fy = sub(g, out, err, parts.fy)?;
@@ -523,7 +555,11 @@ impl<T: Real> RegistrationStep<T> {
         let (fxw, fxh, fxd, fxf) = (fx.vg.width, fx.vg.height, fx.vg.depth, fx.nframes);
         let n = i64::from(fxw) * i64::from(fxh) * i64::from(fxd) * i64::from(fxf);
         if verbose > 1 {
-            let _ = write!(out, "     -- size {fxw} x {fxh} x {fxd} x {fxf} = {}", n as i32);
+            let _ = write!(
+                out,
+                "     -- size {fxw} x {fxh} x {fxd} x {fxf} = {}",
+                n as i32
+            );
         }
         let eps = 0.00001f64;
         let oepss = add64(eps, div64(mri_s.outside_val, 255.0));
@@ -607,7 +643,10 @@ impl<T: Real> RegistrationStep<T> {
             return Err(Fatal::Exit(1));
         }
         if verbose > 1 {
-            let _ = writeln!(out, "     -- nans: {ncount} zeros: {zcount} outside: {ocount}");
+            let _ = writeln!(
+                out,
+                "     -- nans: {ncount} zeros: {zcount} outside: {ocount}"
+            );
         }
         let mut pnum = trans.dof();
         if p.iscale {
@@ -620,7 +659,11 @@ impl<T: Real> RegistrationStep<T> {
         );
         let bmu = div64(mul64(counti as f64, tsize), 1024.0 * 1024.0);
         if verbose > 1 {
-            let _ = write!(out, "     -- allocating {}Mb mem for A and b ... ", ostream(add64(amu, bmu)));
+            let _ = write!(
+                out,
+                "     -- allocating {}Mb mem for A and b ... ",
+                ostream(add64(amu, bmu))
+            );
         }
         let rows = counti as usize;
         let mut a = Mat::<T>::zeros(rows, pnum);
@@ -642,7 +685,11 @@ impl<T: Real> RegistrationStep<T> {
             );
         }
         if maxmu > 3800.0 {
-            let _ = writeln!(out, "     -- WARNING: mem usage large: {}Mb mem + 6 MRI", ostream(maxmu));
+            let _ = writeln!(
+                out,
+                "     -- WARNING: mem usage large: {}Mb mem + 6 MRI",
+                ostream(maxmu)
+            );
             let _ = writeln!(out, "          Maybe use --subsample <int> ");
         }
         let mut count = 0usize;

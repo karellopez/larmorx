@@ -27,7 +27,6 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::sse::{add, add64, mul, mul64, sub};
 
-
 use crate::mymatrix::{Mat4, get_vnl_matrix};
 use crate::quaternion::Quaternion;
 use crate::real::Real;
@@ -465,11 +464,11 @@ fn block3(ret: &mut Mat4, m: &VnlMatrix) {
 
 /// `ret` from a 3 x 3 block and a translation, the last row `(0, 0, 0, 1)`.
 fn copy3(ret: &mut Mat4, m: &VnlMatrix, t: &[f64; 3]) {
-    for rr in 0..3 {
-        for cc in 0..3 {
-            ret[rr][cc] = m.at(rr, cc);
+    for (rr, &tr) in t.iter().enumerate() {
+        for (cc, x) in ret[rr].iter_mut().enumerate().take(3) {
+            *x = m.at(rr, cc);
         }
-        ret[rr][3] = t[rr];
+        ret[rr][3] = tr;
         ret[3][rr] = 0.0;
     }
     ret[3][3] = 1.0;

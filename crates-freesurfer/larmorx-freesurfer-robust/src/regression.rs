@@ -219,9 +219,9 @@ impl<'a, T: Real> Regression<'a, T> {
     ) -> Result<Vec<T>, Fatal> {
         let a = self.a.expect("getRobustEstWAB with A");
         if self.verbose > 1 {
-            let _ = write!(
+            let _ = writeln!(
                 out,
-                "  Regression<T>::getRobustEstWAB( {} , {} ) {}\n",
+                "  Regression<T>::getRobustEstWAB( {} , {} ) {}",
                 ostream(sat),
                 ostream(sig),
                 if self.floatsvd {
@@ -233,7 +233,7 @@ impl<'a, T: Real> Regression<'a, T> {
         }
         const MAXIT: usize = 20;
         const EPS: f64 = 2e-12;
-        let mut errv = vec![T::ZERO; MAXIT + 1];
+        let mut errv = [T::ZERO; MAXIT + 1];
         errv[0] = T::narrow(f64::INFINITY);
         errv[1] = T::narrow(1e20);
         let (arows, acols) = (a.rows, a.cols);
@@ -252,7 +252,11 @@ impl<'a, T: Real> Regression<'a, T> {
             }
             let sigma = get_sigma_mad(g, &r, T::narrow(SIG)).wide();
             if sigma < EPS {
-                let _ = writeln!(out, "  Sigma too small: {} (identical images?)", ostream(sigma));
+                let _ = writeln!(
+                    out,
+                    "  Sigma too small: {} (identical images?)",
+                    ostream(sigma)
+                );
                 w.fill(T::ONE);
             } else {
                 let s = T::narrow(1.0 / sigma);
@@ -372,12 +376,7 @@ impl<'a, T: Real> Regression<'a, T> {
             }
         }
         let qr = Qr::<T>::from_column_major(wa, rows, cols);
-        let wb: Vec<T> = self
-            .b
-            .iter()
-            .zip(w)
-            .map(|(&x, &y)| x.sse_mul(y))
-            .collect();
+        let wb: Vec<T> = self.b.iter().zip(w).map(|(&x, &y)| x.sse_mul(y)).collect();
         let (p, info) = qr.solve(&wb);
         if info > 0 {
             rank_deficient(err, info);
@@ -435,11 +434,7 @@ impl<'a, T: Real> Regression<'a, T> {
     /// did not converge: VNL's lines, then `    Regression<T>::getLSEst   could not compute
     /// pseudo inverse!` on standard error and the end of the program (status 1). Without `A`:
     /// the mean of `b` (FS-1066).
-    pub fn get_ls_est(
-        &mut self,
-        g: &mut Globals,
-        err: &mut dyn Write,
-    ) -> Result<Vec<T>, Fatal> {
+    pub fn get_ls_est(&mut self, g: &mut Globals, err: &mut dyn Write) -> Result<Vec<T>, Fatal> {
         self.lastweight = -1.0;
         self.lastzero = -1.0;
         let Some(a) = self.a else {
@@ -515,7 +510,12 @@ fn one_row_unwritten(g: &mut Globals, rows: usize) {
 /// FS-1067: fewer rows (usable voxels) than parameters. VNL's QR solve then reads past its
 /// arrays (memory FreeSurfer does not own); by default a clear error (rule B), noted in both
 /// modes; `reproduce` ends too (its numbers would be memory contents).
-fn too_few_rows(g: &mut Globals, err: &mut dyn Write, rows: usize, cols: usize) -> Result<(), Fatal> {
+fn too_few_rows(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    rows: usize,
+    cols: usize,
+) -> Result<(), Fatal> {
     if rows >= cols {
         return Ok(());
     }
@@ -646,4 +646,3 @@ pub fn get_sqrt_tukey_dia_weights<T: Real>(r: &[T], w: &mut [T], sat: f64) {
         }
     }
 }
-

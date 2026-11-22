@@ -24,7 +24,9 @@ use larmorx_freesurfer_mri::vol_geom::{VolGeom, reinit_cache};
 use larmorx_freesurfer_mri::voxel::mri_set_vox_val;
 use larmorx_freesurfer_robust::quaternion::Quaternion;
 use larmorx_freesurfer_robust::real::{Mat, Real};
-use larmorx_freesurfer_robust::regression::{Regression, get_sigma_mad, get_sqrt_tukey_dia_weights};
+use larmorx_freesurfer_robust::regression::{
+    Regression, get_sigma_mad, get_sqrt_tukey_dia_weights,
+};
 use larmorx_freesurfer_robust::regstep::{Cost, RegistrationStep, StepParams};
 use larmorx_freesurfer_robust::robust_gauss as rg;
 use larmorx_freesurfer_robust::transformation::{Kind, Transformation};
@@ -755,7 +757,9 @@ fn tokf_special(g: &mut Gen) -> String {
 fn gen_rgauss(g: &mut Gen, t: &mut Vec<String>) {
     let dbl = g.chance(2);
     t.push(i64::from(dbl).to_string());
-    let op = g.pick(&["median", "median", "medianI", "mad", "mad", "kth", "qsel", "kthI", "qselI"]);
+    let op = g.pick(&[
+        "median", "median", "medianI", "mad", "mad", "kth", "qsel", "kthI", "qselI",
+    ]);
     t.push(op.to_owned());
     let sel = op.starts_with('k') || op.starts_with('q');
     let n = if sel {
@@ -786,7 +790,9 @@ fn gen_rgauss(g: &mut Gen, t: &mut Vec<String>) {
 fn gen_regress(g: &mut Gen, t: &mut Vec<String>) {
     let dbl = g.chance(2);
     t.push(i64::from(dbl).to_string());
-    let method = g.pick(&["rob", "rob", "rob", "rob", "ls", "ls", "wls", "wlsf", "sigma", "tukey"]);
+    let method = g.pick(&[
+        "rob", "rob", "rob", "rob", "ls", "ls", "wls", "wlsf", "sigma", "tukey",
+    ]);
     t.push(method.to_owned());
     t.push(g.pick(&[0, 1, 1]).to_string());
     t.push(g.pick(&[0, 1, 2, 2]).to_string());
@@ -836,7 +842,9 @@ fn gen_regress(g: &mut Gen, t: &mut Vec<String>) {
     let identical = g.chance(12);
     for r in 0..rows {
         let mut v = if has_a {
-            (0..cols).map(|c| a[(r * cols + c) as usize] * ptrue[c as usize]).sum::<f64>()
+            (0..cols)
+                .map(|c| a[(r * cols + c) as usize] * ptrue[c as usize])
+                .sum::<f64>()
         } else {
             ptrue[0] * 10.0
         };
@@ -888,7 +896,7 @@ fn tparam(g: &mut Gen) -> f64 {
         0 => (g.unit() - 0.5) * 0.4,
         1 => (g.unit() - 0.5) * 40.0,
         2 => 1.0 + (g.unit() - 0.5) * 0.2,
-        3 => g.pick(&[0.0, -0.0, 1.0, 3.141592653589793, 1e-8, 1e-7]),
+        3 => g.pick(&[0.0, -0.0, 1.0, std::f64::consts::PI, 1e-8, 1e-7]),
         _ => (g.unit() - 0.5) * 8.0,
     }
 }
@@ -927,7 +935,7 @@ fn gen_quat(g: &mut Gen, t: &mut Vec<String>) {
     let k = if op == "rva" { 4 } else { 3 };
     for _ in 0..k {
         let v = if g.chance(6) {
-            g.pick(&[0.0, 1e-7, 1e-6, -1e-6, 3.141592653589793])
+            g.pick(&[0.0, 1e-7, 1e-6, -1e-6, std::f64::consts::PI])
         } else {
             tparam(g)
         };
@@ -1045,11 +1053,19 @@ fn gen_rstep(g: &mut Gen, t: &mut Vec<String>) {
         let shift = [
             (g.unit() - 0.5) * 1.5,
             (g.unit() - 0.5) * 1.5,
-            if s.d == 1 { 0.0 } else { (g.unit() - 0.5) * 1.5 },
+            if s.d == 1 {
+                0.0
+            } else {
+                (g.unit() - 0.5) * 1.5
+            },
         ];
         let bg = g.pick(&[0.0, 0.0, 0.0, 10.0]);
         let nan = s.ty == 3 && g.chance(10);
-        let scale_t = if iscale { 1.0 + (g.unit() - 0.5) * 0.3 } else { 1.0 };
+        let scale_t = if iscale {
+            1.0 + (g.unit() - 0.5) * 0.3
+        } else {
+            1.0
+        };
         reg_vol(g, t, s, c, 1.0, bg, nan);
         let ct = [c[0] + shift[0], c[1] + shift[1], c[2] + shift[2]];
         reg_vol(g, t, s, ct, scale_t, bg, nan);
@@ -1803,10 +1819,7 @@ fn regress<T: Real>(
                 o.rv(&w);
             }
         }
-        (
-            (r.lasterror, r.lastweight, r.lastzero),
-            r.b().to_vec(),
-        )
+        ((r.lasterror, r.lastweight, r.lastzero), r.b().to_vec())
     };
     o.d(last.0);
     o.d(last.1);

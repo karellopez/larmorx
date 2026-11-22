@@ -178,10 +178,10 @@ impl<T: Real> Mat<T> {
 
     /// `self * v` (`vnl_sse<T>::matrix_x_vector`, the portable loop): each row's `som += m(i, j)
     /// * v(j)` from `+0` in `j` order, with the official library's operand orders (GCC 8's
-    /// vectorised products, the sums kept in order; they decide which of two NaNs comes out): in
-    /// `float`, for rows of four or more numbers, blocks of four products `v * m` summed as `p0 +
-    /// s`, `p1 + s`, `s + p2`, `s + p3`; in `double`, for rows of two or more, pairs `v * m` summed
-    /// `s + p`; the rest (and every number of shorter rows) `s + m * v`.
+    /// vectorised products, the sums kept in order; they decide which of two NaNs comes out). In
+    /// `float`, for rows of four or more numbers, blocks of four products `v * m` summed as
+    /// `p0 + s`, then `p1 + s`, `s + p2` and `s + p3`. In `double`, for rows of two or more, pairs
+    /// `v * m` summed `s + p`. The rest (and every number of shorter rows): `s + m * v`.
     pub fn mul_vec(&self, v: &[T]) -> Vec<T> {
         assert_eq!(self.cols, v.len(), "matrix_x_vector: sizes");
         let c = self.cols;
@@ -258,6 +258,9 @@ mod tests {
             data: vec![1.0, 2.0, 3.0, 4.0],
         };
         assert_eq!(d.mul_vec(&[1.0, 1.0]), vec![3.0, 7.0]);
-        assert_eq!(f32::narrow(f64::from_bits(0xfff4_0000_0000_0001)).to_bits(), 0xffe0_0000);
+        assert_eq!(
+            f32::narrow(f64::from_bits(0xfff4_0000_0000_0001)).to_bits(),
+            0xffe0_0000
+        );
     }
 }

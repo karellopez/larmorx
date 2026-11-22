@@ -1157,3 +1157,182 @@ fn fs481_a_reshape_of_64_bit_voxels() {
     let line = format!("reshape {} 1 2 1 1", wp("2 1 1 2 1 0", "7", "0"));
     check("FS-481", true, &line);
 }
+
+// ---- §54: the rest of the operations on a transform array (FS-504, FS-507, FS-508)
+
+/// G1 to G3 (Gf): three valid geometries; M1, M2 invertible matrices, SING a singular one.
+const G1: &str = "1 4 3 2 40000000 3fc00000 3f000000 1 00000000 3f800000 00000000 bf800000 00000000 00000000 00000000 00000000 3f800000 41200000 c0a00000 40400000 00000000 00000000 00000000 x 1 null";
+const G2: &str = "1 3 5 2 3f800000 40400000 3f800000 1 3f800000 00000000 00000000 00000000 3f800000 00000000 00000000 00000000 3f800000 bf800000 40000000 40e00000 00000000 00000000 00000000 x 1 null";
+const G3: &str = "1 2 2 6 3f800000 3f800000 3f800000 1 3f800000 00000000 00000000 00000000 3f800000 00000000 00000000 00000000 3f800000 00000000 00000000 00000000 00000000 00000000 00000000 x 1 null";
+const M1: &str = "4 4 3f8ccccd 3e4ccccd 00000000 40a00000 bdcccccd 3f666666 3e99999a c0000000 00000000 3dcccccd 3f99999a 40800000 00000000 00000000 00000000 3f800000";
+const M2: &str = "4 4 00000000 bf800000 00000000 41480000 3f800000 00000000 00000000 c0400000 00000000 00000000 40000000 3f400000 00000000 00000000 00000000 3f800000";
+const SING: &str = "4 4 3f800000 40000000 00000000 00000000 40000000 40800000 00000000 00000000 00000000 00000000 3f800000 00000000 00000000 00000000 00000000 3f800000";
+const IDENT: &str = "4 4 3f800000 00000000 00000000 00000000 00000000 3f800000 00000000 00000000 00000000 00000000 3f800000 00000000 00000000 00000000 00000000 3f800000";
+
+/// An array (LTA) of type `ty`: the transforms (matrix, source, destination), their inverses
+/// the identity between the same geometries the other way round.
+fn arr54(ty: i32, items: &[(&str, &str, &str)]) -> String {
+    let z = format!("4 4 {}", ["00000000"; 16].join(" "));
+    let lt = |m: &str, a: &str, b: &str| {
+        format!("00000000 00000000 00000000 3f800000 {m} {z} {z} 0 0 {a} {b}")
+    };
+    let fw: Vec<String> = items.iter().map(|(m, a, b)| lt(m, a, b)).collect();
+    let inv: Vec<String> = items.iter().map(|(_, a, b)| lt(IDENT, b, a)).collect();
+    format!(
+        "{} {ty} 3f800000 x {} {}",
+        items.len(),
+        fw.join(" "),
+        inv.join(" ")
+    )
+}
+
+/// The standard output of a result line (`<result> | x<out> <err>`) decoded.
+fn out_of(r: &str) -> String {
+    let (_, streams) = r.rsplit_once(" | ").expect("a result line");
+    let out = streams.split(' ').next().unwrap_or("x");
+    let b: Vec<u8> = (1..out.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&out[i..i + 2], 16).expect("hex"))
+        .collect();
+    String::from_utf8_lossy(&b).into_owned()
+}
+
+/// FS-507: REGISTER_DAT to RAS-to-RAS of two transforms: with `reproduce` the first transform
+/// changed twice and the second left; by default each changed once; noted in both modes.
+#[test]
+fn fs507_register_dat_to_ras_of_two_transforms() {
+    let line = format!("ltachg {} 1", arr54(14, &[(M1, G1, G2), (M2, G2, G3)]));
+    check("FS-507", true, &line);
+    let (rep, _) = run(&line, UpstreamDefects::Reproduce);
+    // the second transform's matrix is still M2's under reproduce
+    assert!(rep.contains(&M2[4..]), "{rep}");
+    let one = format!("ltachg {} 1", arr54(14, &[(M1, G1, G2)]));
+    let (a, ida) = run(&one, UpstreamDefects::Fix);
+    let (b, idb) = run(&one, UpstreamDefects::Reproduce);
+    assert_eq!(a, b);
+    assert!(
+        !ida.iter().chain(&idb).any(|i| i == "FS-507"),
+        "one transform: not noted"
+    );
+}
+
+/// FS-508: a REGISTER_DAT registration that cannot be inverted changed to FSL: the program ends
+/// in both modes (status 252), noted.
+#[test]
+fn fs508_an_fsl_conversion_without_a_matrix() {
+    let line = format!(
+        "+env=FSLOUTPUTTYPE=NIFTI_GZ ltachg {} 15",
+        arr54(14, &[(SING, G1, G2)])
+    );
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let (r, ids) = run(&line, mode);
+        assert!(r.starts_with("EXIT 252 |"), "{r}");
+        assert!(r.contains("LTAchangeType: the FSL conversion gave no matrix (FreeSurfer frees the transform's matrix and goes on using it here)\n"), "{r}");
+        assert!(ids.iter().any(|i| i == "FS-508"), "{ids:?}");
+    }
+}
+
+/// FS-504: a transform the array does not hold read (no arrays, an array without transforms, a
+/// matrix smaller than 4 x 4, the diagnostic print of an empty array): the program ends in both
+/// modes (status 252), noted.
+#[test]
+fn fs504_transforms_an_array_does_not_hold() {
+    let empty = arr54(1, &[]);
+    let lines = [
+        ("ltacat 0 0".to_owned(), "LTAconcat: no transform arrays"),
+        (
+            format!("ltacat 2 {} {empty} 0", arr54(1, &[(M1, G1, G2)])),
+            "LTAconcat: a transform array without transforms",
+        ),
+        (
+            format!("ltacat 2 {empty} {} 0", arr54(1, &[(M1, G1, G2)])),
+            "LTAconcat: a transform array without transforms",
+        ),
+        (
+            format!("ltared {empty}"),
+            "LTAreduce: a transform array without transforms",
+        ),
+        (
+            format!("ltasrc {empty} {}", w("1 1 1 0 1 0", "0")),
+            "LTAmriIsSource: a transform array without transforms",
+        ),
+        (
+            format!(
+                "ltaprt {}",
+                arr54(
+                    1,
+                    &[(
+                        "3 4 3f800000 40000000 40400000 40800000 40a00000 40c00000 40e00000 41000000 41100000 41200000 41300000 41400000",
+                        G1,
+                        G2
+                    )]
+                )
+            ),
+            "LTAprint: a transform without a 4 x 4 matrix",
+        ),
+        (
+            format!("+gdiagno=1 ltachg {} 1", arr54(14, &[])),
+            "LTAchangeType: a transform array without transforms",
+        ),
+    ];
+    for (line, why) in &lines {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let (r, ids) = run(line, mode);
+            assert!(r.starts_with("EXIT 252 |"), "{line}: {r}");
+            assert!(
+                r.contains(&format!(
+                    "{why} (FreeSurfer reads memory it does not own here)\n"
+                )),
+                "{line}: {r}"
+            );
+            assert!(ids.iter().any(|i| i == "FS-504"), "{line}: {ids:?}");
+        }
+    }
+    // the print's lines up to the short matrix's 1 4 4, and the diagnostic print's first line
+    let (r, _) = run(&lines[5].0, UpstreamDefects::Fix);
+    assert!(out_of(&r).ends_with("sigma     = 1.0000\n1 4 4\n"), "{r}");
+    let (r, _) = run(&lines[6].0, UpstreamDefects::Fix);
+    assert_eq!(out_of(&r), "transformed matrix:\n");
+}
+
+/// §54: the targets REGISTER_DAT, FSL and coronal RAS do not support end the program (status 252)
+/// with their messages, also for an array of no transforms; the diagnostic print of a change from
+/// REGISTER_DAT; a NaN element printed as the C library prints it.
+#[test]
+fn transform_array_targets_prints_and_nan_elements() {
+    for (ty, tg, name) in [
+        (14, 2, "REGISTER_DAT"),
+        (15, -1, "FSLREG_TYPE"),
+        (21, 0, "COR_RAS_TO_COR_RAS"),
+    ] {
+        for items in [&[(M1, G1, G2)][..], &[][..]] {
+            let line = format!("ltachg {} {tg}", arr54(ty, items));
+            let (r, _) = run(&line, UpstreamDefects::Fix);
+            assert!(r.starts_with("EXIT 252 |"), "{r}");
+            assert!(
+                r.contains(&format!(
+                    "LTAchangeType unsupported: you are requesting {name} to {tg} "
+                )),
+                "{r}"
+            );
+        }
+    }
+    let line = format!("+gdiagno=1 ltachg {} 1", arr54(14, &[(M1, G1, G2)]));
+    let (r, _) = run(&line, UpstreamDefects::Fix);
+    let out = out_of(&r);
+    assert!(
+        out.starts_with("transformed matrix:\n") && out.ends_with(";\n"),
+        "{out}"
+    );
+    assert_eq!(out.lines().count(), 5, "{out}");
+    let nanm = "4 4 3f800000 00000000 00000000 7fc00000 00000000 3f800000 00000000 00000000 00000000 00000000 3f800000 00000000 00000000 00000000 00000000 3f800000";
+    let (r, _) = run(
+        &format!("ltaprt {}", arr54(1, &[(nanm, G1, G2)])),
+        UpstreamDefects::Fix,
+    );
+    assert!(
+        out_of(&r).contains("0.000000000000000e+00                nan \n"),
+        "{}",
+        out_of(&r)
+    );
+}

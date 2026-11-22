@@ -253,6 +253,14 @@ const GOLDEN: &[(&str, &str)] = &[
         "ltatypes.reproduce",
         "078a4d6b39e0066c95ae84f37d034204af6e9ae64226197c73bdb93f1da835ac",
     ),
+    (
+        "lta54.fix",
+        "81ade48d5a99463e67434bd76b30e60e650e20d42201d90b3bdf2d86086e46a4",
+    ),
+    (
+        "lta54.reproduce",
+        "93d1fa98179bae5b9497845e15ecd94a83158f55694febe75de5d70adf0dd595",
+    ),
 ];
 
 fn check(name: &str, bytes: &[u8]) {
@@ -2394,6 +2402,214 @@ const LTATYPES: &[(&str, Make)] = &[("ltachg", |g| {
     )
 })];
 
+/// An invertible 4 x 4 matrix (M): a permutation with signs and scales, and a translation.
+fn pool_mat(g: &mut G) -> String {
+    let perm = [
+        [0, 1, 2],
+        [1, 0, 2],
+        [2, 0, 1],
+        [0, 2, 1],
+        [1, 2, 0],
+        [2, 1, 0],
+    ][g.int(0, 5) as usize];
+    let mut v = vec!["00000000".to_owned(); 16];
+    for (r, &c) in perm.iter().enumerate() {
+        v[4 * r + c] = g
+            .pick(&["3f800000", "bf800000", "40000000", "3f000000"])
+            .to_owned();
+    }
+    for r in 0..3 {
+        v[4 * r + 3] = g.f(false);
+    }
+    v[15] = "3f800000".to_owned();
+    format!("4 4 {}", v.join(" "))
+}
+
+/// A pool of three valid geometries for §54's chains: (extent, the 19 fields).
+fn lta_pool(g: &mut G) -> Vec<(String, String)> {
+    let z = "00000000";
+    (0..3)
+        .map(|_| {
+            let e = format!("{} {} {}", g.int(2, 4), g.int(2, 4), g.int(1, 3));
+            let mut f = vec![g.size(false), g.size(false), g.size(false), "1".to_owned()];
+            f.extend(g.cosines(false));
+            f.extend((0..3).map(|_| g.f(false)));
+            f.extend([z.to_owned(), z.to_owned(), z.to_owned()]);
+            (e, f.join(" "))
+        })
+        .collect()
+}
+
+/// An array (LTA) of `n` transforms of type `ty` between the pool's geometries, chained (each
+/// source the previous destination) unless `chained` is false, from `start` when given; the
+/// inverses' matrices absent sometimes, `m_dL` absent rarely (FS-198). Returns the text and the
+/// first source's and the last destination's places in the pool.
+fn pool_lta(
+    g: &mut G,
+    pool: &[(String, String)],
+    ty: &str,
+    n: usize,
+    chained: bool,
+    start: Option<usize>,
+) -> (String, usize, usize) {
+    let zeros = format!("4 4 {}", ["00000000"; 16].join(" "));
+    let gf = |k: usize| format!("1 {} {} x 1 null", pool[k].0, pool[k].1);
+    let first = g.int(0, 2) as usize;
+    let mut idx = vec![start.unwrap_or(first)];
+    for _ in 0..n {
+        let last = idx[idx.len() - 1];
+        let next = if chained {
+            (last + 1 + g.int(0, 1) as usize) % 3
+        } else {
+            g.int(0, 2) as usize
+        };
+        idx.push(next);
+    }
+    let lt = |g: &mut G, inverse: bool, a: usize, b: usize| {
+        let m = if inverse && g.one_in(8) {
+            "null".to_owned()
+        } else if g.one_in(8) {
+            let mut m = g.mat4();
+            while m == "null" {
+                m = g.mat4();
+            }
+            m
+        } else {
+            pool_mat(g)
+        };
+        let dl = if g.one_in(16) {
+            "null".to_owned()
+        } else {
+            zeros.clone()
+        };
+        format!(
+            "{} {} {} {} {m} {dl} {dl} {} {} {} {}",
+            g.f(false),
+            g.f(false),
+            g.f(false),
+            g.pick(&["3f800000", "3f000000"]),
+            g.int(0, 1),
+            g.pick(&["0", "0", "3"]),
+            gf(a),
+            gf(b)
+        )
+    };
+    let fw: Vec<String> = (0..n).map(|i| lt(g, false, idx[i], idx[i + 1])).collect();
+    let inv: Vec<String> = (0..n).map(|i| lt(g, true, idx[i + 1], idx[i])).collect();
+    let subject = g.pick(&["x", "x", "x62657274"]).to_owned();
+    let fscale = g.pick(&["3f800000", "00000000", "3f000000"]).to_owned();
+    let text = format!(
+        "{n} {ty} {fscale} {subject} {} {}",
+        fw.join(" "),
+        inv.join(" ")
+    );
+    (text, idx[0], idx[n])
+}
+
+/// A W of a pool geometry (a byte volume of its extent, plain header fields).
+fn pool_w(pool: &[(String, String)], k: usize) -> String {
+    let z11 = ["00000000"; 11].join(" ");
+    let d = pool[k].0.split(' ').nth(2).unwrap_or("1");
+    format!(
+        "{} 0 1 0 5 {} 1 {d} {z11} 0000000000000000 0 00000000 00000000 0 1 null null",
+        pool[k].0, pool[k].1
+    )
+}
+
+/// An array of a type for `ltachg` and its target, over a fresh pool.
+fn lta54_change(g: &mut G, types: &[&str], targets: &[&str]) -> String {
+    let pool = lta_pool(g);
+    let ty = g.pick(types).to_owned();
+    let n = g.int(1, 3) as usize - usize::from(g.one_in(12));
+    let chained = g.one_in(2);
+    let (a, _, _) = pool_lta(g, &pool, &ty, n, chained, None);
+    format!("{a} {}", g.pick(targets))
+}
+
+/// §54's other operations: the changes to and from REGISTER_DAT, FSL and coronal RAS (with
+/// `FSLOUTPUTTYPE` and a diagnostic level), the inversions, concatenations, reductions, source and
+/// target tests and prints.
+const LTA54: &[(&str, Make)] = &[
+    ("+env=FSLOUTPUTTYPE=NIFTI_GZ ltachg", |g| {
+        lta54_change(
+            g,
+            &["14", "15", "21", "1", "0", "2"],
+            &["14", "15", "21", "1", "0", "2", "5"],
+        )
+    }),
+    ("+env=FSLOUTPUTTYPE=ANALYZE ltachg", |g| {
+        lta54_change(g, &["14", "15", "1"], &["15", "14", "1", "0"])
+    }),
+    ("ltachg", |g| {
+        lta54_change(g, &["14", "21"], &["1", "0", "14"])
+    }),
+    ("+gdiagno=1 +env=FSLOUTPUTTYPE=NIFTI ltachg", |g| {
+        lta54_change(g, &["14", "15", "21"], &["1", "0", "14", "15"])
+    }),
+    ("ltainv", |g| {
+        let pool = lta_pool(g);
+        let k = g.int(0, 2);
+        let n = g.int(0, 3) as usize;
+        let ty = g.pick(&["1", "0", "2"]).to_owned();
+        let chained = g.one_in(2);
+        let (a, _, _) = pool_lta(g, &pool, &ty, n, chained, None);
+        if k == 1 {
+            let m = if g.one_in(4) { (n + 1) % 4 } else { n };
+            let (b, _, _) = pool_lta(g, &pool, "0", m, false, None);
+            format!("1 {a} {b}")
+        } else {
+            format!("{k} {a}")
+        }
+    }),
+    ("+env=FSLOUTPUTTYPE=NIFTI_GZ ltacat", |g| {
+        let pool = lta_pool(g);
+        let k = g.int(1, 3) as usize;
+        let mut arrays = Vec::new();
+        let mut last: Option<usize> = None;
+        for _ in 0..k {
+            let ty = g.pick(&["1", "1", "0", "2", "14"]).to_owned();
+            let n = g.int(1, 2) as usize - usize::from(g.one_in(16));
+            // mostly from where the previous array ended
+            let start = if g.one_in(4) { None } else { last };
+            let (text, _, b) = pool_lta(g, &pool, &ty, n, true, start);
+            arrays.push(text);
+            last = Some(b);
+        }
+        format!("{k} {} {}", arrays.join(" "), g.int(0, 1))
+    }),
+    ("ltacat2", |g| {
+        let pool = lta_pool(g);
+        let n1 = g.int(1, 2) as usize;
+        let (a, _, e) = pool_lta(g, &pool, "1", n1, true, None);
+        let n2 = g.int(1, 2) as usize;
+        let start = if g.one_in(3) { None } else { Some(e) };
+        let (b, _, _) = pool_lta(g, &pool, "1", n2, true, start);
+        format!("{a} {b} {}", g.int(0, 1))
+    }),
+    ("ltared", |g| {
+        let pool = lta_pool(g);
+        let n = g.int(0, 3) as usize;
+        let ty = g.pick(&["1", "0", "14"]).to_owned();
+        let chained = !g.one_in(4);
+        let (a, _, _) = pool_lta(g, &pool, &ty, n, chained, None);
+        a
+    }),
+    ("ltasrc", |g| {
+        let pool = lta_pool(g);
+        let n = g.int(1, 3) as usize - usize::from(g.one_in(10));
+        let (a, s, d) = pool_lta(g, &pool, "1", n, true, None);
+        let k = [s, d, 0, 1, 2][g.int(0, 4) as usize];
+        format!("{a} {}", pool_w(&pool, k))
+    }),
+    ("ltaprt", |g| {
+        let pool = lta_pool(g);
+        let n = g.int(0, 2) as usize;
+        let ty = g.pick(&["0", "1", "14", "2", "15", "21", "-1"]).to_owned();
+        let (a, _, _) = pool_lta(g, &pool, &ty, n, false, None);
+        a
+    }),
+];
+
 /// A painted W of the shape (labels 0 to 3 at a few voxels).
 fn wl(g: &mut G, s: &str) -> String {
     let w = g.w_of(s);
@@ -2897,4 +3113,9 @@ fn partial_volumes_and_sequences() {
 #[test]
 fn voxelwise_operations() {
     group("vox8", VOX8, 8);
+}
+
+#[test]
+fn transform_array_operations() {
+    group("lta54", LTA54, 8);
 }

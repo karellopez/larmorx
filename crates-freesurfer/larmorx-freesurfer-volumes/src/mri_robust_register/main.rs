@@ -251,7 +251,9 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     if reg.iscale && md_second > 0.0 && !p.iscaleout.is_empty() {
         // ofstream f(name) << Md.second: nothing when the file cannot be created
         let path = resolve(r.dir, &p.iscaleout);
-        let _ = std::fs::write(path, ostream(md_second));
+        if let Err(e) = std::fs::write(path, ostream(md_second)) {
+            g.errno = log::errno_of(&e).unwrap_or(2);
+        }
     }
     if reg.iscale && md_second > 0.0 && !p.entropy {
         let _ = writeln!(
@@ -803,7 +805,9 @@ fn init_registration(
         match std::fs::read(&path) {
             Ok(text) => istream_double(&text, &mut iscale),
             Err(_) if path.is_dir() => {}
-            Err(_) => {
+            Err(e) => {
+                // the failed open's errno, which ErrorExit prints first
+                g.errno = log::errno_of(&e).unwrap_or(2);
                 log::error_exit(
                     g,
                     r.err,

@@ -21,7 +21,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::FS_1063;
+use larmorx_core::defects::{FS_1063, FS_1073};
 use larmorx_core::vnl_matrix::VnlMatrix;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
@@ -165,8 +165,33 @@ impl Transformation {
     /// first `getDOF()` entries), or from a `vnl_vector<double>` (`exact == false`: FreeSurfer
     /// copies the vector, then resizes it to `getDOF()`, which leaves it unwritten when the
     /// lengths differ). FS-1063 for a vector of another length than FreeSurfer reads correctly.
+    /// FS-1073: a longer vector whose block and the resized one share glibc's size class (the
+    /// official build's allocator hands the freed block straight back): its first two entries are
+    /// the allocator's own words (a positive subnormal number, then 0) and the rest the vector's;
+    /// `reproduce` takes those, the default the vector's first entries.
     pub fn set_parameters<T: Real>(&mut self, g: &mut Globals, v: &[T], exact: bool) {
         let dof = self.dof();
+        // glibc's chunk of a request of `n` doubles (its header, 16-byte steps, at least 32)
+        let chunk = |n: usize| (8 * n + 8 + 15).max(32) & !15;
+        if !exact && v.len() > dof && dof >= 2 && chunk(v.len()) == chunk(dof) {
+            g.notices.add(
+                &FS_1073,
+                format!(
+                    "a transformation of {dof} parameters set from a vector of {}: FreeSurfer's first two are the memory allocator's words",
+                    v.len()
+                ),
+            );
+            for i in 0..dof {
+                self.parameters[i] = v[i].wide();
+            }
+            if g.notices.reproduce() {
+                // tcache's mangled next pointer (an address shifted right by 12, below 2^47: a
+                // positive subnormal) and its key, cleared when the block is handed out
+                self.parameters[0] = f64::from_bits(0x5555_5555_5000);
+                self.parameters[1] = 0.0;
+            }
+            return;
+        }
         if v.len() < dof || (!exact && v.len() != dof) {
             g.notices.add(
                 &FS_1063,

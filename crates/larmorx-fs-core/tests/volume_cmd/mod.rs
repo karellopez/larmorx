@@ -15,6 +15,7 @@
 pub mod args;
 
 mod bspline;
+mod lta54;
 mod part7b;
 mod part8;
 
@@ -1328,7 +1329,11 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
             l.putg(&a.geom, false);
         }
         _ => {
-            if !bspline::call(p, l, &c)? && !part7b::call(p, l, &c)? && !part8::call(p, l, &c)? {
+            if !bspline::call(p, l, &c)?
+                && !part7b::call(p, l, &c)?
+                && !part8::call(p, l, &c)?
+                && !lta54::call(p, l, &c)?
+            {
                 args::bad("unknown command")
             }
         }
@@ -1461,16 +1466,27 @@ fn putlta(l: &mut Line, lta: Option<&Lta>) {
     }
 }
 
-/// One line of a batch (its tokens, the `@<seconds>` and `+gdiag=<hex>` prefixes included) on a
-/// fresh process state in `mode`: the probe's result line.
+/// One line of a batch (its tokens, the `@<seconds>`, `+gdiag=<hex>`, `+gdiagno=<n>` and
+/// `+env=<NAME>=<value>` prefixes included) on a fresh process state in `mode`: the probe's
+/// result line. `+gdiagno=` sets the diagnostic level (the diagnostic stream is standard
+/// output, as after a program's diagnostic set-up); `+env=` sets a variable for the call.
 pub fn run_line(toks: &[String], mode: UpstreamDefects, env: &Environment) -> String {
     let mut first = 0;
     let mut gdiag = 0u64;
+    let mut gdiag_no = None;
+    let mut envs: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
     while first < toks.len() {
         let t = &toks[first];
         if t.starts_with('@') {
         } else if let Some(h) = t.strip_prefix("+gdiag=") {
             gdiag = u64::from_str_radix(h, 16).unwrap_or(0);
+        } else if let Some(n) = t.strip_prefix("+gdiagno=") {
+            gdiag_no = Some(n.parse::<i64>().unwrap_or(0) as i32);
+        } else if let Some(e) = t.strip_prefix("+env=") {
+            let Some((name, value)) = e.split_once('=') else {
+                args::bad("+env= needs NAME=VALUE")
+            };
+            envs.push((name.as_bytes().to_vec(), value.as_bytes().to_vec()));
         } else {
             break;
         }
@@ -1480,6 +1496,12 @@ pub fn run_line(toks: &[String], mode: UpstreamDefects, env: &Environment) -> St
     let mut p = Process::new(env.clone(), mode, Box::new(o.clone()), Box::new(e.clone()));
     p.progname = b"fs_volume_probe".to_vec();
     p.gdiag = gdiag;
+    if let Some(n) = gdiag_no {
+        p.gdiag_no = n;
+    }
+    for (name, value) in &envs {
+        p.env.set(name, value);
+    }
     let mut l = Line::new(toks[first..].to_vec());
     let r = call(&mut p, &mut l);
     p.flush();

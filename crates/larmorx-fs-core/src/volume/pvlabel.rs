@@ -28,9 +28,11 @@ impl Process {
     /// between its own label's mean and its neighbour label's (the wide window's means), into
     /// `mixing` and `nbr_labels` when given. `label >= maxlabels`: two lines and -100000.
     ///
-    /// The border volume written to `b.mgz` under `Gdiag`'s verbose and write bits (FreeSurfer's
-    /// diagnostic, which no recorded step sets) needs a volume writer, which this crate does not
-    /// hold: not written.
+    /// FS-471 (a negative `maxlabels`): the first counted voxel on the border, or the first
+    /// counted voxel at all from -4 down, ends the program (status 252); -1 to -3 count the voxels
+    /// off the border as usual. FS-470: no `vals` ends it at the first border voxel weighed,
+    /// after its two windows. The border volume written to `b.mgz` under `Gdiag`'s verbose and
+    /// write bits waits for a volume writer (fs.io's clean room, §37): not yet made.
     #[allow(clippy::too_many_arguments)]
     pub fn mri_voxels_in_label_with_partial_volume_effects(
         &mut self,
@@ -71,6 +73,7 @@ impl Process {
             means: vec![0.0; n],
         };
         let mut volume = 0.0f32;
+        let mut first_counted = true;
         for x in 0..g.width {
             for y in 0..g.height {
                 for z in 0..g.depth {
@@ -97,6 +100,28 @@ impl Process {
                             continue;
                         }
                     }
+                    // a counted voxel: FS-471's ends and its note of tables past the stack
+                    if max_labels < 0 && (on_border || max_labels <= -4) {
+                        self.note(
+                            &FS_471,
+                            "the partial-volume count with a negative label limit refused where FreeSurfer crashes",
+                        );
+                        self.error_exit(
+                            codes::BAD_PARM,
+                            format!(
+                                "MRIvoxelsInLabelWithPartialVolumeEffects(): a negative maximum label number {max_labels} (FreeSurfer crashes here)\n"
+                            )
+                            .as_bytes(),
+                        )?;
+                        return Ok(volume);
+                    }
+                    if first_counted && max_labels > 0 && (max_labels as u64) * 12 > STACK_BYTES {
+                        self.note(
+                            &FS_471,
+                            "the partial-volume count's tables of more labels than FreeSurfer's stack holds counted all the same (FreeSurfer crashes)",
+                        );
+                    }
+                    first_counted = false;
                     if !on_border {
                         volume = sse::add32(volume, vox_vol);
                         continue;
@@ -134,37 +159,23 @@ impl Process {
         (vox_vol, volume): (f32, f32),
         (mixing, nbr_labels): (Option<&mut Mri>, Option<&mut Mri>),
     ) -> Result<f32, Stop> {
-        let name = "MRIvoxelsInLabelWithPartialVolumeEffects";
-        if max_labels < 0 {
-            self.note(
-                &FS_471,
-                "the partial-volume count with a negative label limit refused (FreeSurfer crashes)",
-            );
-            self.error_exit(
-                codes::BAD_PARM,
-                format!("{name}: a negative maximum label number {max_labels}\n").as_bytes(),
-            )?;
-            return Ok(volume);
-        }
-        if (max_labels as u64) * 12 > STACK_BYTES {
-            self.note(
-                &FS_471,
-                "the partial-volume count's tables of more labels than FreeSurfer's stack holds counted all the same (FreeSurfer crashes)",
-            );
-        }
+        self.mri_compute_label_nbhd(mri, None, p, &mut t.small, None, 1)?;
+        self.mri_compute_label_nbhd(mri, vals, p, &mut t.wide, Some(&mut t.means), 7)?;
+        let (x, y, z) = p;
         let Some(vals) = vals else {
             self.note(
                 &FS_470,
-                "the partial-volume count without an intensity volume refused at its first border voxel (FreeSurfer crashes)",
+                "the partial-volume count without an intensity volume refused at its first border voxel weighed (FreeSurfer crashes)",
             );
             self.error_exit(
                 codes::BAD_PARM,
-                format!("{name}: no intensity volume\n").as_bytes(),
+                format!(
+                    "MRIvoxelsInLabelWithPartialVolumeEffects(): no intensity volume for the border voxel ({x}, {y}, {z}) (FreeSurfer crashes here)\n"
+                )
+                .as_bytes(),
             )?;
             return Ok(volume);
         };
-        self.mri_compute_label_nbhd(mri, None, p, &mut t.small, None, 1)?;
-        self.mri_compute_label_nbhd(mri, Some(vals), p, &mut t.wide, Some(&mut t.means), 7)?;
         let val = self.v0(vals, p)?;
         let inside = |l: i32| l >= 0 && l < max_labels;
         let m0 = if inside(own) {
@@ -194,7 +205,6 @@ impl Process {
         if own != label && nbr != label {
             return Ok(volume);
         }
-        let (x, y, z) = p;
         if nbr < 0 {
             let volume = sse::add32(volume, vox_vol);
             if let Some(nl) = nbr_labels {

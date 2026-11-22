@@ -28,7 +28,7 @@ fn getlt(p: &mut Process, l: &mut Line, lt: &mut LinearTransform) -> Result<(), 
 }
 
 /// LTA: `<n> <type> <fscale> <subject>`, the transforms and inverse transforms.
-fn getlta(p: &mut Process, l: &mut Line) -> Result<Lta, Stop> {
+pub(super) fn getlta(p: &mut Process, l: &mut Line) -> Result<Lta, Stop> {
     let n = l.geti();
     let mut lta = p.lta_alloc(n, None)?;
     lta.kind = l.geti();

@@ -30,6 +30,7 @@ pub mod geometry;
 pub mod image;
 pub mod info;
 pub mod linear;
+pub mod ltachain;
 pub mod ltaops;
 pub mod ltaread;
 pub mod moves;

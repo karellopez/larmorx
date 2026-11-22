@@ -135,7 +135,7 @@ impl Process {
     }
 
     /// The volume header a geometry value makes (its extent, sizes, cosines, centre).
-    fn header_of(&mut self, g: &VolGeom) -> Result<VolGeom, Stop> {
+    pub(crate) fn header_of(&mut self, g: &VolGeom) -> Result<VolGeom, Stop> {
         let h = self.mri_from_vol_geom(g, types::UCHAR, 1, true)?;
         Ok(h.geom)
     }

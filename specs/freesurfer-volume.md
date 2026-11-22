@@ -1830,7 +1830,10 @@ probe's `pvlab`.)
 - The voxel volume `vox_vol = (xsize * ysize) * zsize` (`float`). The border volume: `segborder` when given, else a
   new one, `MRImarkLabelBorderVoxels(mri, none, label, mark 1, six neighbours)` (section 35), freed at the end. With
   `Gdiag`'s verbose and write bits both set, that border volume is first written to `b.mgz` in the working
-  directory (FreeSurfer's volume writer; no recorded step sets them, and the probe does not reach it).
+  directory (FreeSurfer's volume writer; no recorded step sets them, and the probe does not reach it). That write
+  waits for a volume writer: `MRIwrite` of an `.mgz` (`specs/freesurfer-io.md`, part 11), in fs.io's clean room;
+  until it exists, an implementation writes nothing there and lists the write as not yet made (the replica does
+  the same for now).
 - Voxels in the order x, y, z (outermost first). A voxel's label is `(int)` of `mri`'s frame 0 (FS-12's rule), and it
   is on the border when `(int)` of the border volume's frame 0 at the same place is non-zero (so 0.5 is not). A
   voxel neither of `label` nor on the border is skipped; with `segborder`, a border voxel of another label is

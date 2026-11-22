@@ -3300,8 +3300,10 @@ class Gen12(Gen11):
         and into an array of another size; LTAconcat of one array, of arrays that do not match, of
         an inverted one, of other types, with an array without transforms; LTAreduce of one
         transform, of a mismatch and of an inverted one; LTAmriIsSource and LTAmriIsTarget;
-        LTAprint of every type, subjects, scales, NaN elements, a 3 x 4 matrix (FS-504). Lines that
-        read memory FreeSurfer does not own are on lines of their own."""
+        LTAprint of every type, subjects, scales, NaN elements, a 3 x 4 matrix (FS-504); relay 15's:
+        LTAreduce after a transform taken inverted, FS-508's place with two transforms and the
+        diagnostic level, transforms without a matrix. Lines that read memory FreeSurfer does not
+        own are on lines of their own."""
         L = []
         zero = f32(0.0)
 
@@ -3447,9 +3449,577 @@ class Gen12(Gen11):
         m34 = "3 4 " + " ".join(f32(v) for v in range(1, 13))
         L.append(f"ltaprt {arr(1, [(m34, g1, g2)])}")
         L.append(f"ltaprt {arr(1, [('5 5 ' + ' '.join(f32(v) for v in range(25)), g1, g2)])}")
+        # relay 15: LTAreduce compares each transform with the previous transform's own destination,
+        # also after that one was taken inverted: G1 to G2, G3 to G2 (inverted), then G3 to G1 (a
+        # mismatch) or G2 to G4 (a match); comparing with the chain's end would decide both the
+        # other way
+        L.append(f"ltared {arr(1, [(m1, g1, g2), (m2, g3, g2), (m3, g3, g1)])}")
+        L.append(f"ltared {arr(1, [(m1, g1, g2), (m2, g3, g2), (m3, g2, g4)])}")
+        # FS-508's place: FreeSurfer converts the later transforms (their lines, their own ends)
+        # and reads the freed matrix first in the diagnostic print or in the inverses' fill; each
+        # on a line of its own
+        gz = geo((3, 5, 2), (0.0, 3.0, 1.0), c=(-1.0, 2.0, 7.0))
+        L.append(f"{nz}ltachg {arr(14, [(sing, g1, g2), (m2, g2, g3)])} 15")
+        L.append(f"{nz}ltachg {arr(14, [(m1, g1, g2), (sing, g2, g3)])} 15")
+        L.append(f"{nz}ltachg {arr(14, [(sing, g1, g2), (m2, gz, g3)])} 15")
+        L.append(f"+gdiagno=1 {nz}ltachg {arr(14, [(sing, g1, g2)])} 15")
+        L.append(f"+gdiagno=1 {nz}ltachg {arr(14, [(m1, g1, g2), (sing, g2, g3)])} 15")
+        # a transform without a matrix: a conversion's result copied into none is kept nowhere
+        for ty, tg in ((1, 14), (1, 15), (14, 1), (14, 15), (15, 14), (21, 1)):
+            L.append(f"{nz}ltachg {arr(ty, [('null', g1, g2)])} {tg}")
+        L.append(f"+gdiagno=1 {nz}ltachg {arr(14, [('null', g1, g2)])} 1")
+        L.append(f"{nz}ltachg {arr(14, [(m1, g1, g2), ('null', g2, g3)])} 1")
         # FS-198, FS-504, FS-508: FreeSurfer reads a freed matrix or a transform the array does not
         # hold, the same bytes in every run of the probe: a line noting one may differ in both modes
         return [Batch("vrules14", "vrules14", L, both="FS-198,FS-504,FS-508")]
+
+
+def lfill(vals) -> str:
+    """The ``i`` fill (README.md, W) of a list of ints: an int volume's voxels as they are."""
+    return "i" + ",".join(str(int(v) & 0xFFFFFFFF) for v in vals)
+
+
+class Gen13(Gen12):
+    """§55 to §57 (relay 15): a segmentation onto another grid, SPM warps, the codes' names;
+    segment borders, statistics, indices, concatenation, edits, shifts, the entorhinal fix, the
+    amygdala-cortex junction; crops."""
+
+    @staticmethod
+    def plain(dims, sizes=(1.0, 1.0, 1.0), perm=(0, 1, 2), signs=(1, 1, 1), c=(0.0, 0.0, 0.0)):
+        """An axis-aligned geometry: (dims, its 19 fields)."""
+        cos = []
+        for j in range(3):
+            v = [0.0, 0.0, 0.0]
+            v[perm[j]] = float(signs[j])
+            cos += v
+        f = [*(f32(s) for s in sizes), "1", *(f32(x) for x in cos), *(f32(x) for x in c)]
+        return dims, f + [f32(0.0)] * 3
+
+    def rplain(self, r: random.Random, dims) -> tuple:
+        sizes = tuple(r.choice([1.0, 1.0, 2.0, 0.5, 1.5]) for _ in range(3))
+        perm = tuple(r.sample(range(3), 3)) if r.random() < 0.5 else (0, 1, 2)
+        signs = tuple(r.choice([1, -1]) for _ in range(3)) if r.random() < 0.5 else (1, 1, 1)
+        c = tuple(float(r.randint(-5, 5)) for _ in range(3))
+        return self.plain(dims, sizes, perm, signs, c)
+
+    def rgeo(self, r: random.Random, dims) -> tuple:
+        """A geometry of the extent: axis-aligned, or of any direction cosines (shears 0)."""
+        if r.random() < 0.7:
+            return self.rplain(r, dims)
+        f = self.gfields(r, 0.0, shear=0.0)
+        f[3] = "1"
+        return dims, f
+
+    @staticmethod
+    def lab(geo, vals, t: int = 1, nf: int = 1, ct: str = "null") -> str:
+        """W of the geometry, type t (int: the values as they are; float: their bits), nf frames,
+        an ``i`` fill of the values, a colour table."""
+        dims, fields = geo
+        base = w_of(dims, fields).split(" ")
+        base[3], base[4] = str(t), str(nf)
+        if t == 3:
+            base[6] = ifill(vals)
+        elif t == 0:
+            # bytes: four labels to a word
+            b = [int(v) & 0xFF for v in vals] or [0]
+            while len(b) % 4:
+                b.append(0)
+            words = [
+                b[i] | b[i + 1] << 8 | b[i + 2] << 16 | b[i + 3] << 24 for i in range(0, len(b), 4)
+            ]
+            base[6] = lfill(words)
+        else:
+            base[6] = lfill(vals)
+        base[-1] = ct
+        return " ".join(base)
+
+    @staticmethod
+    def near(r: random.Random, scale: float = 1.0, t: float = 2.0) -> str:
+        """A 4 x 4 affine near a scaling."""
+        vals = []
+        for i in range(3):
+            row = [scale * (1.0 if j == i else 0.0) + r.uniform(-0.1, 0.1) for j in range(3)]
+            vals += [f32(x) for x in row] + [f32(r.uniform(-t, t))]
+        return "4 4 " + " ".join(vals + [f32(0.0)] * 3 + [f32(1.0)])
+
+    def arr1(self, r: random.Random, ty: int, ga, gb, m: str | None = None) -> str:
+        """An array of one transform from ga to gb (and its inverse transform)."""
+        fw = self.lt(r, m or self.near(r), self.g_of(ga), self.g_of(gb))
+        inv = self.lt(r, self.affine(r), self.g_of(gb), self.g_of(ga))
+        return f"1 {ty} {f32(1.0)} {xs('')} {fw} {inv}"
+
+    def tct(
+        self, r: random.Random, nlab: int, ntt: int, lo: int = -1, hi: int | None = None
+    ) -> str:
+        """A colour table of nlab places, each with a tissue type from lo to hi (ntt - 1), and a
+        tissue-type table of ntt places."""
+        hi = ntt - 1 if hi is None else hi
+        parts = [str(nlab), xs("lut"), "0", "0", xs("")]
+        for i in range(nlab):
+            parts += ["1", xs(f"lab{i}"), *(str(r.randint(0, 255)) for _ in range(4))]
+            parts += [f32(r.random()) for _ in range(4)] + [str(r.randint(lo, hi)), "0"]
+        parts += [str(ntt), xs("tissue"), "0", "0", xs("")]
+        for k in range(ntt):
+            parts += ["1", xs(f"type{k}"), "0", "0", "0", "0", *[f32(0.0)] * 4, "0", "0"]
+        parts.append("null")
+        return " ".join(parts)
+
+    def tkr(self, r: random.Random) -> str:
+        k = r.random()
+        if k < 0.4:
+            return (
+                self.near(r, t=0.0)
+                if r.random() < 0.3
+                else "4 4 " + " ".join(f32(1.0 if i % 5 == 0 else 0.0) for i in range(16))
+            )
+        if k < 0.7:
+            return self.near(r, scale=r.choice([0.5, 2.0, 1.5]))
+        if k < 0.9:
+            return self.near(r, t=5.0)
+        return self.affine(r)
+
+    def vaseg(self) -> list[Batch]:
+        """§55: MRIaseg2vol (labels of int, float and byte volumes onto templates of other extents
+        and voxel sizes; registrations near the identity, scalings, any; thresholds 0 to 1 and
+        -1; colour tables with tissue types, -1 and -2 among them; the diagnostic level 1),
+        MRIaseg2volMU without upsampling (the segmentation the array's source, its destination or
+        neither), MRIapplySpmWarp (with and without a source array, reversed, nearest, trilinear
+        and other sample types, new and given outputs), interpolation_code and float2int_code."""
+        r = self.rng("vaseg")
+        L = []
+        for _ in range(110):
+            ad = (r.randint(1, 5), r.randint(1, 5), r.randint(1, 4))
+            nlab = r.choice([3, 4, 6])
+            vals = [r.randrange(nlab) for _ in range(ad[0] * ad[1] * ad[2])]
+            t = r.choice([1, 1, 3, 0])
+            aseg = self.lab(self.rgeo(r, ad), [float(v) for v in vals] if t == 3 else vals, t=t)
+            td = (r.randint(1, 4), r.randint(1, 4), r.randint(1, 3))
+            tmp = self.lab(self.rgeo(r, td), [0], t=r.choice([0, 1, 3]))
+            ft = r.choice([0.0, 0.0, 0.3, 0.5, 0.6, 1.0, -1.0])
+            ct = "null" if r.random() < 0.55 else self.tct(r, nlab, r.choice([1, 2, 3, 4]), lo=-2)
+            pre = "+gdiagno=1 " if r.random() < 0.1 else ""
+            L.append(f"{pre}a2v {aseg} 0 {self.tkr(r)} {tmp} {f64(ft)} {ct}")
+        pool = [self.rgeo(r, (r.randint(2, 4), r.randint(2, 4), r.randint(1, 3))) for _ in range(5)]
+        for _ in range(40):
+            ia, ib = r.sample(range(len(pool)), 2)
+            ty = r.choice([1, 1, 0])
+            arr = self.arr1(r, ty, pool[ia], pool[ib], m=self.near(r, t=1.0))
+            ig = r.choice([ia, ia, ib, ib, r.randrange(len(pool))])
+            dims = pool[ig][0]
+            nlab = r.choice([3, 5])
+            vals = [r.randrange(nlab) for _ in range(dims[0] * dims[1] * dims[2])]
+            ct = "null" if r.random() < 0.6 else self.tct(r, nlab, r.choice([2, 3]))
+            ft = r.choice([0.0, 0.5, 1.0])
+            L.append(f"a2vmu {self.lab(pool[ig], vals)} 0 {arr} {f64(ft)} -1 {ct}")
+        for _ in range(45):
+            vd = (r.randint(2, 5), r.randint(2, 5), r.randint(1, 4))
+            nf = r.choice([1, 1, 2])
+            vg = self.plain(vd) if r.random() < 0.6 else self.rgeo(r, vd)
+            vol = self.lab(vg, self.fvals(r, vd[0] * vd[1] * vd[2] * nf, lo=-50, hi=50), t=3, nf=nf)
+            wd = (r.randint(1, 5), r.randint(1, 5), r.randint(1, 5))
+            wv = []
+            for _ in range(wd[0] * wd[1] * wd[2] * 3):
+                wv.append(f"{QNAN}" if r.random() < 0.02 else r.uniform(-3.0, 3.0))
+            nwf = r.choice([3, 3, 3, 4])
+            wv = wv + [r.uniform(-1, 1) for _ in range(wd[0] * wd[1] * wd[2] * (nwf - 3))]
+            warp = self.lab(self.rgeo(r, wd), wv, t=3, nf=nwf)
+            lta = "null"
+            if r.random() < 0.35:
+                other = self.rplain(r, (r.randint(2, 5), r.randint(2, 5), r.randint(1, 4)))
+                ty = r.choice([0, 0, 1])
+                lta = (
+                    self.arr1(r, ty, vg, other, m=self.near(r, t=1.0))
+                    if r.random() < 0.5
+                    else self.arr1(r, ty, other, vg, m=self.near(r, t=1.0))
+                )
+            interp = r.choice([0, 0, 1, 1, 1, 2, -1, 5])
+            d = "new"
+            if r.random() < 0.25:
+                d = self.lab(
+                    self.rgeo(r, wd), self.fvals(r, wd[0] * wd[1] * wd[2] * nf), t=3, nf=nf
+                )
+            L.append(f"spmw {vol} 0 {lta} {warp} 0 {r.choice([0, 1])} {interp} {d}")
+        for s in (
+            "nearest", "trilinear", "sinc", "cubic", "interpolate", "Nearest", "TRILINEAR", "round",
+            "RINT", "rint", "floor", "Floor", "tkreg", "tkregister", "TKREGx", "tkre", "", "bogus",
+            "voxavg", "weighted", "rounding", "floo", "cub", "nearest ",
+        ):  # fmt: skip
+            L.append(f"icode {xs(s)}")
+        return [Batch("vaseg", "vaseg", L)]
+
+    def vsegs(self) -> list[Batch]:
+        """§56: MRIsegBoundary, MRIsegBorder (topologies 1 to 3, 0 and -1), MRIindexNo,
+        MRIsegStatsRobust (percentages 0 to 100, negative, labels present and absent, NaN and
+        infinite values), MRIsegFrameAvg, MRIzconcat (skips, widths not above the heights, given
+        and new outputs, mismatches), MRIapplyEdits, MRIshiftDim (every axis, shifts in and past
+        the extent, wraps, dimensions out of range), MRIfixEntoWM (every level, both hemispheres,
+        the junction's labels), LabelAmygalaCortalJunction into a given output."""
+        r = self.rng("vsegs")
+        L = []
+
+        def dims(lo=1, hi=5):
+            return (r.randint(lo, hi), r.randint(lo, hi), r.randint(lo, hi))
+
+        def labs(d, labels, t=1, nf=1, special=0.0):
+            n = d[0] * d[1] * d[2] * nf
+            if t == 3:
+                v = [
+                    f"{r.choice(SPECIAL):08x}" if r.random() < special else float(r.choice(labels))
+                    for _ in range(n)
+                ]
+            else:
+                v = [r.choice(labels) for _ in range(n)]
+            return self.lab(self.rgeo(r, d), v, t=t, nf=nf)
+
+        for _ in range(30):
+            d = dims()
+            L.append(f"sbound {labs(d, [0, 1, 2, 2, 3], t=r.choice([1, 3, 0]), special=0.05)} 0")
+        for _ in range(30):
+            d = dims()
+            topo = r.choice([1, 2, 3, 3, 0, -1])
+            L.append(
+                f"sborder {labs(d, [0, 1, 2, 5, 5], t=r.choice([1, 3]), special=0.03)} 0 {topo}"
+            )
+        for _ in range(15):
+            d = dims()
+            shape = f"{d[0]} {d[1]} {d[2]} {r.choice([0, 1, 3, 4])} 1 0"
+            dst = r.choice(["new", "new", "self", self.cvol(r, shape=shape, ct=0.0)])
+            L.append(f"idxno {self.cvol(r, shape=shape, ct=0.0)} 0 {dst}")
+        for _ in range(35):
+            d = dims(1, 4)
+            nf = r.choice([1, 2])
+            seg = labs(d, [0, 1, 1, 2, 3])
+            vals = self.fvals(r, d[0] * d[1] * d[2] * nf, special=0.06, lo=-20, hi=20)
+            m = self.lab(self.rgeo(r, d), vals, t=3, nf=nf)
+            pct = r.choice([0.0, 5.0, 10.0, 25.0, 33.3, 49.0, 50.0, 60.0, 100.0, -10.0])
+            L.append(
+                f"ssrob {seg} 0 {m} 0 {r.choice([0, 1, 2, 3, 7])} {r.randrange(nf)} {f32(pct)}"
+            )
+        for _ in range(20):
+            d = dims(1, 4)
+            nf = r.choice([1, 2, 3])
+            seg = labs(d, [0, 1, 2])
+            vals = self.fvals(r, d[0] * d[1] * d[2] * nf, special=0.05, lo=-20, hi=20)
+            m = self.lab(self.rgeo(r, d), vals, t=3, nf=nf)
+            L.append(f"sfavg {seg} 0 {m} 0 {r.choice([0, 1, 2, 9])}")
+        for _ in range(35):
+            w = r.randint(1, 4)
+            h = r.randint(w, 5)
+            d1, d2 = r.randint(1, 4), r.randint(1, 4)
+            t = r.choice([1, 3, 0])
+            nf = r.choice([1, 1, 2])
+            g1, g2 = self.rgeo(r, (w, h, d1)), self.rgeo(r, (w, h, d2))
+            if r.random() < 0.1:
+                g2 = self.rgeo(r, (w + 1, h + 1, d2))
+            a = self.lab(g1, [r.randint(0, 9) for _ in range(w * h * d1 * nf)], t=t, nf=nf)
+            b = self.lab(
+                g2, [r.randint(0, 9) for _ in range(g2[0][0] * g2[0][1] * d2 * nf)], t=t, nf=nf
+            )
+            nskip = r.choice([0, 0, 1, d2 - 1, d2])
+            k = r.random()
+            if k < 0.6:
+                dst = "new"
+            elif k < 0.7:
+                dst = r.choice(["self", "other"])
+            else:
+                dd = d1 + d2 - nskip if r.random() < 0.8 else d1 + d2
+                dst = self.lab(
+                    self.rgeo(r, (w, h, max(dd, 1))),
+                    [7],
+                    t=t,
+                    nf=nf if r.random() < 0.9 else nf + 1,
+                )
+            L.append(f"zcat {a} 0 {b} 0 {nskip} {dst}")
+        for _ in range(20):
+            d = dims(1, 4)
+            t = r.choice([1, 3])
+            nf = r.choice([1, 2])
+            n, o, m = (labs(d, [0, 1, 2], t=t, nf=nf, special=0.05) for _ in range(3))
+            dst = r.choice(
+                ["new", "new", "self", "other", self.lab(self.rgeo(r, d), [5], t=t, nf=nf)]
+            )
+            L.append(f"aedit {n} 0 {o} 0 {m} 0 {dst}")
+        for _ in range(35):
+            w = r.randint(1, 4)
+            d = (w, r.randint(w, 5), r.randint(w, 5))
+            nf = r.choice([1, 2])
+            v = labs(d, list(range(10)), t=r.choice([1, 3, 0]), nf=nf)
+            # shifts of at most the width: one wrap brings every index back inside (vrules15 holds
+            # the larger ones, whose writes leave the volume)
+            dim, ns = r.choice([1, 2, 3, 1, 2, 3, 0, 4]), r.randint(-w, w)
+            L.append(f"shdim {v} 0 {dim} {ns} {r.choice([0, 1])}")
+        for _ in range(25):
+            d = dims(1, 4)
+            vol = labs(d, [0, 110, 255, 5], t=r.choice([0, 1, 3]))
+            ento = labs(d, [0, 3006, 4006, 3201, 4201, 7030, 7031, 5])
+            lh, rh = r.choice([255.0, 127.0, 0.0, -1.5]), r.choice([255.0, 127.0, 1e10])
+            L.append(
+                f"fento {vol} 0 {ento} 0 {r.choice([0, 1, 2, 3, 4])} {f64(lh)} {f64(rh)} {r.choice([0, 1])}"
+            )
+        for _ in range(25):
+            d = dims(3, 5)
+            seg = labs(d, [3, 3, 3, 42, 42, 18, 54, 0, 2])
+            out = self.lab(self.rgeo(r, d), [r.choice([0, 1, 7030])], t=r.choice([1, 3]))
+            L.append(f"lacj {seg} 0 {r.choice([0, 1, 2, 3, 3])} {out}")
+        return [Batch("vsegs", "vsegs", L)]
+
+    def vrules15(self) -> list[Batch]:
+        """§55 to §57's fixed cases: MRIaseg2vol's errors and ends (a table without tissue
+        types, no registration, a template whose tkregister matrix has no inverse, a singular
+        registration with and without unmapped voxels), its sort's order of equal pairs at the
+        diagnostic level 2, a NaN threshold, the tissue-type vote (FS-510's test, types past the
+        tissue table, a tissue table of no places), FS-509's labels outside the table, an empty
+        place and a type of 100; MRIapplySpmWarp's warps of two frames and of two voxels;
+        MRIsegBorder's topologies 4 and 5; MRIsegStatsRobust with every value trimmed and a frame
+        past the last; MRIzconcat wider than high (FS-512), a negative skip, fewer frames in the
+        second volume; MRIshiftDim's shifts past the width (FS-513 and the writes outside);
+        LabelAmygalaCortalJunction's new output and its colours, a voxel next to both amygdalae;
+        MRIfixEntoWM's NaN labels; MRIcropToFoV with no voxel above the threshold and fields of
+        view of 0 and -2; MRIcropAroundCRS of fields of view 0 and -1 and a last voxel past
+        `int`'s range (FS-517); MRIcropAroundRAS of an orientation naming an axis twice (FS-515)
+        and its array's direction (FS-516: the volume marked valid or not; the array from it, to
+        it, neither and both). Lines that read memory FreeSurfer does not own, crashes and hangs
+        are on lines of their own."""
+        L = []
+        r = random.Random(1515)
+        ident = "4 4 " + " ".join(f32(1.0 if i % 5 == 0 else 0.0) for i in range(16))
+        g1 = self.plain((5, 1, 1), sizes=(1.0, 1.0, 1.0))
+        big = self.plain((1, 1, 1), sizes=(8.0, 8.0, 8.0))
+
+        def ct_no_tt(n: int) -> str:
+            e = []
+            for i in range(n):
+                e += ["1", xs(f"lab{i}"), "1", "2", "3", "0", *[f32(0.5)] * 4, "0", "0"]
+            return " ".join([str(n), xs("lut"), "0", "0", xs(""), *e, "null"])
+
+        def ct_tt(types: list, ntt: int, empty=()) -> str:
+            e = []
+            for i, t in enumerate(types):
+                if i in empty:
+                    e.append("0")
+                    continue
+                e += ["1", xs(f"lab{i}"), "1", "2", "3", "0", *[f32(0.5)] * 4, str(t), "0"]
+            tt = []
+            for k in range(ntt):
+                tt += ["1", xs(f"type{k}"), "0", "0", "0", "0", *[f32(0.0)] * 4, "0", "0"]
+            return " ".join(
+                [
+                    str(len(types)),
+                    xs("lut"),
+                    "0",
+                    "0",
+                    xs(""),
+                    *e,
+                    str(ntt),
+                    xs("t"),
+                    "0",
+                    "0",
+                    xs(""),
+                    *tt,
+                    "null",
+                ]
+            )
+
+        a5 = self.lab(g1, [2, 1, 2, 1, 1])
+        one = self.lab(big, [0])
+        # a template of two voxels whose second takes every voxel of a3 and a4 (and four of a5)
+        two = self.lab(self.plain((2, 1, 1), sizes=(4.0, 8.0, 8.0)), [0])
+        # MRIaseg2vol: a table without tissue types; no registration; a template whose K has no
+        # inverse; a singular registration without and with unmapped template voxels
+        L.append(f"a2v {a5} 0 {ident} {one} {f64(0.0)} {ct_no_tt(3)}")
+        L.append(f"a2v {a5} 0 null {one} {f64(0.0)}  null")
+        zsz = self.lab(self.plain((2, 2, 2), sizes=(0.0, 1.0, 1.0)), [0])
+        L.append(f"a2v {a5} 0 {ident} {zsz} {f64(0.0)} null")
+        sing = "4 4 " + " ".join(f32(v) for v in (1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))
+        L.append(f"a2v {a5} 0 {sing} {one} {f64(0.0)} null")
+        L.append(f"a2v {a5} 0 {sing} {self.lab(self.plain((3, 3, 3)), [0])} {f64(0.0)} null")
+        # the sort's order of equal pairs (the diagnostic level 2 prints each voxel's first pair),
+        # also for more pairs than fit 1,024 bytes
+        L.append(f"+gdiagno=2 a2v {a5} 0 {ident} {one} {f64(0.0)} null")
+        many = [r.choice([1, 2, 3]) for _ in range(300)]
+        g300 = self.plain((10, 10, 3), sizes=(0.5, 0.5, 0.5))
+        L.append(
+            f"+gdiagno=2 a2v {self.lab(g300, many)} 0 {ident} {self.lab(self.plain((2, 2, 1), sizes=(4.0, 4.0, 4.0)), [0])} {f64(0.0)} null"
+        )
+        L.append(
+            f"+gdiagno=1 a2v {a5} 0 {ident} {self.lab(self.plain((3, 1, 1)), [0])} {f64(0.5)} null"
+        )
+        # a NaN threshold; the vote: FS-510's test (label 1 two thirds, label 2 a third)
+        L.append(f"a2v {a5} 0 {ident} {two} {f64(float('nan'))} null")
+        a3 = self.lab(self.plain((3, 1, 1)), [1, 1, 2])
+        L.append(f"a2v {a3} 0 {ident} {two} {f64(0.0)} {ct_tt([0, 0, 1], 2)}")
+        L.append(f"a2v {a3} 0 {ident} {two} {f64(0.0)} {ct_tt([0, 1, 0], 2)}")
+        # FS-510 changing the label: 1 has half (its type 1), 2 and 3 a quarter each (type 0)
+        a4b = self.lab(self.plain((4, 1, 1)), [1, 1, 2, 3])
+        L.append(f"a2v {a4b} 0 {ident} {two} {f64(0.0)} {ct_tt([0, 1, 0, 0], 2)}")
+        a4 = self.lab(self.plain((4, 1, 1)), [1, 2, 3, 4])
+        # four labels of a quarter each: the vote; types past the tissue table; a table of none;
+        # no type counted
+        L.append(f"a2v {a4} 0 {ident} {two} {f64(0.0)} {ct_tt([0, 1, 0, 1, 0], 2)}")
+        L.append(f"a2v {a4} 0 {ident} {two} {f64(0.0)} {ct_tt([0, 2, 3, 3, 2], 2)}")
+        L.append(f"a2v {a4} 0 {ident} {two} {f64(0.25)} {ct_tt([0, 2, 3, 3, 2], 2)}")
+        L.append(f"a2v {a4} 0 {ident} {two} {f64(0.0)} {ct_tt([0, 0, 0, 1, 0], 0)}")
+        L.append(f"a2v {a4} 0 {ident} {two} {f64(0.0)} {ct_tt([0, -1, -1, -2, -1], 2)}")
+        # FS-509: a label outside the table, an empty place, a type of 100 (each on its own)
+        L.append(f"a2v {a4} 0 {ident} {two} {f64(0.0)} {ct_tt([0, 0, 1, 0], 2)}")
+        L.append(f"a2v {a4} 0 {ident} {two} {f64(0.0)} {ct_tt([0, 0, 1, 0, 1], 2, empty=(2,))}")
+        L.append(f"a2v {a4} 0 {ident} {two} {f64(0.0)} {ct_tt([0, 0, 100, 1, 0], 2)}")
+        # MRIapplySpmWarp: a warp of two frames (frame 2 read past, on its own); of two voxels
+        v3 = self.lab(self.plain((3, 3, 3)), [float(i) for i in range(27)], t=3)
+        w2 = self.lab(self.plain((3, 3, 3)), [0.0] * 54, t=3, nf=2)
+        L.append(f"spmw {v3} 0 null {w2} 0 0 0 new")
+        wsmall = self.lab(self.plain((2, 3, 3)), [0.0] * 54, t=3, nf=3)
+        L.append(f"spmw {v3} 0 null {wsmall} 0 0 1 new")
+        w3 = self.lab(self.plain((3, 3, 3)), [0.0] * 27 + [0.5] * 27 + [-0.5] * 27, t=3, nf=3)
+        for lr, interp in ((0, 0), (1, 0), (0, 1), (1, 1)):
+            L.append(f"spmw {v3} 0 null {w3} 0 {lr} {interp} new")
+        # MRIsegBorder past topology 3 (its own lines: frames past the last written)
+        s3 = self.lab(self.plain((3, 3, 3)), [1] * 13 + [2] + [1] * 13)
+        for topo in (4, 5):
+            L.append(f"sborder {s3} 0 {topo}")
+        L.append(f"sborder {s3} 0 3")
+        # MRIsegStatsRobust: every value trimmed; a frame past the last (its own line)
+        seg3 = self.lab(self.plain((3, 1, 1)), [1, 1, 1])
+        m3 = self.lab(self.plain((3, 1, 1)), [3.0, 1.0, 2.0], t=3)
+        L.append(f"ssrob {seg3} 0 {m3} 0 1 0 {f32(60.0)}")
+        L.append(f"ssrob {seg3} 0 {m3} 0 1 0 {f32(50.0)}")
+        L.append(f"ssrob {seg3} 0 {m3} 0 1 0 {f32(float('nan'))}")
+        L.append(f"ssrob {seg3} 0 {m3} 0 1 1 {f32(0.0)}")
+        L.append(f"sfavg {seg3} 0 {m3} 0 5")
+        # MRIzconcat: wider than high (FS-512, rows past the height read: its own line); higher
+        # than wide (rows past the width left 0); a negative skip; fewer frames in the second
+        wide1 = self.lab(self.plain((3, 2, 1)), list(range(6)))
+        wide2 = self.lab(self.plain((3, 2, 2)), list(range(10, 22)))
+        L.append(f"zcat {wide1} 0 {wide2} 0 0 new")
+        tall1 = self.lab(self.plain((2, 3, 1)), list(range(6)))
+        tall2 = self.lab(self.plain((2, 3, 2)), list(range(10, 22)))
+        L.append(f"zcat {tall1} 0 {tall2} 0 0 new")
+        L.append(f"zcat {tall1} 0 {tall2} 0 1 new")
+        L.append(f"zcat {tall1} 0 {tall2} 0 -1 new")
+        tall1f = self.lab(self.plain((2, 3, 1)), list(range(12)), nf=2)
+        L.append(f"zcat {tall1f} 0 {tall2} 0 0 new")
+        # MRIshiftDim past the width: FS-513's in-range rows and slices; writes outside
+        sq = self.lab(self.plain((2, 4, 4)), list(range(32)))
+        for dim, ns, wrap in (
+            (2, 1, 1),
+            (2, -1, 1),
+            (3, 2, 1),
+            (2, 3, 0),
+            (1, 3, 1),
+            (2, 3, 1),
+            (3, -5, 1),
+        ):
+            L.append(f"shdim {sq} 0 {dim} {ns} {wrap}")
+        # LabelAmygalaCortalJunction: a new output (its colour table); a cortex voxel next to both
+        # amygdalae (one thread: the later write stays)
+        both = [3] * 27
+        both[1 + 3 * 1 + 9 * 1] = 18
+        jn = self.lab(self.plain((5, 3, 3)), [3] * 20 + [3, 18, 3, 54, 3] + [3] * 20)
+        L.append(f"lacj {jn} 0 1 {self.lab(self.plain((5, 3, 3)), [0])}")
+        L.append(f"lacj {jn} 0 1 new")
+        L.append(f"lacj {self.lab(self.plain((3, 3, 3)), both)} 0 3 new")
+        # MRIfixEntoWM: NaN labels
+        ef = self.lab(self.plain((3, 1, 1)), [QNAN, f32(3006.0), f32(4201.5)], t=3)
+        L.append(
+            f"fento {self.lab(self.plain((3, 1, 1)), [9, 9, 9])} 0 {ef} 0 3 {f64(1.0)} {f64(2.0)} 0"
+        )
+        # MRIcropToFoV: no voxel above the threshold; fields of view 0 and -2
+        mk = self.lab(self.plain((3, 3, 2)), [0.0] * 18, t=3)
+        L.append(f"cfov {mk} 0 2 2 2 {f64(0.5)}")
+        mk2 = self.lab(self.plain((3, 3, 2)), [1.0] * 18, t=3)
+        L.append(f"cfov {mk2} 0 0 -2 1 {f64(0.5)}")
+        L.append(f"cfov {mk2} 0 2 2 2 {f64(float('nan'))}")
+        # MRIcropAroundCRS: fields of view 0 and -1 (their own lines); FS-517 (a hang: its own
+        # line, a short alarm)
+        cv = self.lab(self.plain((4, 4, 2)), list(range(32)))
+        c1 = " ".join(f64(x) for x in (1.0, 1.0, 0.0))
+        L.append(f"ccrs {cv} 0 {c1} 0 2 1 0")
+        L.append(f"ccrs {cv} 0 {c1} 2 -1 1 0")
+        L.append(f"ccrs {cv} 0 {c1} 2 2 1 2 5 7")
+        # a last voxel just inside int's range; past it (FS-517: from the top, and from a NaN
+        # centre's int minimum with a field of view of 0); a NaN centre inside the range
+        L.append(f"ccrs {cv} 0 {f64(2147483647.0)} {f64(1.0)} {f64(0.0)} 1 1 1 0")
+        L.append(f"ccrs {cv} 0 {f64(2147483647.0)} {f64(1.0)} {f64(0.0)} 3 1 1 0")
+        L.append(f"ccrs {cv} 0 {f64(float('nan'))} {f64(1.0)} {f64(0.0)} 0 1 1 0")
+        L.append(f"ccrs {cv} 0 {f64(float('nan'))} {f64(1.0)} {f64(0.0)} 2 2 1 0")
+        # MRIcropAroundRAS: an orientation naming an axis twice (FS-515, its own line); FS-516
+        # (two columns along x: no inverse, the program ends; two of an invertible matrix whose
+        # largest components are both x: FS-515)
+        rr = self.plain((4, 4, 2), perm=(0, 0, 2))
+        L.append(f"crras {self.lab(rr, list(range(32)))} 0 1 {c1} 2 2 1 0 null")
+        cs = (0.8, 0.6, 0.0, 0.75, -0.66, 0.0, 0.0, 0.0, 1.0)
+        ob = (
+            (4, 4, 2),
+            [*(f32(1.0) for _ in range(3)), "1", *(f32(x) for x in cs), *[f32(0.0)] * 6],
+        )
+        L.append(f"crras {self.lab(ob, list(range(32)))} 0 1 {c1} 2 2 1 0 null")
+        gv = self.plain((4, 4, 2), c=(1.0, 0.0, 0.0))
+        go = self.plain((3, 3, 3), c=(-2.0, 1.0, 0.0))
+        gq = self.plain((5, 2, 2))
+        vv = self.lab(gv, list(range(32)))
+        for valid in (0, 1):
+            for a, b in ((gv, go), (go, gv), (go, gq), (gv, gv)):
+                arr = self.arr1(r, 1, a, b, m=self.near(r, t=1.0))
+                L.append(f"crras {vv} 0 {valid} {c1} 2 2 1 0 {arr}")
+        # FS-509: FreeSurfer counts a tissue type of 100 past its table (a value of its own memory,
+        # the same in every run): a line noting it may differ in both modes
+        return [Batch("vrules15", "vrules15", L, both="FS-509")]
+
+    def vcrops(self) -> list[Batch]:
+        """§57: MRIcropToFoV (thresholds, fields of view inside and past the mask, NaN voxels),
+        MRIcropAroundCRS (centres inside, at the edges and outside, fractions, fields of view of 1
+        to 6, label lists), MRIcropAroundRAS (axis-aligned volumes of every orientation, marked
+        valid or not, with and without an array from or to the volume)."""
+        r = self.rng("vcrops")
+        L = []
+        for _ in range(30):
+            d = (r.randint(1, 6), r.randint(1, 6), r.randint(1, 5))
+            vals = self.fvals(r, d[0] * d[1] * d[2], special=0.04, lo=0.0, hi=1.0)
+            m = self.lab(self.rgeo(r, d), vals, t=3)
+            fov = [r.choice([1, 2, 3, 4, 8]) for _ in range(3)]
+            th = r.choice([0.5, 0.5, 0.2, 0.9, 0.0, 2.0])
+            L.append(f"cfov {m} 0 {fov[0]} {fov[1]} {fov[2]} {f64(th)}")
+        for _ in range(35):
+            d = (r.randint(1, 6), r.randint(1, 6), r.randint(1, 5))
+            nf = r.choice([1, 1, 2])
+            v = self.lab(
+                self.rgeo(r, d),
+                [r.randint(0, 4) for _ in range(d[0] * d[1] * d[2] * nf)],
+                t=r.choice([1, 3, 0]),
+                nf=nf,
+            )
+            ctr = [
+                r.choice([float(r.randint(-2, k + 1)), r.randint(0, k) + 0.5, r.uniform(-1, k)])
+                for k in d
+            ]
+            fov = [r.randint(1, 6) for _ in range(3)]
+            keep = r.sample(range(5), r.choice([0, 0, 1, 2]))
+            L.append(
+                f"ccrs {v} 0 {' '.join(f64(x) for x in ctr)} {' '.join(map(str, fov))} {len(keep)} {' '.join(map(str, keep))}".rstrip()
+            )
+        for _ in range(30):
+            d = (r.randint(2, 6), r.randint(2, 6), r.randint(1, 5))
+            g = self.rplain(r, d)
+            v = self.lab(g, [r.randint(0, 4) for _ in range(d[0] * d[1] * d[2])])
+            ctr = [r.uniform(-8.0, 8.0) for _ in range(3)]
+            fov = [r.randint(1, 5) for _ in range(3)]
+            keep = r.sample(range(5), r.choice([0, 0, 1]))
+            lta = "null"
+            if r.random() < 0.5:
+                other = self.rplain(r, (r.randint(2, 5), r.randint(2, 5), r.randint(1, 4)))
+                k = r.random()
+                ends = (
+                    (g, other)
+                    if k < 0.4
+                    else (other, g)
+                    if k < 0.8
+                    else (other, self.rplain(r, (3, 3, 3)))
+                )
+                lta = self.arr1(r, r.choice([1, 1, 0]), ends[0], ends[1], m=self.near(r, t=1.0))
+            valid = r.choice([0, 1])
+            body = f"{' '.join(f64(x) for x in ctr)} {' '.join(map(str, fov))} {len(keep)} {' '.join(map(str, keep))}"
+            L.append(" ".join(f"crras {v} 0 {valid} {body} {lta}".split()))
+        return [Batch("vcrops", "vcrops", L)]
 
 
 GROUPS = [
@@ -3496,6 +4066,10 @@ GROUPS = [
     "vrules13",
     "vlta54",
     "vrules14",
+    "vaseg",
+    "vsegs",
+    "vcrops",
+    "vrules15",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -3603,7 +4177,7 @@ def mask(b: Batch, line: bytes) -> bytes:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen12) else Gen12(gen.seed)
+    gen = gen if isinstance(gen, Gen13) else Gen13(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

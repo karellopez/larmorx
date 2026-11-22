@@ -1387,6 +1387,10 @@ defects! {
         "the 4 x 4 matrix helpers (MRImatrixOfDirectionCosines, MRImatrixOfVoxelSizes, MRImatrixOfTranslations, a geometry's toMatrix and RASFromSurfaceRAS_ given a matrix to fill; MRIsetVox2RASFromMatrix given its matrix) given a matrix with fewer than 4 rows or columns write or read past its elements: a crash, memory contents, or other elements of the matrix changed";
     FS_265 = "FS-265", "FreeSurfer", true,
         "MRIvalRangeRegion given no region crashes, where MRIextractRegion takes a missing region as the whole volume";
+    FS_266 = "FS-266", "FreeSurfer", true,
+        "raising each frame of a volume to its power (mri_framepower) given fewer powers than the volume has frames reads past the powers given: the later frames are raised to whatever memory holds there";
+    FS_267 = "FS-267", "FreeSurfer", true,
+        "mapping a segmentation onto another grid with a tissue-type vote (MRIaseg2vol with a colour table) whose tissue-type table has no places takes, as the vote's tissue type, the one an earlier vote of the same program chose (0 in its first): a later call's labels depend on the earlier calls";
     FS_331 = "FS-331", "FreeSurfer", true,
         "RASFromSurfaceRAS_ (and VGtkreg2RAS) given a matrix larger than 4 x 4 to fill computes the tkregister matrix's inverse into it as if it were 4 x 4 and the product into it again: a 4 x N matrix (N > 4) gets the numbers laid out across its rows, the program ends when one of the matrix's first 4 x 4 numbers left unwritten is not finite, and one of more than 4 rows gives nothing after a size-mismatch error";
     FS_332 = "FS-332", "FreeSurfer", true,
@@ -2912,7 +2916,7 @@ defects! {
     FS_516 = "FS-516", "FreeSurfer", true,
         "cropping around an RAS point through an LTA (MRIcropAroundRAS) decides the LTA's direction backwards (it inverts the LTA when the volume is its destination, goes on when the volume is neither end, refuses when it is both) and compares the volume's validity flag, which no volume constructor sets";
     FS_517 = "FS-517", "FreeSurfer", true,
-        "cropping around a voxel (MRIcropAroundCRS) whose last voxel lies beyond the int range (a centre that is not a number or too far away, with a field of view that overflows) never ends";
+        "cropping around a voxel (MRIcropAroundCRS) whose last voxel lies beyond the int range (a centre too far away, or one that is not a number with a field of view of 0) loops through the whole int range and then writes outside the cropped volume, which crashes the program";
     FS_518 = "FS-518", "NrrdIO", true,
         "a NRRD space named 3D-left-handed or 3Drighthanded is not recognised (the read fails), 3D-right-handed-time is read as 3D-left-handed and 3D-left-handed-time as 3D-right-handed-time (two names of its table run together)";
     FS_519 = "FS-519", "NrrdIO", true,

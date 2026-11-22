@@ -2895,8 +2895,15 @@ with `USF` -1 only.)
   not below the extent) skipped; else every frame sampled (`MRIsampleVolumeFrameType`) into `out` (**(observed)**:
   `vrules16`, warp points placed through the array's other end land at their voxels of the volume, for the volume the
   array's source and its destination, arrays of types 0 and 1, both reversals and both sample types; the same points
-  read in the volume's own space, without an array, land outside). A sample that fails
-  before any succeeded: FS-511. A warp of fewer than three frames is read past its frames, and a given `out` of another
+  read in the volume's own space, without an array, land outside). A sample fails on a volume type the sampler cannot
+  read: the trilinear sampler (a point on a voxel in every coordinate takes the nearest one instead) of a type other
+  than `uchar`, `short`, `ushort`, `int`, `long` and `float` prints `error: MRIsampleVolumeFrame: unsupported type <t> `
+  (standard error, with the space before the newline) and writes no value; the nearest sampler of a type other than
+  `uchar`, `short`, `ushort`, `int` and `float` prints `error: MRIsampleVolumeFrameType: unsupported volume type <t> `
+  and gives 0. Where no value is written, `out`'s voxel takes the last value written in the call (a previous frame's,
+  voxel's or the nearest sampler's 0); before any, FreeSurfer stores a value never written (FS-511): both modes 0,
+  noted (0 in all four probe runs) (**(observed)**: `vrules16`, tensor and RGB volumes of one and two frames, the first
+  sample's point off the voxels, then on one, and the reverse order). A warp of fewer than three frames is read past its frames, and a given `out` of another
   extent or of fewer frames written outside, as the voxel functions read and write outside a volume (fs.mri §5, FS-52,
   FS-53); a warp of an extent below 3 in any direction has no voxel to take, and `out` keeps its voxels
   (**(observed)**: `vaseg`, `vrules15`: both sample types, reversed or not, with and without a source array of types 0
@@ -3033,7 +3040,7 @@ differ): the implementations' own tests, against §54's text.
 (their fixed cases) (the open probe's `a2v`, `a2vmu`, `spmw`, `icode`, `sbound`, `sborder`, `idxno`, `ssrob`, `sfavg`,
 `zcat`, `aedit`, `shdim`, `fento`, `lacj`, `cfov`, `ccrs`, `crras`; README.md says what each prints), identical with
 `reproduce` but where FreeSurfer crashes or reads or writes memory it does not own (FS-509, FS-515, FS-517, the voxel
-functions' FS-52 and FS-53), lines the loop allows; the default differs only with a notice (FS-510, FS-511, FS-512,
+functions' FS-52 and FS-53), lines the loop allows; the default differs only with a notice (FS-510, FS-512,
 FS-513, FS-514, FS-516, FS-267, FS-268). FS-509's, FS-515's and FS-517's errors are larmorx's own (the loop lets those
 lines differ; FS-509's in both modes: a tissue type of 100 counted past FreeSurfer's array gives a value of its memory,
 the same in every run): the implementations' own tests, against these sections' text. FS-511's and FS-515's values

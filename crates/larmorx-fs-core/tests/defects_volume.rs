@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//! fs.volume's defects as D13 switches (`specs/freesurfer-volume.md` §69.4, parts 1 to 7a; fs.bspline's,
+//! fs.volume's defects as D13 switches (`specs/freesurfer-volume.md` §69.4, parts 1 to 8; fs.bspline's,
 //! `specs/freesurfer-bspline.md` §7): each one noted in
 //! both modes on a case that meets it, and its two modes' results different where the correction
 //! changes them (memory reads and crashes give the same result in both modes; the end of the
@@ -900,4 +900,176 @@ fn label_nbhd_values_without_means() {
     .expect("counted");
     assert_eq!(counts, [0, 0, 1, 0]);
     assert_eq!(means, [0.0, 0.0, 5.0, 0.0]);
+}
+
+// ---- part 8 (§37 to §39)
+
+/// Labels 1, 5, 2 (5 outside a table of 4) and values 10, 50, 60 along a row of three floats.
+const PV_LABELS: &str = "i1065353216,1084227584,1073741824";
+const PV_VALUES: &str = "i1092616192,1112014848,1114636288";
+
+/// FS-469: a border voxel whose own label lies outside the label table weighed with its mean over
+/// the wide window (FreeSurfer reads it outside its table), both modes, noted.
+#[test]
+fn fs469_an_own_label_outside_the_table() {
+    let line = format!(
+        "pvlab {} {} 2 4 null null null",
+        wp("3 1 1 3 1 0", PV_LABELS, "0"),
+        wp("3 1 1 3 1 0", PV_VALUES, "0")
+    );
+    check("FS-469", false, &line);
+}
+
+/// FS-470 and FS-471: no intensity volume at a border voxel, and a negative label limit, end the
+/// program in both modes (FreeSurfer crashes), noted.
+#[test]
+fn fs470_fs471_the_partial_volume_counts_ends() {
+    let line = format!(
+        "pvlab {} null 2 4 null null null",
+        wp("3 1 1 3 1 0", PV_LABELS, "0")
+    );
+    check("FS-470", true, &line);
+    let (r, _) = run(&line, UpstreamDefects::Fix);
+    assert!(r.starts_with("EXIT 252 |"), "{r}");
+    let line = format!(
+        "pvlab {} {} -5 -3 null null null",
+        wp("3 1 1 3 1 0", "i3231711232,1065353216,1065353216", "0"),
+        wp("3 1 1 3 1 0", PV_VALUES, "0")
+    );
+    check("FS-471", true, &line);
+}
+
+/// The partial-volume count of §37's observed case: labels 1, 2, 2 with values 10, 50, 60 give
+/// 1.8205128 for label 2 (the border voxel weighed 40 / 48.75), the mixing volume 0.8205128 there.
+#[test]
+fn partial_volume_count_of_a_row() {
+    let line = format!(
+        "pvlab {} {} 2 4 {} null null",
+        wp("3 1 1 3 1 0", "i1065353216,1073741824,1073741824", "0"),
+        wp("3 1 1 3 1 0", PV_VALUES, "0"),
+        w("3 1 1 3 1 0", "0")
+    );
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let (r, _) = run(&line, mode);
+        let v = f32::from_bits(u32::from_str_radix(&r[..8], 16).expect("hex"));
+        assert!((v - 1.820_512_8).abs() < 1e-6, "{r}");
+    }
+}
+
+/// FS-472: 300 into a byte volume (`MRIconst`): its low bits (44) with `reproduce`, 255 by
+/// default.
+#[test]
+fn fs472_a_constant_past_the_byte_range() {
+    let line = format!("const 1 1 1 1 43960000 {}", w("1 1 1 0 1 0", "0"));
+    check("FS-472", true, &line);
+    let (rep, _) = run(&line, UpstreamDefects::Reproduce);
+    let (fix, _) = run(&line, UpstreamDefects::Fix);
+    assert!(rep.starts_with("given ") && rep.contains(" x2c |"), "{rep}");
+    assert!(fix.starts_with("given ") && fix.contains(" xff |"), "{fix}");
+}
+
+/// FS-473: b-tables of one row for two frames (`MRIreverseSliceOrder`): the second row left 0 in
+/// both modes (FreeSurfer reads past the table), noted.
+#[test]
+fn fs473_a_b_table_shorter_than_the_frames() {
+    let line = format!(
+        "revsl {} 1 1 3f800000 1 3 3f800000 40000000 40400000 0 new",
+        wp("1 1 2 3 2 0", "0", "0")
+    );
+    check("FS-473", false, &line);
+}
+
+/// FS-474: values 300.7, 2 and -1.5 ordered as bytes (`MRIorderIndices`): 2, 44, 255 with
+/// `reproduce` (the coordinates 1, 0, 2), clamped by default (-1.5 first).
+#[test]
+fn fs474_an_order_of_values_past_a_byte() {
+    let line = format!(
+        "ordidx {} 0",
+        wp("3 1 1 3 1 0", "i1133926810,1073741824,3217031168", "0")
+    );
+    check("FS-474", true, &line);
+    let (rep, _) = run(&line, UpstreamDefects::Reproduce);
+    assert!(rep.starts_with("0 1 0 2 0 0 0 0 0 0 |"), "{rep}");
+}
+
+/// The volume fractions of a row of two segmentation voxels doubled onto three (`vfrac`): the
+/// middle voxel, which no segmentation voxel reaches, maps back onto the second.
+fn vfrac_line(labels: &str) -> String {
+    format!(
+        "vfrac {} 4 4 40000000 00000000 00000000 00000000 00000000 3f800000 00000000 00000000 \
+         00000000 00000000 3f800000 00000000 00000000 00000000 00000000 3f800000 {} {}",
+        w("3 1 1 3 1 0", "0"),
+        wp("2 1 1 3 1 0", labels, "0"),
+        w("3 1 1 3 2 0", "0")
+    )
+}
+
+/// FS-475 and FS-476: label 0 left out in both modes (FreeSurfer counts it outside the volume);
+/// the last label marked in the second pass by default, not with `reproduce`.
+#[test]
+fn fs475_fs476_the_volume_fractions_labels() {
+    check("FS-475", false, &vfrac_line("i0,1065353216"));
+    check("FS-476", true, &vfrac_line("i1073741824"));
+}
+
+/// FS-477: an index equal to the extent (`MRIapplyDiffVect`): written with `reproduce` (past the
+/// volume), refused by default; FS-478: in place with a colour table, the table lost with
+/// `reproduce`, kept by default.
+#[test]
+fn fs477_fs478_the_difference_lists() {
+    let row =
+        "4000000000000000 0000000000000000 0000000000000000 0000000000000000 4014000000000000";
+    let line = format!("applyv {} null 1 {row} new", wp("2 1 1 3 1 0", "0", "0"));
+    check("FS-477", true, &line);
+    let ct = "null 1 x 1 0 x 1 x41 10 20 30 0 3f000000 3f000000 3f000000 3f800000 1 3 null";
+    let wct = w("2 1 1 3 1 0", "0").replace(" null null", &format!(" {ct}"));
+    let line = format!("applyv {wct} 0 null 0 self");
+    check("FS-478", true, &line);
+}
+
+/// FS-479: a transform file of no linear transform (`MRIestimateTIV`) ends the program in both
+/// modes (FreeSurfer crashes), noted.
+#[test]
+fn fs479_a_transform_file_of_no_transform() {
+    use larmorx_fs_core::mri::VolGeom;
+    use larmorx_fs_core::volume::ltaread::TransformInputs;
+    struct One(Vec<u8>);
+    impl TransformInputs for One {
+        fn read_file(&mut self, _name: &[u8]) -> Result<Vec<u8>, i32> {
+            Ok(self.0.clone())
+        }
+        fn volume_geometry(
+            &mut self,
+            _p: &mut Process,
+            _name: &[u8],
+        ) -> Result<Option<VolGeom>, i32> {
+            Err(2)
+        }
+    }
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut p = Process::silent(Environment::new(), mode);
+        let mut input = One(b"type = 1\nnxforms = 0\n".to_vec());
+        let r = p.mri_estimate_tiv(b"talairach.lta", 1755.0, None, &mut input);
+        assert!(r.is_err(), "the end of the program");
+        assert!(noted(&mut p, "FS-479"));
+    }
+}
+
+/// FS-480: frames -1, 0, 0 with zeros excluded (`MRIvote`): the last run of zeros taken with
+/// `reproduce` (0, 2/3), left out by default (-1, 1/3).
+#[test]
+fn fs480_a_last_run_of_zeros() {
+    let line = format!(
+        "vote {} null new 1",
+        wp("1 1 1 3 3 0", "i3212836864,0,0", "0")
+    );
+    check("FS-480", true, &line);
+}
+
+/// FS-481: a reshape of 64-bit voxels: 32-bit halves at their indices with `reproduce`, whole
+/// voxels by default.
+#[test]
+fn fs481_a_reshape_of_64_bit_voxels() {
+    let line = format!("reshape {} 1 2 1 1", wp("2 1 1 2 1 0", "7", "0"));
+    check("FS-481", true, &line);
 }

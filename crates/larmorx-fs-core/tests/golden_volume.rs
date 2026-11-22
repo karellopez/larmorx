@@ -234,6 +234,22 @@ const GOLDEN: &[(&str, &str)] = &[
         "b2bc745208eec2a832b8ccf6b89023960999e2d2c64b3e0471d91a0d7d73c750",
     ),
     (
+        "fr8.fix",
+        "284ff0d3d39048391cba86ab3584371800c3e960260fab58cda95c05a756abdc",
+    ),
+    (
+        "fr8.reproduce",
+        "11ffadaecf65888b4c4b2fbe3f57e7d2b98b08866e04dc3b8d5b717fa3360533",
+    ),
+    (
+        "vox8.fix",
+        "cfe29cdf5318a1f841e71ae1c52d96eb908ae9c608a84f8ebc518943ee416b41",
+    ),
+    (
+        "vox8.reproduce",
+        "5f0a412ca930f6fbc900e3b2dd5eb85e8c957754a235538a3caf294053d4d85c",
+    ),
+    (
         "ltatypes.reproduce",
         "078a4d6b39e0066c95ae84f37d034204af6e9ae64226197c73bdb93f1da835ac",
     ),
@@ -2378,6 +2394,338 @@ const LTATYPES: &[(&str, Make)] = &[("ltachg", |g| {
     )
 })];
 
+/// A painted W of the shape (labels 0 to 3 at a few voxels).
+fn wl(g: &mut G, s: &str) -> String {
+    let w = g.w_of(s);
+    format!("{w} {}", lpaint(g, s))
+}
+
+/// A W of the shape, not painted.
+fn w0(g: &mut G, s: &str) -> String {
+    format!("{} 0", g.w_of(s))
+}
+
+/// A W of the shape painted, or `null` one time in `k`.
+fn wl_or_null(g: &mut G, s: &str, k: u64) -> String {
+    if g.one_in(k) {
+        "null".to_owned()
+    } else {
+        wl(g, s)
+    }
+}
+
+/// A shape of the extent of `s` with another type and frame count.
+fn like(s: &str, kind: i64, frames: i64) -> String {
+    let (w, h, d) = ext3(s);
+    format!("{w} {h} {d} {kind} {frames} 0")
+}
+
+/// Part 8's §37 and §38 (tiv, which reads files, is in the defect tests).
+const FR8: &[(&str, Make)] = &[
+    ("pvlab", |g| {
+        let s = g.shape(&[0, 3, 3, 4]);
+        let vs = like(&s, 3, 1);
+        let lab = wl(g, &s);
+        let vals = wl_or_null(g, &vs, 8);
+        let label = g.int(-1, 4);
+        let maxl = g.pick(&["4", "4", "5", "1", "0"]).to_owned();
+        let mix = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            g.w_of(&vs)
+        };
+        let nbr = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            g.w_of(&vs)
+        };
+        let sb = if g.one_in(4) {
+            let f = g.int(1, 3);
+            wl(g, &like(&s, 3, f))
+        } else {
+            "null".to_owned()
+        };
+        format!("{lab} {vals} {label} {maxl} {mix} {nbr} {sb}")
+    }),
+    ("randn", |g| {
+        let n: Vec<i64> = vec![g.int(1, 3), g.int(1, 3), g.int(1, 3), g.int(1, 2)];
+        let given = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            let s = format!(
+                "{} {} {} {} {} 0",
+                n[0],
+                n[1],
+                n[2],
+                g.pick(&["3", "3", "0"]),
+                n[3]
+            );
+            g.w_of(&s)
+        };
+        format!(
+            "{} {} {} {} {} {} {} {given}",
+            n[0],
+            n[1],
+            n[2],
+            n[3],
+            g.f(true),
+            g.f(true),
+            g.int(0, 99)
+        )
+    }),
+    ("const", |g| {
+        let n: Vec<i64> = vec![g.int(1, 3), g.int(1, 3), g.int(1, 3), g.int(1, 2)];
+        let given = if g.one_in(3) {
+            "null".to_owned()
+        } else {
+            let t = g.pick(&["0", "1", "2", "3", "4", "9", "10"]).to_owned();
+            let s = format!("{} {} {} {t} {} 0", n[0], n[1], n[2], n[3]);
+            g.w_of(&s)
+        };
+        let v = g
+            .pick(&[
+                "43960000", "bf800000", "471c4080", "c0200000", "4f32d05e", "7fc00000",
+            ])
+            .to_owned();
+        let v = if g.one_in(2) { v } else { g.f(true) };
+        format!("{} {} {} {} {v} {given}", n[0], n[1], n[2], n[3])
+    }),
+    ("nseq", |g| {
+        let s = g.shape(&[0, 3, 3, 4, 10, 1]);
+        format!("{} {} {}", w0(g, &s), g.int(0, 2), g.f(true))
+    }),
+    ("nfr", |g| {
+        let s = g.shape(NUMERIC);
+        format!("{} {} {}", w0(g, &s), g.int(0, 2), g.f(false))
+    }),
+    ("sort", |g| {
+        let s = g.shape(NUMERIC);
+        let a = w0(g, &s);
+        let m = wl_or_null(g, &like(&s, 3, 1), 2);
+        let d = g.dst(&s, m != "null");
+        format!("{a} {m} {d}")
+    }),
+    ("revsl", |g| {
+        let s = g.shape(NUMERIC);
+        let f = frames_of(&s);
+        let a = w0(g, &s);
+        let short = g.int(0, 1);
+        let bv = if g.one_in(3) {
+            "null".to_owned()
+        } else {
+            matrix(g, (f - short).max(0), 1)
+        };
+        let bc = if g.one_in(3) {
+            "null".to_owned()
+        } else {
+            matrix(g, f, 3)
+        };
+        format!("{a} {bv} {bc} {} {}", g.int(0, 2), g.dst(&s, false))
+    }),
+    ("cdtype", |g| {
+        let a = g.w(NUMERIC);
+        format!("{a} {}", g.pick(&["0", "1", "2", "3", "4", "10", "6"]))
+    }),
+    ("ordidx", |g| {
+        let s = g.shape(NUMERIC);
+        format!("{} {}", w0(g, &s), g.int(0, 9))
+    }),
+    ("vperm", |g| {
+        let s = g.shape(NUMERIC);
+        format!("{} {}", w0(g, &s), g.int(0, 9))
+    }),
+    ("nonmax", |g| {
+        let s = g.shape(&[0, 3, 3, 4]);
+        let a = w0(g, &s);
+        format!("{a} {} {} {}", g.dst(&s, false), g.f(false), g.int(-1, 2))
+    }),
+    ("xrpad", |g| {
+        let s = g.shape(NUMERIC);
+        let (w, h, d) = ext3(&s);
+        let a = w0(g, &s);
+        let r = if g.one_in(3) {
+            "null".to_owned()
+        } else {
+            format!(
+                "{} {} {} {} {} {}",
+                g.int(0, w - 1),
+                g.int(0, h - 1),
+                g.int(0, d - 1),
+                g.int(1, w),
+                g.int(1, h),
+                g.int(1, d)
+            )
+        };
+        format!("{a} {r} {}", g.int(0, 2))
+    }),
+    ("rms", |g| {
+        let s = g.shape(NUMERIC);
+        let o = like(&s, g.pick(&["3", "0", "4"]).parse().unwrap_or(3), 1);
+        format!("{} {}", w0(g, &s), g.w_of(&o))
+    }),
+    ("vfrac", |g| {
+        let s = g.shape(&[3]);
+        let seg = wl(g, &like(&s, 3, 1));
+        let nf = g.int(1, 3);
+        let fr = g.w_of(&like(&s, 3, nf));
+        let m = if g.one_in(4) {
+            g.mat4()
+        } else {
+            let mut e = vec!["00000000".to_owned(); 16];
+            for k in 0..3 {
+                e[5 * k] = g.pick(&["3f000000", "3f800000", "40000000"]).to_owned();
+                e[4 * k + 3] = g.pick(&["00000000", "3f800000", "bf800000"]).to_owned();
+            }
+            e[15] = "3f800000".to_owned();
+            format!("4 4 {}", e.join(" "))
+        };
+        format!("{} {m} {seg} {fr}", g.w_of(&s))
+    }),
+    ("cdt", |g| {
+        let s = g.shape(NUMERIC);
+        let (a, b) = (w0(g, &s), w0(g, &s));
+        format!("{a} {b} {}", g.dst(&s, true))
+    }),
+    ("diffv", |g| {
+        let s = g.shape(NUMERIC);
+        let (a, b) = (w0(g, &s), w0(g, &s));
+        let m = wl_or_null(g, &like(&s, 3, 1), 2);
+        format!("{a} {b} {m} {}", g.d(true))
+    }),
+    ("applyv", |g| {
+        let s = g.shape(NUMERIC);
+        let (w, h, d) = ext3(&s);
+        let a = w0(g, &s);
+        let m = wl_or_null(g, &like(&s, 3, 1), 2);
+        let n = g.int(0, 3);
+        let mut rows = Vec::new();
+        for _ in 0..n {
+            for e in [w, h, d] {
+                rows.push(format!("{:016x}", (g.int(-1, e) as f64).to_bits()));
+            }
+            rows.push(g.d(false));
+            rows.push(g.d(true));
+        }
+        let dd = g.dst(&s, m != "null");
+        format!("{a} {m} {n} {} {dd}", rows.join(" "))
+    }),
+    ("dimmis", |g| {
+        let (a, b) = (g.w(NUMERIC), g.w(NUMERIC));
+        format!("{a} {b} {}", g.int(0, 1))
+    }),
+];
+
+/// Part 8's §39.
+const VOX8: &[(&str, Make)] = &[
+    ("fpow", |g| {
+        let s = g.shape(&[3]);
+        let n = g.int(0, 3);
+        let p: Vec<String> = (0..n)
+            .map(|_| {
+                let v = g
+                    .pick(&["3f800000", "3f000000", "40000000", "3fc00000"])
+                    .to_owned();
+                if g.one_in(3) { g.f(true) } else { v }
+            })
+            .collect();
+        format!("{} {n} {}", w0(g, &s), p.join(" "))
+    }),
+    ("mbin", |g| {
+        let s = g.shape(NUMERIC);
+        let a = w0(g, &s);
+        let d = g.dst(&s, false);
+        let tail = g
+            .pick(&[
+                "null",
+                "x706f73",
+                "x4e4547",
+                "x616273",
+                "x706f",
+                "x",
+                "x6162736f6c757465",
+            ])
+            .to_owned();
+        format!("{a} {d} {} {tail} {}", g.f(false), g.int(0, 1))
+    }),
+    ("reshape", |g| {
+        let s = g.shape(&[0, 1, 2, 3, 4, 10, 9]);
+        let (w, h, d) = ext3(&s);
+        let f = frames_of(&s).max(1);
+        let n = w * h * d * f;
+        let (a, b, c) = if g.one_in(4) {
+            (n + 1, 1, 1)
+        } else {
+            (1, n, 1)
+        };
+        format!("{} {a} {b} {c} 1", w0(g, &s))
+    }),
+    ("msq", |g| {
+        let k = g.int(0, 2);
+        let s = g.shape(NUMERIC);
+        let a = w0(g, &s);
+        let m = wl_or_null(g, &like(&s, 3, 1), 2);
+        let d = g.dst(&s, m != "null");
+        format!("{k} {a} {m} {d}")
+    }),
+    ("mmax", |g| {
+        let s = g.shape(NUMERIC);
+        let (a, b) = (w0(g, &s), w0(g, &s));
+        format!("{a} {b} {}", g.dst(&s, true))
+    }),
+    ("mconst", |g| {
+        let s = g.shape(NUMERIC);
+        let a = w0(g, &s);
+        format!("{a} {} {} {}", g.d(true), g.int(0, 1), g.dst(&s, false))
+    }),
+    ("fbin", |g| {
+        let s = g.shape(NUMERIC);
+        let a = w0(g, &s);
+        let m = wl_or_null(g, &like(&s, 3, 1), 2);
+        format!("{a} {} {m}", g.d(false))
+    }),
+    ("vote", |g| {
+        let s = g.shape(&[0, 3, 4]);
+        let a = w0(g, &s);
+        let m = wl_or_null(g, &like(&s, 3, 1), 2);
+        let d = g.dst(&s, m != "null");
+        format!("{a} {m} {d} {}", g.int(0, 1))
+    }),
+    ("crop", |g| {
+        let s = g.shape(NUMERIC);
+        let (w, h, d) = ext3(&s);
+        let a = w0(g, &s);
+        format!(
+            "{a} {} {} {} {} {} {}",
+            g.int(-1, w - 1),
+            g.int(0, h - 1),
+            g.int(0, d - 1),
+            g.int(0, w),
+            g.int(0, h - 1),
+            g.int(0, d - 1)
+        )
+    }),
+    ("revs", |g| {
+        let s = g.shape(NUMERIC);
+        let a = w0(g, &s);
+        format!("{a} {}", g.dst(&s, false))
+    }),
+    ("cutend", |g| {
+        let s = g.shape(NUMERIC);
+        let a = w0(g, &s);
+        format!("{a} {}", g.int(0, 2))
+    }),
+    ("segids", |g| {
+        let s = g.shape(NUMERIC);
+        let a = wl(g, &s);
+        format!("{a} 0 {}", g.int(0, 1))
+    }),
+    ("hcos", |g| {
+        let s = g.shape(NUMERIC);
+        let a = w0(g, &s);
+        format!("{a} {} {}", g.d(true), g.dst(&s, false))
+    }),
+];
+
 fn group(name: &str, table: &[(&str, Make)], per: usize) {
     let seed = name.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
         (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
@@ -2538,4 +2886,14 @@ fn transform_arrays_changed_to_ras() {
 #[test]
 fn transform_arrays_between_types() {
     group("ltatypes", LTATYPES, 24);
+}
+
+#[test]
+fn partial_volumes_and_sequences() {
+    group("fr8", FR8, 8);
+}
+
+#[test]
+fn voxelwise_operations() {
+    group("vox8", VOX8, 8);
 }

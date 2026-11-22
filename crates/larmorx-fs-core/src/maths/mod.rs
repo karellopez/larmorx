@@ -146,6 +146,22 @@ impl Process {
         )
     }
 
+    /// `powf` as [`Process::libm`]; where both results are NaN, glibc's (the official build's
+    /// bits) in both modes.
+    pub(crate) fn libm_powf(&mut self, x: f32, y: f32) -> f32 {
+        let (a, b) = (
+            larmorx_core::math::powf(x, y),
+            larmorx_core::math::powf_glibc(x, y),
+        );
+        if a.is_nan() && b.is_nan() {
+            return b;
+        }
+        if a.to_bits() != b.to_bits() {
+            self.note_glibc07("powf");
+        }
+        if self.mode().reproduce() { b } else { a }
+    }
+
     /// A float function of the C library (`expf`, `sinf`, `cosf`) as [`Process::libm`].
     pub(crate) fn libmf(
         &mut self,

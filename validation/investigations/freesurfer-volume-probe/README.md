@@ -200,7 +200,7 @@ The spec's sections in brackets.
 | `cdt W P W P D` | `MRIcombineDistanceTransforms` | the result |
 | `diffv W P W P W\|null P d` | `MRIdiff2Vect` (the mask painted or none, the threshold) | `null`, or the row count and each row's five doubles |
 | `applyv W P W\|null P n (d×5)×n D` | `MRIapplyDiffVect` of the n rows (the mask painted or none) into D | the count applied (unset -7), then the result |
-| `tiv x x\|nofile i d i` | the second string written to a file named by the first (`nofile`: none), `USE_AVERAGE305` as in `ltaread`, then `MRIestimateTIV` (the scale; the determinant asked for: 1, or not: 0) | the double, the determinant (unset 7.0) |
+| `tiv x x\|nofile i d i` | `USE_AVERAGE305` as in `ltaread`; any old file of the first string's name removed, the second string written to it (`nofile`: none), then `MRIestimateTIV` (the scale; the determinant asked for: 1, or not: 0), the file removed after a call that returns. Unlike `ltaread`, `errno` is not set to 0 first: when no old file was there, its removal leaves `ENOENT` (2), which the transform reader's error lines then print first (`error: No such file or directory`); a call that ends the program leaves its file in the working directory, so a later line of the batch that names it removes it without setting `errno` | the double, the determinant (unset 7.0) |
 | `dimmis W W i` | `MRIdimMismatch` (frames compared: 1) | its value |
 | `fpow W P n f×n` | `mri_framepower` with an array of exactly n powers [§39] | its value, the volume |
 | `mbin W P D f x\|null i` | `mri_binarize` (thresh, the tail or none, invert) | the count (unset -7), the result |

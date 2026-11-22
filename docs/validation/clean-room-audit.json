@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-22-freesurfer-batch-79",
+ "dossier": "2026-11-22-freesurfer-batch-80",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 516872,
-  "agents": 552,
+  "accesses": 517417,
+  "agents": 553,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 905,
-  "archived_files": 905,
+  "archive_checksums_matched": 907,
+  "archived_files": 907,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -538,13 +538,17 @@
    "2026-11-22-session-transcripts-freesurfer-batch-79": {
     "files": 7,
     "sha256": "7c6c95b11cf32ad56b58baa5c097b949750f9c1ffc0e233a3aacf7fa0721675a"
+   },
+   "2026-11-22-session-transcripts-freesurfer-batch-80": {
+    "files": 3,
+    "sha256": "3a0395f0788b61bd56e73fcfcd2460df9873be59fdf78ba9636c03cfa5097d99"
    }
   },
-  "commits_printed": 5380,
-  "distinct_transcripts": 556,
+  "commits_printed": 5382,
+  "distinct_transcripts": 557,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 447,
+   "agents_without_worktree": 448,
    "bad_lines": 0,
    "calls_without_result": 122,
    "compaction_parent_missing": 9,
@@ -553,17 +557,17 @@
    "refused_calls_restricted_accesses": 743,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 9947
+   "unresolved_paths": 9953
   },
-  "last_record": "2026-11-22 07:15 UTC",
-  "live_files": 556,
+  "last_record": "2026-11-22 08:12 UTC",
+  "live_files": 557,
   "live_files_also_archived": 555,
   "sessions": 4,
-  "tool_calls": 145408,
+  "tool_calls": 145564,
   "tool_calls_by_tool": [
    [
     "Agent",
-    554
+    555
    ],
    [
     "Artifact",
@@ -575,7 +579,7 @@
    ],
    [
     "Bash",
-    127881
+    128028
    ],
    [
     "CronCreate",
@@ -599,7 +603,7 @@
    ],
    [
     "Read",
-    3174
+    3176
    ],
    [
     "ReadNotifications",
@@ -643,12 +647,12 @@
    ],
    [
     "Write",
-    7215
+    7221
    ]
   ],
-  "transcript_bytes": 29811636501,
-  "transcript_files": 1461,
-  "unique_paths": 95244
+  "transcript_bytes": 30056985936,
+  "transcript_files": 1464,
+  "unique_paths": 95319
  },
  "levels": [
   [
@@ -729,7 +733,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "ad27ed9f"
+  "verdicts_repository": "c1d48607"
  },
  "overview": {
   "agents_by_role": [
@@ -755,7 +759,7 @@
    ],
    [
     "replica author",
-    154
+    155
    ],
    [
     "spec writer",

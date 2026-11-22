@@ -19,6 +19,7 @@ pub mod mri_normalize;
 
 use larmorx_freesurfer_core::run::Program;
 
+pub mod fs_temp_file;
 pub mod lta_convert;
 pub mod mri_add_xform_to_header;
 pub mod mri_binarize;
@@ -32,6 +33,10 @@ pub mod mris_calc;
 
 /// The programs of this crate, by their original names.
 pub const PROGRAMS: &[Program] = &[
+    Program {
+        name: fs_temp_file::main::NAME,
+        run: fs_temp_file::main::run,
+    },
     Program {
         name: lta_convert::main::NAME,
         run: lta_convert::main::run,

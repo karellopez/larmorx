@@ -392,9 +392,12 @@ def whole_path_texts(args: Sequence[str]) -> list[str]:
 #: ``mri_mask`` and ``mri_robust_register`` (relay 52 of track A: none of their entries had an
 #: input whose name the old key could confuse; one entry re-keyed, run fresh: the same result).
 #: ``validation/tests/test_oracle_cache.py`` fails when a program registered in
-#: larmorx-freesurfer (its crates' ``PROGRAMS``) is missing here.
+#: larmorx-freesurfer (its crates' ``PROGRAMS``) is missing here; ``fs_temp_file`` and
+#: ``getfullpath`` read no file but are listed, so the rule has no exception.
 EXTENSION_FROM_WHOLE_PATH = (
+    "fs_temp_file",
     "fsunit",
+    "getfullpath",
     "lta_convert",
     "mri_add_xform_to_header",
     "mri_binarize",

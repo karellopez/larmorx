@@ -2697,6 +2697,8 @@ defects! {
         "lta_convert --sqrt (which prints the matrix's singular value decomposition, MATRIX SQRT not supported yet) puts the decomposition's left factor in place of the transform: every output written after the .lta (--outfsl, --outmni, --outreg, --outniftyreg, --outitk, --outvox) holds that factor instead of the transform; corrected: the outputs keep the transform";
     FS_1170 = "FS-1170", "FreeSurfer", true,
         "lta_convert stops reading its options at the first argument that does not start with a dash, without a message: that argument and every option after it are ignored, and the program goes on with what it read; corrected: ERROR: Option: <argument> unknown, status 1";
+    FS_1171 = "FS-1171", "FreeSurfer", true,
+        "fs_temp_file --base with a folder that does not exist, cannot be written or is empty makes its file elsewhere without a message: in the folder of the next of TMPDIR, TMP, TEMP and TEMPDIR that is set and writable, else in /tmp; corrected: Can not write to temporary directory <base>, status 1";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

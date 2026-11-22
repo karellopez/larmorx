@@ -1037,18 +1037,22 @@ fn temp_letters(attempt: u64) -> String {
 }
 
 /// Makes `<base>/tmp.XXXXXX<suffix>` as a new file (`mkstemps`) or directory (`mkdtemp`) with a
-/// fresh name, trying as many names as glibc (62^3).
+/// fresh name, trying as many names as glibc (62^3); on Unix with glibc's modes, 0600 for a file
+/// and 0700 for a directory (less the process's umask).
 fn make_unique(base: &Path, suffix: &str, directory: bool) -> Option<PathBuf> {
     for attempt in 0..238_328u64 {
         let p = base.join(format!("tmp.{}{suffix}", temp_letters(attempt)));
         let made = if directory {
-            std::fs::create_dir(&p).map(|_| ())
+            let mut b = std::fs::DirBuilder::new();
+            #[cfg(unix)]
+            std::os::unix::fs::DirBuilderExt::mode(&mut b, 0o700);
+            b.create(&p)
         } else {
-            std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&p)
-                .map(|_| ())
+            let mut o = std::fs::OpenOptions::new();
+            o.write(true).create_new(true);
+            #[cfg(unix)]
+            std::os::unix::fs::OpenOptionsExt::mode(&mut o, 0o600);
+            o.open(&p).map(|_| ())
         };
         match made {
             Ok(()) => return Some(p),

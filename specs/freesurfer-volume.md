@@ -2629,7 +2629,9 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
 - **`LTAconcat(ltas, n, Reduce)`** (and `LTAconcat2` of two): every array's inverses filled first (each array is
   changed); a new array holding all their transforms: the first array's copied, its type, `fscale` and subject taken;
   each later array is first changed to that type when it has another (`LTAchangeType` below: the caller's array
-  changes); its transforms are then copied when its first source equals the last copied destination
+  changes); its transforms are then copied when its first source equals the last copied destination (the destination
+  of the last transform copied into the new array: after an array taken inverted, the inverse of its first transform,
+  whose destination is that array's first source; **(observed)**, relay 15)
   (`vg_isEqual`), else, when its last destination equals it, its inverse transforms in reverse order after `WARNING:
   LTAconcat(): inverting LTA <k> to match geometry` on standard output, else `ERROR: LTAconcat(): LTAs <k-1> and <k> do
   not match`, `LTA <k-1> -------------------`, the array (`LTAprint`), `LTA <k> -------------------`, the other, and
@@ -2767,7 +2769,7 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
     from 21).
   - The diagnostic print: from REGISTER_DAT, coronal RAS and FSL, after the change and before the inverses' fill, with
     `Gdiag_no` above 0: `transformed matrix:` + `\n` on standard output, then the first transform's matrix
-    (`MatrixPrint`, `specs/freesurfer-maths.md` §8.6) to the diagnostic stream (`Gstdout`: standard output once a
+    (`MatrixPrint`, `specs/freesurfer-maths.md` §8.6, at its default precision, 5) to the diagnostic stream (`Gstdout`: standard output once a
     program's diagnostic set-up has run) (**(observed)**: `vrules14`: one print from 14 to 1; three from 15 to 1 (the
     inner change to 14, the inner change to 1, the outer call), two from 21 to 14; none from 1 to 14; none at level 0).
     An array of no transforms with `Gdiag_no` above 0: FS-504 (FreeSurfer prints `transformed matrix:` and reads a

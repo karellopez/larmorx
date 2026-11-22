@@ -4218,7 +4218,7 @@ class Gen15(Gen14):
     """Part 9 (relay 16): volume-to-volume resampling (§41) with MRIaseg2volMU's upsampling (§55)
     and MRIvol2VolTkRegVSM (§56); the region boxes (§43)."""
 
-    def pvol(self, r: random.Random, dims, t: int, nf: int, special: float = 0.05):
+    def p9vol(self, r: random.Random, dims, t: int, nf: int, special: float = 0.05):
         """(W, its geometry): a volume of the extent, type and frames, an axis-aligned or any
         geometry, values from the type's range (floats with special ones)."""
         geo = self.rgeo(r, dims)
@@ -4294,9 +4294,9 @@ class Gen15(Gen14):
 
         for _ in range(130):
             nf = r.choice([1, 1, 2])
-            s, _ = self.pvol(r, dims(), r.choice(types), nf)
+            s, _ = self.p9vol(r, dims(), r.choice(types), nf)
             tnf = nf if r.random() < 0.88 else 3 - nf
-            t, _ = self.pvol(r, dims(), r.choice(types), tnf)
+            t, _ = self.p9vol(r, dims(), r.choice(types), tnf)
             interp = r.choice([0, 0, 1, 1, 1, 2, 2, 5, 5, 3, -1])
             param = f32(r.choice([0.5, 1.0, 2.0, 3.0, 1.4]))
             pre = "+gdiagno=1 " if r.random() < 0.1 else ""
@@ -4304,8 +4304,8 @@ class Gen15(Gen14):
         for _ in range(110):
             nf = r.choice([1, 1, 2])
             sd = dims(2, 4)
-            s, sg = self.pvol(r, sd, r.choice(types), nf)
-            t, tg = self.pvol(r, dims(), r.choice(types), nf)
+            s, sg = self.p9vol(r, sd, r.choice(types), nf)
+            t, tg = self.p9vol(r, dims(), r.choice(types), nf)
             vsm = "null"
             if r.random() < 0.75:
                 vsm = f"{self.shiftmap(r, sd if r.random() < 0.9 else dims(2, 4))} 0 {self.od(r)}"
@@ -4328,17 +4328,17 @@ class Gen15(Gen14):
                 f"{vsm} {lta} {pedir}"
             )
         for _ in range(40):
-            s, _ = self.pvol(r, dims(), r.choice(types), 1)
-            t, _ = self.pvol(r, dims(), 3, r.choice([8, 8, 8, 8, 8, 8, 9, 2]))
+            s, _ = self.p9vol(r, dims(), r.choice(types), 1)
+            t, _ = self.p9vol(r, dims(), 3, r.choice([8, 8, 8, 8, 8, 8, 9, 2]))
             L.append(f"vvk {s} 0 {t} 0 {self.v2vmat(r)}")
         for _ in range(30):
-            mv, _ = self.pvol(r, dims(), r.choice(types), 1)
-            t, _ = self.pvol(r, dims(), r.choice(types), r.choice([1, 2]))
+            mv, _ = self.p9vol(r, dims(), r.choice(types), 1)
+            t, _ = self.p9vol(r, dims(), r.choice(types), r.choice([1, 2]))
             m = r.choice(["null", self.near(r, t=2.0), self.affine(r)])
             L.append(f"vvd {mv} 0 {t} 0 {m}")
         for _ in range(30):
-            t, _ = self.pvol(r, dims(), 3, 1)
-            mv, _ = self.pvol(r, dims(), 3, 1)
+            t, _ = self.p9vol(r, dims(), 3, 1)
+            mv, _ = self.p9vol(r, dims(), 3, 1)
             m = r.choice(["null", self.near(r, t=2.0), self.affine(r)])
             L.append(f"rd2lta {t} {mv} {m}")
         for _ in range(45):

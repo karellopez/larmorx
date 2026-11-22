@@ -89,6 +89,7 @@ fn e(pairs: &[(&'static str, &str)]) -> Vec<(&'static str, String)> {
 }
 
 /// Every case of the probe.
+#[allow(clippy::vec_init_then_push)] // one push per case, each with its comment
 pub fn all_cases() -> Vec<String> {
     let t = "<D>/t";
     let tt = vec!["t"];

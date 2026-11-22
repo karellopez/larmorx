@@ -79,9 +79,12 @@ pub fn fixture() -> (Vec<&'static str>, Vec<&'static str>) {
     (portable, unix)
 }
 
+/// A case before it is written: its flag, the folder it runs in, its variables, its arguments.
+type Draft<'a> = (char, &'a str, Vec<(&'a str, &'a str)>, Vec<String>);
+
 /// Every case of the probe.
 pub fn all_cases() -> Vec<String> {
-    let mut c: Vec<(char, &str, Vec<(&str, &str)>, Vec<String>)> = Vec::new();
+    let mut c: Vec<Draft> = Vec::new();
     let home = vec![("HOME", "/nonexistent-home")];
     let s = |v: &[&str]| v.iter().map(|x| (*x).to_owned()).collect::<Vec<_>>();
     // plain: the scripts' calls and names tcsh reads as they are

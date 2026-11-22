@@ -145,16 +145,16 @@ pub fn has_range(w: &str) -> bool {
     let b = w.as_bytes();
     let mut i = 0;
     while i < b.len() {
-        if b[i] == b'[' {
-            if let Some(k) = b[i + 1..].iter().position(|&c| c == b']') {
-                let inner = &b[i + 1..i + 1 + k.max(1)];
-                let inner = inner.strip_prefix(b"^").unwrap_or(inner);
-                if inner.len() >= 3 && inner[1..inner.len() - 1].contains(&b'-') {
-                    return true;
-                }
-                i += k + 2;
-                continue;
+        if b[i] == b'['
+            && let Some(k) = b[i + 1..].iter().position(|&c| c == b']')
+        {
+            let inner = &b[i + 1..i + 1 + k.max(1)];
+            let inner = inner.strip_prefix(b"^").unwrap_or(inner);
+            if inner.len() >= 3 && inner[1..inner.len() - 1].contains(&b'-') {
+                return true;
             }
+            i += k + 2;
+            continue;
         }
         i += 1;
     }
@@ -325,8 +325,8 @@ impl Shell<'_> {
                 let whole = len > 0 && (rest.len() == len || rest[len..].starts_with('/'));
                 if whole {
                     let depth = 1 + self.stack.len();
-                    let (n, tail) = if rest.starts_with('-') {
-                        (depth - 1, &rest[1..])
+                    let (n, tail) = if let Some(after) = rest.strip_prefix('-') {
+                        (depth - 1, after)
                     } else {
                         (
                             rest[..digits].parse().unwrap_or(usize::MAX),
@@ -546,10 +546,10 @@ pub fn enter(cwd: &Path, dir: &str) -> Result<PathBuf, String> {
         Ok(_) => {}
     }
     // entering needs search permission: `<dir>/.` cannot be looked at without it
-    if let Err(e) = std::fs::metadata(p.join(".")) {
-        if e.kind() == std::io::ErrorKind::PermissionDenied {
-            return Err(format!("{dir}: Permission denied."));
-        }
+    if let Err(e) = std::fs::metadata(p.join("."))
+        && e.kind() == std::io::ErrorKind::PermissionDenied
+    {
+        return Err(format!("{dir}: Permission denied."));
     }
     match physical(&p) {
         Some(s) => Ok(PathBuf::from(s)),

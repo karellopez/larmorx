@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Builds fsrobust (fsrobust.cpp) with FreeSurfer 8.2.0's robust-registration files
 # (mri_robust_register/ MyMRI.cpp, MyMatrix.cpp, CostFunctions.cpp, Quaternion.cpp, JointHisto.cpp,
-# compiled from the tag) against the unit oracle: its compiler (Ubuntu's gcc-8 8.4.0), the official
+# Registration.cpp, RegRobust.cpp, RegPowell.cpp, compiled from the tag) against the unit oracle: its compiler (Ubuntu's gcc-8 8.4.0), the official
 # programs' compile flags (the unit oracle's compile_commands.json for mri_normalize, without
 # -Werror; the source paths mapped to the official build's, so __FILE__ prints as there), its
 # libraries (the official build's utils and packages, ITK 4.13.2's VNL), and Ubuntu 22.04's static
@@ -35,7 +35,7 @@ flags=(-DHAVE_OPENGL -DHAVE_OPENMP -DHAVE_ZLIB -DITK_USE_SYSTEM_ZLIB -DLinux -DU
   -fmacro-prefix-map="$tag"=/home/rd521/space_freesurfer/build/docker_ubuntu22/trunk/rd521-8.2.0
   -fopenmp -std=c++11)
 objs=()
-for f in MyMRI MyMatrix CostFunctions Quaternion JointHisto; do
+for f in MyMRI MyMatrix CostFunctions Quaternion JointHisto Registration RegRobust RegPowell; do
   "$gcc" "${flags[@]}" -c "$rr/$f.cpp" -o "$out/$f.o"
   objs+=("$out/$f.o")
 done

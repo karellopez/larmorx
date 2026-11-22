@@ -3045,6 +3045,20 @@ defects! {
         "the matrix square root of the robust registration (and the complex Schur form it is computed from) of a matrix with an infinite or NaN element: the Schur form's QR iteration does not converge (`info = 2, something went wrong` and `the QR iteration failed` on standard error) or the result is NaN, and the NaN matrix is returned all the same, the checks of the result never failing on NaNs; refused with a clear error by default";
     FS_970 = "FS-970", "FreeSurfer", true,
         "the matrix square root of the robust registration of an empty (0 x 0) matrix: ` ** On entry to ZGEES parameter number  6 had an illegal value` on standard output and the end of the program with status 0; refused with a clear error and status 1 by default";
+    FS_1061 = "FS-1061", "FreeSurfer", false,
+        "a robust registration step of an image with more than 2,147,483,647 voxels and frames gives some voxels the weights of others; unreachable in practice (it needs more than 60 GB of memory), noted, computed as FreeSurfer computes it";
+    FS_1062 = "FS-1062", "FreeSurfer", false,
+        "a subsampled robust registration step (`--subsample`) estimates its rotation, scale and shear parameters as if every voxel position were halved; kept until measured with the registrations that reach it (rule D)";
+    FS_1063 = "FS-1063", "FreeSurfer", true,
+        "the robust registration in double precision with an intensity scale (`--doubleprec --iscale`) builds each step's transformation from memory contents instead of the step's solution; larmorx uses the solution in both modes";
+    FS_1064 = "FS-1064", "FreeSurfer", true,
+        "the robust registration's median and median absolute deviation of an empty list return memory contents; NaN in both modes";
+    FS_1065 = "FS-1065", "FreeSurfer", true,
+        "the robust location estimate of a set of values (Tukey's biweight, `mri_robust_template --average 2`) crashes unless the values are all almost equal; larmorx computes it in both modes";
+    FS_1066 = "FS-1066", "FreeSurfer", true,
+        "the least-squares estimate of a single location returns memory contents instead of the mean; larmorx returns the mean in both modes (no program reaches it)";
+    FS_1067 = "FS-1067", "FreeSurfer", true,
+        "a robust registration step with fewer usable voxels than the transformation has parameters gives memory contents (the robust solve) or an arbitrary solution (least squares); refused with a clear error and status 1 by default";
 }
 
 /// The register entry with ID `id`.

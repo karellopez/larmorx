@@ -1,7 +1,7 @@
-# fs.volume's and fs.bspline's clean rooms against FreeSurfer 8.2.0, as a black box (parts 1 to 8, §54, fs.bspline)
+# fs.volume's and fs.bspline's clean rooms against FreeSurfer 8.2.0, as a black box (parts 1 to 8, §54 to §57, fs.bspline)
 
 larmorx's clean rooms of FreeSurfer's volume functions (`crates/larmorx-fs-core/src/volume/`, written
-from [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) §1 to §40 and §54 alone) and of its
+from [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) §1 to §40 and §54 to §58 alone) and of its
 B-splines (`crates/larmorx-fs-core/src/bspline/`, from
 [`specs/freesurfer-bspline.md`](../../../specs/freesurfer-bspline.md) alone) compared
 with the prebuilt probe of the open folder [`../freesurfer-volume-probe/`](../freesurfer-volume-probe/README.md)
@@ -30,7 +30,7 @@ The golden cases: `cargo test -p larmorx-fs-core --test golden_volume` (record w
 NAN_TRAP_DIR=<scratch>/nt`, the library built from `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`
 as that folder's README says. The defects' own tests: `cargo test -p larmorx-fs-core --test defects_volume`.
 
-## Results (2026-11-22, relay 15, seed 7, every group of the volume spec's §69.2 and the B-spline spec's §9; the probe's reference hashes are the specs', the probe of commit `84fda65e`)
+## Results (2026-11-22, relay 16, seed 7, every group of the volume spec's §69.2 and the B-spline spec's §9; the probe's reference hashes are the specs', the probe of commit `2c4d9f97`)
 
 `compare.py` per group: calls, identical, FreeSurfer did not finish, memory, defect corrected,
 unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay15-full.log`).
@@ -43,7 +43,7 @@ unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay15-full.log`).
 | vrange | 800 | 685 / 115 / 0 / 0 / **0** | 496 / 115 / 3 / 186 / **0** |
 | vscale | 1,100 | 918 / 178 / 4 / 0 / **0** | 506 / 178 / 114 / 302 / **0** |
 | vtwo | 200 | 164 / 32 / 4 / 0 / **0** | 98 / 32 / 6 / 64 / **0** |
-| vextract | 600 | 501 / 44 / 55 / 0 / **0** | 144 / 44 / 130 / 282 / **0** |
+| vextract | 600 | 501 / 43 / 56 / 0 / **0** | 144 / 43 / 131 / 282 / **0** |
 | vcoords | 1,350 | 1,350 / 0 / 0 / 0 / **0** | 1,178 / 0 / 0 / 172 / **0** |
 | vstats | 750 | 711 / 39 / 0 / 0 / **0** | 475 / 39 / 12 / 224 / **0** |
 | vheader | 606 | 606 / 0 / 0 / 0 / **0** | 498 / 0 / 0 / 108 / **0** |
@@ -58,12 +58,12 @@ unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay15-full.log`).
 | vres | 830 | 717 / 77 / 36 / 0 / **0** | 498 / 77 / 98 / 157 / **0** |
 | vrules6 | 16 | 15 / 1 / 0 / 0 / **0** | 13 / 1 / 0 / 2 / **0** |
 | vframes | 404 | 401 / 3 / 0 / 0 / **0** | 371 / 3 / 0 / 30 / **0** |
-| vderiv | 382 | 357 / 22 / 3 / 0 / **0** | 341 / 22 / 5 / 14 / **0** |
+| vderiv | 382 | 358 / 22 / 2 / 0 / **0** | 342 / 22 / 4 / 14 / **0** |
 | vlinear | 360 | 346 / 12 / 1 / 1 / **0** | 217 / 12 / 4 / 127 / **0** |
 | vresamp | 272 | 253 / 17 / 1 / 1 / **0** | 158 / 17 / 1 / 96 / **0** |
 | vrules7 | 12 | 12 / 0 / 0 / 0 / **0** | 10 / 0 / 0 / 2 / **0** |
 | vbspline | 410 | 377 / 24 / 9 / 0 / **0** | 318 / 24 / 10 / 58 / **0** |
-| vbsrules | 71 | 68 / 0 / 3 / 0 / **0** | 64 / 0 / 3 / 4 / **0** |
+| vbsrules | 71 | 69 / 0 / 2 / 0 / **0** | 64 / 0 / 3 / 4 / **0** |
 | vbsvol | 70 | 66 / 4 / 0 / 0 / **0** | 29 / 4 / 1 / 36 / **0** |
 | vstat7 | 481 | 474 / 0 / 7 / 0 / **0** | 432 / 0 / 7 / 42 / **0** |
 | vrules8 | 32 | 29 / 0 / 3 / 0 / **0** | 27 / 0 / 3 / 2 / **0** |
@@ -73,28 +73,32 @@ unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay15-full.log`).
 | vrules9 | 34 | 30 / 1 / 3 / 0 / **0** | 18 / 1 / 4 / 11 / **0** |
 | vrules10 | 65 | 65 / 0 / 0 / 0 / **0** | 27 / 0 / 0 / 38 / **0** |
 | vrules11 | 28 | 28 / 0 / 0 / 0 / **0** | 28 / 0 / 0 / 0 / **0** |
-| vpvlab | 90 | 84 / 1 / 2 / 3 / **0** | 84 / 1 / 2 / 3 / **0** |
+| vpvlab | 90 | 83 / 1 / 3 / 3 / **0** | 83 / 1 / 3 / 3 / **0** |
 | vfr8 | 490 | 482 / 7 / 1 / 0 / **0** | 395 / 7 / 10 / 78 / **0** |
 | vmri2 | 390 | 384 / 3 / 3 / 0 / **0** | 321 / 3 / 4 / 62 / **0** |
 | vrules12 | 112 | 105 / 6 / 1 / 0 / **0** | 80 / 6 / 2 / 24 / **0** |
 | vrules13 | 13 | 6 / 7 / 0 / 0 / **0** | 6 / 7 / 0 / 0 / **0** |
-| vlta54 | 225 | 217 / 6 / 2 / 0 / **0** | 121 / 6 / 3 / 95 / **0** |
-| vrules14 | 94 | 85 / 4 / 5 / 0 / **0** | 50 / 4 / 5 / 35 / **0** |
-| all | 15,753 | 14,658 / 889 / 194 / 12 / **0** | 10,894 / 889 / 568 / 3,402 / **0** |
+| vlta54 | 225 | 217 / 4 / 4 / 0 / **0** | 121 / 4 / 5 / 95 / **0** |
+| vrules14 | 109 | 96 / 4 / 9 / 0 / **0** | 51 / 4 / 9 / 45 / **0** |
+| vaseg | 219 | 219 / 0 / 0 / 0 / **0** | 216 / 0 / 0 / 3 / **0** |
+| vsegs | 270 | 270 / 0 / 0 / 0 / **0** | 243 / 0 / 0 / 27 / **0** |
+| vcrops | 95 | 95 / 0 / 0 / 0 / **0** | 79 / 0 / 0 / 16 / **0** |
+| vrules15 | 70 | 59 / 9 / 1 / 1 / **0** | 38 / 9 / 2 / 21 / **0** |
+| all | 16,422 | 15,313 / 895 / 201 / 13 / **0** | 11,471 / 895 / 577 / 3,479 / **0** |
 
-Totals: `reproduce` 14,658 of 15,753 identical (889 where FreeSurfer did not finish, 9 of them
-FS-314's aborts that the candidate gives too, which §69.3 checks; 194 memory lines; 12 lines where the
+Totals: `reproduce` 15,313 of 16,422 identical (895 where FreeSurfer did not finish, 9 of them
+FS-314's aborts that the candidate gives too, which §69.3 checks; 201 memory lines; 13 lines where the
 candidate noted a defect whose value in FreeSurfer is memory, which §69.3 allows in both modes: FS-300
-in `vsample` and `vresamp`, FS-325 in `vlinear`, and FS-469 in 3 `vpvlab` lines, a border voxel's own
-label outside the label table, whose mean FreeSurfer reads beside the table), none unexplained; `fix`
-10,894 identical (889 not finished, 568 memory, 3,402 corrected by a noted defect), none unexplained.
-Relay 15 followed the spec writer's answers to relay 14's items (§37 to §39: FS-470's and FS-471's
-errors, FS-471's limits off the border, `vrules13`; FS-479's error; fewer powers than frames;
-FS-469 allowed in both modes in `vpvlab`), then the rest of §54 (`LTAchangeType` to and from
-REGISTER_DAT, FSL and coronal RAS, `LTAinvert`, `LTAconcat`, `LTAconcat2`, `LTAreduce`,
-`LTAmriIsSource`, `LTAmriIsTarget`, `LTAprint`: `vlta54` and `vrules14`, every line identical with
-`reproduce` but where FreeSurfer did not finish or read memory). fs.mri (16 groups, 9,511 calls) was run
-again: none unexplained in either mode. fs.bspline's own findings: `docs/findings/fs-bspline-clean-room.md`.
+in `vsample` and `vresamp`, FS-325 in `vlinear`, FS-469 in 3 `vpvlab` lines, a border voxel's own
+label outside the label table, whose mean FreeSurfer reads beside the table, and FS-509 in `vrules15`,
+a tissue type of 100 counted past FreeSurfer's array), none unexplained; `fix` 11,471 identical (895
+not finished, 577 memory, 3,479 corrected by a noted defect), none unexplained. Relay 16 followed the
+spec writer's answers to relay 15's items (§39: FS-266 noted for fewer powers than frames; §54:
+FS-508 ends the program at the first read of the freed matrix, after the later transforms'
+conversions; `vrules14` grown to 109 calls), then §55 to §57 (`vaseg`, `vsegs` and `vcrops` identical in
+every line with `reproduce`; `vrules15` but where FreeSurfer crashed or read memory), but
+`MRIaseg2volMU`'s upsampling and `MRIvol2VolTkRegVSM`, which wait for part 9. fs.mri (16 groups, 9,511
+calls) was run again: none unexplained in either mode. fs.bspline's own findings: `docs/findings/fs-bspline-clean-room.md`.
 `nan-order/mk.py` holds the black-box check of §35's label sums' NaN order (its docstring says how to
 run it and what it showed).
 
@@ -129,8 +133,8 @@ run it and what it showed).
   group `info`; fs.bspline's 10, the group `bspline`, its transform arrays on clean geometries too;
   the cubic B-spline paths, the group `bsvol`; part 7b's 16 commands, the groups `image` and `nbhd`;
   §54's changes of type, the groups `ltapv` and `ltatypes`; part 8's commands, the groups `fr8` and
-  `vox8`; §54's other operations, the group `lta54`), both modes, 60 SHA-256 over 30 groups (0.13 s in
-  a debug build). Identical in debug and release builds and under the AArch64 NaN emulation of both.
+  `vox8`; §54's other operations, the group `lta54`; §55 to §57's 18 commands, the group `segs57`),
+  both modes, 62 SHA-256 over 31 groups (0.21 s in a debug build). Identical in debug and release builds and under the AArch64 NaN emulation of both.
 - `cargo test -p larmorx-fs-core --test defects_volume`: each defect of the spec's §69.4 (FS-265,
   FS-285 to FS-318) and FS-332, FS-258 noted in both modes on a line of the comparison's own batches
   (the shortest), FS-292, FS-296, FS-297, FS-302, FS-305, FS-311 to FS-315 and FS-258 on lines
@@ -154,8 +158,12 @@ run it and what it showed).
   (FS-470's and FS-471's errors, FS-471's limits -1 to -3 off the border, FS-479's error, fewer powers
   than frames); §54's FS-504 (no arrays, arrays without transforms, a 3 x 4 matrix printed, the
   diagnostic print of an empty array), FS-507 (REGISTER_DAT to RAS-to-RAS of two transforms), FS-508
-  (a registration that cannot be inverted changed to FSL), the unsupported targets' messages, the
-  diagnostic print and a NaN element printed; also FS-12, FS-47, ITK-112, FS-52, FS-53 and FS-58.
+  (a registration that cannot be inverted changed to FSL, and its place: the first read after the
+  later transforms' conversions), the unsupported targets' messages, the diagnostic print and a NaN
+  element printed; FS-266 (fewer powers than frames); §55 to §57's FS-267 (a tissue table of no
+  places, also after an earlier vote in the same process: the candidate's own command `a2vtwice`),
+  FS-509 (a label past the table, an empty place, a type of 100), FS-510, FS-512, FS-513, FS-514,
+  FS-515, FS-516 and FS-517 on `vrules15`'s lines; also FS-12, FS-47, ITK-112, FS-52, FS-53 and FS-58.
 - Speed (part 4; the spec's plan names none): one batch line each through the probe and the
   candidate, end to end, best of 3: 20,000 points on a 32^3 float volume, trilinear 1.3x faster than
   FreeSurfer, cubic 1.1x, nearest 1.5x, windowed sinc 0.72x (the main package's `sin` and `cos`

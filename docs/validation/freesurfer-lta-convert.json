@@ -1,0 +1,99 @@
+{
+ "name": "freesurfer-lta-convert",
+ "tool": "lta_convert (FreeSurfer 8.2.0)",
+ "status": "experimental",
+ "larmorx_commit": "559d855c4966",
+ "generated": "2026-11-22",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/lta_convert/), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's recon-all runs (oracles/freesurfer-8.2.0/runs/: every step recorded) and its official program ($FREESURFER_HOME/bin/lta_convert)",
+ "replay": {
+  "reproduce": {
+   "steps": 12,
+   "runs": 12,
+   "verdicts": {
+    "reproduced": 12
+   },
+   "seconds_recorded": 2.7,
+   "seconds_replayed": 0.9
+  },
+  "fix": {
+   "steps": 12,
+   "runs": 12,
+   "verdicts": {
+    "reproduced": 12
+   },
+   "seconds_recorded": 2.7,
+   "seconds_replayed": 0.9
+  }
+ },
+ "probe": [
+  {
+   "set": "seed 1",
+   "cases": 400,
+   "identical": 366,
+   "different": 0,
+   "skipped": 34,
+   "fix_different_with_notice": 187,
+   "fix_different_without_notice": 0
+  },
+  {
+   "set": "seed 3",
+   "cases": 1000,
+   "identical": 878,
+   "different": 0,
+   "skipped": 122,
+   "fix_different_with_notice": 504,
+   "fix_different_without_notice": 0
+  },
+  {
+   "set": "extra",
+   "cases": 3,
+   "identical": 3,
+   "different": 0,
+   "skipped": 0,
+   "fix_different_with_notice": 0,
+   "fix_different_without_notice": 0
+  }
+ ],
+ "real": {
+  "calls": 21,
+  "reproduce_identical": 21,
+  "fix_identical": 21,
+  "runs": [
+   "ds000005-sub-01-classic",
+   "ds002422-sub-02-v8",
+   "ds005454-sub-16-classic"
+  ]
+ },
+ "golden_sha256": {
+  "official_and_reproduce": "22d2636b6f0feee5166d8eac6fcd19d0cb15d4a7c4ec7703b37c15a6e038636c",
+  "fix": "22d2636b6f0feee5166d8eac6fcd19d0cb15d4a7c4ec7703b37c15a6e038636c"
+ },
+ "memory": [
+  {
+   "case": "recon-all",
+   "mode": "reproduce",
+   "larmorx_mib": 5.5,
+   "freesurfer_mib": 5.5
+  },
+  {
+   "case": "recon-all",
+   "mode": "fix",
+   "larmorx_mib": 6.0,
+   "freesurfer_mib": 5.5
+  },
+  {
+   "case": "talairach",
+   "mode": "reproduce",
+   "larmorx_mib": 5.8,
+   "freesurfer_mib": 5.8
+  },
+  {
+   "case": "talairach",
+   "mode": "fix",
+   "larmorx_mib": 5.5,
+   "freesurfer_mib": 5.8
+  }
+ ]
+}

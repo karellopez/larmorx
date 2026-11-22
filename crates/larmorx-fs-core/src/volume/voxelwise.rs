@@ -19,6 +19,11 @@ fn extent(m: &Mri) -> (i32, i32, i32) {
     (m.geom.width, m.geom.height, m.geom.depth)
 }
 
+/// `!(x > t)`: not above (a NaN is not above anything).
+fn not_above<T: PartialOrd>(x: T, t: T) -> bool {
+    x.partial_cmp(&t) != Some(std::cmp::Ordering::Greater)
+}
+
 /// Whether `(c, r, s)` lies in the volume.
 fn inside(m: &Mri, c: i32, r: i32, s: i32) -> bool {
     let (w, h, d) = extent(m);
@@ -222,7 +227,7 @@ impl Process {
             for r in 0..h {
                 for s in 0..d {
                     for f in 0..nf {
-                        let zero = has_mask && !(self.v0(v.b(), (c, r, s))? > 0.5);
+                        let zero = has_mask && not_above(self.v0(v.b(), (c, r, s))?, 0.5);
                         let x = if zero {
                             0.0
                         } else {
@@ -270,7 +275,7 @@ impl Process {
                     if mv.is_some_and(|m| m < 0.5) {
                         continue;
                     }
-                    let zero = mv.is_some_and(|m| !(m > 0.5));
+                    let zero = mv.is_some_and(|m| not_above(m, 0.5));
                     for f in 0..nf {
                         let x = if zero {
                             0.0
@@ -376,7 +381,7 @@ impl Process {
                     }
                     let mut all = true;
                     for f in 0..m.nframes {
-                        if !(sse::widen(self.vf(m, (c, r, s), f)?).abs() > thresh) {
+                        if not_above(sse::widen(self.vf(m, (c, r, s), f)?).abs(), thresh) {
                             all = false;
                             break;
                         }

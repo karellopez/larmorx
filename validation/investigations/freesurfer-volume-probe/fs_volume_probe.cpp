@@ -7,7 +7,10 @@
 // factors, changes of type; part 6b: frame-range samplers, the trilinear kernel and splatting,
 // derivatives, gradients, neighbour counts, linear transforms; part 6c: resampling onto a template,
 // replacing a value; part 7a: statistics, orientation strings, voxel-to-RAS matrices; part 7b: slices
-// as 2-D images, neighbourhoods and labels; a transform array's change of type (§54); fs.bspline: the
+// as 2-D images, neighbourhoods and labels; a transform array's change of type and its other
+// operations (§54); segmentations onto another grid, SPM warps, segment borders and statistics,
+// concatenation, edits, shifts, the entorhinal fix, the amygdala-cortex junction, crops (§55 to
+// §57); fs.bspline: the
 // B-spline coefficients, their sampling, transforms and factor-of-two pyramids,
 // specs/freesurfer-bspline.md), linked against the unit oracle's libutils.a (GCC 8.4.0,
 // FreeSurfer's flags). It holds only calls of FreeSurfer's functions (and of the C library's) by name
@@ -46,6 +49,7 @@
 #include "matrix.h"
 #include "mri.h"
 #include "mri2.h"
+#include "resample.h"
 #include "transform.h"
 #include "utils.h"
 
@@ -2294,6 +2298,177 @@ static void call(const std::string &c)
     MRI *d = getdst(a);
     MRI *r = MRIhalfCosBias(a, al, d);
     putres(r, a, NULL, d);
+  }
+  // relay 15 (§55 to §57): a segmentation onto another grid, SPM warps, the codes' names; segment
+  // borders, statistics, indices, concatenation, edits, shifts, the entorhinal fix, the
+  // amygdala-cortex junction; crops
+  else if (c == "a2v") {
+    MRI *a = getw();
+    paint(a);
+    MATRIX *m = getm();
+    MRI *t = getw();
+    double ft = getd();
+    COLOR_TABLE *ct = getct();
+    MRI *hit = NULL;
+    MRI *r = MRIaseg2vol(a, m, t, ft, &hit, ct);
+    fflush(stdout);
+    putv(r);
+    putv(r ? hit : NULL);
+  }
+  else if (c == "a2vmu") {
+    MRI *a = getw();
+    paint(a);
+    LTA *l = getlta();
+    double ft = getd();
+    int usf = geti();
+    COLOR_TABLE *ct = getct();
+    MRI *hit = NULL;
+    MRI *r = MRIaseg2volMU(a, l, ft, &hit, usf, ct);
+    fflush(stdout);
+    putv(r);
+    putv(r ? hit : NULL);
+    putlta(l);
+  }
+  else if (c == "spmw") {
+    MRI *v = getw();
+    paint(v);
+    LTA *l = take("null") ? NULL : getlta();
+    MRI *w = getw();
+    paint(w);
+    int lr = geti(), interp = geti();
+    MRI *d = take("new") ? NULL : getw();
+    MRI *r = MRIapplySpmWarp(v, l, w, lr, interp, d);
+    fflush(stdout);
+    putres(r, v, w, d);
+    putlta(l);
+  }
+  else if (c == "icode") {
+    std::string s = getx();
+    puti(interpolation_code(s.c_str()));
+    puti(float2int_code(s.c_str()));
+  }
+  else if (c == "sbound") {
+    MRI *a = getw();
+    paint(a);
+    putv(MRIsegBoundary(a));
+  }
+  else if (c == "sborder") {
+    MRI *a = getw();
+    paint(a);
+    int topo = geti(), ml = -7;
+    MRI *r = MRIsegBorder(a, &ml, topo);
+    fflush(stdout);
+    puti(ml);
+    putv(r);
+  }
+  else if (c == "idxno") {
+    MRI *a = getw();
+    paint(a);
+    MRI *d = getdst(a);
+    MRI *r = MRIindexNo(a, d);
+    putres(r, a, NULL, d);
+  }
+  else if (c == "ssrob") {
+    MRI *s = getw();
+    paint(s);
+    MRI *m = getw();
+    paint(m);
+    int id = geti(), f = geti();
+    float pct = getf();
+    float mn = -7, mx = -7, rg = -7, mean = -7, sd = -7;
+    puti(MRIsegStatsRobust(s, id, m, f, &mn, &mx, &rg, &mean, &sd, pct));
+    for (float x : {mn, mx, rg, mean, sd}) putf(x);
+  }
+  else if (c == "sfavg") {
+    MRI *s = getw();
+    paint(s);
+    MRI *m = getw();
+    paint(m);
+    int id = geti();
+    std::vector<double> av(m->nframes > 0 ? (size_t)m->nframes : 1, -7.0);
+    puti(MRIsegFrameAvg(s, id, m, av.data()));
+    for (int f = 0; f < m->nframes; f++) putd(av[(size_t)f]);
+  }
+  else if (c == "zcat") {
+    MRI *a = getw();
+    paint(a);
+    MRI *b = getw();
+    paint(b);
+    int nskip = geti();
+    MRI *d = getdst(a, b);
+    MRI *r = MRIzconcat(a, b, nskip, d);
+    fflush(stdout);
+    putres(r, a, b, d);
+  }
+  else if (c == "aedit") {
+    MRI *n = getw();
+    paint(n);
+    MRI *o = getw();
+    paint(o);
+    MRI *m = getw();
+    paint(m);
+    MRI *d = getdst(n, o);
+    MRI *r = MRIapplyEdits(n, o, m, d);
+    fflush(stdout);
+    putres(r, n, o, d);
+  }
+  else if (c == "shdim") {
+    MRI *a = getw();
+    paint(a);
+    int dim = geti(), ns = geti(), wrap = geti();
+    MRI *r = MRIshiftDim(a, dim, ns, wrap);
+    fflush(stdout);
+    putv(r);
+  }
+  else if (c == "fento") {
+    MRI *a = getw();
+    paint(a);
+    MRI *e = getw();
+    paint(e);
+    int level = geti();
+    double lh = getd(), rh = getd();
+    int acj = geti();
+    int n = MRIfixEntoWM(a, e, level, lh, rh, acj);
+    fflush(stdout);
+    puti(n);
+    putv(a);
+  }
+  else if (c == "lacj") {
+    MRI *a = getw();
+    paint(a);
+    int topo = geti();
+    MRI *d = take("new") ? NULL : getw();
+    // the new output's colour table draws its colours: a fixed seed first, as a program sets one
+    setRandomSeed(1);
+    MRI *r = LabelAmygalaCortalJunction(a, topo, d);
+    fflush(stdout);
+    putres(r, a, NULL, d);
+  }
+  else if (c == "cfov") {
+    MRI *a = getw();
+    paint(a);
+    int cf = geti(), rf = geti(), sf = geti();
+    double th = getd();
+    MRI_REGION *r = MRIcropToFoV(a, cf, rf, sf, th);
+    fflush(stdout);
+    for (int v : {r->x, r->y, r->z, r->dx, r->dy, r->dz}) puti(v);
+  }
+  else if (c == "ccrs" || c == "crras") {
+    MRI *a = getw();
+    paint(a);
+    if (c == "crras") a->valid = geti();
+    double ctr[3];
+    for (double &x : ctr) x = getd();
+    int fov[3];
+    for (int &x : fov) x = geti();
+    int nk = geti();
+    std::vector<int> keep;
+    for (int i = 0; i < nk; i++) keep.push_back(geti());
+    LTA *l = c == "crras" && !take("null") ? getlta() : NULL;
+    MRI *r = c == "ccrs" ? MRIcropAroundCRS(a, ctr, fov, keep) : MRIcropAroundRAS(a, ctr, fov, l, keep);
+    fflush(stdout);
+    putv(r);
+    if (l) putlta(l);
   }
   else
     bad("unknown command");

@@ -39,7 +39,7 @@ use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::cfmt;
-use larmorx_core::defects::{FS_1101, FS_1102, FS_1106, FS_1113, FS_1114, FS_1115, FS_1116};
+use larmorx_core::defects::{FS_1101, FS_1102, FS_1106, FS_1113, FS_1114, FS_1115, FS_1116, FS_1118};
 use larmorx_freesurfer_core::affine::float_to_int;
 use larmorx_freesurfer_core::diag::diag_init;
 use larmorx_freesurfer_core::globals::Globals;
@@ -933,10 +933,17 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
                 match ctab_is_entry_valid(g, r.err, ct, id) {
                     Ok(v) => valid = Some(v),
                     Err(_) => {
-                        g.notices.add(
-                            &FS_1116,
-                            format!("mri_segstats --id {id}: outside the colour table (FreeSurfer decides with the last id's answer, or memory contents for the first)"),
-                        );
+                        if valid.is_none() {
+                            g.notices.add(
+                                &FS_1116,
+                                format!("mri_segstats --id {id}: outside the colour table (FreeSurfer decides with memory contents)"),
+                            );
+                        } else {
+                            g.notices.add(
+                                &FS_1118,
+                                format!("mri_segstats --id {id}: outside the colour table (FreeSurfer decides with the id before it)"),
+                            );
+                        }
                         valid = if g.notices.reproduce() { valid } else { Some(false) };
                     }
                 }

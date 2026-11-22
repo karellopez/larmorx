@@ -1998,9 +1998,11 @@ defects! {
     FS_1115 = "FS-1115", "FreeSurfer", true,
         "mri_segstats crashes when a step gives no volume and the program goes on with it: --seg-from-input with an input whose header cannot be read";
     FS_1116 = "FS-1116", "FreeSurfer", true,
-        "mri_segstats --id with a colour table accepts or refuses an id outside the table by the answer for the id before it (by memory contents for the first): an accepted one is reported with an empty name and colour; larmorx refuses it (ERROR: cannot find seg id)";
+        "mri_segstats --id with a colour table: an id outside the table given first is accepted or refused by memory contents; larmorx refuses it (ERROR: cannot find seg id)";
     FS_1117 = "FS-1117", "FreeSurfer", true,
         "mri_segstats --ctab-gca writes a GCA label of 1,000 or more past the list it marks labels in (undefined behaviour), and crashes on a label that FreeSurferColorLUT.txt does not hold; larmorx keeps every label and ends with an error for one the table lacks";
+    FS_1118 = "FS-1118", "FreeSurfer", true,
+        "mri_segstats --id with a colour table: an id outside the table after other ids is accepted or refused by the answer for the id before it (an accepted one is reported with an empty name and colour); larmorx refuses it (ERROR: cannot find seg id)";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

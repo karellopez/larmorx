@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Voxelwise operations (spec §39, part 8): frame powers, binarising, reshaping, squares and
 //! roots, maxima, constants, frame binarising, votes, crops, slice reversals, end cuts, label
-//! lists and the half-cosine weighting; FS-480 and FS-481 (GLIBC-07 for `powf` and `cos`).
+//! lists and the half-cosine weighting; FS-266, FS-480 and FS-481 (GLIBC-07 for `powf` and `cos`).
 
-use larmorx_core::defects::{FS_480, FS_481};
+use larmorx_core::defects::{FS_266, FS_480, FS_481};
 use larmorx_core::math;
 
 use super::sample::cvtt;
@@ -45,11 +45,16 @@ impl Process {
     /// `mri_framepower(vol, powers)` (§39): frame `f`'s voxels (as `float`s directly) left for a
     /// power within 0.00001 of 1, `sqrtf` for one within 0.00001 of 0.5, else `powf` (glibc's
     /// with `reproduce`; GLIBC-07). One power per frame: fewer powers than frames end the program
-    /// before any frame changes (rule B, status 252; FreeSurfer reads past the array).
+    /// before any frame changes (FS-266, rule B, status 252, both modes, noted; FreeSurfer reads
+    /// past the array).
     pub fn mri_framepower(&mut self, m: &mut Mri, powers: &[f32]) -> Result<i32, Stop> {
         let (w, h, d) = extent(m);
         if (powers.len() as i64) < i64::from(m.nframes) {
-            // rule B (§39): FreeSurfer reads past the array; larmorx ends before any frame changes
+            // FS-266, rule B (§39): FreeSurfer reads past the array; larmorx ends before any frame changes
+            self.note(
+                &FS_266,
+                "mri_framepower(): fewer powers than frames: the program ended (FreeSurfer reads past them)",
+            );
             self.error_exit(
                 codes::BAD_PARM,
                 b"mri_framepower(): fewer powers than frames (FreeSurfer reads past them)\n",

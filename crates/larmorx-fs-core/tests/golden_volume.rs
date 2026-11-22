@@ -243,11 +243,11 @@ const GOLDEN: &[(&str, &str)] = &[
     ),
     (
         "vox8.fix",
-        "f18978fa925c7ae6c5c2503c82917b799a1093fbf250cf4a569647583c22031c",
+        "fc9f3142c82828389754d607f0f90c36af568d4f6abae6c21421373f86f96818",
     ),
     (
         "vox8.reproduce",
-        "406730a49b4dd05afb5d75a4e328f01262d62027e774fb3b197d565f764b3b62",
+        "ca5889e40a68782916e1027e931c1d813f2ffcb5af6dd7b3fc0f1e82de49e6e0",
     ),
     (
         "ltatypes.reproduce",
@@ -260,6 +260,14 @@ const GOLDEN: &[(&str, &str)] = &[
     (
         "lta54.reproduce",
         "93d1fa98179bae5b9497845e15ecd94a83158f55694febe75de5d70adf0dd595",
+    ),
+    (
+        "segs57.fix",
+        "047348cde3ce21f1408a2a87ca4123e853b3faf5c416414985e068daf01199ef",
+    ),
+    (
+        "segs57.reproduce",
+        "9604a9930481e8e48bef51a8a3fcbcaec25e116385ca9f1c11cee985e0d1fb17",
     ),
 ];
 
@@ -3118,4 +3126,296 @@ fn voxelwise_operations() {
 #[test]
 fn transform_array_operations() {
     group("lta54", LTA54, 8);
+}
+
+/// A W of the extent and type (1 `int`, 3 `float`) whose voxels are labels drawn from `labels`
+/// (the fill `i<word>,...`), the rest of its fields seeded.
+fn seg_w(g: &mut G, (w, h, d): (i64, i64, i64), kind: i64, frames: i64, labels: &[i64]) -> String {
+    let n = (w * h * d * frames) as usize;
+    let words: Vec<String> = (0..n)
+        .map(|_| {
+            let l = labels[g.below(labels.len() as u64) as usize];
+            if kind == 3 {
+                (l as f32).to_bits().to_string()
+            } else {
+                l.to_string()
+            }
+        })
+        .collect();
+    // an ordinary geometry (as the pool's: sizes, cosines and centre without special values)
+    let mut f = vec![g.size(false), g.size(false), g.size(false), "1".to_owned()];
+    f.extend(g.cosines(false));
+    f.extend((0..3).map(|_| g.f(false)));
+    f.extend(["00000000"; 3].map(str::to_owned));
+    let z11 = ["00000000"; 11].join(" ");
+    format!(
+        "{w} {h} {d} {kind} {frames} 0 i{} {} 1 {d} {z11} 0000000000000000 0 00000000 00000000 0 1 null null",
+        words.join(","),
+        f.join(" ")
+    )
+}
+
+/// A colour table of `nlab` places (a tenth empty) of tissue types -2 to 2, with a tissue-type
+/// table of `ntt` places (none for a negative `ntt`).
+fn tissue_ct(g: &mut G, nlab: i64, ntt: i64) -> String {
+    let mut p = vec![
+        nlab.to_string(),
+        xs(b"lut"),
+        "0".into(),
+        "0".into(),
+        "x".into(),
+    ];
+    for i in 0..nlab {
+        if g.one_in(10) {
+            p.push("0".into());
+            continue;
+        }
+        p.push("1".into());
+        p.push(xs(format!("lab{i}").as_bytes()));
+        for _ in 0..4 {
+            p.push(g.int(0, 255).to_string());
+        }
+        p.extend(["3f000000"; 4].map(str::to_owned));
+        p.push(g.int(-2, 2).to_string());
+        p.push("0".into());
+    }
+    if ntt < 0 {
+        p.push("null".into());
+    } else {
+        p.extend([
+            ntt.to_string(),
+            xs(b"t"),
+            "0".into(),
+            "0".into(),
+            "x".into(),
+        ]);
+        for k in 0..ntt {
+            p.push("1".into());
+            p.push(xs(format!("type{k}").as_bytes()));
+            p.extend(["0"; 4].map(str::to_owned));
+            p.extend(["00000000"; 4].map(str::to_owned));
+            p.extend(["0".to_owned(), "0".to_owned()]);
+        }
+        p.push("null".into());
+    }
+    p.join(" ")
+}
+
+/// A small extent.
+fn ext(g: &mut G, lo: i64, hi: i64) -> (i64, i64, i64) {
+    (g.int(lo, hi), g.int(lo, hi), g.int(lo, hi))
+}
+
+/// One of the integers.
+fn pi(g: &mut G, v: &[i64]) -> i64 {
+    v[g.below(v.len() as u64) as usize]
+}
+
+/// §55 to §57: segmentations onto another grid (votes, thresholds, the diagnostic levels), the
+/// array's version without upsampling, SPM warps, the names' codes; segment borders,
+/// statistics, indices, concatenations, edits, shifts, the entorhinal fix and the junction;
+/// the crops.
+const SEGS57: &[(&str, Make)] = &[
+    ("a2v", |g| {
+        let e = ext(g, 1, 3);
+        let kind = pi(g, &[1, 3]);
+        let seg = seg_w(g, e, kind, 1, &[0, 1, 1, 2, 3, 4]);
+        let tkr = if g.one_in(3) { g.mat4() } else { pool_mat(g) };
+        let te = ext(g, 1, 3);
+        let tk = pi(g, &[0, 1, 3]);
+        let t = seg_w(g, te, tk, 1, &[0]);
+        let ft = g.pick(&["0000000000000000", "3fe0000000000000", "3fd3333333333333"]);
+        let ct = match g.int(0, 3) {
+            0 => "null".to_owned(),
+            1 => tissue_ct(g, 5, -1),
+            2 => tissue_ct(g, 5, 0),
+            _ => {
+                let n = g.int(1, 3);
+                tissue_ct(g, 6, n)
+            }
+        };
+        format!("{seg} 0 {tkr} {t} {ft} {ct}")
+    }),
+    ("+gdiagno=2 a2v", |g| {
+        let e = ext(g, 1, 3);
+        let seg = seg_w(g, e, 1, 1, &[1, 2, 3]);
+        let te = ext(g, 1, 2);
+        let t = seg_w(g, te, 1, 1, &[0]);
+        let m = pool_mat(g);
+        format!("{seg} 0 {m} {t} 0000000000000000 null")
+    }),
+    ("a2vmu", |g| {
+        let pool = lta_pool(g);
+        let ty = g.pick(&["1", "0"]);
+        let (lta, s, d) = pool_lta(g, &pool, ty, 1, true, None);
+        let k = [s, d, s, d, 0, 1, 2][g.int(0, 6) as usize];
+        let shape = format!("{} 0 1 0", pool[k].0);
+        let w = pool_w(&pool, k);
+        let ct = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            tissue_ct(g, 6, 2)
+        };
+        let p = lpaint(g, &shape);
+        format!("{w} {p} {lta} 0000000000000000 -1 {ct}")
+    }),
+    ("spmw", |g| {
+        let pool = lta_pool(g);
+        let ty = g.pick(&["0", "1"]);
+        let (lta, s, _) = pool_lta(g, &pool, ty, 1, true, None);
+        let (lta, v) = if g.one_in(2) {
+            let nf = g.int(1, 2);
+            (
+                "null".to_owned(),
+                seg_w(g, (3, 3, 2), 3, nf, &[0, 1, 5, -3]),
+            )
+        } else {
+            let e: Vec<i64> = pool[s]
+                .0
+                .split(' ')
+                .map(|x| x.parse().unwrap_or(1))
+                .collect();
+            (lta, seg_w(g, (e[0], e[1], e[2]), 3, 1, &[0, 1, 5, -3]))
+        };
+        let we = ext(g, 2, 4);
+        let wf = pi(g, &[3, 3, 2]);
+        let warp = seg_w(g, we, 3, wf, &[-2, -1, 0, 1, 2]);
+        let d = if g.one_in(3) {
+            let nf = g.int(1, 2);
+            g.w_of(&format!("3 3 3 3 {nf} 0"))
+        } else {
+            "new".to_owned()
+        };
+        let (lr, interp) = (g.int(0, 1), g.pick(&["0", "1", "1", "2"]));
+        format!("{v} 0 {lta} {warp} 0 {lr} {interp} {d}")
+    }),
+    ("icode", |g| {
+        let n = g.pick(&[
+            "nearest",
+            "TRILINEAR",
+            "sinc",
+            "cubic",
+            "rint",
+            "Floor",
+            "tkregister",
+            "tkre",
+            "",
+            "x",
+        ]);
+        xs(n.as_bytes())
+    }),
+    ("sbound", |g| {
+        let e = ext(g, 1, 4);
+        let kind = pi(g, &[1, 3]);
+        format!("{} 0", seg_w(g, e, kind, 1, &[0, 1, 2, 2]))
+    }),
+    ("sborder", |g| {
+        let e = ext(g, 1, 3);
+        let a = seg_w(g, e, 1, 1, &[0, 1, 2, 5]);
+        format!("{a} 0 {}", g.int(-1, 4))
+    }),
+    ("idxno", |g| {
+        let s = g.shape(&[0, 1, 3]);
+        let a = w0(g, &s);
+        format!("{a} {}", g.dst(&s, false))
+    }),
+    ("ssrob", |g| {
+        let e = ext(g, 1, 3);
+        let nf = g.int(1, 2);
+        let seg = seg_w(g, e, 1, 1, &[0, 1, 1, 2]);
+        let m = g.w_of(&format!("{} {} {} 3 {nf} 0", e.0, e.1, e.2));
+        let pct = g.pick(&[
+            "00000000", "41200000", "42480000", "42700000", "7fc00000", "c1200000",
+        ]);
+        format!("{seg} 0 {m} 0 {} {} {pct}", g.int(0, 3), g.int(0, nf))
+    }),
+    ("sfavg", |g| {
+        let e = ext(g, 1, 3);
+        let seg = seg_w(g, e, 1, 1, &[0, 1, 2]);
+        let nf = g.int(1, 3);
+        let m = g.w_of(&format!("{} {} {} 3 {nf} 0", e.0, e.1, e.2));
+        format!("{seg} 0 {m} 0 {}", g.int(0, 3))
+    }),
+    ("zcat", |g| {
+        let w = g.int(1, 3);
+        let (h, d1, d2) = (g.int(1, 3), g.int(1, 3), g.int(1, 3));
+        let a = seg_w(g, (w, h, d1), 1, 1, &[1, 2, 3, 4]);
+        let b = seg_w(g, (w, h, d2), 1, 1, &[5, 6, 7]);
+        let nskip = g.int(-1, d2);
+        let dst = g.pick(&["new", "new", "self", "other"]);
+        format!("{a} 0 {b} 0 {nskip} {dst}")
+    }),
+    ("aedit", |g| {
+        let e = ext(g, 1, 3);
+        let n = seg_w(g, e, 1, 1, &[0, 1, 2]);
+        let o = seg_w(g, e, 1, 1, &[0, 1, 2]);
+        let m = seg_w(g, e, 1, 1, &[0, 1, 2]);
+        let dst = g.pick(&["new", "self", "other"]);
+        format!("{n} 0 {o} 0 {m} 0 {dst}")
+    }),
+    ("shdim", |g| {
+        let e = ext(g, 1, 3);
+        let (kind, nf) = (pi(g, &[1, 3]), g.int(1, 2));
+        let a = seg_w(g, e, kind, nf, &[0, 1, 2, 3, 4, 5]);
+        format!("{a} 0 {} {} {}", g.int(0, 4), g.int(-2, 2), g.int(0, 1))
+    }),
+    ("fento", |g| {
+        let e = ext(g, 1, 3);
+        let kind = pi(g, &[1, 3]);
+        let a = seg_w(g, e, kind, 1, &[0, 110, 5]);
+        let ento = seg_w(g, e, 1, 1, &[0, 3006, 4006, 3201, 4201, 7030, 7031]);
+        let lh = g.pick(&["406fe00000000000", "0000000000000000"]);
+        let rh = g.d(false);
+        format!("{a} 0 {ento} 0 {} {lh} {rh} {}", g.int(0, 4), g.int(0, 1))
+    }),
+    ("lacj", |g| {
+        let e = ext(g, 3, 4);
+        let seg = seg_w(g, e, 1, 1, &[3, 3, 42, 18, 54, 0]);
+        let d = if g.one_in(3) {
+            "new".to_owned()
+        } else {
+            seg_w(g, e, 1, 1, &[0, 7030])
+        };
+        format!("{seg} 0 {} {d}", g.int(0, 3))
+    }),
+    ("cfov", |g| {
+        let e = ext(g, 1, 4);
+        let m = seg_w(g, e, 3, 1, &[0, 0, 1, 1, 2]);
+        let th = g.pick(&["3fe0000000000000", "0000000000000000", "7ff8000000000000"]);
+        format!("{m} 0 {} {} {} {th}", g.int(0, 4), g.int(1, 4), g.int(1, 4))
+    }),
+    ("ccrs", |g| {
+        let e = ext(g, 1, 4);
+        let (kind, nf) = (pi(g, &[1, 3]), g.int(1, 2));
+        let v = seg_w(g, e, kind, nf, &[0, 1, 2, 3]);
+        let c: Vec<String> = (0..3).map(|_| g.d(false)).collect();
+        let keep = if g.one_in(2) { "0" } else { "2 1 3" };
+        let f = [g.int(0, 3), g.int(1, 3), g.int(1, 3)];
+        format!("{v} 0 {} {} {} {} {keep}", c.join(" "), f[0], f[1], f[2])
+    }),
+    ("crras", |g| {
+        let pool = lta_pool(g);
+        let ty = g.pick(&["1", "0"]);
+        let (lta, s, d) = pool_lta(g, &pool, ty, 1, true, None);
+        let k = [s, d, 0][g.int(0, 2) as usize];
+        let shape = format!("{} 0 1 0", pool[k].0);
+        let p = lpaint(g, &shape);
+        let v = format!("{} {p}", pool_w(&pool, k));
+        let lta = if g.one_in(3) { "null".to_owned() } else { lta };
+        let valid = g.int(0, 1);
+        let c: Vec<String> = (0..3).map(|_| g.d(false)).collect();
+        let f = [g.int(1, 3), g.int(1, 3), g.int(1, 3)];
+        format!(
+            "{v} {valid} {} {} {} {} 0 {lta}",
+            c.join(" "),
+            f[0],
+            f[1],
+            f[2]
+        )
+    }),
+];
+
+#[test]
+fn segmentations_segments_and_crops() {
+    group("segs57", SEGS57, 6);
 }

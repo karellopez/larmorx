@@ -21,7 +21,9 @@
 //! or meets a defect is a method of the program's [`Process`](crate::Process).
 
 pub mod arith;
+pub mod aseg;
 pub mod cma;
+pub mod crops;
 pub mod deriv;
 pub mod extract;
 pub mod frames;
@@ -39,6 +41,7 @@ pub mod pvlabel;
 pub mod regrid;
 pub mod resample;
 pub mod sample;
+pub mod segs;
 pub mod seqops;
 pub mod skull;
 pub mod stats;

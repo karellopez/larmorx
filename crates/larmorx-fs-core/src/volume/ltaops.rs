@@ -61,8 +61,18 @@ impl Process {
     /// transform's destination and its destination the transform's source. FS-505: an inverse
     /// without a matrix keeps the new one by default, stays without one with `reproduce`.
     pub fn lta_fill_inverse(&mut self, lta: &mut Lta) -> Result<(), Stop> {
+        self.lta_fill_inverse_freed(lta, &[])
+    }
+
+    /// `LTAfillInverse` of an array whose transforms `freed` marks hold a matrix FS-508's copy
+    /// freed (§54): the earlier transforms filled first (their own ends first), the first marked
+    /// one ends the program there.
+    fn lta_fill_inverse_freed(&mut self, lta: &mut Lta, freed: &[bool]) -> Result<(), Stop> {
         let reproduce = self.mode().reproduce();
         for i in 0..lta.xforms.len() {
+            if freed.get(i) == Some(&true) {
+                return self.lta_fs508();
+            }
             let m = lta.xforms[i].m_l.clone();
             let inv = &mut lta.inv_xforms[i];
             match self.matrix_inverse(m.as_ref(), inv.m_l.as_mut())? {
@@ -182,6 +192,8 @@ impl Process {
             (FSL, RAS | VOX) => Some(TK),
             _ => None,
         };
+        // FS-508: the transforms whose matrix a conversion's copy freed (read at the first use below)
+        let mut freed = vec![false; lta.xforms.len()];
         if let Some(mid) = through {
             self.lta_change_type(lta, mid)?;
             self.lta_change_type(lta, kind)?;
@@ -191,13 +203,13 @@ impl Process {
                     (RAS, TK) => {
                         let (src, dst) = (lta.xforms[i].src.clone(), lta.xforms[i].dst.clone());
                         let r = self.tkreg_from_native(&dst, &src, lta.xforms[i].m_l.as_ref())?;
-                        self.lta_copy_into_m(r, &mut lta.xforms[i].m_l)?;
+                        freed[i] |= self.lta_copy_into_m(r, &mut lta.xforms[i].m_l)?;
                     }
                     (RAS, FSL) => {
                         let (src, dst) = (lta.xforms[i].src.clone(), lta.xforms[i].dst.clone());
                         let r = self.tkreg_from_native(&dst, &src, lta.xforms[i].m_l.as_ref())?;
                         let f = self.tkreg_to_fsl(&dst, &src, r.as_ref())?;
-                        self.lta_copy_into_m(f, &mut lta.xforms[i].m_l)?;
+                        freed[i] |= self.lta_copy_into_m(f, &mut lta.xforms[i].m_l)?;
                     }
                     (RAS, _) => {
                         self.lta_ras_to_vox_one(lta, i)?;
@@ -213,16 +225,16 @@ impl Process {
                         self.lta_sandwich(Some(&s1_dst), &mut lta.xforms[i].m_l, Some(&s_src))?;
                     }
                     (PHYS, _) => self.lta_physvox_to_ras_one(lta, i)?,
-                    (TK, RAS) => self.lta_tkreg_to_ras_one(lta, i)?,
+                    (TK, RAS) => self.lta_tkreg_to_ras_one(lta, i, &mut freed)?,
                     (TK, _) => {
                         let (src, dst) = (lta.xforms[i].src.clone(), lta.xforms[i].dst.clone());
                         let f = self.tkreg_to_fsl(&dst, &src, lta.xforms[i].m_l.as_ref())?;
-                        self.lta_copy_into_m(f, &mut lta.xforms[i].m_l)?;
+                        freed[i] |= self.lta_copy_into_m(f, &mut lta.xforms[i].m_l)?;
                     }
                     (FSL, _) => {
                         let (src, dst) = (lta.xforms[i].src.clone(), lta.xforms[i].dst.clone());
                         let r = self.fsl_to_tkreg(&dst, &src, lta.xforms[i].m_l.as_ref())?;
-                        self.lta_copy_into_m(r, &mut lta.xforms[i].m_l)?;
+                        freed[i] |= self.lta_copy_into_m(r, &mut lta.xforms[i].m_l)?;
                     }
                     _ => {
                         // coronal RAS to RAS: M = RASFromSurfaceRAS_(dst header) · M
@@ -248,39 +260,62 @@ impl Process {
                 self.flush();
                 return self.lta_fs504("LTAchangeType", "a transform array without transforms");
             };
+            if freed[0] {
+                // FS-508: the freed matrix first read by the print
+                self.flush();
+                return self.lta_fs508();
+            }
             let m = first.m_l.clone();
             self.matrix_print(Some(false), m.as_ref(), 5);
         }
         lta.kind = kind;
-        self.lta_fill_inverse(lta)
+        self.lta_fill_inverse_freed(lta, &freed)
     }
 
     /// "Copied into `M`" (§54): `MatrixCopy(new, M)` (`specs/freesurfer-maths.md` §2.4: a given
-    /// `M` smaller than the new matrix keeps its numbers, none stays none). A conversion that gives
-    /// no matrix is FS-508 (FreeSurfer's copy frees `M` and goes on using it): the end of the
-    /// program, status 252, both modes.
-    fn lta_copy_into_m(&mut self, new: Option<Matrix>, m: &mut Option<Matrix>) -> Result<(), Stop> {
-        let Some(new) = new else {
-            self.note(
-                &FS_508,
-                "LTAchangeType: the FSL conversion gave no matrix: the program ended (FreeSurfer frees the transform's matrix and goes on using it)",
-            );
-            return self.error_exit(
-                codes::BAD_PARM,
-                b"LTAchangeType: the FSL conversion gave no matrix (FreeSurfer frees the transform's matrix and goes on using it here)\n",
-            );
-        };
-        if let Some(m) = m.as_mut() {
-            self.matrix_copy(Some(&new), Output::Given(m))?;
+    /// `M` smaller than the new matrix keeps its numbers, none stays none). Returns whether the
+    /// copy is FS-508's: a conversion that gives no matrix into a transform that has one
+    /// (FreeSurfer's copy frees `M`, which the transform keeps, and goes on; the first read of it
+    /// ends the program: `lta_fs508`).
+    fn lta_copy_into_m(
+        &mut self,
+        new: Option<Matrix>,
+        m: &mut Option<Matrix>,
+    ) -> Result<bool, Stop> {
+        match (new, m.as_mut()) {
+            (None, Some(_)) => Ok(true),
+            (Some(new), Some(m)) => {
+                self.matrix_copy(Some(&new), Output::Given(m))?;
+                Ok(false)
+            }
+            // a result copied into none is a new matrix nothing keeps: the transform stays without
+            _ => Ok(false),
         }
-        Ok(())
+    }
+
+    /// FS-508's end (§54): at the first read of a matrix FreeSurfer's copy freed, in both modes,
+    /// status 252, noted.
+    fn lta_fs508(&mut self) -> Result<(), Stop> {
+        self.note(
+            &FS_508,
+            "LTAchangeType: the FSL conversion gave no matrix: the program ended at its first use (FreeSurfer frees the transform's matrix and goes on using it)",
+        );
+        self.error_exit(
+            codes::BAD_PARM,
+            b"LTAchangeType: the FSL conversion gave no matrix (FreeSurfer frees the transform's matrix and goes on using it here)\n",
+        )
     }
 
     /// One transform's change from REGISTER_DAT to RAS-to-RAS (§54): headers of the source's and
     /// the destination's geometry, then `MRItkReg2Native(destination, source, M)` copied into
     /// `M`. FS-507: with `reproduce` FreeSurfer's change of the FIRST transform each time (from its
     /// previous result), by default transform `i`; noted when the array holds more than one.
-    fn lta_tkreg_to_ras_one(&mut self, lta: &mut Lta, i: usize) -> Result<(), Stop> {
+    fn lta_tkreg_to_ras_one(
+        &mut self,
+        lta: &mut Lta,
+        i: usize,
+        freed: &mut [bool],
+    ) -> Result<(), Stop> {
         let mut j = i;
         if lta.xforms.len() > 1 {
             if self.mode().reproduce() {
@@ -299,7 +334,8 @@ impl Process {
         let src = self.header_of(&lta.xforms[j].src)?;
         let dst = self.header_of(&lta.xforms[j].dst)?;
         let r = self.tkreg_to_native(&dst, &src, lta.xforms[j].m_l.as_ref())?;
-        self.lta_copy_into_m(r, &mut lta.xforms[j].m_l)
+        freed[j] |= self.lta_copy_into_m(r, &mut lta.xforms[j].m_l)?;
+        Ok(())
     }
 
     /// One transform's change from RAS-to-RAS to voxel (§54): `V(src)`, then `inv(V(dst))` (none

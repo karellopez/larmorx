@@ -1,0 +1,125 @@
+{
+ "name": "freesurfer-getfullpath",
+ "tool": "getfullpath (FreeSurfer 8.2.0)",
+ "status": "experimental",
+ "larmorx_commit": "d68bc7fc8120",
+ "generated": "2026-11-22",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/getfullpath/, src/csh.rs), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's official script ($FREESURFER_HOME/bin/getfullpath, /bin/tcsh 6.21.00, GNU coreutils 8.32) and the reference runs' recorded calls",
+ "fixed": {
+  "cases": 134,
+  "plain": 40,
+  "identical": 132,
+  "different": 0,
+  "unmodelled": 2,
+  "fix_differs": 81,
+  "fix_unexplained": 0
+ },
+ "fixed_sha256": {
+  "unix": "a2e80735ba60c2798c6284cbaca86f49c0ebb337e6b2ab9c79b71c8176b1a03f",
+  "plain": "3bf059766084e723866c3019e85c2437c00247c6e833bca2bf62ed812f000921"
+ },
+ "seeds": {
+  "seed1": {
+   "cases": 300,
+   "plain": 0,
+   "identical": 274,
+   "different": 0,
+   "unmodelled": 26,
+   "fix_differs": 199,
+   "fix_unexplained": 0
+  },
+  "seed2": {
+   "cases": 300,
+   "plain": 0,
+   "identical": 285,
+   "different": 0,
+   "unmodelled": 15,
+   "fix_differs": 210,
+   "fix_unexplained": 0
+  },
+  "seed3": {
+   "cases": 300,
+   "plain": 0,
+   "identical": 274,
+   "different": 0,
+   "unmodelled": 26,
+   "fix_differs": 190,
+   "fix_unexplained": 0
+  },
+  "seed4": {
+   "cases": 300,
+   "plain": 0,
+   "identical": 278,
+   "different": 0,
+   "unmodelled": 22,
+   "fix_differs": 194,
+   "fix_unexplained": 0
+  },
+  "seed5": {
+   "cases": 300,
+   "plain": 0,
+   "identical": 280,
+   "different": 0,
+   "unmodelled": 20,
+   "fix_differs": 206,
+   "fix_unexplained": 0
+  }
+ },
+ "golden": {
+  "cases": 5,
+  "sha256": "59ce37864da8f17cd6bfbaa1d9a0e64fbb46398c480c1d71f4bcbf9352a7bec0"
+ },
+ "recorded_calls": {
+  "calls": 54,
+  "runs": [
+   "ds000005-sub-01-classic",
+   "ds000005-sub-01-classic-1thread",
+   "ds000005-sub-01-v8",
+   "ds000228-sub-pixar008-classic",
+   "ds000228-sub-pixar008-classic-1thread",
+   "ds000228-sub-pixar008-v8",
+   "ds002422-sub-02-classic",
+   "ds002422-sub-02-classic-1thread",
+   "ds002422-sub-02-v8",
+   "ds004173-sub-603309-classic",
+   "ds004173-sub-603309-classic-1thread",
+   "ds004173-sub-603309-v8",
+   "ds005003-sub-RS001-classic",
+   "ds005003-sub-RS001-classic-1thread",
+   "ds005003-sub-RS001-v8",
+   "ds005454-sub-16-classic",
+   "ds005454-sub-16-classic-1thread",
+   "ds005454-sub-16-v8"
+  ],
+  "reproduce_identical": 54,
+  "fix_identical": 54
+ },
+ "memory": [
+  {
+   "case": "seg2cc",
+   "mode": "reproduce",
+   "larmorx_mib": 4.2,
+   "freesurfer_mib": 2.8
+  },
+  {
+   "case": "seg2cc",
+   "mode": "fix",
+   "larmorx_mib": 4.2,
+   "freesurfer_mib": 2.8
+  },
+  {
+   "case": "relative",
+   "mode": "reproduce",
+   "larmorx_mib": 4.2,
+   "freesurfer_mib": 2.8
+  },
+  {
+   "case": "relative",
+   "mode": "fix",
+   "larmorx_mib": 4.2,
+   "freesurfer_mib": 2.8
+  }
+ ]
+}

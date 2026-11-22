@@ -1127,6 +1127,39 @@ def test_the_key_keeps_a_paths_text_where_the_program_reads_it(cache, tmp_path_f
     assert e1.key == e2.key and "text" not in e1.parts
 
 
+def test_the_key_keeps_a_whole_paths_extension_for_freesurfers_readers(tmp_path_factory):
+    """FreeSurfer's readers take a format from the whole name's last dot (``a.b/c``: ``b/c``) and a
+    gzipped name's ``.mgh.gz`` / ``.nii.gz`` anywhere in it: inputs of the same content under names
+    whose own suffix does not tell them apart have keys of their own; names the suffix decides
+    (``in.mgz``, ``x.nii.gz``, ``noext``) keep the key they had (relay 50 of FreeSurfer's track A:
+    ``a.b/c`` was served the run of ``trail.``)."""
+    texts = oc.policy.whole_path_texts
+    assert texts(["in.mgz", "x.nii.gz", "noext", "--o", "a.b/c.mgz", "-c", "2.5"]) == []
+    assert texts(["a.b/c"]) == [".b/c"] and texts(["trail."]) == ["."]
+    assert texts([".mgz"]) == [".mgz"] and texts(["--in=a.b/c"]) == [".b/c"]
+    assert texts(["x.mgh.gz"]) == [".mgh.gz"] and texts(["xnii.gz"]) == ["nii.gz"]
+    assert texts(["a.nii.gz/b.gz"]) == [".nii.gz", "nii.gz"]
+    assert "lta_convert" in oc.policy.EXTENSION_FROM_WHOLE_PATH
+    assert oc.policy.path_text("bet2", ["a.b/c", "o"]) == oc.policy.WHITESPACE
+    d = tmp_path_factory.mktemp("whole")
+    prog = make_program(tmp_path_factory.mktemp("bin"), BET2, "mri_info")
+    env = env_for()
+
+    def k(name: str) -> str:
+        p = d / name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(b"the same volume")
+        args = [name, "o"]
+        text = oc.policy.path_text("mri_info", args)
+        return key.prepare(key.program_identity(prog, env), args, env, cwd=d, text=text).key
+
+    names = ["a.b/c", "trail.", "noext", ".mgz", "x.mgh.gz", "y.gz"]
+    keys = [k(n) for n in names]
+    assert len(set(keys)) == len(names)
+    plain = key.prepare(key.program_identity(prog, env), ["noext", "o"], env, cwd=d)
+    assert plain.key == keys[2] and "text" not in plain.parts
+
+
 def test_bet_temporary_folders_hold_no_option_text(tmp_path):
     pytest.importorskip("larmorx_testdata")
     from larmorx_validation.parity import fsl_bet

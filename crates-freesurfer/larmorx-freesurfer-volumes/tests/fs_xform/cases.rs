@@ -185,9 +185,10 @@ fn base_inputs(g: &mut Gen) -> Inputs {
     p.pedir = None;
     p.cmdlines.clear();
     files.extend(write_as(&mut p, "p.mgh", false));
-    // the same bytes under names FreeSurfer refuses or reads otherwise
+    // the same bytes under names FreeSurfer refuses or reads otherwise (none differing from
+    // another only by case: Windows' names do not)
     let v = files[0].1.clone();
-    for name in ["V.MGZ", "noext", "trail.", "a.b/c", "v.nii.gz"] {
+    for name in ["U.MGZ", "noext", "a.b/c", "v.nii.gz"] {
         files.push((name.to_owned(), v.clone()));
     }
     let mut n = build(g, &spec(MRI_FLOAT, [2, 2, 2, 1], None));
@@ -246,9 +247,27 @@ fn s(v: &[&str]) -> Vec<String> {
 
 /// The inputs the cases name: every kind of volume, folder and failure.
 const INPUTS: &[&str] = &[
-    "v.mgz", "x.mgz", "y.mgz", "z.mgz", "w.mgz", "p.mgh", "V.MGZ", "noext", "trail.", "a.b/c",
-    "v.nii.gz", "n.nii", "c.mgz", "trunc.mgh", "cor", "cor/", "cor2", "cor3", "outdir", "emptydir",
-    "gone.mgz", "",
+    "v.mgz",
+    "x.mgz",
+    "y.mgz",
+    "z.mgz",
+    "w.mgz",
+    "p.mgh",
+    "U.MGZ",
+    "noext",
+    "a.b/c",
+    "v.nii.gz",
+    "n.nii",
+    "c.mgz",
+    "trunc.mgh",
+    "cor",
+    "cor/",
+    "cor2",
+    "cor3",
+    "outdir",
+    "emptydir",
+    "gone.mgz",
+    "",
 ];
 
 /// The outputs the cases name (besides the input itself).
@@ -395,9 +414,10 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
     out
 }
 
-/// The cases whose names pass macOS's 1,024-byte paths (not in the recorded test): a COR folder
-/// 1,014 bytes or more deep (FS-1156), written with and without a transform name.
-pub fn long_cases() -> Vec<String> {
+/// The cases only Linux's file names hold (not in the recorded test): a COR folder 1,014 bytes or
+/// more deep (FS-1156; macOS's paths stop at 1,024 bytes), written with and without a transform
+/// name; a volume whose name ends in a dot (Windows drops a name's last dots).
+pub fn extra_cases() -> Vec<String> {
     let mut g = Gen::new(0xadd_f0e);
     let mut base = base_inputs(&mut g);
     let deep = (0..5)
@@ -405,10 +425,15 @@ pub fn long_cases() -> Vec<String> {
         .collect::<Vec<_>>()
         .join("/");
     base.dirs.push(deep.clone());
+    let v = base.files[0].1.clone();
+    base.files.push(("trail.".to_owned(), v));
     let mut out = Vec::new();
     for args in [
         s(&["-c", "t.xfm", "v.mgz", &deep]),
         s(&["t.xfm", "cor", &deep]),
+        s(&["-c", "t.xfm", "trail."]),
+        s(&["t.xfm", "trail.", "o.mgz"]),
+        s(&["-v", "gone.xfm", "trail.", "outdir"]),
     ] {
         out.push(line(None, &base, &args));
     }

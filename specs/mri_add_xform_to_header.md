@@ -161,7 +161,7 @@ and FS-441 (memory contents FreeSurfer reads in damaged or frameless volumes).
   options (`-x`, `--x`, `-`), `-c`, `-C`, `-copy`, `-v` once and twice, `-n` with and without its
   argument, one to five positional arguments, an empty transform name. Inputs: MGZ and MGH volumes
   whose header names a transform that loads, one that is missing, one that does not read, one
-  that fails after its first transform, none; the same bytes named `V.MGZ`, `noext`, `trail.`,
+  that fails after its first transform, none; the same bytes named `U.MGZ`, `noext`, `trail.` (where names may end in a dot: Windows drops a name's last dots),
   `a.b/c`, `v.nii.gz`; a NIfTI volume; a damaged MGZ; an MGH volume cut in its voxels; COR folders
   (4 x 4 x 3 bytes) with their transform beside them, without one and with slices 2 mm thick, with
   a missing one; `cor/`; empty folders; a missing name; an empty name. Transform files: a good

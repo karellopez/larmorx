@@ -14,11 +14,11 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-22 from the official program (`check.py --seed 1 --n 600`): 600 cases, 561
-/// lines identical, 39 hashed as `SKIP`.
+/// Recorded 2026-11-22 from the official program (`check.py --seed 1 --n 600`): 600 cases, 564
+/// lines identical, 36 hashed as `SKIP`.
 const N: usize = 600;
-const OFFICIAL_SHA256: &str = "e5aa197cb8312a0535bbddfd85d29f7dfa7b44d37b32be82b45bda8f629b949a";
-const SKIPPED: usize = 39;
+const OFFICIAL_SHA256: &str = "7ae8257416ec8d5007f88953cb3a86992caf9f6d620dcb9e283aa00ae6911eb2";
+const SKIPPED: usize = 36;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 5] = ["FS-1154", "FS-1156", "FS-58", "FS-167", "FS-441"];

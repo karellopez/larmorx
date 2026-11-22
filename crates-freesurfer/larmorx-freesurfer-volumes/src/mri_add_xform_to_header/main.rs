@@ -223,7 +223,8 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
         unreachable!("ErrorExit returns only for code 0");
     };
     if !o.copy_name_only {
-        let (status, read) = input_transform_file_ex(g, r.out, r.err, r.dir, xform_fname.as_bytes());
+        let (status, read) =
+            input_transform_file_ex(g, r.out, r.err, r.dir, xform_fname.as_bytes());
         // volume_io assigns its argument as it reads: what it read stays, even after a failure
         if read.is_some() {
             m.transform = read;

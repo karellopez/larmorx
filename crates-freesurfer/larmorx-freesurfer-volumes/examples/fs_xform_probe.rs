@@ -6,9 +6,12 @@
 //!     fs_xform_probe cases <seed> <n>            the case file, on standard output
 //!     fs_xform_probe golden-cases                the golden cases
 //!                                                (`tests/mri_add_xform_to_header_golden.rs`)
-//!     fs_xform_probe long-cases                  the cases of paths past 1,024 bytes
+//!     fs_xform_probe extra-cases                 the cases only Linux's names hold
 //!     fs_xform_probe run <cases> fix|reproduce   one line per case: the output, a tab, the
 //!                                                defects the port noted (comma-separated)
+//!     fs_xform_probe run-seed <seed> <n> fix|reproduce   the same for the cases of a seed,
+//!                                                generated in place (each line after its number:
+//!                                                the Windows cross-check compares them)
 
 #[path = "../tests/fs_xform/cases.rs"]
 mod cases;
@@ -30,9 +33,22 @@ fn main() {
                 println!("{line}");
             }
         }
-        Some("long-cases") => {
-            for line in cases::long_cases() {
+        Some("extra-cases") => {
+            for line in cases::extra_cases() {
                 println!("{line}");
+            }
+        }
+        Some("run-seed") if args.len() == 5 => {
+            let seed: u64 = args[2].parse().expect("seed");
+            let n: usize = args[3].parse().expect("n");
+            let mode = match args[4].as_str() {
+                "fix" => UpstreamDefects::Fix,
+                "reproduce" => UpstreamDefects::Reproduce,
+                m => panic!("mode {m}"),
+            };
+            for (k, line) in cases::generate(seed, n).iter().enumerate() {
+                let (out, ids) = cases::run_line(line, mode);
+                println!("{k}\t{out}\t{}", ids.join(","));
             }
         }
         Some("run") if args.len() == 4 => {
@@ -49,7 +65,7 @@ fn main() {
         }
         _ => {
             eprintln!(
-                "usage: fs_xform_probe cases <seed> <n> | golden-cases | long-cases | run <cases> fix|reproduce"
+                "usage: fs_xform_probe cases <seed> <n> | golden-cases | extra-cases | run <cases> fix|reproduce | run-seed <seed> <n> fix|reproduce"
             );
             std::process::exit(2);
         }

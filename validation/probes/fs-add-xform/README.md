@@ -20,8 +20,9 @@ Queue item 3.2-10 (track A, relay 50).
   through the oracle-output cache at one thread; the port runs them in both modes; compared line
   by line with the folder's name as `<DIR>`. `SKIP`: FS-1154 and FS-1156 (the official build
   aborts), FS-58 (a crash), FS-167 and FS-441 (memory contents). `--golden`: the golden cases'
-  official SHA-256 (`tests/mri_add_xform_to_header_golden.rs`). `--long`: the cases whose paths
-  pass 1,024 bytes (not in the recorded test, macOS's paths stop there). No case sets `DIAG_NO`
+  official SHA-256 (`tests/mri_add_xform_to_header_golden.rs`). `--extra`: the cases only Linux's
+  file names hold (not in the recorded test: a path past 1,024 bytes, where macOS's stop; a name
+  ending in a dot, which Windows drops). No case sets `DIAG_NO`
   (the licence check then prints the licence file); the cache keeps the extension text of each
   argument for this program (`oracle_cache.policy.EXTENSION_FROM_WHOLE_PATH`:
   `docs/findings/freesurfer-add-xform.md`).
@@ -31,12 +32,14 @@ Queue item 3.2-10 (track A, relay 50).
 
 ## Results (relay 50)
 
-Seed 1, 600 cases: 561 identical with `reproduce`, 39 `SKIP`, 0 different; `fix` differs on 351,
-each with a notice (FS-01, FS-1155, FS-1157, FS-1158). Seed 3, 1,000 cases: 938 identical, 62
-`SKIP`, 0 different. Long cases: 2, both `SKIP` (FS-1156; the official build aborts, measured).
-Recorded: `tests/fs_xform_official.rs` (seed 1, 600 cases, 39 `SKIP`, `e5aa197c...`; debug
-9.6 s). Golden: 5 cases, `92ff34ba...` with `reproduce` (the official value), `8c733367...` by
-default (FS-1158). The recorded steps: 24 on 12 runs, all reproduced, both modes.
+Seed 1, 600 cases: 564 identical with `reproduce`, 36 `SKIP`, 0 different; `fix` differs on 351,
+each with a notice (FS-01, FS-1155, FS-1157, FS-1158). Seed 3, 1,000 cases: 933 identical, 67
+`SKIP`, 0 different. Extra cases: 5, 3 identical (a name ending in a dot), 2 `SKIP` (FS-1156: the
+official build aborts, measured). Recorded: `tests/fs_xform_official.rs` (seed 1, 600 cases, 36
+`SKIP`, `7ae82574...`; debug about 10 s; Windows x64 checked with
+`validation/investigations/windows-cross-check/`: every case's line as Linux's). Golden: 5 cases,
+`92ff34ba...` with `reproduce` (the official value), `8c733367...` by default (FS-1158). The
+recorded steps: 24 on 12 runs, all reproduced, both modes.
 
     scripts/orchestration/boxed.sh 16 python -P validation/probes/fs-add-xform/check.py --seed 1 --n 600
     scripts/orchestration/boxed.sh 16 python -P validation/probes/fs-add-xform/check.py --golden

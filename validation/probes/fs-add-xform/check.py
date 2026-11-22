@@ -14,8 +14,9 @@ status, standard output, standard error, every file and folder after the run): `
 give FreeSurfer's on every case but those where FreeSurfer's result is undefined (``SKIP``), which
 are counted, not compared; ``fix`` may differ only where a defect it corrects changed the result
 (its notices). Prints the counts and the hash the port's recorded test checks
-(``tests/fs_xform_official.rs``). ``--long``: the cases whose paths pass 1,024 bytes (not in the
-recorded test: macOS's paths stop there).
+(``tests/fs_xform_official.rs``). ``--extra``: the cases only Linux's file names hold (not in the
+recorded test: a path past 1,024 bytes, where macOS's stop; a name ending in a dot, which Windows
+drops).
 
 The official side runs with ``FS_DISABLE_LANG=1``: FreeSurfer's start sets the numbers' locale
 (``en_US``), which on a machine without that locale leaves ``errno`` at ``ENOENT`` and so prefixes
@@ -156,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--golden", action="store_true", help="the golden cases: their official SHA-256 only"
     )
-    ap.add_argument("--long", action="store_true", help="the cases of paths past 1,024 bytes")
+    ap.add_argument("--extra", action="store_true", help="the cases only Linux's names hold")
     a = ap.parse_args(argv)
     ws = workspace()
     if ws is None:
@@ -173,13 +174,13 @@ def main(argv: list[str] | None = None) -> int:
     )  # fmt: skip
     inputs = ws / "oracles" / "inputs" / "fs-add-xform"
     inputs.mkdir(parents=True, exist_ok=True)
-    tag = "golden" if a.golden else "long" if a.long else f"{a.seed}-{a.n}"
+    tag = "golden" if a.golden else "extra" if a.extra else f"{a.seed}-{a.n}"
     cases_path = inputs / f"cases-{tag}.txt"
     gen = (
         ["golden-cases"]
         if a.golden
-        else ["long-cases"]
-        if a.long
+        else ["extra-cases"]
+        if a.extra
         else ["cases", str(a.seed), str(a.n)]
     )
     text = subprocess.run([EXAMPLE, *gen], check=True, capture_output=True, text=True).stdout

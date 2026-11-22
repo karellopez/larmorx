@@ -2406,9 +2406,7 @@ MRI_ADD_XFORM_CASES = [
 
 
 @pytest.mark.parametrize(("name", "args"), MRI_ADD_XFORM_CASES)
-def test_mri_add_xform_to_header_replica_needs_no_more_memory_than_freesurfer(
-    tmp_path, name, args
-):
+def test_mri_add_xform_to_header_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, args):
     from larmorx_validation.freesurfer import files as fsfiles
     from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
     from larmorx_validation.oracle_cache.store import workspace
@@ -2466,7 +2464,9 @@ def test_mri_add_xform_to_header_replica_needs_no_more_memory_than_freesurfer(
         cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_add_xform_to_header", *words]
         code, mib = _peak(cmd, env, r_dir)
         assert code == 0
-        print(f"mri_add_xform_to_header {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        print(
+            f"mri_add_xform_to_header {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}"
+        )
         assert mib <= allowance(fs_mib), (
             f"mri_add_xform_to_header {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
         )

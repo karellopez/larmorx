@@ -121,3 +121,9 @@ reaches (their items).
   images of different extents, frames or types (FreeSurfer reads past one): an error in both modes, noted.
 - A debug level above 0 (`--debug`): `Registration: the debug output (--debug) is not ported yet` and
   status 1 (its writes and key waits come with 3.2-13).
+- `src/entropy.rs` (queue 3.2-13, relay 45 of track C): `mri_robust_register/MyMRI.cpp`
+  `MyMRI::entropyImage(MRI*, int, bool, bool, MRI*)` (1177-1569) and `MyMRI::get3Dcorrection`
+  (1571-1631), FreeSurfer 8.2.0. Changes: FS-1074 (rule B: a negative or overflowing radius an error by
+  default; `reproduce` the abort or the 2-D zeros); the OpenMP slices on the port's threads (each voxel
+  computed alone); `log` and `exp` through `larmorx_core::math::Libm` (correctly rounded by default,
+  glibc 2.35's with `reproduce`).

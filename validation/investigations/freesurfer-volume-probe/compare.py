@@ -94,7 +94,8 @@ class Batch:
     never: str = ""  # why the probe's runs are never cached
     guards: bool = True  # False: the plain runs only
     # the defects (comma-separated) whose correction holds in both modes because FreeSurfer's value
-    # there is memory it never wrote: a line noting one of them may differ in both modes
+    # there is memory it never wrote, or memory outside the table it reads: a line noting one of them
+    # may differ in both modes
     both: str = ""
 
 
@@ -2634,7 +2635,9 @@ class Gen11(Gen10):
             else:
                 sb = "null"
             L.append(f"pvlab {lab} {paint} {vals}{vp} {label} {maxl} {mix} {nbr} {sb}")
-        return [Batch("vpvlab", "vpvlab", L)]
+        # FS-469: a label outside the tables reads its mean from the stack beside them, which the
+        # call's own steps and the probe's frames fill the same way in every run
+        return [Batch("vpvlab", "vpvlab", L, both="FS-469")]
 
     def vfr8(self) -> list[Batch]:
         """§38: MRIrandn and MRIconst (new and given volumes of every type, dimensions matching
@@ -3080,6 +3083,374 @@ class Gen11(Gen10):
             L.append(f"mbin {fw(2, 1, 1, 1, [-3.0, 2.0])} 0 new {f32(1.0)} {xs(tl)} 0")
         return [Batch("vrules12", "vrules12", L)]
 
+    @staticmethod
+    def vrules13() -> list[Batch]:
+        """§37's fixed cases of relay 14: a negative maxlabels (FS-471) with a label below it, on
+        volumes whose counted voxels all lie off the border (FreeSurfer finishes for -1 to -3 and
+        crashes from -4) and on a volume with border voxels (a crash for every negative number);
+        the label absent. Each on a line of its own."""
+        L = []
+
+        def fw(w, h, d, vals) -> str:
+            return fixed_w(w, h, d, 3, 1, fill=ifill(vals))
+
+        inner = fw(3, 2, 2, [-200.0])
+        vals = fw(3, 2, 2, [10.0, 50.0, 60.0])
+        for m in (-1, -2, -3, -4, -5, -17):
+            L.append(f"pvlab {inner} 0 {vals} 0 -200 {m} null null null")
+        for m in (-1, -3, -4):
+            L.append(
+                f"pvlab {fw(1, 1, 1, [-200.0])} 0 {fw(1, 1, 1, [7.0])} 0 -200 {m} null null null"
+            )
+        edge = fw(3, 1, 1, [-200.0, 0.0, -200.0])
+        evals = fw(3, 1, 1, [10.0, 50.0, 60.0])
+        for m in (-1, -2, -4):
+            L.append(f"pvlab {edge} 0 {evals} 0 -200 {m} null null null")
+        L.append(f"pvlab {fw(3, 1, 1, [0.0])} 0 {evals} 0 -200 -2 null null null")
+        return [Batch("vrules13", "vrules13", L)]
+
+
+#: a 4 x 4 matrix of zeros (README.md, M)
+Z44 = "4 4 " + " ".join([f32(0.0)] * 16)
+#: FSLOUTPUTTYPE for the FSL conversions: unset (no prefix), or one of FSL's output types
+FSLOUT = [
+    "",
+    "+env=FSLOUTPUTTYPE=NIFTI_GZ ",
+    "+env=FSLOUTPUTTYPE=NIFTI ",
+    "+env=FSLOUTPUTTYPE=ANALYZE ",
+]
+
+
+def w_of(dims: tuple, fields: list[str]) -> str:
+    """A W (README.md) of a byte volume of the extent with a geometry's 19 fields (sizes, ras_good,
+    cosines, centre, shears), plain header fields, the cache recomputed, no registration matrix,
+    no colour table."""
+    zero = f32(0.0)
+    head = ["1", str(max(dims[2], 1)), *([zero] * 11), f64(0.0), "0", zero, zero, "0"]
+    return " ".join(
+        [f"{dims[0]} {dims[1]} {dims[2]} 0 1 0", "5", *fields, *head, "1", "null", "null"]
+    )
+
+
+class Gen12(Gen11):
+    """§54's other operations on a transform array: LTAchangeType to and from REGISTER_DAT, FSL
+    and coronal RAS, LTAinvert, LTAconcat, LTAconcat2, LTAreduce, LTAmriIsSource and
+    LTAmriIsTarget, LTAprint."""
+
+    def pool(self, r: random.Random, n: int = 6) -> list[tuple[tuple, list[str]]]:
+        """n valid scanner-like geometries of distinct extents: (dims, the 19 fields)."""
+        out, seen = [], set()
+        while len(out) < n:
+            dims = (r.randint(2, 6), r.randint(2, 6), r.randint(1, 5))
+            if dims in seen:
+                continue
+            seen.add(dims)
+            f = self.gfields(r, 0.0, shear=0.0)
+            f[3] = "1"
+            out.append((dims, f))
+        return out
+
+    @staticmethod
+    def g_of(geo: tuple[tuple, list[str]], valid: int = 1) -> str:
+        """Gf (the fs.mri probe's) of a pool geometry: valid, extent, fields, name, cache, no
+        registration matrix."""
+        dims, f = geo
+        return " ".join([str(valid), *map(str, dims), *f, xs(""), "1", "null"])
+
+    def lt(self, r: random.Random, m: str, a: str, b: str) -> str:
+        centre = [self.fv(r) for _ in range(3)]
+        sigma = f32(r.choice([1.0, 0.5, 10000.0]))
+        ty, label = str(r.choice([0, 1])), str(r.choice([0, 0, 3]))
+        # m_dL and m_last_dL zeros as a new array holds them (none would be FS-198's freed copy)
+        dl = Z44 if r.random() > 0.02 else "null"
+        return " ".join([*centre, sigma, m, dl, dl, ty, label, a, b])
+
+    def lta(
+        self,
+        r: random.Random,
+        pool: list,
+        ty: int,
+        n: int,
+        how: str = "chain",
+        sing: float = 0.03,
+        invnull: float = 0.1,
+        start: int | None = None,
+        end: int | None = None,
+    ) -> tuple[str, int, int]:
+        """An array (README.md, LTA) of n transforms between pool geometries: `chain` (each
+        transform's source the previous one's destination), `rev` (some transforms the other way
+        round), `rand` (any); the chain's first source `start` or its last destination `end` when
+        given. Returns the text and the first source's and last destination's indices in the
+        pool."""
+
+        def other(k: int) -> int:
+            j = r.randrange(len(pool) - 1)
+            return j if j < k else j + 1
+
+        idx = [r.randrange(len(pool)) if start is None else start]
+        for _ in range(n):
+            idx.append(other(idx[-1]))
+        if end is not None and n > 0:
+            idx[-1] = end
+            if idx[-2] == end:
+                idx[-2] = other(end)
+                if n == 1:
+                    idx[0] = idx[-2]
+        fw, inv = [], []
+        for i in range(n):
+            a, b = idx[i], idx[i + 1]
+            if how == "rev" and r.random() < 0.4:
+                a, b = b, a
+            elif how == "rand":
+                a, b = r.randrange(len(pool)), r.randrange(len(pool))
+            m = self.xmat(r) if r.random() < sing else self.affine(r, special=0.02)
+            if m == "null":
+                m = self.affine(r)
+            fw.append(self.lt(r, m, self.g_of(pool[a]), self.g_of(pool[b])))
+            im = "null" if r.random() < invnull else self.affine(r)
+            inv.append(self.lt(r, im, self.g_of(pool[b]), self.g_of(pool[a])))
+        subj = xs(r.choice(["", "", "bert", "fsaverage"]))
+        fs = f32(r.choice([1.0, 0.0, 0.5, -1.0]))
+        return f"{n} {ty} {fs} {subj} {' '.join(fw + inv)}", idx[0], idx[-1]
+
+    def vlta54(self) -> list[Batch]:
+        """§54 (relay 14): seeded arrays of 0 to 3 transforms between a pool of six geometries,
+        chained, partly reversed or random; RAS, voxel, physical-voxel, tkregister, FSL and
+        coronal-RAS types: LTAchangeType to and from REGISTER_DAT, FSL and coronal RAS (FSLOUTPUTTYPE
+        unset, NIFTI_GZ, NIFTI and ANALYZE; a diagnostic level of 1), LTAinvert (no array, a given
+        one of the same or another size, in place), LTAconcat of 1 to 3 arrays and LTAconcat2 (with
+        and without the reduction), LTAreduce, LTAmriIsSource and LTAmriIsTarget, LTAprint."""
+        r = self.rng("vlta54")
+        pool = self.pool(r)
+        L = []
+        types = [1, 1, 0, 2, 14, 15, 21]
+        for _ in range(90):
+            ty = r.choice(types)
+            tg = r.choice([1, 0, 2, 14, 15, 21, 14, 15])
+            n = r.choice([1, 1, 1, 2, 2, 3])
+            arr, _, _ = self.lta(r, pool, ty, n, how=r.choice(["chain", "rand"]), sing=0.06)
+            pre = r.choice(FSLOUT[1:] * 4 + FSLOUT[:1]) + (
+                "+gdiagno=1 " if r.random() < 0.15 else ""
+            )
+            L.append(f"{pre}ltachg {arr} {tg}")
+        for _ in range(30):
+            k = r.choice([0, 0, 1, 2])
+            n = r.choice([1, 1, 2, 3])
+            arr, _, _ = self.lta(r, pool, r.choice(types), n, how="rand", sing=0.05)
+            if k == 1:
+                m = n if r.random() < 0.8 else r.choice([n + 1, max(n - 1, 0)])
+                given, _, _ = self.lta(r, pool, r.choice(types), m, how="rand")
+                L.append(f"ltainv 1 {arr} {given}")
+            else:
+                L.append(f"ltainv {k} {arr}")
+        for _ in range(40):
+            k = r.choice([1, 2, 2, 3])
+            arrs = []
+            last = None
+            for _ in range(k):
+                ty = r.choice([1, 1, 0, 2]) if r.random() < 0.85 else r.choice([14, 21])
+                n = r.choice([1, 1, 2])
+                how = r.choice(["chain", "chain", "rev"])
+                u = r.random()
+                if last is None or u < 0.15:
+                    text, a, b = self.lta(r, pool, ty, n, how=how, invnull=0.05)
+                elif u < 0.6:
+                    # this array starts where the previous one ended
+                    text, a, b = self.lta(r, pool, ty, n, how=how, invnull=0.05, start=last)
+                else:
+                    # this array ends where the previous one ended: inverted to match
+                    text, a, b = self.lta(r, pool, ty, n, how=how, invnull=0.05, end=last)
+                    b = a
+                arrs.append(text)
+                last = b
+            body = " ".join(arrs)
+            pre = r.choice(FSLOUT[1:])
+            if k == 2 and r.random() < 0.3:
+                L.append(f"{pre}ltacat2 {body} {r.choice([0, 1])}")
+            else:
+                L.append(f"{pre}ltacat {k} {body} {r.choice([0, 1])}")
+        for _ in range(25):
+            n = r.choice([1, 2, 2, 3, 3])
+            arr, _, _ = self.lta(
+                r, pool, r.choice([1, 0, 2, 14]), n, how=r.choice(["chain", "rev", "rand"])
+            )
+            L.append(f"ltared {arr}")
+        for _ in range(20):
+            n = r.choice([1, 2, 3])
+            arr, a, b = self.lta(r, pool, 1, n, how="chain", invnull=0.0)
+            pick = r.choice([a, b, r.randrange(len(pool))])
+            L.append(f"ltasrc {arr} {w_of(*pool[pick])}")
+        for _ in range(20):
+            n = r.choice([1, 1, 2])
+            arr, _, _ = self.lta(
+                r, pool, r.choice([0, 1, 2, 14, 15, 21, 99, -1]), n, how="rand", sing=0.1
+            )
+            L.append(f"ltaprt {arr}")
+        # FS-198, FS-504, FS-508: FreeSurfer reads a freed matrix or a transform the array does not
+        # hold, the same bytes in every run of the probe: a line noting one may differ in both modes
+        return [Batch("vlta54", "vlta54", L, both="FS-198,FS-504,FS-508")]
+
+    @staticmethod
+    def vrules14() -> list[Batch]:
+        """§54's fixed cases of relay 14: REGISTER_DAT to RAS of two transforms (FS-507); the
+        changes through RAS (voxel and physical-voxel to REGISTER_DAT and FSL, FSL and REGISTER_DAT
+        to voxel); FSLOUTPUTTYPE unset and of each kind; an FSL conversion that gives no matrix
+        (FS-508); the targets REGISTER_DAT, FSL and coronal RAS do not support; the diagnostic print
+        (one level, an array without transforms: FS-504); LTAinvert of three transforms in place
+        and into an array of another size; LTAconcat of one array, of arrays that do not match, of
+        an inverted one, of other types, with an array without transforms; LTAreduce of one
+        transform, of a mismatch and of an inverted one; LTAmriIsSource and LTAmriIsTarget;
+        LTAprint of every type, subjects, scales, NaN elements, a 3 x 4 matrix (FS-504). Lines that
+        read memory FreeSurfer does not own are on lines of their own."""
+        L = []
+        zero = f32(0.0)
+
+        def geo(
+            dims, sizes=(1.0, 1.0, 1.0), cos=(1, 0, 0, 0, 1, 0, 0, 0, 1), c=(0.0, 0.0, 0.0), valid=1
+        ):
+            f = [
+                *(f32(v) for v in sizes),
+                "1",
+                *(f32(v) for v in cos),
+                *(f32(v) for v in c),
+                zero,
+                zero,
+                zero,
+            ]
+            return dims, f
+
+        def g(gg, valid: int = 1) -> str:
+            return Gen12.g_of(gg, valid)
+
+        def aff(a: tuple) -> str:
+            return "4 4 " + " ".join(f32(v) for v in (*a, 0.0, 0.0, 0.0, 1.0))
+
+        ident = aff((1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0))
+
+        def lt(m: str, a, b, x0: float = 0.0, dl: str = Z44) -> str:
+            return " ".join([f32(x0), zero, zero, f32(1.0), m, dl, dl, "0", "0", g(a), g(b)])
+
+        def arr(ty: int, items: list, subj: str = "", fs: float = 1.0) -> str:
+            fw = [lt(m, a, b) for m, a, b in items]
+            inv = [lt(ident, b, a) for _, a, b in items]
+            return f"{len(items)} {ty} {f32(fs)} {xs(subj)} {' '.join(fw + inv)}"
+
+        g1 = geo((4, 3, 2), (2.0, 1.5, 0.5), (0, 1, 0, -1, 0, 0, 0, 0, 1), (10.0, -5.0, 3.0))
+        g2 = geo((3, 5, 2), (1.0, 3.0, 1.0), c=(-1.0, 2.0, 7.0))
+        g3 = geo(
+            (2, 2, 6),
+            (0.9375, 1.0, 1.25),
+            (0.6, 0.8, 0.0, -0.8, 0.6, 0.0, 0.0, 0.0, 1.0),
+            (0.5, 0.25, -3.0),
+        )
+        g4 = geo((5, 4, 3), (1.0, 1.0, 1.0), (-1, 0, 0, 0, 0, -1, 0, 1, 0), (0.0, 0.0, 0.0))
+        m1 = aff((1.1, 0.2, 0.0, 5.0, -0.1, 0.9, 0.3, -2.0, 0.0, 0.1, 1.2, 4.0))
+        m2 = aff((0.0, -1.0, 0.0, 12.5, 1.0, 0.0, 0.0, -3.0, 0.0, 0.0, 2.0, 0.75))
+        m3 = aff((1.0, 0.0, 0.0, -4.0, 0.0, 1.0, 0.0, 1.5, 0.0, 0.0, 1.0, 2.0))
+        sing = aff((1.0, 2.0, 0.0, 0.0, 2.0, 4.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0))
+        nanm = aff((1.0, 0.0, 0.0, float("nan"), 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0))
+        nz = "+env=FSLOUTPUTTYPE=NIFTI_GZ "
+        two = [(m1, g1, g2), (m2, g2, g3)]
+        # FS-507: tkregister to RAS of two transforms; the other changes from REGISTER_DAT
+        for tg in (1, 0, 15):
+            L.append(f"{nz}ltachg {arr(14, two)} {tg}")
+            L.append(f"{nz}ltachg {arr(14, [(m1, g1, g2)])} {tg}")
+        # to REGISTER_DAT and FSL from every type, through RAS where FreeSurfer has no direct change
+        for ty in (1, 0, 2, 21):
+            for tg in (14, 15):
+                L.append(f"{nz}ltachg {arr(ty, two)} {tg}")
+        for tg in (14, 1, 0):
+            L.append(f"{nz}ltachg {arr(15, two)} {tg}")
+        L.append(f"{nz}ltachg {arr(21, two)} 1")
+        # FSLOUTPUTTYPE unset and of each kind, both directions; positive and negative determinants
+        for pre in (
+            "",
+            "+env=FSLOUTPUTTYPE=NIFTI ",
+            "+env=FSLOUTPUTTYPE=NIFTI_PAIR ",
+            "+env=FSLOUTPUTTYPE=ANALYZE ",
+            "+env=FSLOUTPUTTYPE= ",
+        ):
+            L.append(f"{pre}ltachg {arr(1, [(m1, g1, g4)])} 15")
+            L.append(f"{pre}ltachg {arr(15, [(m1, g4, g1)])} 14")
+        # FS-508: an FSL conversion that gives no matrix (a singular registration), each on its own
+        L.append(f"{nz}ltachg {arr(14, [(sing, g1, g2)])} 15")
+        L.append(f"{nz}ltachg {arr(15, [(sing, g1, g2)])} 14")
+        L.append(f"{nz}ltachg {arr(1, [(sing, g1, g2)])} 15")
+        # the targets the three types do not support, with transforms and without
+        for ty, tg in (
+            (14, 2),
+            (14, 21),
+            (14, 5),
+            (15, 2),
+            (15, 21),
+            (15, -1),
+            (21, 0),
+            (21, 2),
+            (21, 15 + 85),
+        ):
+            L.append(f"{nz}ltachg {arr(ty, [(m1, g1, g2)])} {tg}")
+        L.append(f"{nz}ltachg {arr(14, [])} 2")
+        L.append(f"{nz}ltachg {arr(14, [])} 1")
+        L.append(f"{nz}ltachg {arr(21, [])} 1")
+        # the diagnostic print: one level; an array without transforms on a line of its own (FS-504)
+        for ty, tg in ((14, 1), (15, 1), (21, 14), (1, 14), (14, 15), (15, 0)):
+            L.append(f"+gdiagno=1 {nz}ltachg {arr(ty, two)} {tg}")
+        L.append(f"+gdiagno=1 {nz}ltachg {arr(14, [])} 1")
+        L.append(f"+gdiagno=0 {nz}ltachg {arr(14, two)} 1")
+        # LTAinvert: three transforms in place, into an array of another size, into one of the same
+        three = [(m1, g1, g2), (m2, g2, g3), (m3, g3, g4)]
+        L.append(f"ltainv 2 {arr(1, three, 'bert', 0.5)}")
+        L.append(f"ltainv 0 {arr(1, three)}")
+        L.append(f"ltainv 1 {arr(1, three)} {arr(0, two)}")
+        L.append(f"ltainv 1 {arr(1, two)} {arr(0, [(m3, g3, g4), (m1, g4, g1)], 'x', 2.0)}")
+        L.append(f"ltainv 0 {arr(1, [(sing, g1, g2)])}")
+        L.append(f"ltainv 0 {arr(1, [])}")
+        # LTAconcat: one array; a chain; an inverted array; a mismatch (both arrays printed); other types
+        L.append(f"ltacat 1 {arr(1, two)} 0")
+        L.append(f"ltacat 1 {arr(1, two)} 1")
+        L.append(f"ltacat 2 {arr(1, [(m1, g1, g2)])} {arr(1, [(m2, g2, g3)])} 1")
+        L.append(f"ltacat 2 {arr(1, [(m1, g1, g2)], 'bert', 0.25)} {arr(1, [(m2, g3, g2)])} 0")
+        L.append(f"ltacat 2 {arr(1, [(m1, g1, g2)])} {arr(1, [(m2, g3, g4)])} 0")
+        L.append(
+            f"{nz}ltacat 3 {arr(1, [(m1, g1, g2)])} {arr(0, [(m2, g2, g3)])} {arr(2, [(m3, g3, g4)])} 1"
+        )
+        L.append(f"{nz}ltacat 2 {arr(0, [(m1, g1, g2)])} {arr(14, [(m2, g2, g3)])} 0")
+        L.append(f"ltacat2 {arr(1, [(m1, g1, g2)])} {arr(1, [(m2, g2, g3)])} 1")
+        L.append(f"ltacat2 {arr(1, [(m1, g1, g2)])} {arr(1, [(sing, g2, g3)])} 0")
+        L.append(f"ltacat 2 {arr(1, [(m1, g1, g2)])} {arr(1, [])} 0")
+        L.append(f"ltacat 2 {arr(1, [])} {arr(1, [(m1, g1, g2)])} 0")
+        L.append("ltacat 0 0")
+        # LTAreduce: one transform; a chain; an inverted transform; a mismatch; no transforms
+        L.append(f"ltared {arr(1, [(m1, g1, g2)], 'bert', 3.0)}")
+        L.append(f"ltared {arr(1, three)}")
+        L.append(f"ltared {arr(0, [(m1, g1, g2), (m2, g3, g2)])}")
+        L.append(f"ltared {arr(1, [(m1, g1, g2), (m2, g3, g4)])}")
+        L.append(f"ltared {arr(1, [])}")
+        nodl = " ".join([lt(m1, g1, g2, dl="null"), lt(ident, g2, g1, dl="null")])
+        L.append(f"ltared 1 1 {f32(1.0)} {xs('')} {nodl}")
+        # LTAmriIsSource and LTAmriIsTarget: the source, the target, neither, a 1-voxel difference
+        for gg in (
+            g1,
+            g3,
+            g2,
+            geo((4, 3, 3), (2.0, 1.5, 0.5), (0, 1, 0, -1, 0, 0, 0, 0, 1), (10.0, -5.0, 3.0)),
+        ):
+            L.append(f"ltasrc {arr(1, two)} {w_of(*gg)}")
+        L.append(f"ltasrc {arr(1, [])} {w_of(*g1)}")
+        # LTAprint: every type, subjects, scales, NaN elements; a 3 x 4 matrix and no transforms alone
+        for ty in (0, 1, 14, 2, 15, 21, 99, -1):
+            L.append(f"ltaprt {arr(ty, [(m1, g1, g2)])}")
+        L.append(f"ltaprt {arr(1, two, 'bert', 0.5)}")
+        L.append(f"ltaprt {arr(1, [(nanm, g1, g2)], 'a b', -1.0)}")
+        L.append(f"ltaprt {arr(1, [(nanm, g1, g2)], '', 0.0)}")
+        L.append(f"ltaprt {arr(1, [], 'bert', 1.0)}")
+        m34 = "3 4 " + " ".join(f32(v) for v in range(1, 13))
+        L.append(f"ltaprt {arr(1, [(m34, g1, g2)])}")
+        L.append(f"ltaprt {arr(1, [('5 5 ' + ' '.join(f32(v) for v in range(25)), g1, g2)])}")
+        # FS-198, FS-504, FS-508: FreeSurfer reads a freed matrix or a transform the array does not
+        # hold, the same bytes in every run of the probe: a line noting one may differ in both modes
+        return [Batch("vrules14", "vrules14", L, both="FS-198,FS-504,FS-508")]
+
 
 GROUPS = [
     "vgblock",
@@ -3122,6 +3493,9 @@ GROUPS = [
     "vfr8",
     "vmri2",
     "vrules12",
+    "vrules13",
+    "vlta54",
+    "vrules14",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -3229,7 +3603,7 @@ def mask(b: Batch, line: bytes) -> bytes:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen11) else Gen11(gen.seed)
+    gen = gen if isinstance(gen, Gen12) else Gen12(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

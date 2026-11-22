@@ -23,7 +23,7 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 |---|---|
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 29 groups of seeded cases and eleven of fixed cases (`vrules`, `vrules4` to `vrules12`, `vbsrules`; 15,422 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 30 groups of seeded cases and thirteen of fixed cases (`vrules`, `vrules4` to `vrules14`, `vbsrules`; 15,753 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 | `models.py` | statements of the spec checked as models of the probe's printed results: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
@@ -44,7 +44,11 @@ fs.mri probe runs its lines ([`../freesurfer-mri-probe/README.md`](../freesurfer
 "Running it": a child process each, an alarm of 2 seconds unless `@` sets another, the line
 `<result> | <standard output> <standard error>`, `EXIT <status>`, `CRASH <signal>`, `TIMEOUT`). From the
 build of relay 8 (commit `9319981f`) each child orients its standard error before the call, as a program
-that has written to it (the C library's `perror` then leaves `errno` alone: the spec's §21). The
+that has written to it (the C library's `perror` then leaves `errno` alone: the spec's §21). From the build of
+relay 14, two more prefixes before the command: `+gdiagno=<n>` sets `Gdiag_no` to n and points the diagnostic
+stream `Gstdout` at standard output (as a program's diagnostic set-up does), `+env=<NAME>=<value>` sets an
+environment variable for that call (`+env=FSLOUTPUTTYPE=NIFTI_GZ`; `+env=NAME=` sets it empty; the comparison
+loop's runs start from an environment of `PATH`, `LC_ALL=C` and `OMP_NUM_THREADS=1` only). The
 commands that write or read a file use `vg.out` and `vg.in` in the working directory (`ltaread` and
 `ltareads` their own names, `bvc` and `bvr` the folder `subj`).
 
@@ -185,6 +189,11 @@ The spec's sections in brackets.
 | `mskz W W P D` | `MRImaskZero` (the source, the painted mask, the destination) | the result |
 | `clipwm W W P` | `MRIclipBrightWM` (the T1 volume, the painted white-matter volume) | its value, the T1 volume |
 | `ltachg LTA i` | `LTAchangeType` (the type) [§54] | `self` when it returns the array, then the array (LTA) |
+| `ltainv k LTA [LTA]` | `LTAinvert` of the array into k 0 none, 1 the second array, 2 the array itself [§54] | `null`, `self`, `given` or `new`, then the result (LTA or `null`), the given array when it is not the result (k 1), the first array when it is not the result (k 0, 1) |
+| `ltacat n LTA×n i`, `ltacat2 LTA LTA i` | `LTAconcat` of the n arrays, resp. `LTAconcat2` of the two, with the reduction (1) or not (0) | the result (LTA or `null`), then each given array as the call left it |
+| `ltared LTA` | `LTAreduce` | the result (LTA or `null`), then the array |
+| `ltasrc LTA W` | `LTAmriIsSource`, then `LTAmriIsTarget` of the volume | the two integers |
+| `ltaprt LTA` | `LTAprint` to standard output | its value |
 | `pvlab W P W\|null P i i W\|null W\|null W\|null P` | the label volume painted, the values (painted) or none, label, maxlabels, the mixing and neighbour-label volumes or none, the border volume (painted) or none: `MRIvoxelsInLabelWithPartialVolumeEffects` [§37] | the float, then the mixing and the neighbour volumes (`null` when none) |
 | `randn i i i i f f i W\|null` | `srand48` of the seed, then `MRIrandn` (columns, rows, slices, frames, avg, stddev) into the given volume or none [§38] | the result (`given` when it is the given one) |
 | `const i i i i f W\|null` | `MRIconst` (columns, rows, slices, frames, the value) | the result |
@@ -200,7 +209,7 @@ The spec's sections in brackets.
 | `cdt W P W P D` | `MRIcombineDistanceTransforms` | the result |
 | `diffv W P W P W\|null P d` | `MRIdiff2Vect` (the mask painted or none, the threshold) | `null`, or the row count and each row's five doubles |
 | `applyv W P W\|null P n (d×5)×n D` | `MRIapplyDiffVect` of the n rows (the mask painted or none) into D | the count applied (unset -7), then the result |
-| `tiv x x\|nofile i d i` | the second string written to a file named by the first (`nofile`: none), `USE_AVERAGE305` as in `ltaread`, then `MRIestimateTIV` (the scale; the determinant asked for: 1, or not: 0) | the double, the determinant (unset 7.0) |
+| `tiv x x\|nofile i d i` | `USE_AVERAGE305` as in `ltaread`; any old file of the first string's name removed, the second string written to it (`nofile`: none), then `MRIestimateTIV` (the scale; the determinant asked for: 1, or not: 0), the file removed after a call that returns. Unlike `ltaread`, `errno` is not set to 0 first: when no old file was there, its removal leaves `ENOENT` (2), which the transform reader's error lines then print first (`error: No such file or directory`); a call that ends the program leaves its file in the working directory, so a later line of the batch that names it removes it without setting `errno` | the double, the determinant (unset 7.0) |
 | `dimmis W W i` | `MRIdimMismatch` (frames compared: 1) | its value |
 | `fpow W P n f×n` | `mri_framepower` with an array of exactly n powers [§39] | its value, the volume |
 | `mbin W P D f x\|null i` | `mri_binarize` (thresh, the tail or none, invert) | the count (unset -7), the result |
@@ -249,7 +258,9 @@ the candidate noted a defect whose value in FreeSurfer is memory on the stack it
 the probe's four runs agree only because the program's own earlier steps leave the same bytes there:
 FS-300 in `vsample` and `vresamp` (the cubic frame sampler's window points outside the volume), FS-322 in
 `vderiv` (a gradient's sample never written) and FS-325 in `vlinear` (a linear transform's samples before
-the first that succeeds), and in both modes on the
+the first that succeeds), FS-469 in `vpvlab` (a label's mean read outside the table, from the stack
+beside it, which every run fills the same way) and FS-198, FS-504 and FS-508 in `vlta54` and `vrules14` (a freed
+matrix, or a transform the array does not hold, read: the same bytes in every run), and in both modes on the
 `bvr` line without a cache that FreeSurfer ends at its licence check (`EXIT 255`, `FREESURFER_HOME is
 not defined`: LARMORX performs no licence check). Under `reproduce` a line where FreeSurfer aborted
 with the C++ runtime's lines (`CRASH 6`, standard error starting `terminate called after throwing`:
@@ -343,7 +354,11 @@ difference lists, TIV estimates), `vmri2` (§39: frame powers, binarisations, re
 constants, frame binarisations, votes, crops, slice reversals, end cuts, label lists, half-cosine weightings) and
 the fixed cases of `vrules12` (§37 to §39: the NaN orders of the normalisations', the root mean square's and the
 random draw's sums, the zero test, the integer stores past their range, the vote's runs, the defects' cases on
-lines of their own), and fs.bspline's `vbspline` (the coefficients of volumes of the six numeric types, degrees 2
+lines of their own) and of `vrules13` (§37: FS-471's negative label limits off and on the border), §54's `vlta54`
+(arrays of 0 to 3 transforms between a pool of six geometries: type changes to and from REGISTER_DAT, FSL and coronal
+RAS with each `FSLOUTPUTTYPE` and a diagnostic level, inversions, concatenations, reductions, source and target tests,
+prints) and the fixed cases of `vrules14` (§54: FS-504, FS-507, FS-508, FS-198's copies, the unsupported targets, the
+diagnostic print, the edges of every operation), and fs.bspline's `vbspline` (the coefficients of volumes of the six numeric types, degrees 2
 to 9 and 0, 1, 10, -1, given B-splines with fitting, other or no coefficients; sampling at points inside,
 at and past the edges, NaN and infinite, frames -1 to one past; the frame-range sampler; coefficients
 sampled as given with degrees -2 to 12; the linear, RAS and transform-array transforms; the pyramids into
@@ -446,3 +461,15 @@ cached matrices as allocated, recomputed or dropped.
   cache; the probe as its own candidate: no unexplained difference in either mode; every model as before, none
   different (log `oracles/logs/fs-volume-probe-r13-final-2026-11-22.log`). Part 8's generators keep every volume's
   cached matrices (FS-252 would end the line; `vrules12` holds it once).
+- Relay 14 (2026-11-22): the prebuilt probe from `1536bbbb` unchanged; the new fixed group `vrules13` (13 calls: §37's
+  FS-471 with negative label limits) the same cold, warm and twice without the cache, the probe as its own candidate
+  identical in both modes (log `oracles/logs/fs-volume-probe-r14-vrules13-2026-11-22.log`). The loop lets a `vpvlab`
+  line noting FS-469 differ in both modes (a label's mean read beside the table, the same in all four runs).
+- Relay 14, §54: the prebuilt probe rebuilt from commit `84fda65e` (§54's commands `ltainv`, `ltacat`, `ltacat2`,
+  `ltared`, `ltasrc`, `ltaprt` and the line prefixes `+gdiagno=` and `+env=`; its build in `BUILD_INFO.txt`, the same
+  bytes twice; the 1536bbbb build kept in `<workspace>/archive/2026-11-22-fs-volume-probe-1536bbbb/`): every earlier
+  group's hash unchanged; the new groups `vlta54` (225 calls) and `vrules14` (94) the same cold, warm and twice without
+  the cache; the probe as its own candidate: no unexplained difference in either mode; every model as before, none
+  different (log `oracles/logs/fs-volume-probe-r14-final-2026-11-22.log`). The arrays' transforms carry `m_dL` and
+  `m_last_dL` as 4 x 4 zeros, as a new array holds them: without them the fs.mri copy frees the destination's
+  (FS-198), and every reduction then fails glibc's heap checks; FS-198 has a line of its own.

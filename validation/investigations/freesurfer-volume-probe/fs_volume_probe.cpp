@@ -1943,6 +1943,50 @@ static void call(const std::string &c)
     out(r == lta ? "self" : "other");
     putlta(r);
   }
+  // relay 14 (§54): the other operations on a transform array
+  else if (c == "ltainv") {
+    int k = geti();  // 0 no array given, 1 a second array given, 2 the array itself
+    LTA *lta = getlta();
+    LTA *d = k == 1 ? getlta() : k == 2 ? lta : NULL;
+    LTA *r = LTAinvert(lta, d);
+    fflush(stdout);
+    out(r == NULL ? "null" : r == lta ? "self" : r == d ? "given" : "new");
+    putlta(r);
+    if (k == 1 && r != d) putlta(d);
+    if (k != 2 && r != lta) putlta(lta);
+  }
+  else if (c == "ltacat" || c == "ltacat2") {
+    int n = c == "ltacat2" ? 2 : geti();
+    std::vector<LTA *> v;
+    for (int i = 0; i < n; i++) v.push_back(getlta());
+    int reduce = geti();
+    LTA *r = c == "ltacat2" ? LTAconcat2(v[0], v[1], reduce) : LTAconcat(v.data(), n, reduce);
+    fflush(stdout);
+    putlta(r);
+    for (LTA *l : v) putlta(l);
+  }
+  else if (c == "ltared") {
+    LTA *lta = getlta();
+    LTA *r = LTAreduce(lta);
+    fflush(stdout);
+    putlta(r);
+    putlta(lta);
+  }
+  else if (c == "ltasrc") {
+    LTA *lta = getlta();
+    MRI *m = getw();
+    int s = LTAmriIsSource(lta, m);
+    int t = LTAmriIsTarget(lta, m);
+    fflush(stdout);
+    puti(s);
+    puti(t);
+  }
+  else if (c == "ltaprt") {
+    LTA *lta = getlta();
+    int r = LTAprint(stdout, lta);
+    fflush(stdout);
+    puti(r);
+  }
   // part 8 (§37 to §39): the partial-volume count of a label; random and constant volumes,
   // frames, orders, fractions, difference lists; voxelwise operations
   else if (c == "pvlab") {
@@ -2270,11 +2314,20 @@ static std::string run_line(const Toks &line)
   unsigned seconds = 2;
   size_t first = 0;
   unsigned long gdiag = 0;
+  long gdiag_no = -1;
+  bool set_gdiag_no = false;
+  std::vector<std::string> envs;
   for (; first < line.size(); first++) {
     if (line[first][0] == '@')
       seconds = (unsigned)strtoul(line[first].c_str() + 1, NULL, 10);
     else if (line[first].compare(0, 7, "+gdiag=") == 0)
       gdiag = strtoul(line[first].c_str() + 7, NULL, 16);
+    else if (line[first].compare(0, 9, "+gdiagno=") == 0) {
+      gdiag_no = strtol(line[first].c_str() + 9, NULL, 10);
+      set_gdiag_no = true;
+    }
+    else if (line[first].compare(0, 5, "+env=") == 0)
+      envs.push_back(line[first].substr(5));
     else
       break;
   }
@@ -2302,6 +2355,17 @@ static std::string run_line(const Toks &line)
     R.clear();
     Gerror = NO_ERROR;
     Gdiag = gdiag;
+    if (set_gdiag_no) {
+      // as a program's diagnostic set-up leaves them: the level, and the diagnostic stream
+      Gdiag_no = (int)gdiag_no;
+      Gstdout = stdout;
+    }
+    // +env=NAME=VALUE sets a variable for this call (NAME= sets it empty)
+    for (const std::string &e : envs) {
+      size_t eq = e.find('=');
+      if (eq == std::string::npos) bad("+env= needs NAME=VALUE");
+      setenv(e.substr(0, eq).c_str(), e.substr(eq + 1).c_str(), 1);
+    }
     errno = 0;
     dirty_stack();
     call(tok());

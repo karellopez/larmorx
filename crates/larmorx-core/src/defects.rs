@@ -2794,7 +2794,7 @@ defects! {
     FS_470 = "FS-470", "FreeSurfer", true,
         "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) given no intensity volume reads the first border voxel's intensity from no volume: the program crashes";
     FS_471 = "FS-471", "FreeSurfer", true,
-        "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) crashes the program for a negative label limit, and for a very large one (from about 699,000 labels with Linux's default 8 MiB stack)";
+        "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) crashes the program for a negative label limit (at a voxel on the label's border, and from -4 down at any voxel it counts; -1 to -3 count the voxels off the border as usual), and for a very large one (from about 699,000 labels with Linux's default 8 MiB stack)";
     FS_472 = "FS-472", "FreeSurfer", true,
         "a constant fill (MRIconst) or a normalisation of each voxel's frames (MRInormalizeSequence) of a byte, short or unsigned short volume stores a value past the type's range as the low bits of its integer: it wraps";
     FS_473 = "FS-473", "FreeSurfer", true,
@@ -2868,7 +2868,7 @@ defects! {
     FS_507 = "FS-507", "FreeSurfer", true,
         "changing a transform array of several transforms from a tkregister registration to RAS-to-RAS (LTAchangeType) converts the first transform once for every transform and leaves the others unconverted";
     FS_508 = "FS-508", "FreeSurfer", true,
-        "changing a transform array to or from FSL's type (LTAchangeType) when FSL's conversion gives no matrix (a product that cannot be inverted) frees the transform's matrix and goes on using it: memory it no longer owns read";
+        "changing a transform array to FSL's type (LTAchangeType, directly or through RAS-to-RAS) when FSL's conversion gives no matrix (a registration that cannot be inverted) frees the transform's matrix and goes on using it: memory it no longer owns read";
     FS_509 = "FS-509", "FreeSurfer", true,
         "mapping a segmentation onto another grid with a tissue-type vote (MRIaseg2vol with a colour table) reads the table at a label it does not hold (outside it or an empty place), and counts tissue types of 100 or more and more than 1,000 labels in one voxel past its arrays";
     FS_510 = "FS-510", "FreeSurfer", true,

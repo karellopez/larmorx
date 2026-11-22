@@ -2014,8 +2014,10 @@ probe's `pvlab`.)
 Unless said, voxels are read with `MRIgetVoxVal` and written with `MRIsetVoxVal` (the destination's type converts
 them as that function does).
 - `mri_framepower(vol, powers)`: one power per frame (FreeSurfer reads `powers[f]` for each frame: a shorter array
-  is read past, memory; larmorx, in both modes, rule B: before any frame changes, the program ends (status 252) with
-  the error `mri_framepower(): fewer powers than frames (FreeSurfer reads past them)` + `\n`); per frame `f`, the voxels as `float`s directly (rows, then columns, then slices): a power
+  is read past, memory; FS-266 (relay 15), in both modes, rule B: before any frame changes, the program ends (status
+  252) with the error `mri_framepower(): fewer powers than frames (FreeSurfer reads past them)` + `\n`, noted;
+  FreeSurfer's programs that call it check the count first, so only a library caller reaches it); per frame `f`, the
+  voxels as `float`s directly (rows, then columns, then slices): a power
   within 0.00001 of 1 (`|p - 1.0| < 0.00001` in `double`) leaves the frame; within 0.00001 of 0.5 each voxel becomes
   `sqrtf` of it; any other (2 included) `powf(v, p)` (glibc's with `reproduce`, correctly rounded by default; GLIBC-07
   (whose register entry covers the single-precision functions too) where they differ). Returns 0.
@@ -2086,12 +2088,12 @@ Sections 37 to 39 (part 8, made ready by the spec finisher's relay 13): §69's g
 `const`, `nseq`, `nfr`, `sort`, `revsl`, `cdtype`, `ordidx`, `vperm`, `nonmax`, `xrpad`, `rms`, `vfrac`, `cdt`, `diffv`, `applyv`, `tiv`, `dimmis` (§38); `fpow`,
 `mbin`, `reshape`, `msq`, `mmax`, `mconst`, `fbin`, `vote`, `crop`, `revs`, `cutend`, `segids`, `hcos` (§39); §69.2
 says what each covers and gives its hash), identical with `reproduce` but where FreeSurfer reads or writes memory
-it does not own or crashes (FS-52, FS-53, FS-58, FS-252, FS-290, FS-469, FS-470, FS-471, FS-473, FS-475, FS-479, the
-powers read past their array), lines the loop allows; the default differs only with a notice (FS-12, FS-469,
+it does not own or crashes (FS-52, FS-53, FS-58, FS-252, FS-290, FS-469, FS-470, FS-471, FS-473, FS-475, FS-479, FS-266:
+the powers read past their array), lines the loop allows; the default differs only with a notice (FS-12, FS-469,
 FS-472, FS-474, FS-476, FS-477, FS-478, FS-480, FS-481, GLIBC-07 for `powf` and `cos`). Not in the probe: the
 border volume written to `b.mgz` under `Gdiag` (§37), an allocation that fails (`could not alloc` messages),
 `MRIorderIndices`' table that cannot be allocated; and the errors larmorx prints where FreeSurfer crashes or reads
-past an array (FS-470, FS-471, FS-479, fewer powers than frames: the loop lets those lines differ, so their texts and
+past an array (FS-470, FS-471, FS-479, FS-266's fewer powers than frames: the loop lets those lines differ, so their texts and
 statuses are not compared): the implementations' own tests, against these sections' text.
 
 ## 41. Volume-to-volume resampling (3.1-37, piece d, part 2)
@@ -3569,13 +3571,13 @@ and of `MRIrandn`'s draw; `MRInormalizeSequence`'s zero test; `MRIconst` of 300,
 into every integer type, float and RGB (FS-472); `MRIvote`'s runs, zeros excluded, the last run of zeros (FS-480),
 NaN frames, an `int` volume; `MRIorderIndices` past 255 (FS-474); the partial-volume count's limit message, FS-470's
 missing values, FS-471's limits 0 and -3, FS-469's own label past the table; `MRIestimateTIV` without a file and
-with a file of no transform (FS-479); fewer powers than frames; b-tables of one row (FS-473); `MRIapplyDiffVect` at
+with a file of no transform (FS-479); fewer powers than frames (FS-266); b-tables of one row (FS-473); `MRIapplyDiffVect` at
 the extent (FS-477) and in place with a colour table (FS-478); `MRIcomputeVolumeFractions`' label 0 (FS-475), last
 label (FS-476) and a singular matrix; `MRIcloneDifferentType` to a bitmap and a tensor; a volume without its cached
 matrices (FS-252); one slice weighted by the half cosine; an end cut of -1; a crop whose end is before its start;
 the binarisation's short and empty tails). Part 8's generators keep every volume's cached matrices (a volume without
 them makes FreeSurfer's header copies crash, FS-252: `vrules12` holds it once). Their memory and crash lines: the
-partial-volume count's FS-469 and FS-470, the powers read past their array, FS-473, FS-475, FS-479, given
+partial-volume count's FS-469 and FS-470, the powers read past their array (FS-266), FS-473, FS-475, FS-479, given
 destinations of another extent written outside (FS-53), the end cut's reads outside; their exits: the singular
 fractions matrix (status 252), `MRIestimateTIV`'s missing transforms (255), a bitmap's allocation (1), the
 transform readers' errors for names that are not `.lta` files.
@@ -3723,7 +3725,7 @@ unexplained difference in either mode.
 | FS-474 | 38 | FS-475 | 38 | FS-476 | 38 |
 | FS-477 | 38 | FS-478 | 38 | FS-479 | 38 |
 | FS-480 | 39 | FS-481 | 39 | FS-504 | 54 |
-| FS-507 | 54 | FS-508 | 54 | | |
+| FS-507 | 54 | FS-508 | 54 | FS-266 | 39 |
 
 Others' defects these parts meet: FS-12 (`nint`, `specs/freesurfer-core.md`), FS-52 (§35's second volumes), FS-53 and FS-58
 (`specs/freesurfer-mri.md`; FS-252, its header copy without cached matrices, in part 4), FS-47 and

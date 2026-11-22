@@ -10,7 +10,8 @@
 // as 2-D images, neighbourhoods and labels; a transform array's change of type and its other
 // operations (§54); segmentations onto another grid, SPM warps, segment borders and statistics,
 // concatenation, edits, shifts, the entorhinal fix, the amygdala-cortex junction, crops (§55 to
-// §57); fs.bspline: the
+// §57); volume-to-volume resampling, frame covariance and principal components, the false discovery
+// rate, regions and voxel neighbourhood measures (part 9, §41 to §44); fs.bspline: the
 // B-spline coefficients, their sampling, transforms and factor-of-two pyramids,
 // specs/freesurfer-bspline.md), linked against the unit oracle's libutils.a (GCC 8.4.0,
 // FreeSurfer's flags). It holds only calls of FreeSurfer's functions (and of the C library's) by name
@@ -49,6 +50,7 @@
 #include "matrix.h"
 #include "mri.h"
 #include "mri2.h"
+#include "region.h"
 #include "resample.h"
 #include "transform.h"
 #include "utils.h"
@@ -2469,6 +2471,218 @@ static void call(const std::string &c)
     fflush(stdout);
     putv(r);
     if (l) putlta(l);
+  }
+  // relay 16 (part 9, §41 to §44): volume-to-volume resampling with and without a voxel-shift map,
+  // the trilinear kernel, the displacement volume, a registration's array, the masked and
+  // upsampled source; the frame covariance, principal components and their statistics, the false
+  // discovery rate's threshold; the region boxes; the voxel neighbourhood measures
+  else if (c == "vv" || c == "vvsm" || c == "vvtk") {
+    MRI *s = getw();
+    paint(s);
+    s->outside_val = getd();
+    MRI *t = getw();
+    paint(t);
+    MATRIX *m = getm();
+    int interp = geti();
+    float param = getf();
+    MRI *vsm = NULL;
+    LTA *l = NULL;
+    int pedir = 0;
+    if (c != "vv") {
+      if (!take("null")) {
+        vsm = getw();
+        paint(vsm);
+        vsm->outside_val = getd();
+      }
+      l = take("null") ? NULL : getlta();
+      pedir = geti();
+    }
+    fflush(stdout);
+    int r = c == "vv"     ? MRIvol2Vol(s, t, m, interp, param)
+            : c == "vvtk" ? MRIvol2VolTkRegVSM(s, t, m, interp, param, vsm, l, pedir)
+                          : MRIvol2VolVSM(s, t, m, interp, param, vsm, l, pedir);
+    fflush(stdout);
+    puti(r);
+    putv(t);
+    if (c != "vv") putlta(l);
+  }
+  else if (c == "vvk") {
+    MRI *s = getw();
+    paint(s);
+    MRI *t = getw();
+    paint(t);
+    MATRIX *m = getm();
+    fflush(stdout);
+    MRI *r = MRIvol2VolTLKernel(s, t, m);
+    fflush(stdout);
+    puti(r == NULL);
+    putv(t);
+  }
+  else if (c == "vvd") {
+    MRI *mv = getw();
+    paint(mv);
+    MRI *t = getw();
+    paint(t);
+    MATRIX *m = getm();
+    fflush(stdout);
+    MRI *r = MRIvol2VolDelta(mv, t, m);
+    fflush(stdout);
+    putv(r);
+  }
+  else if (c == "rd2lta") {
+    MRI *t = getw();
+    MRI *mv = getw();
+    MATRIX *m = getm();
+    fflush(stdout);
+    LTA *l = TransformRegDat2LTA(t, mv, m);
+    fflush(stdout);
+    putlta(l);
+  }
+  else if (c == "maskup") {
+    MRI *s = getw();
+    paint(s);
+    MRI *mk = NULL;
+    if (!take("null")) {
+      mk = getw();
+      paint(mk);
+    }
+    int up = geti(), npad = geti(), cons = geti();
+    LTA *l = NULL;
+    fflush(stdout);
+    MRI *r = MRImaskAndUpsample(s, mk, up, npad, cons, &l);
+    fflush(stdout);
+    putv(r);
+    putlta(r ? l : NULL);
+  }
+  else if (c == "cov" || c == "mpca") {
+    MRI *a = getw();
+    paint(a);
+    MRI *mk = NULL;
+    if (!take("null")) {
+      mk = getw();
+      paint(mk);
+    }
+    fflush(stdout);
+    if (c == "cov") {
+      MATRIX *m = MRIcovarianceMatrix(a, mk);
+      fflush(stdout);
+      putm(m);
+    }
+    else {
+      MATRIX *U = NULL;
+      VECTOR *S = NULL;
+      MRI *V = NULL;
+      int r = MRIpca(a, &U, &S, &V, mk);
+      fflush(stdout);
+      puti(r);
+      putm(U);
+      putm(S);
+      putv(V);
+    }
+  }
+  else if (c == "pcast") {
+    // the singular values (a row vector), then 0 (PrintPCAStats on standard output), 1
+    // (WritePCAStats into pca.dat, printed after the program flushes it) or 2 (into a folder that
+    // does not exist)
+    int n = geti();
+    MATRIX *S = MatrixAlloc(1, n, MATRIX_REAL);
+    for (int i = 1; i <= n; i++) S->rptr[1][i] = getf();
+    int mode = geti();
+    unlink("pca.dat");
+    fflush(stdout);
+    int r = mode == 0 ? PrintPCAStats(stdout, S)
+                      : WritePCAStats((char *)(mode == 2 ? "no-such-folder/pca.dat" : "pca.dat"), S);
+    // a program's end flushes the file WritePCAStats leaves open
+    fflush(NULL);
+    puti(r);
+    std::string f = slurp("pca.dat");
+    out(hexbytes(f.data(), f.size()));
+    unlink("pca.dat");
+  }
+  else if (c == "fdr") {
+    // n inputs, each: W P, its frame, a mask (W P or null), its output (new: none, self: the
+    // input, or a W); then fdr, sign, log10flag, debug, whether the masks and the outputs are passed
+    int n = geti();
+    std::vector<MRI *> vols((size_t)n), masks((size_t)n), outs((size_t)n);
+    std::vector<int> frames((size_t)n);
+    for (int i = 0; i < n; i++) {
+      vols[(size_t)i] = getw();
+      paint(vols[(size_t)i]);
+      frames[(size_t)i] = geti();
+      masks[(size_t)i] = NULL;
+      if (!take("null")) {
+        masks[(size_t)i] = getw();
+        paint(masks[(size_t)i]);
+      }
+      outs[(size_t)i] = take("new") ? NULL : take("self") ? vols[(size_t)i] : getw();
+    }
+    double fdr = getd();
+    int sign = geti(), lg = geti(), dbg = geti(), passmask = geti(), passout = geti();
+    double vwth = 7.0;
+    fflush(stdout);
+    int r = MRIfdr2vwth(vols.data(), n, frames.data(), fdr, sign, lg, passmask ? masks.data() : NULL, &vwth,
+                        passout ? outs.data() : NULL, dbg);
+    fflush(stdout);
+    puti(r);
+    putd(vwth);
+    for (int i = 0; i < n; i++)
+      if (passout && outs[(size_t)i]) putv(outs[(size_t)i]);
+  }
+  else if (c == "rgbb") {
+    // kind 0 REGIONgetBoundingBox (a pad), 1 REGIONgetBoundingBoxM (six pads), 2
+    // REGIONgetBoundingBoxEqOdd (a pad)
+    MRI *m = getw();
+    paint(m);
+    int kind = geti();
+    int p[6] = {0, 0, 0, 0, 0, 0};
+    int npad = 0;
+    if (kind == 1)
+      for (int &x : p) x = geti();
+    else
+      npad = geti();
+    fflush(stdout);
+    MRI_REGION *r = kind == 0   ? REGIONgetBoundingBox(m, npad)
+                    : kind == 1 ? REGIONgetBoundingBoxM(m, p)
+                                : REGIONgetBoundingBoxEqOdd(m, npad);
+    fflush(stdout);
+    if (!r)
+      out("null");
+    else
+      for (int v : {r->x, r->y, r->z, r->dx, r->dy, r->dz}) puti(v);
+  }
+  else if (c == "rgprt") {
+    MRI_REGION rg;
+    rg.x = geti();
+    rg.y = geti();
+    rg.z = geti();
+    rg.dx = geti();
+    rg.dy = geti();
+    rg.dz = geti();
+    fflush(stdout);
+    REGIONprint(stdout, &rg);
+    fflush(stdout);
+    MRI_REGION *cp = REGIONcopy(&rg, NULL);
+    for (int v : {cp->x, cp->y, cp->z, cp->dx, cp->dy, cp->dz}) puti(v);
+    REGIONclear(cp);
+    for (int v : {cp->x, cp->y, cp->z, cp->dx, cp->dy, cp->dz}) puti(v);
+  }
+  else if (c == "vxn") {
+    // n points: x y z wsize frame; each prints Dx, Dy, Dz, the mean, the direction and the
+    // second derivative along the gradient
+    MRI *m = getw();
+    paint(m);
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int x = geti(), y = geti(), z = geti(), w = geti(), f = geti();
+      fflush(stdout);
+      putf(MRIvoxelDx(m, x, y, z));
+      putf(MRIvoxelDy(m, x, y, z));
+      putf(MRIvoxelDz(m, x, y, z));
+      putf(MRIvoxelMean(m, x, y, z, w, f));
+      putf(MRIvoxelDirection(m, x, y, z, w));
+      putf(MRIvoxelGradientDir2ndDerivative(m, x, y, z, w));
+      fflush(stdout);
+    }
   }
   else
     bad("unknown command");

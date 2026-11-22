@@ -239,10 +239,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument(
         "--family",
-        choices=("helpers", "sqrtm", "regstep"),
+        choices=("helpers", "sqrtm", "regstep", "reg"),
         default="helpers",
-        help="the seeded stream: the helpers (part 1), the matrix square root's (schur, sqrtm) or "
-        "the registration step's (3.2-03: rgauss, regress, trans, quat, rstep)",
+        help="the seeded stream: the helpers (part 1), the matrix square root's (schur, sqrtm), "
+        "the registration step's (3.2-03: rgauss, regress, trans, quat, rstep) or the "
+        "registration's (3.2-03 part 2: rreg)",
     )
     ap.add_argument(
         "--cases",

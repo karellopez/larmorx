@@ -515,6 +515,191 @@ template <class T> void rstep()
   }
 }
 
+// 3.2-03 part 2 (relay 43): the registration (RegRobust with Registration's code).
+//
+// A structured volume of the registration cases: w h d type, the geometry's sizes (floats),
+// cosines x_r x_a x_s y_r y_a y_s z_r z_a z_s and centre c_r c_a c_s (floats), then the voxels of
+// an analytic picture: n blobs (cx cy cz amp r2, doubles), the background and a texture amplitude
+// (doubles), and a 3 x 4 voxel transform (doubles, row by row) applied to (x, y, z) first; all in
+// double, left to right, no fused operations (the port computes the same bits); a byte or short
+// volume takes (int)(v + 0.5) of v clamped to [0, 255] or [0, 32767]; set with MRIsetVoxVal.
+MRI *get_blob()
+{
+  int w = geti(), h = geti(), d = geti(), type = geti();
+  MRI *m = MRIalloc(w, h, d, type);
+  m->xsize = getf(); m->ysize = getf(); m->zsize = getf();
+  m->x_r = getf(); m->x_a = getf(); m->x_s = getf();
+  m->y_r = getf(); m->y_a = getf(); m->y_s = getf();
+  m->z_r = getf(); m->z_a = getf(); m->z_s = getf();
+  m->c_r = getf(); m->c_a = getf(); m->c_s = getf();
+  m->ras_good_flag = 1;
+  MRIreInitCache(m);
+  int nb = geti();
+  std::vector<double> b(5 * nb);
+  for (double &v : b) v = getd();
+  double bg = getd(), tex = getd();
+  double A[12];
+  for (double &a : A) a = getd();
+  for (int z = 0; z < d; z++)
+    for (int y = 0; y < h; y++)
+      for (int x = 0; x < w; x++) {
+        double px = A[0] * x + A[1] * y + A[2] * z + A[3];
+        double py = A[4] * x + A[5] * y + A[6] * z + A[7];
+        double pz = A[8] * x + A[9] * y + A[10] * z + A[11];
+        double v = bg;
+        for (int k = 0; k < nb; k++) {
+          double dx = px - b[5 * k], dy = py - b[5 * k + 1], dz = pz - b[5 * k + 2];
+          double d2 = dx * dx + dy * dy + dz * dz;
+          v = v + b[5 * k + 3] * b[5 * k + 4] / (b[5 * k + 4] + d2);
+        }
+        int ti = ((int)(px * 3.0) + (int)(py * 5.0) + (int)(pz * 7.0)) % 7;
+        v = v + tex * ti;
+        if (type != MRI_FLOAT) {
+          double hi = type == MRI_UCHAR ? 255.0 : 32767.0;
+          v = v < 0 ? 0 : v > hi ? hi : v;
+          v = (double)(int)(v + 0.5);
+        }
+        MRIsetVoxVal(m, x, y, z, 0, (float)v);
+      }
+  return m;
+}
+
+// FNV-1a (64 bits) of bytes
+uint64_t fnv1a(const unsigned char *p, size_t n)
+{
+  uint64_t h = 0xcbf29ce484222325ull;
+  for (size_t i = 0; i < n; i++) {
+    h ^= p[i];
+    h *= 0x100000001b3ull;
+  }
+  return h;
+}
+
+// a volume's extent, type, voxel sizes, outside value, cached voxel-to-RAS and its voxels' FNV-1a
+void put_vol_hash(const MRI *m)
+{
+  if (!m) { out += "NULL "; return; }
+  oi(m->width); oi(m->height); oi(m->depth); oi(m->nframes); oi(m->type);
+  of(m->xsize); of(m->ysize); of(m->zsize); od(m->outside_val);
+  oam(m->i_to_r__);
+  if (m->chunk && m->ischunked) {
+    char b[40];
+    snprintf(b, sizeof b, "fnv %016" PRIx64 " %zu ", fnv1a((const unsigned char *)m->chunk, m->bytes_total),
+             m->bytes_total);
+    out += b;
+  } else {
+    out += "nochunk ";
+  }
+}
+
+void put_vm4(const vnl_matrix<double> &m)
+{
+  if (m.rows() != 4 || m.cols() != 4) { out += "EMPTY "; return; }
+  for (int i = 0; i < 4; i++)
+    for (int j = 0; j < 4; j++) od(m[i][j]);
+}
+
+// rreg <doubleprec> <model: 0 rigid, 1 affine, 2 translation, 3 isoscale, 4 iscale only> <iscale>
+//   <symmetry> <sat> <wlimit> <satit> <nomulti> <iterate> <epsit> <highit> <minsize> <maxsize>
+//   <subsample> <inittrans> <initorient> <initscaling> <verbose> <keeptype> <minit: 0 | 1 and 16
+//   doubles> <iscaleinit> <mov blob> <dst blob>: mri_robust_register's set-up (initRegistration's
+//   order), setSourceAndTarget, then findSaturation and computeMultiresRegistration (satit),
+//   computeIterativeRegistration (nomulti) or computeMultiresRegistration; prints the images as
+//   set, Rsrc, Rtrg, the saturation found, the final voxel transform, the intensity scale,
+//   converged, sat, wcheck, Mfinal, the half-way maps, the weights and the centroids
+void rreg()
+{
+  int dbl = geti(), model = geti(), iscale = geti(), sym = geti();
+  double sat = getd(), wlimit = getd();
+  int satit = geti(), nomulti = geti(), iterate = geti();
+  double epsit = getd();
+  int highit = geti(), minsize = geti(), maxsize = geti(), ss = geti();
+  int inittrans = geti(), initorient = geti(), initscaling = geti(), verbose = geti();
+  int keeptype = geti(), hasminit = geti();
+  vnl_matrix<double> minit;
+  if (hasminit) {
+    minit.set_size(4, 4);
+    for (int r = 0; r < 4; r++)
+      for (int c = 0; c < 4; c++) minit[r][c] = getd();
+  }
+  double iscaleinit = getd();
+  MRI *mov = get_blob();
+  MRI *dst = get_blob();
+  RegRobust R;
+  if (model != 1) R.setRigid();
+  else R.setAffine();
+  if (model == 2) R.setTransonly();
+  if (model == 3) R.setIsoscale();
+  R.setIscale(iscale != 0);
+  if (model == 4) R.setIscaleOnly();
+  R.setVerbose(verbose);
+  R.setDebug(0);
+  R.setHighit(highit);
+  R.setInitTransform(inittrans != 0);
+  R.setInitOrient(initorient != 0);
+  R.setInitScaling(initscaling != 0);
+  R.setDoublePrec(dbl != 0);
+  R.setSymmetry(sym != 0);
+  R.setCost(Registration::ROB);
+  R.setSaturation(sat);
+  R.setWLimit(wlimit);
+  R.setName("reg");
+  if (ss > 0) R.setSubsampleSize(ss);
+  R.setMinSize(minsize);
+  R.setMaxSize(maxsize);
+  if (hasminit) R.setMinitOrig(minit);
+  R.setIscaleInit(iscaleinit);
+  fflush(stdout);
+  R.setSourceAndTarget(mov, dst, keeptype != 0);
+  std::cout << std::flush;
+  MRIfree(&mov);
+  MRIfree(&dst);
+  put_vol_hash(R.mri_source);
+  put_vol_hash(R.mri_target);
+  put_vm4(R.Rsrc);
+  put_vm4(R.Rtrg);
+  oi(R.resample);
+  if (satit) {
+    od(R.findSaturation());
+    R.computeMultiresRegistration(0, iterate, epsit);
+  } else if (nomulti) {
+    R.computeIterativeRegistration(iterate, epsit);
+  } else {
+    R.computeMultiresRegistration(0, iterate, epsit);
+  }
+  std::cout << std::flush;
+  put_m4(R.getFinalVox2Vox());
+  std::cout << std::flush;
+  od(R.getFinalIscale());
+  oi(R.getConverged());
+  od(R.sat);
+  // wcheck is never written before the first iteration (memory contents): printed after one only
+  if (R.mov2weights.rows() == 4) od(R.wcheck);
+  else out += "nowcheck ";
+  put_vm4(R.Mfinal);
+  if (R.mov2weights.rows() == 4) {
+    std::pair<vnl_matrix_fixed<double, 4, 4>, vnl_matrix_fixed<double, 4, 4> > hw = R.getHalfWayMaps();
+    std::cout << std::flush;
+    put_m4(hw.first);
+    put_m4(hw.second);
+  } else {
+    out += "nohalfway ";
+  }
+  put_vol_hash(R.getWeights());
+  put_vol_hash(R.mri_hweights);
+  if (R.centroidS.size() == 3 && R.centroidT.size() == 3) {
+    vnl_vector_fixed<double, 4> c = R.getCentroidS();
+    for (int i = 0; i < 4; i++) od(c[i]);
+    c = R.getCentroidT();
+    for (int i = 0; i < 4; i++) od(c[i]);
+    c = R.getCentroidSinT();
+    std::cout << std::flush;
+    for (int i = 0; i < 4; i++) od(c[i]);
+  } else {
+    out += "nocentroids ";
+  }
+}
+
 std::string slurp(const std::string &path)
 {
   std::string r;
@@ -675,6 +860,8 @@ void run_case()
   } else if (cmd == "rstep") {
     if (geti()) rstep<double>();
     else rstep<float>();
+  } else if (cmd == "rreg") {
+    rreg();
   } else {
     fail("unknown command");
   }
@@ -737,7 +924,8 @@ int main(int argc, char *argv[])
       dup2(fd, 2);
       close(fd);
       setvbuf(stdout, NULL, _IONBF, 0);
-      alarm(5);
+      // a registration (rreg) gets 60 s, every other case 5
+      alarm(line.compare(0, 5, "rreg ") == 0 ? 60 : 5);
       memcpy(buf, line.c_str(), line.size() + 1);
       toks.clear();
       pos = 0;

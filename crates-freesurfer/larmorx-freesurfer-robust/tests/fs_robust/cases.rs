@@ -1091,6 +1091,247 @@ pub fn generate_regstep(seed: u64, n: usize) -> Vec<String> {
         .collect()
 }
 
+// ---- the registration's cases (3.2-03 part 2, relay 43)
+
+/// The registration's command.
+pub const REG: [&str; 1] = ["rreg"];
+
+/// A blob picture's tokens (`fsrobust.cpp`'s `get_blob`): the extent and type, the geometry,
+/// the blobs, the background, the texture and the voxel transform (row by row).
+#[allow(clippy::too_many_arguments)]
+fn blob_toks(
+    t: &mut Vec<String>,
+    dims: [i64; 3],
+    ty: i64,
+    sizes: [f32; 3],
+    cosines: [f32; 9],
+    c_ras: [f32; 3],
+    blobs: &[[f64; 5]],
+    bg: f64,
+    tex: f64,
+    a: &[f64; 12],
+) {
+    for v in dims {
+        t.push(v.to_string());
+    }
+    t.push(ty.to_string());
+    for v in sizes.iter().chain(&cosines).chain(&c_ras) {
+        t.push(fx(*v));
+    }
+    t.push(blobs.len().to_string());
+    for b in blobs {
+        for &v in b {
+            t.push(dx(v));
+        }
+    }
+    t.push(dx(bg));
+    t.push(dx(tex));
+    for &v in a {
+        t.push(dx(v));
+    }
+}
+
+/// A small rotation-like voxel transform about `c` (`[[1, -a, b], [a, 1, -c], [-b, c, 1]]`
+/// times `k`, rational entries only) and a shift.
+fn moved(g: &mut Gen, centre: [f64; 3], two_d: bool, big: bool) -> [f64; 12] {
+    let r = |g: &mut Gen, m: f64| ((g.unit() - 0.5) * 2.0 * m * 64.0).round() / 64.0;
+    let m = if big { 0.15 } else { 0.06 };
+    let (a, b, c) = if two_d {
+        (r(g, m), 0.0, 0.0)
+    } else {
+        (r(g, m), r(g, m), r(g, m))
+    };
+    let k = if g.chance(4) { 1.0 + r(g, 0.05) } else { 1.0 };
+    let rot = [[k, -a * k, b * k], [a * k, k, -c * k], [-b * k, c * k, k]];
+    let mut sh = [r(g, 2.0), r(g, 2.0), if two_d { 0.0 } else { r(g, 2.0) }];
+    if big {
+        for v in &mut sh {
+            *v *= 2.0;
+        }
+    }
+    let mut out = [0.0; 12];
+    for i in 0..3 {
+        out[4 * i] = rot[i][0];
+        out[4 * i + 1] = rot[i][1];
+        out[4 * i + 2] = rot[i][2];
+        // p = R (x - c) + c + shift
+        out[4 * i + 3] = centre[i]
+            - (rot[i][0] * centre[0] + rot[i][1] * centre[1] + rot[i][2] * centre[2])
+            + sh[i];
+    }
+    out
+}
+
+fn gen_rreg(g: &mut Gen, t: &mut Vec<String>) {
+    let model = g.pick(&[0i64, 0, 0, 0, 1, 1, 2, 4, 3]);
+    let two_d = g.chance(8);
+    let dbl = g.chance(5);
+    let iscale = model == 4 || g.chance(3);
+    let sym = !g.chance(5);
+    let sat = g.pick(&[4.685, 4.685, 6.0, 9.0, 3.0, -1.0]);
+    let wlimit = g.pick(&[0.16, 0.16, 0.16, 0.08, 0.3]);
+    let satit = g.chance(6);
+    let nomulti = !satit && g.chance(6);
+    let iterate = g.pick(&[5i64, 5, 3, 1, 8]);
+    let epsit = g.pick(&[0.01, 0.01, 0.05, 0.001]);
+    let highit = g.pick(&[-1i64, -1, -1, -1, 0, 1, 2]);
+    let minsize = g.pick(&[-1i64, -1, -1, -1, 16, 18]);
+    let maxsize = g.pick(&[-1i64, -1, -1, -1, 20, 28]);
+    let ss = g.pick(&[-1i64, -1, -1, -1, 16, 18]);
+    let inittrans = !g.chance(4);
+    let initorient = g.chance(6);
+    let initscaling = g.chance(12);
+    let verbose = g.pick(&[1i64, 1, 1, 2, 0]);
+    let keeptype = g.chance(2);
+    for v in [i64::from(dbl), model, i64::from(iscale), i64::from(sym)] {
+        t.push(v.to_string());
+    }
+    t.push(dx(sat));
+    t.push(dx(wlimit));
+    for v in [i64::from(satit), i64::from(nomulti), iterate] {
+        t.push(v.to_string());
+    }
+    t.push(dx(epsit));
+    for v in [
+        highit,
+        minsize,
+        maxsize,
+        ss,
+        i64::from(inittrans),
+        i64::from(initorient),
+        i64::from(initscaling),
+        verbose,
+        i64::from(keeptype),
+    ] {
+        t.push(v.to_string());
+    }
+    if g.chance(6) {
+        t.push("1".to_owned());
+        let m = moved(g, [10.0, 10.0, 10.0], two_d, false);
+        for i in 0..3 {
+            for j in 0..4 {
+                t.push(dx(m[4 * i + j]));
+            }
+        }
+        for v in [0.0, 0.0, 0.0, 1.0] {
+            t.push(dx(v));
+        }
+    } else {
+        t.push("0".to_owned());
+    }
+    t.push(dx(if g.chance(5) { 1.125 } else { 1.0 }));
+    // the movable and the destination
+    let side = |g: &mut Gen| g.pick(&[16i64, 16, 18, 20, 20, 22, 24, 28, 33]);
+    let dims = [side(g), side(g), if two_d { 1 } else { side(g) }];
+    let ty = g.pick(&[3i64, 3, 0, 0, 4]);
+    let sizes = g.pick(&[
+        [1.0f32, 1.0, 1.0],
+        [1.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0],
+        [1.0, 1.0, 1.5],
+        [0.9375, 0.9375, 1.25],
+        [2.0, 2.0, 2.0],
+    ]);
+    let ident = [1.0f32, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
+    // LIA (a coronal volume): x -> -R, y -> -S, z -> +A
+    let lia = [-1.0f32, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0];
+    // 45 degrees about S (reorientSource's conflict between two columns) and a sagittal volume
+    let h = std::f32::consts::FRAC_1_SQRT_2;
+    let rot45 = [h, h, 0.0, -h, h, 0.0, 0.0, 0.0, 1.0];
+    let sag = [0.0f32, -1.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0, 0.0];
+    let orient = |g: &mut Gen| match g.below(12) {
+        0 | 1 => lia,
+        2 => rot45,
+        3 => sag,
+        _ => ident,
+    };
+    let cos_m = orient(g);
+    let c_ras = [
+        g.pick(&[0.0f32, 0.0, 1.5, -2.25]),
+        g.pick(&[0.0f32, 0.0, 3.0]),
+        g.pick(&[0.0f32, -1.0]),
+    ];
+    let ctr = [
+        (dims[0] - 1) as f64 / 2.0,
+        (dims[1] - 1) as f64 / 2.0,
+        (dims[2] - 1) as f64 / 2.0,
+    ];
+    let hi = if ty == 0 { 70.0 } else { 140.0 };
+    let nb = g.int(2, 3) as usize;
+    let mut blobs = Vec::new();
+    for _ in 0..nb {
+        let off = |g: &mut Gen, n: i64| ((g.unit() - 0.5) * (n as f64) * 0.5 * 16.0).round() / 16.0;
+        let r = (dims[0].min(dims[1]) as f64 / 4.0).round();
+        blobs.push([
+            ctr[0] + off(g, dims[0]),
+            ctr[1] + off(g, dims[1]),
+            if two_d { 0.0 } else { ctr[2] + off(g, dims[2]) },
+            (hi * (0.5 + g.unit() * 0.5) * 16.0).round() / 16.0,
+            r * r,
+        ]);
+    }
+    let bg = g.pick(&[0.0, 0.0, 0.0, 0.0, 10.0]);
+    let tex = g.pick(&[0.0, 1.0, 2.5]);
+    let mut id12 = [0.0; 12];
+    id12[0] = 1.0;
+    id12[5] = 1.0;
+    id12[10] = 1.0;
+    blob_toks(t, dims, ty, sizes, cos_m, c_ras, &blobs, bg, tex, &id12);
+    // the destination: the same picture moved (and scaled in intensity with iscale)
+    let same = !g.chance(4);
+    let dims_t = if same {
+        dims
+    } else {
+        [side(g), side(g), if two_d { 1 } else { side(g) }]
+    };
+    let ty_t = if g.chance(5) {
+        g.pick(&[3i64, 0, 4])
+    } else {
+        ty
+    };
+    let sizes_t = if same || g.chance(2) {
+        sizes
+    } else {
+        [1.0, 1.0, 1.0]
+    };
+    let cos_t = if g.chance(6) { orient(g) } else { cos_m };
+    let big = g.chance(5);
+    let a = moved(g, ctr, two_d, big);
+    let k = if iscale {
+        g.pick(&[1.0, 1.0625, 0.9375, 1.125])
+    } else {
+        1.0
+    };
+    let blobs_t: Vec<[f64; 5]> = blobs
+        .iter()
+        .map(|b| [b[0], b[1], b[2], b[3] * k, b[4]])
+        .collect();
+    blob_toks(
+        t,
+        dims_t,
+        ty_t,
+        sizes_t,
+        cos_t,
+        c_ras,
+        &blobs_t,
+        bg * k,
+        tex,
+        &a,
+    );
+}
+
+/// The registration's cases of `seed`.
+pub fn generate_reg(seed: u64, n: usize) -> Vec<String> {
+    let mut g = Gen::new(seed ^ 0x5252_4547);
+    (0..n)
+        .map(|_| {
+            let mut t = vec!["rreg".to_owned()];
+            gen_rreg(&mut g, &mut t);
+            t.join(" ")
+        })
+        .collect()
+}
+
 // ------------------------------------------------------------------------------------------
 // The answers
 
@@ -1679,6 +1920,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                 rstep::<f32>(cx, t, o)?;
             }
         }
+        "rreg" => rreg(cx, t, o)?,
         _ => panic!("unknown command {cmd}"),
     }
     Ok(())
@@ -1899,6 +2141,229 @@ fn rstep<T: Real>(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> 
         o.rv(&step.pvec);
         o.vol(step.mri_weights.as_ref());
         o.vol(step.mri_indexing.as_ref());
+    }
+    Ok(())
+}
+
+// ---- the registration's answers (3.2-03 part 2)
+
+/// `fsrobust.cpp`'s `get_blob`.
+fn get_blob(cx: &mut Ctx, t: &mut Toks) -> Result<Mri, Fatal> {
+    let (w, h, d, ty) = (t.i(), t.i(), t.i(), t.i());
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let mut m = mm::mri_alloc(g, a, b, w, h, d, ty)?;
+    let v = &mut m.vg;
+    v.xsize = t.f();
+    v.ysize = t.f();
+    v.zsize = t.f();
+    v.x_r = t.f();
+    v.x_a = t.f();
+    v.x_s = t.f();
+    v.y_r = t.f();
+    v.y_a = t.f();
+    v.y_s = t.f();
+    v.z_r = t.f();
+    v.z_a = t.f();
+    v.z_s = t.f();
+    v.c_r = t.f();
+    v.c_a = t.f();
+    v.c_s = t.f();
+    v.ras_good_flag = 1;
+    reinit_cache(g, a, b, &mut m.vg)?;
+    let nb = t.i() as usize;
+    let bl: Vec<f64> = (0..5 * nb).map(|_| t.d()).collect();
+    let (bg, tex) = (t.d(), t.d());
+    let am: Vec<f64> = (0..12).map(|_| t.d()).collect();
+    for z in 0..d {
+        for y in 0..h {
+            for x in 0..w {
+                let (xf, yf, zf) = (f64::from(x), f64::from(y), f64::from(z));
+                let px = am[0] * xf + am[1] * yf + am[2] * zf + am[3];
+                let py = am[4] * xf + am[5] * yf + am[6] * zf + am[7];
+                let pz = am[8] * xf + am[9] * yf + am[10] * zf + am[11];
+                let mut v = bg;
+                for k in 0..nb {
+                    let (dx_, dy_, dz_) = (px - bl[5 * k], py - bl[5 * k + 1], pz - bl[5 * k + 2]);
+                    let d2 = dx_ * dx_ + dy_ * dy_ + dz_ * dz_;
+                    v += bl[5 * k + 3] * bl[5 * k + 4] / (bl[5 * k + 4] + d2);
+                }
+                let ti = ((px * 3.0) as i32 + (py * 5.0) as i32 + (pz * 7.0) as i32) % 7;
+                v += tex * f64::from(ti);
+                if ty != mm::MRI_FLOAT {
+                    let hi = if ty == mm::MRI_UCHAR { 255.0 } else { 32767.0 };
+                    v = if v < 0.0 {
+                        0.0
+                    } else if v > hi {
+                        hi
+                    } else {
+                        v
+                    };
+                    v = f64::from((v + 0.5) as i32);
+                }
+                mri_set_vox_val(g, b, &mut m, x, y, z, 0, v as f32, 0)?;
+            }
+        }
+    }
+    Ok(m)
+}
+
+impl Out {
+    /// `fsrobust.cpp`'s `put_vol_hash`.
+    fn vol_hash(&mut self, m: Option<&Mri>) {
+        let Some(m) = m else {
+            self.0 += "NULL ";
+            return;
+        };
+        for v in [m.vg.width, m.vg.height, m.vg.depth, m.nframes, m.mtype] {
+            self.i(i64::from(v));
+        }
+        self.f(m.vg.xsize);
+        self.f(m.vg.ysize);
+        self.f(m.vg.zsize);
+        self.d(m.outside_val);
+        self.am(m.vg.i_to_r.as_ref());
+        match &m.chunk {
+            Some(c) => {
+                let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+                for &x in c {
+                    h ^= u64::from(x);
+                    h = h.wrapping_mul(0x0100_0000_01b3);
+                }
+                self.0 += &format!("fnv {h:016x} {} ", c.len());
+            }
+            None => self.0 += "nochunk ",
+        }
+    }
+    /// `put_vm4`: a 4 x 4 `vnl_matrix`, `EMPTY` for another size.
+    fn vm4(&mut self, m: Option<&VnlMatrix>) {
+        match m {
+            Some(m) if m.rows == 4 && m.cols == 4 => {
+                for i in 0..4 {
+                    for j in 0..4 {
+                        self.d(m.at(i, j));
+                    }
+                }
+            }
+            _ => self.0 += "EMPTY ",
+        }
+    }
+}
+
+fn rreg(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
+    use larmorx_freesurfer_core::run::Environment;
+    use larmorx_freesurfer_robust::registration::{Io, RegRobust};
+    let (dbl, model, iscale, sym) = (t.i() != 0, t.i(), t.i() != 0, t.i() != 0);
+    let (sat, wlimit) = (t.d(), t.d());
+    let (satit, nomulti, iterate) = (t.i() != 0, t.i() != 0, t.i());
+    let epsit = t.d();
+    let (highit, minsize, maxsize, ss) = (t.i(), t.i(), t.i(), t.i());
+    let (inittrans, initorient, initscaling, verbose) = (t.i() != 0, t.i() != 0, t.i() != 0, t.i());
+    let keeptype = t.i() != 0;
+    let minit = if t.i() != 0 {
+        let mut m = VnlMatrix::zeros(4, 4);
+        for r in 0..4 {
+            for c in 0..4 {
+                *m.at_mut(r, c) = t.d();
+            }
+        }
+        Some(m)
+    } else {
+        None
+    };
+    let iscaleinit = t.d();
+    let mov = get_blob(cx, t)?;
+    let dst = get_blob(cx, t)?;
+    let mut r = RegRobust::new();
+    if model != 1 {
+        r.set_rigid();
+    } else {
+        r.set_affine();
+    }
+    if model == 2 {
+        r.set_transonly();
+    }
+    if model == 3 {
+        r.set_isoscale();
+    }
+    r.iscale = iscale;
+    if model == 4 {
+        r.set_iscale_only();
+    }
+    r.set_verbose(verbose);
+    r.set_debug(0);
+    r.highit = highit;
+    r.inittransform = inittrans;
+    r.initorient = initorient;
+    r.initscaling = initscaling;
+    r.doubleprec = dbl;
+    r.symmetry = sym;
+    r.costfun = Cost::Rob;
+    r.sat = sat;
+    r.wlimit = wlimit;
+    r.set_name("reg");
+    if ss > 0 {
+        r.subsamplesize = ss;
+    }
+    r.minsize = minsize;
+    r.maxsize = maxsize;
+    if minit.is_some() {
+        r.minit = minit;
+    }
+    r.iscaleinit = iscaleinit;
+    let env = Environment::from_pairs(Vec::<(String, String)>::new());
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let mut io = Io {
+        out: a,
+        err: b,
+        env: &env,
+    };
+    r.set_source_and_target(g, &mut io, &mov, &dst, keeptype)?;
+    drop(mov);
+    drop(dst);
+    o.vol_hash(r.mri_source.as_ref());
+    o.vol_hash(r.mri_target.as_ref());
+    o.vm4(r.rsrc.as_ref());
+    o.vm4(r.rtrg.as_ref());
+    o.i(i64::from(r.resample));
+    if satit {
+        o.d(r.find_saturation(g, &mut io)?);
+        r.compute_multires_registration(g, &mut io, 0, iterate, epsit)?;
+    } else if nomulti {
+        r.compute_iterative_registration(g, &mut io, iterate, epsit)?;
+    } else {
+        r.compute_multires_registration(g, &mut io, 0, iterate, epsit)?;
+    }
+    o.m4(&r.get_final_vox2vox(io.out));
+    o.d(r.get_final_iscale());
+    o.i(i64::from(r.get_converged()));
+    o.d(r.sat);
+    if r.mov2weights.is_some() {
+        o.d(r.wcheck);
+    } else {
+        o.0 += "nowcheck ";
+    }
+    o.vm4(r.mfinal.as_ref());
+    if r.mov2weights.is_some() {
+        let (h1, h2) = r.get_half_way_maps(io.err)?;
+        o.m4(&h1);
+        o.m4(&h2);
+    } else {
+        o.0 += "nohalfway ";
+    }
+    o.vol_hash(r.mri_weights.as_ref());
+    o.vol_hash(r.mri_hweights.as_ref());
+    if r.centroid_s.len() == 3 && r.centroid_t.len() == 3 {
+        for v in r.get_centroid_s() {
+            o.d(v);
+        }
+        for v in r.get_centroid_t() {
+            o.d(v);
+        }
+        for v in r.get_centroid_s_in_t(io.out) {
+            o.d(v);
+        }
+    } else {
+        o.0 += "nocentroids ";
     }
     Ok(())
 }

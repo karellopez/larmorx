@@ -25,8 +25,9 @@ pub const N: i32 = 32;
 /// partial-volume corrected volumes of given ids with robust statistics; a mask, the cortex
 /// excluded, a replacement and an erosion of the segmentation; the waveforms (table, means,
 /// volume) with the old table and accumulated means; a segmentation of 1s from the input with
-/// its square root; `--rescale-by-seg`.
-pub const CASES: [&[&str]; 6] = [
+/// its square root; `--rescale-by-seg`; the segmentation's own statistics, whose signal-to-noise
+/// ratios divide by a deviation of 0 (a NaN for label 0, an infinity for 2).
+pub const CASES: [&[&str]; 7] = [
     &[
         "--seg", "seg.mgz", "--sum", "s1.stats", "--in", "t1.mgz", "--snr", "--excludeid", "0",
     ],
@@ -46,16 +47,20 @@ pub const CASES: [&[&str]; 6] = [
     &[
         "--rescale-by-seg", "t1.mgz", "seg.mgz", "100", "rescaled.mgz", "2", "41",
     ],
+    &[
+        "--seg", "seg.mgz", "--sum", "s6.stats", "--in", "seg.mgz", "--snr", "--id", "0", "2",
+    ],
 ];
 
 /// The files each case writes (compared by digest).
-pub const OUTPUTS: [&[&str]; 6] = [
+pub const OUTPUTS: [&[&str]; 7] = [
     &["s1.stats"],
     &["s2.stats"],
     &["s3.stats"],
     &["wf.txt", "sf.txt", "wf.mgz", "s4.stats"],
     &["s5.stats"],
     &["rescaled.mgz"],
+    &["s6.stats"],
 ];
 
 fn io() -> (std::io::Sink, std::io::Sink) {

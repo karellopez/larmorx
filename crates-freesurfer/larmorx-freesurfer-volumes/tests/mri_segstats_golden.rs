@@ -15,11 +15,11 @@ use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
 /// Recorded 2026-11-22 by `prog.py --golden` from the official program on Linux x64 (the port's
-/// `reproduce` gave the same): six cases, 32^3 inputs.
-const OFFICIAL_SHA256: &str = "fa672db74dd748ba21951a118617ed94965c46832f83e275d58089074689d319";
+/// `reproduce` gave the same): seven cases, 32^3 inputs.
+const OFFICIAL_SHA256: &str = "580141bcfeb2d1f7fe638ad61d685a15a7846f6c7df953fb42a3859ff3eef5f0";
 /// The port's default on Linux x64 (`cases_digest(Fix)`, recorded with the official value: no defect
 /// of the program changes these cases).
-const FIX_SHA256: &str = "fa672db74dd748ba21951a118617ed94965c46832f83e275d58089074689d319";
+const FIX_SHA256: &str = "580141bcfeb2d1f7fe638ad61d685a15a7846f6c7df953fb42a3859ff3eef5f0";
 
 fn cases_digest(mode: UpstreamDefects) -> String {
     let dir = tempfile::tempdir().expect("a folder");

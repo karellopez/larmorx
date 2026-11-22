@@ -25,7 +25,8 @@
 //! - **FS-1176**: a folder whose physical path holds blanks or pattern characters: its blanks
 //!   collapse to one space each, its patterns are matched (`echo: No match.`).
 //!
-//! Each with a notice when it changed the result. Forms of tcsh this model does not reproduce (a
+//! Each with a notice when it changed the result. On Windows (where FreeSurfer does not run) `\`
+//! separates folders too and both modes give the name as given. Forms of tcsh this model does not reproduce (a
 //! new line in the name, subscripted assignments, `dirname`'s own `--help`, `--version`, `-z`)
 //! give the default's result with FS-1173's notice saying so, in both modes.
 
@@ -96,6 +97,10 @@ pub fn main(g: &mut Globals, env: &Environment, cwd: &Path, args: &[String]) -> 
     let cwd: PathBuf = cwd.components().collect();
     let cwd = cwd.as_path();
     let literal = as_named(cwd, args);
+    // tcsh's reading is a Unix shell's: elsewhere both modes give the name as given
+    if !cfg!(unix) {
+        return literal;
+    }
     let tcsh = match script(env, cwd, args) {
         Model::Done(o) => o,
         Model::Unmodelled(what) => {
@@ -150,8 +155,10 @@ fn as_named(cwd: &Path, args: &[String]) -> Outcome {
     let Some(name) = args.first().filter(|n| !n.is_empty()) else {
         return Outcome::out(b"getfullpath filename\n", 1);
     };
-    let folder = csh::dirname(name);
-    let at = if folder.starts_with('/') {
+    // on Windows `\` separates folders too (the port's rule, larmorx_freesurfer_core::pathsep)
+    let windows = cfg!(windows);
+    let folder = csh::dirname_on(name, windows);
+    let at = if Path::new(&folder).is_absolute() || folder.starts_with('/') {
         PathBuf::from(&folder)
     } else {
         cwd.join(&folder)
@@ -166,7 +173,12 @@ fn as_named(cwd: &Path, args: &[String]) -> Outcome {
             stderr: format!("{msg}\n").into_bytes(),
         },
         Ok(phys) => Outcome::out(
-            format!("{}/{}\n", phys.to_string_lossy(), csh::basename(name)).as_bytes(),
+            format!(
+                "{}/{}\n",
+                phys.to_string_lossy(),
+                csh::basename_on(name, windows)
+            )
+            .as_bytes(),
             0,
         ),
     }

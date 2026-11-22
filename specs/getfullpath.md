@@ -32,7 +32,9 @@ its standard output as the name.
    only `/`s: `/`). So `/` gives `///`, `/.` gives `//.`, `d1/` gives `<path of the current
    folder>/d1`, `a/.` with `a` a file gives `a: Not a directory.`.
 
-Nothing is written. The name and the paths are printed as they are (no escapes, blanks kept).
+Nothing is written. The name and the paths are printed as they are (no escapes, blanks kept). On
+Windows (the port only: FreeSurfer runs where `/` alone separates folders) `\` separates folders as
+well, and both modes give this default (tcsh's reading, §3, is a Unix shell's).
 
 ## 3. What tcsh does (`reproduce`) (observed)
 

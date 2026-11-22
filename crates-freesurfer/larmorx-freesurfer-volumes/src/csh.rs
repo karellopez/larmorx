@@ -433,26 +433,38 @@ pub fn echo(words: &[String]) -> Vec<u8> {
 
 /// GNU `dirname` of one operand.
 pub fn dirname(s: &str) -> String {
-    let b = s.trim_end_matches('/');
-    if b.is_empty() {
-        return if s.starts_with('/') { "/" } else { "." }.to_owned();
-    }
-    match b.rfind('/') {
-        None => ".".to_owned(),
-        Some(k) => {
-            let d = b[..k].trim_end_matches('/');
-            if d.is_empty() { "/" } else { d }.to_owned()
-        }
-    }
+    dirname_on(s, false)
 }
 
 /// GNU `basename` of one operand.
 pub fn basename(s: &str) -> String {
-    let b = s.trim_end_matches('/');
+    basename_on(s, false)
+}
+
+/// [`dirname`] with `\` a separator as well (`windows`: the port's rule on Windows).
+pub fn dirname_on(s: &str, windows: bool) -> String {
+    let sep = |c: char| c == '/' || (windows && c == '\\');
+    let b = s.trim_end_matches(sep);
     if b.is_empty() {
-        return if s.is_empty() { "" } else { "/" }.to_owned();
+        return if s.starts_with(sep) { "/" } else { "." }.to_owned();
     }
-    match b.rfind('/') {
+    match b.rfind(sep) {
+        None => ".".to_owned(),
+        Some(k) => {
+            let d = b[..k].trim_end_matches(sep);
+            if d.is_empty() { &b[..1] } else { d }.to_owned()
+        }
+    }
+}
+
+/// [`basename`] with `\` a separator as well (`windows`).
+pub fn basename_on(s: &str, windows: bool) -> String {
+    let sep = |c: char| c == '/' || (windows && c == '\\');
+    let b = s.trim_end_matches(sep);
+    if b.is_empty() {
+        return if s.is_empty() { "" } else { &s[..1] }.to_owned();
+    }
+    match b.rfind(sep) {
         None => b.to_owned(),
         Some(k) => b[k + 1..].to_owned(),
     }

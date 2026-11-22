@@ -30,7 +30,10 @@ fn cases_digest(mode: UpstreamDefects) -> String {
     for k in 0..common::CASES.len() {
         let (status, text) = common::run_case(dir.path(), k, mode);
         // as prog.py --golden takes the official's text: without its last new lines
-        h.update(format!("case {k} {status}\n{}\n", text.trim_end_matches('\n')));
+        h.update(format!(
+            "case {k} {status}\n{}\n",
+            text.trim_end_matches('\n')
+        ));
         for name in common::OUTPUTS[k] {
             h.update(format!(
                 "{name} {}\n",

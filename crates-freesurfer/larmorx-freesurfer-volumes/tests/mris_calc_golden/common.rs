@@ -114,7 +114,9 @@ pub fn write_inputs(dir: &Path) {
     let mut vf = volume(&mut g, MRI_FLOAT, |x, y, z| {
         (((x * 7 + y * 13 + z * 29) % 41 - 20) as f32 / 8.0).to_bits()
     });
-    let mut vu = volume(&mut g, MRI_UCHAR, |x, y, z| ((x * 3 + y * 5 + z * 11) % 7) as u32);
+    let mut vu = volume(&mut g, MRI_UCHAR, |x, y, z| {
+        ((x * 3 + y * 5 + z * 11) % 7) as u32
+    });
     let (mut o, mut e) = io();
     for (m, name) in [(&mut vf, "vf.mgz"), (&mut vu, "vu.mgz")] {
         let p = dir.join(name);
@@ -135,7 +137,11 @@ pub fn write_inputs(dir: &Path) {
     curvature(&dir.join("lh.b"), 5, 2004);
     let mut t = String::from("#!ascii label  , from subject golden vox2ras=TkReg\n100\n");
     for k in 0..100 {
-        t.push_str(&format!("{}  {}.000  0.000  0.000 0.0000000000\n", k * 7 + 3, k));
+        t.push_str(&format!(
+            "{}  {}.000  0.000  0.000 0.0000000000\n",
+            k * 7 + 3,
+            k
+        ));
     }
     std::fs::write(dir.join("lab.label"), t).expect("written");
 }
@@ -221,6 +227,9 @@ pub fn run_case(dir: &Path, k: usize, mode: UpstreamDefects) -> (u8, String) {
     let (mut out, mut err) = (Vec::new(), Vec::new());
     let status =
         larmorx_freesurfer_volumes::mris_calc::main::run(&args, &settings, &mut out, &mut err);
-    let text = mask(&String::from_utf8_lossy(&out), &String::from_utf8_lossy(&err));
+    let text = mask(
+        &String::from_utf8_lossy(&out),
+        &String::from_utf8_lossy(&err),
+    );
     (status, text)
 }

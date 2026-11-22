@@ -105,7 +105,7 @@ def inputs(ws: Path, seed: int) -> dict[str, Path]:
     f["vu"] = save(d / "vu.mgz", rng.integers(0, 256, shape).astype(np.uint8), aff)
     f["vs"] = save(d / "vs.mgz", rng.integers(-500, 500, shape).astype(np.int16), aff)
     f["vi"] = save(d / "vi.mgz", rng.integers(-70000, 70000, shape).astype(np.int32), aff)
-    f["v3"] = save(d / "v3.mgz", rng.normal(0.0, 3.0, shape + (3,)).astype(np.float32), aff)
+    f["v3"] = save(d / "v3.mgz", rng.normal(0.0, 3.0, (*shape, 3)).astype(np.float32), aff)
     f["vother"] = save(d / "vother.mgz", rng.normal(0.0, 3.0, (12, 10, 8)).astype(np.float32),
                        aff)  # fmt: skip
     f["vsmall"] = save(d / "vsmall.mgz", rng.normal(0.0, 3.0, (5, 5, 5)).astype(np.float32), aff)

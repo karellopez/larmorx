@@ -37,10 +37,10 @@ use larmorx_freesurfer_core::affine::float_to_int;
 use larmorx_freesurfer_core::cscan::{self, Bytes, ERANGE, Scan, Scanf};
 use larmorx_freesurfer_core::cstd::note_glibc07;
 use larmorx_freesurfer_core::diag::diag_init;
-use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::help_xml::output_help_xml;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_NOFILE, Fatal};
+use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::run::Settings;
 use larmorx_freesurfer_core::sse::{sqrt, sub};
 use larmorx_freesurfer_core::system;
@@ -270,7 +270,12 @@ fn pad(width: usize, s: &str) -> String {
 }
 
 impl<'a> Calc<'a> {
-    fn new(err: &'a mut dyn Write, env: &'a Environment, dir: Option<&'a Path>, g: &Globals) -> Self {
+    fn new(
+        err: &'a mut dyn Write,
+        env: &'a Environment,
+        dir: Option<&'a Path>,
+        g: &Globals,
+    ) -> Self {
         Calc {
             out: Vec::new(),
             flushed: 0,
@@ -350,7 +355,9 @@ impl<'a> Calc<'a> {
                 ),
             );
             if g.notices.reproduce() {
-                let _ = self.err.write_all(b"*** buffer overflow detected ***: terminated\n");
+                let _ = self
+                    .err
+                    .write_all(b"*** buffer overflow detected ***: terminated\n");
                 return Err(Fatal::Exit(134));
             }
         }
@@ -882,8 +889,13 @@ impl<'a> Calc<'a> {
         };
         let lib = &self.lib;
         let mut to_int = |v: f32| float_to_int(g, f64::from(v), "mris_calc (int) of a value");
-        for i in 0..self.size1 {
-            self.arr3[i] = to_f32(binary(op, self.arr1[i], arr2[i], lib, &mut to_int));
+        let n = self.size1;
+        for ((c, &a), &b) in self.arr3[..n]
+            .iter_mut()
+            .zip(&self.arr1[..n])
+            .zip(&arr2[..n])
+        {
+            *c = to_f32(binary(op, a, b, lib, &mut to_int));
         }
         Ok(())
     }
@@ -891,8 +903,9 @@ impl<'a> Calc<'a> {
     /// `CURV_functionRunAC(F)` for a voxelwise operation of one value.
     fn run_ac_values(&mut self, op: Op) {
         let lib = &self.lib;
-        for i in 0..self.size1 {
-            self.arr3[i] = to_f32(unary(op, self.arr1[i], lib));
+        let n = self.size1;
+        for (c, &a) in self.arr3[..n].iter_mut().zip(&self.arr1[..n]) {
+            *c = to_f32(unary(op, a, lib));
         }
     }
 
@@ -900,8 +913,8 @@ impl<'a> Calc<'a> {
     /// values).
     fn run_ac(&mut self, f: Run) -> f64 {
         let mut v = 0.0;
-        for i in 0..self.size1 {
-            v = self.st.call(f, self.arr1[i]);
+        for &a in &self.arr1[..self.size1] {
+            v = self.st.call(f, a);
         }
         v
     }
@@ -1043,7 +1056,11 @@ impl<'a> Calc<'a> {
             let neg = self.run_ac(Run::NegCount) as i32;
             let zero = self.run_ac(Run::ZeroCount) as i32;
             let pos = self.run_ac(Run::PosCount) as i32;
-            for (left, v) in [(&b"negCount"[..], neg), (b"zeroCount", zero), (b"posCount", pos)] {
+            for (left, v) in [
+                (&b"negCount"[..], neg),
+                (b"zeroCount", zero),
+                (b"posCount", pos),
+            ] {
                 if Self::through_float(g, i64::from(v), "a count") && !g.notices.reproduce() {
                     // the exact count
                     cprint_f64(self.err, left, f64::from(v));
@@ -1413,4 +1430,3 @@ fn cprint_f64(err: &mut dyn Write, left: &[u8], v: f64) {
     );
     let _ = err.flush();
 }
-

@@ -149,6 +149,18 @@ impl Process {
     /// `powf` as [`Process::libm`]; where both results are NaN, glibc's (the official build's
     /// bits) in both modes.
     pub(crate) fn libm_powf(&mut self, x: f32, y: f32) -> f32 {
+        // once GLIBC-07 is noted only the mode's function is needed (glibc's NaN where both are)
+        if self.noted(&GLIBC_07) {
+            if self.mode().reproduce() {
+                return larmorx_core::math::powf_glibc(x, y);
+            }
+            let a = larmorx_core::math::powf(x, y);
+            return if a.is_nan() {
+                larmorx_core::math::powf_glibc(x, y)
+            } else {
+                a
+            };
+        }
         let (a, b) = (
             larmorx_core::math::powf(x, y),
             larmorx_core::math::powf_glibc(x, y),

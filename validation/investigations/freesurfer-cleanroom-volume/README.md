@@ -1,7 +1,7 @@
-# fs.volume's and fs.bspline's clean rooms against FreeSurfer 8.2.0, as a black box (parts 1 to 7b, §54's two ready parts, fs.bspline)
+# fs.volume's and fs.bspline's clean rooms against FreeSurfer 8.2.0, as a black box (parts 1 to 8, §54's ready parts, fs.bspline)
 
 larmorx's clean rooms of FreeSurfer's volume functions (`crates/larmorx-fs-core/src/volume/`, written
-from [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) §1 to §36 and §54's two ready parts alone) and of its
+from [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) §1 to §40 and §54's ready parts alone) and of its
 B-splines (`crates/larmorx-fs-core/src/bspline/`, from
 [`specs/freesurfer-bspline.md`](../../../specs/freesurfer-bspline.md) alone) compared
 with the prebuilt probe of the open folder [`../freesurfer-volume-probe/`](../freesurfer-volume-probe/README.md)
@@ -30,10 +30,10 @@ The golden cases: `cargo test -p larmorx-fs-core --test golden_volume` (record w
 NAN_TRAP_DIR=<scratch>/nt`, the library built from `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`
 as that folder's README says. The defects' own tests: `cargo test -p larmorx-fs-core --test defects_volume`.
 
-## Results (2026-11-21, relay 13, seed 7, every group of the volume spec's §69.2 and the B-spline spec's §9; the probe's reference hashes are the specs', the probe of commit `0b5c7bb6`)
+## Results (2026-11-22, relay 14, seed 7, every group of the volume spec's §69.2 and the B-spline spec's §9; the probe's reference hashes are the specs', the probe of commit `1536bbbb`)
 
 `compare.py` per group: calls, identical, FreeSurfer did not finish, memory, defect corrected,
-unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay13-full.log`).
+unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay14-full.log`).
 
 | Group | Calls | reproduce | fix |
 |---|---|---|---|
@@ -55,10 +55,10 @@ unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay13-full.log`).
 | vrules4 | 94 | 94 / 0 / 0 / 0 / **0** | 42 / 0 / 0 / 52 / **0** |
 | vcma | 377 | 354 / 13 / 10 / 0 / **0** | 296 / 13 / 10 / 58 / **0** |
 | vrules5 | 46 | 27 / 7 / 12 / 0 / **0** | 25 / 7 / 12 / 2 / **0** |
-| vres | 830 | 719 / 77 / 34 / 0 / **0** | 499 / 77 / 97 / 157 / **0** |
+| vres | 830 | 717 / 77 / 36 / 0 / **0** | 498 / 77 / 98 / 157 / **0** |
 | vrules6 | 16 | 15 / 1 / 0 / 0 / **0** | 13 / 1 / 0 / 2 / **0** |
 | vframes | 404 | 401 / 3 / 0 / 0 / **0** | 371 / 3 / 0 / 30 / **0** |
-| vderiv | 382 | 358 / 22 / 2 / 0 / **0** | 342 / 22 / 4 / 14 / **0** |
+| vderiv | 382 | 357 / 22 / 3 / 0 / **0** | 341 / 22 / 5 / 14 / **0** |
 | vlinear | 360 | 346 / 12 / 1 / 1 / **0** | 217 / 12 / 4 / 127 / **0** |
 | vresamp | 272 | 253 / 17 / 1 / 1 / **0** | 158 / 17 / 1 / 96 / **0** |
 | vrules7 | 12 | 12 / 0 / 0 / 0 / **0** | 10 / 0 / 0 / 2 / **0** |
@@ -69,22 +69,30 @@ unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay13-full.log`).
 | vrules8 | 32 | 29 / 0 / 3 / 0 / **0** | 27 / 0 / 3 / 2 / **0** |
 | vimage | 290 | 274 / 15 / 1 / 0 / **0** | 133 / 15 / 1 / 141 / **0** |
 | vnbhd | 441 | 428 / 10 / 3 / 0 / **0** | 379 / 10 / 5 / 47 / **0** |
-| vltapv | 135 | 127 / 1 / 0 / 0 / **7** | 47 / 1 / 0 / 87 / **0** |
+| vltapv | 135 | 134 / 1 / 0 / 0 / **0** | 52 / 1 / 0 / 82 / **0** |
 | vrules9 | 34 | 30 / 1 / 3 / 0 / **0** | 18 / 1 / 4 / 11 / **0** |
-| all | 14,246 | 13,199 / 854 / 177 / 9 / **7** | 9,779 / 854 / 541 / 3,072 / **0** |
+| vrules10 | 65 | 65 / 0 / 0 / 0 / **0** | 27 / 0 / 0 / 38 / **0** |
+| vrules11 | 28 | 28 / 0 / 0 / 0 / **0** | 28 / 0 / 0 / 0 / **0** |
+| vpvlab | 90 | 83 / 1 / 3 / 0 / **3** | 83 / 1 / 3 / 3 / **0** |
+| vfr8 | 490 | 482 / 7 / 1 / 0 / **0** | 395 / 7 / 10 / 78 / **0** |
+| vmri2 | 390 | 384 / 3 / 3 / 0 / **0** | 321 / 3 / 4 / 62 / **0** |
+| vrules12 | 112 | 105 / 6 / 1 / 0 / **0** | 80 / 6 / 2 / 24 / **0** |
+| all | 15,421 | 14,350 / 871 / 188 / 9 / **3** | 10,716 / 871 / 562 / 3,272 / **0** |
 
-Totals: `reproduce` 13,199 of 14,246 identical (854 where FreeSurfer did not finish, 9 of them
-FS-314's aborts that the candidate gives too, which §69.3 checks; 177 memory lines; 9 lines where the
+Totals: `reproduce` 14,350 of 15,421 identical (871 where FreeSurfer did not finish, 9 of them
+FS-314's aborts that the candidate gives too, which §69.3 checks; 188 memory lines; 9 lines where the
 candidate noted a defect whose value in FreeSurfer is memory it never wrote, which §69.3 allows in both
-modes: FS-300 in `vsample` and `vresamp`, FS-325 in `vlinear`) and 7 `vltapv` lines of type changes
-whose text in the volume spec's §54 is not yet ready for the clean room (voxel to RAS, voxel to
-physical-voxel, RAS to physical-voxel: an interim end, status 253; reported to the spec writer);
-`fix` 9,779 identical (854 not finished, 541 memory, 3,072 corrected by a noted defect), none
-unexplained. Relay 13 followed the spec writer's answers to relay 12's items (FS-462's and FS-464's
-ends, FS-964's end in each mode, §54's change of a physical-voxel array to RAS-to-RAS with the
-inverses' fill: `vbspline`'s two lines relay 12 left are identical now), then part 7b (§34, §35:
-`vimage`, `vnbhd`, `vrules9`) and §54's group `vltapv`; part 7b's groups were run again after the label
-sums' NaN order (unchanged). fs.bspline's own findings: `docs/findings/fs-bspline-clean-room.md`.
+modes: FS-300 in `vsample` and `vresamp`, FS-325 in `vlinear`) and 3 `vpvlab` lines of FS-469 (a border
+voxel's own label, -1 or 250, outside the label table: FreeSurfer reads its mean outside the table, the
+clean room uses the label's mean over the wide window in both modes, as §37 says; FreeSurfer's four runs
+read the same memory there, so the loop does not count them as memory lines; with those labels written
+as 0 both programs give the same line, `one14/pv*b.txt` in relay 14's notes; reported to the spec
+writer); `fix` 10,716 identical (871 not finished, 562 memory, 3,272 corrected by a noted defect), none
+unexplained. Relay 14 followed the spec writer's answers to relay 13's items (§54's six changes between
+the voxel, RAS-to-RAS and physical-voxel types, its unsupported targets and arrays of another type:
+`vltapv` and `vrules10` identical with `reproduce`; §35's label sums: `vrules11` identical), then part 8
+(§37 to §39: `vpvlab`, `vfr8`, `vmri2`, `vrules12`). fs.mri (16 groups, 9,511 calls) was run again: none
+unexplained in either mode. fs.bspline's own findings: `docs/findings/fs-bspline-clean-room.md`.
 `nan-order/mk.py` holds the black-box check of §35's label sums' NaN order (its docstring says how to
 run it and what it showed).
 

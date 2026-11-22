@@ -1,0 +1,89 @@
+{
+ "name": "freesurfer-mri-make-uchar",
+ "tool": "mri_make_uchar (FreeSurfer 8.2.0)",
+ "status": "experimental",
+ "larmorx_commit": "d371fb327d10",
+ "generated": "2026-11-22",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_make_uchar/), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mri_make_uchar) and its recon-all runs' files (oracles/freesurfer-8.2.0/runs/)",
+ "real": {
+  "runs": [
+   "ds000005-sub-01-classic",
+   "ds000005-sub-01-v8",
+   "ds000228-sub-pixar008-classic",
+   "ds000228-sub-pixar008-v8",
+   "ds004173-sub-603309-classic",
+   "ds004173-sub-603309-v8"
+  ],
+  "calls": 18,
+  "kinds": {
+   "nu in place": 6,
+   "orig": 6,
+   "T1 files": 6
+  },
+  "verdicts": {
+   "identical": 18,
+   "fix-identical": 18
+  },
+  "seconds": {
+   "reproduce": 61.7,
+   "fix": 61.8,
+   "official": 13.0
+  }
+ },
+ "program": [
+  {
+   "seed": 1,
+   "cases": 103,
+   "verdicts": {
+    "identical": 102,
+    "fix-identical": 65,
+    "fix-explained": 37,
+    "reproduce-skip": 1,
+    "fix-skip": 1
+   }
+  },
+  {
+   "seed": 2,
+   "cases": 103,
+   "verdicts": {
+    "identical": 102,
+    "fix-identical": 65,
+    "fix-explained": 37,
+    "reproduce-skip": 1,
+    "fix-skip": 1
+   }
+  }
+ ],
+ "golden_sha256": {
+  "reproduce": "97ad8284812a22b22c8e5108ba76442c176d0eb55bc9f67a275ba0ecf9dadb01",
+  "fix": "f7d645a03966a44a9bdf0f30cadc9ad7e2fdba57df1e3913e3672b3e62568183"
+ },
+ "memory": [
+  {
+   "case": "nu-in-place",
+   "mode": "reproduce",
+   "larmorx_mib": 84.7,
+   "freesurfer_mib": 598.7
+  },
+  {
+   "case": "nu-in-place",
+   "mode": "fix",
+   "larmorx_mib": 84.7,
+   "freesurfer_mib": 598.7
+  },
+  {
+   "case": "orig",
+   "mode": "reproduce",
+   "larmorx_mib": 36.8,
+   "freesurfer_mib": 550.2
+  },
+  {
+   "case": "orig",
+   "mode": "fix",
+   "larmorx_mib": 36.8,
+   "freesurfer_mib": 550.2
+  }
+ ]
+}

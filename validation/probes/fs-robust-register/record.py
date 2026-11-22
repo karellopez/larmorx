@@ -42,12 +42,26 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--probe", type=Path, nargs="+", required=True)
     ap.add_argument("--real", type=Path, nargs="+", required=True)
     ap.add_argument("--memory", type=Path)
+    ap.add_argument(
+        "--official-times",
+        type=Path,
+        nargs="*",
+        default=[],
+        help="earlier real.py summaries whose official runs were not served (their times)",
+    )
     ap.add_argument("--golden", required=True)
     ap.add_argument("--golden-fix", required=True)
     ap.add_argument("--out", type=Path, default=REPO / "docs" / "validation")
     a = ap.parse_args(argv)
     stamp = commit()
     probes = [json.loads(p.read_text(encoding="utf-8")) for p in a.probe]
+    timed: dict[tuple[str, bool], float] = {}
+    for p in a.official_times:
+        d = json.loads(p.read_text(encoding="utf-8"))
+        outputs = "outputs" in p.name
+        for r in d["rows"]:
+            if not r.get("served") and r["seconds"]["official"]:
+                timed[(r["head"], outputs)] = r["seconds"]["official"]
     real = []
     for p in a.real:
         d = json.loads(p.read_text(encoding="utf-8"))
@@ -59,7 +73,8 @@ def main(argv: list[str] | None = None) -> int:
                     "outputs": outputs,
                     "reproduce": r["reproduce_identical"],
                     "fix": r["fix_identical"],
-                    "seconds": r["seconds"],
+                    "seconds": r["seconds"]
+                    | {"official": timed.get((r["head"], outputs), r["seconds"]["official"])},
                     "peak_mib": r["peak_mib"],
                 }
             )
@@ -139,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
         lines.append(
             f"- {r['head']}{' (every output)' if r['outputs'] else ''}: `reproduce` {files}, "
             f"{so}; {ff}; {r['seconds']['reproduce']} s against FreeSurfer's "
-            f"{r['seconds']['official'] or 'served'} s; peak {r['peak_mib']['reproduce']} MiB "
+            f"{r['seconds']['official']} s; peak {r['peak_mib']['reproduce']} MiB "
             f"against {r['peak_mib']['official']:.1f}."
         )
     lines += [

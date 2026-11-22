@@ -2,7 +2,8 @@
 // fs.robust's speed and memory against FreeSurfer's own code (build.sh builds it beside fsrobust).
 // CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (it names FreeSurfer's functions).
 //
-//     bench <op> <n>     op: partials | subsample | valscale | blur | centroid | sqrtm | all; one n^3
+//     bench <op> <n>     op: partials | subsample | valscale | blur | centroid | sqrtm | rstep |
+//                        rstepa | all; one n^3
 //                        float volume of a fixed pattern (sqrtm: n 4 x 4 square roots); prints each op's seconds and the FNV-1a of its
 //                        outputs' voxels (the port's example fs_robust_bench prints the same hashes)
 #include <chrono>
@@ -18,6 +19,24 @@
 #include "CostFunctions.h"
 #include "MyMRI.h"
 #include "mri.h"
+// 3.2-03: the registration step (its registration's fields opened, as in fsrobust.cpp)
+#include <fstream>
+#include <limits>
+#include <sstream>
+#include <typeinfo>
+#include <vnl/algo/vnl_qr.h>
+#include <vnl/algo/vnl_svd.h>
+#include "Quaternion.h"
+#include "Transformation.h"
+#include "RobustGaussian.h"
+#define private public
+#define protected public
+#include "Regression.h"
+#include "Registration.h"
+#include "RegRobust.h"
+#include "RegistrationStep.h"
+#undef protected
+#undef private
 
 const char *Progname = "bench";
 
@@ -31,15 +50,16 @@ static uint64_t fnv(const MRI *m, uint64_t h = 0xcbf29ce484222325ull)
   return h;
 }
 
-static MRI *pattern(int n)
+static MRI *pattern(int n, int sx = 0)
 {
   MRI *m = MRIallocSequence(n, n, n, MRI_FLOAT, 1);
   for (int z = 0; z < n; z++)
     for (int y = 0; y < n; y++)
-      for (int x = 0; x < n; x++) {
+      for (int x0 = 0; x0 < n; x0++) {
+        int x = x0 - sx;
         int r = (x - n / 2) * (x - n / 2) + (y - n / 2) * (y - n / 2) + (z - n / 3) * (z - n / 3);
         float v = r < n * n / 6 ? (float)((x * 7 + y * 13 + z * 29) % 97 + 100) : 0.0f;
-        MRIsetVoxVal(m, x, y, z, 0, v);
+        MRIsetVoxVal(m, x0, y, z, 0, v);
       }
   m->xsize = m->ysize = m->zsize = 1.0f;
   MRIreInitCache(m);
@@ -103,5 +123,28 @@ int main(int argc, char **argv)
     }
     return h;
   });
+  // one robust registration step (RegistrationStep<float>, the registration's defaults: SATr,
+  // float SVD) between the pattern and the pattern moved by one voxel along x: rigid, then
+  // affine with the intensity scale; the hash of the matrix, the parameter and the weights
+  auto step = [&](int code, bool iscale) {
+    MRI *t = pattern(n, 1);
+    RegRobust R;
+    R.iscale = iscale;
+    R.trans = code == 11 ? (Transformation *)new Transform3dRigid : (Transformation *)new Transform3dAffine;
+    R.verbose = 0;
+    RegistrationStep<float> S(R);
+    S.setFloatSVD(true);
+    std::pair<vnl_matrix_fixed<double, 4, 4>, double> md = S.computeRegistrationStep(src, t);
+    uint64_t h = fnv(S.getWeights());
+    for (int i = 0; i < 4; i++)
+      for (int j = 0; j < 4; j++) { uint64_t u; memcpy(&u, &md.first[i][j], 8); h = h * 31 + u; }
+    uint64_t u;
+    memcpy(&u, &md.second, 8);
+    h = h * 31 + u;
+    MRIfree(&t);
+    return h;
+  };
+  run("rstep", [&] { return step(11, false); });
+  run("rstepa", [&] { return step(7, true); });
   return 0;
 }

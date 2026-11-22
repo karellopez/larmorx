@@ -26,10 +26,21 @@ pub const ENOMEM: i32 = 12;
 /// as fresh pages for a large size (glibc's `calloc`), so a buffer sized from a header costs only
 /// what is written into it. For a type whose default value is not all zero bits each value is
 /// written (as the port's own `Vec` of such values always was).
+///
+/// The system is asked first only for more than 32 MiB (glibc's largest dynamic mmap threshold,
+/// `DEFAULT_MMAP_THRESHOLD_MAX`): freeing a smaller probe of more than 128 KiB would raise glibc's
+/// threshold to its size, so every later buffer of that size would come from the heap, whose
+/// freed buffers stay resident; FreeSurfer's own `calloc` leaves the threshold alone (measured: a
+/// robust registration step at 128^3 held 25 % more memory than FreeSurfer's with the probe, 3 %
+/// less without it; `docs/findings/freesurfer-robust.md` §6). Below 32 MiB the system never
+/// refuses (the address space).
 pub fn zeroed<T: Clone + Default>(n: usize) -> Option<Vec<T>> {
-    let mut probe: Vec<T> = Vec::new();
-    probe.try_reserve_exact(n).ok()?;
-    drop(probe);
+    const PROBE_ABOVE: u128 = 32 << 20;
+    if (n as u128).saturating_mul(std::mem::size_of::<T>() as u128) > PROBE_ABOVE {
+        let mut probe: Vec<T> = Vec::new();
+        probe.try_reserve_exact(n).ok()?;
+        drop(probe);
+    }
     Some(vec![T::default(); n])
 }
 

@@ -38,7 +38,8 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::sse::{DEFAULT_NAN64, add64, div64, mul64, sqrt64, sub64};
 use larmorx_freesurfer_mri::mri::{
-    MRI_FLOAT, MRI_INT, MRI_LONG, Mri, mri_alloc_sequence, mri_copy_header, mri_sizeof,
+    MRI_FLOAT, MRI_INT, MRI_LONG, MRI_RGB, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri, mri_alloc_sequence,
+    mri_copy_header, mri_sizeof,
 };
 use larmorx_freesurfer_mri::voxel::mri_get_vox_val;
 use larmorx_freesurfer_volume::arith::{Pair, Tri, mri_add, mri_scalar_mul, mri_subtract};
@@ -157,6 +158,32 @@ fn set_lvox(m: &mut Mri, x: i32, y: i32, z: i32, f: i32, v: i32) {
     let o = lvox_at(m, x, y, z, f);
     let c = m.chunk.as_mut().expect("the index image's voxels");
     c[o..o + 4].copy_from_slice(&v.to_le_bytes());
+}
+
+/// `MRIgetVoxVal(m, x, y, z, 0)` of a voxel inside the image, read straight from the voxels for
+/// the types it reads (the same value; the step's loops visit every voxel twice); `None` for an
+/// image without voxels or of another type (the caller then asks `mri_get_vox_val`).
+fn frame0_reader(m: &Mri) -> Option<impl Fn(i32, i32, i32) -> f32 + '_> {
+    let c = m.chunk.as_deref()?;
+    let size = match m.mtype {
+        MRI_UCHAR => 1u64,
+        MRI_SHORT | MRI_USHRT => 2,
+        MRI_RGB | MRI_INT | MRI_FLOAT => 4,
+        MRI_LONG => 8,
+        _ => return None,
+    };
+    let (vpr, vps, ty) = (m.vox_per_row, m.vox_per_slice, m.mtype);
+    Some(move |x: i32, y: i32, z: i32| {
+        let o = ((x as u64 + y as u64 * vpr + z as u64 * vps) * size) as usize;
+        match ty {
+            MRI_UCHAR => f32::from(c[o]),
+            MRI_SHORT => f32::from(i16::from_le_bytes([c[o], c[o + 1]])),
+            MRI_USHRT => f32::from(u16::from_le_bytes([c[o], c[o + 1]])),
+            MRI_FLOAT => f32::from_le_bytes(c[o..o + 4].try_into().expect("4 bytes")),
+            MRI_LONG => i64::from_le_bytes(c[o..o + 8].try_into().expect("8 bytes")) as f32,
+            _ => i32::from_le_bytes(c[o..o + 4].try_into().expect("4 bytes")) as f32,
+        }
+    })
 }
 
 /// `MyMRI::getRand(randpos)` as `(int)(2.0 * getRand(randpos))`, then `randpos++`.
@@ -502,6 +529,7 @@ impl<T: Real> RegistrationStep<T> {
         let oepss = add64(eps, div64(mri_s.outside_val, 255.0));
         let oepst = add64(eps, div64(mri_t.outside_val, 255.0));
         let zero_fz = (eps / 2.0) as f32;
+        let (rs, rt) = (frame0_reader(mri_s), frame0_reader(mri_t));
         let mut counti: i64 = 0;
         let (mut ocount, mut ncount, mut zcount) = (0i32, 0i32, 0i32);
         let mut randpos = 0i32;
@@ -536,8 +564,14 @@ impl<T: Real> RegistrationStep<T> {
             for x in 0..fxw {
                 for y in 0..fxh {
                     let (xp1, yp1, zp1) = grid(&mut randpos, x, y, z);
-                    let sv = mri_get_vox_val(g, err, mri_s, xp1, yp1, zp1, 0, 0)?;
-                    let tv = mri_get_vox_val(g, err, mri_t, xp1, yp1, zp1, 0, 0)?;
+                    let sv = match &rs {
+                        Some(r) => r(xp1, yp1, zp1),
+                        None => mri_get_vox_val(g, err, mri_s, xp1, yp1, zp1, 0, 0)?,
+                    };
+                    let tv = match &rt {
+                        Some(r) => r(xp1, yp1, zp1),
+                        None => mri_get_vox_val(g, err, mri_t, xp1, yp1, zp1, 0, 0)?,
+                    };
                     if at_outside(sv, mri_s.outside_val, oepss)
                         || at_outside(tv, mri_t.outside_val, oepst)
                     {
@@ -612,13 +646,20 @@ impl<T: Real> RegistrationStep<T> {
             let _ = writeln!(out, "          Maybe use --subsample <int> ");
         }
         let mut count = 0usize;
+        let mut grad = [0.0f64; 12];
         randpos = 0;
         for z in 0..fxd {
             for x in 0..fxw {
                 for y in 0..fxh {
                     let (xp1, yp1, zp1) = grid(&mut randpos, x, y, z);
-                    let sv = mri_get_vox_val(g, err, mri_s, xp1, yp1, zp1, 0, 0)?;
-                    let tv = mri_get_vox_val(g, err, mri_t, xp1, yp1, zp1, 0, 0)?;
+                    let sv = match &rs {
+                        Some(r) => r(xp1, yp1, zp1),
+                        None => mri_get_vox_val(g, err, mri_s, xp1, yp1, zp1, 0, 0)?,
+                    };
+                    let tv = match &rt {
+                        Some(r) => r(xp1, yp1, zp1),
+                        None => mri_get_vox_val(g, err, mri_t, xp1, yp1, zp1, 0, 0)?,
+                    };
                     let s_out = at_outside(sv, mri_s.outside_val, oepss);
                     let t_out = at_outside(tv, mri_t.outside_val, oepst);
                     if s_out || t_out {
@@ -643,9 +684,10 @@ impl<T: Real> RegistrationStep<T> {
                         }
                         // the row number stored as FreeSurfer's 32-bit integer
                         set_lvox(&mut index, xp1, yp1, zp1, f, count as i32);
-                        let grad = trans.gradient(err, x as u32, fxval, y as u32, fyval, z as u32, fzval)?;
-                        let dof = grad.len();
-                        for (pno, &gv) in grad.iter().enumerate() {
+                        let dof = trans.gradient_into(
+                            err, x as u32, fxval, y as u32, fyval, z as u32, fzval, &mut grad,
+                        )?;
+                        for (pno, &gv) in grad[..dof].iter().enumerate() {
                             *a.at_mut(count, pno) = T::narrow(gv);
                         }
                         if p.iscale {

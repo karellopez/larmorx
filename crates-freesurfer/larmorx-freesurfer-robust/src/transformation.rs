@@ -376,34 +376,56 @@ impl Transformation {
         z: u32,
         fz: f32,
     ) -> Result<Vec<f64>, Fatal> {
+        let mut g = [0.0f64; 12];
+        let n = self.gradient_into(err, x, fx, y, fy, z, fz, &mut g)?;
+        Ok(g[..n].to_vec())
+    }
+
+    /// [`Transformation::gradient`] into `out` (the model's degrees of freedom: their count).
+    #[allow(clippy::too_many_arguments)]
+    pub fn gradient_into(
+        &self,
+        err: &mut dyn Write,
+        x: u32,
+        fx: f32,
+        y: u32,
+        fy: f32,
+        z: u32,
+        fz: f32,
+        out: &mut [f64; 12],
+    ) -> Result<usize, Fatal> {
         if let Some(m) = self.kind.not_implemented() {
             let _ = writeln!(err, "{m}");
             return Err(Fatal::Exit(1));
         }
         let (xf, yf, zf) = (x as f32, y as f32, z as f32);
         let w = |v: f32| v.wide();
+        let mut put = |vals: &[f64]| {
+            out[..vals.len()].copy_from_slice(vals);
+            vals.len()
+        };
         Ok(match self.kind {
             Kind::Affine2d => {
                 let (xd, yd) = (f64::from(x), f64::from(y));
-                vec![
+                put(&[
                     mul64(xd, w(fx)),
                     mul64(yd, w(fx)),
                     w(fx),
                     mul64(xd, w(fy)),
                     mul64(yd, w(fy)),
                     w(fy),
-                ]
+                ])
             }
-            Kind::Isoscale2d => vec![
+            Kind::Isoscale2d => put(&[
                 w(fx),
                 w(fy),
                 w(add(mul(fx, xf), mul(fy, yf))),
                 // `-fx * y + fy * x` compiled as `fy * x - fx * y` (exact)
                 w(sub(mul(fy, xf), mul(fx, yf))),
-            ],
-            Kind::Rigid2d => vec![w(fx), w(fy), w(sub(mul(fy, xf), mul(fx, yf)))],
-            Kind::Translate2d => vec![w(fx), w(fy)],
-            Kind::Affine3d => vec![
+            ]),
+            Kind::Rigid2d => put(&[w(fx), w(fy), w(sub(mul(fy, xf), mul(fx, yf)))]),
+            Kind::Translate2d => put(&[w(fx), w(fy)]),
+            Kind::Affine3d => put(&[
                 w(mul(fx, xf)),
                 w(mul(fx, yf)),
                 w(mul(fx, zf)),
@@ -416,17 +438,17 @@ impl Transformation {
                 w(mul(fz, yf)),
                 w(mul(fz, zf)),
                 w(fz),
-            ],
-            Kind::Rigid3d => vec![
+            ]),
+            Kind::Rigid3d => put(&[
                 w(fx),
                 w(fy),
                 w(fz),
                 w(sub(mul(fz, yf), mul(fy, zf))),
                 w(sub(mul(fx, zf), mul(fz, xf))),
                 w(sub(mul(fy, xf), mul(fx, yf))),
-            ],
-            Kind::Translate3d => vec![w(fx), w(fy), w(fz)],
-            Kind::Identity3d => Vec::new(),
+            ]),
+            Kind::Translate3d => put(&[w(fx), w(fy), w(fz)]),
+            Kind::Identity3d => 0,
             _ => unreachable!("the models without a gradient end above"),
         })
     }

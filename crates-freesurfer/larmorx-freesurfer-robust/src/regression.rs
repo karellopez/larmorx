@@ -359,19 +359,19 @@ impl<'a, T: Real> Regression<'a, T> {
         let a = self.a.expect("getWeightedLSEst with A");
         let (rows, cols) = (a.rows, a.cols);
         too_few_rows(g, err, rows, cols)?;
+        // wA, built column by column as VNL's QR stores it (FreeSurfer keeps wA and VNL's
+        // transposed copy; one copy here, the same numbers). The official build's operand order
+        // (of two NaNs the first comes out): `A * w` where it vectorises the row (four or more
+        // columns in float, three or more in double), else `w * A`
         let mut wa = vec![T::ZERO; rows * cols];
-        // the official build's operand order (of two NaNs the first comes out): `A * w` where it
-        // vectorises the row (four or more columns in float, three or more in double), else
-        // `w * A`
         let a_first = cols >= if T::SINGLE { 4 } else { 3 };
         for rr in 0..rows {
             for cc in 0..cols {
                 let (x, y) = (a.at(rr, cc), w[rr]);
-                wa[rr * cols + cc] = if a_first { x.sse_mul(y) } else { y.sse_mul(x) };
+                wa[rr + rows * cc] = if a_first { x.sse_mul(y) } else { y.sse_mul(x) };
             }
         }
-        let qr = Qr::<T>::new(&wa, rows, cols);
-        drop(wa);
+        let qr = Qr::<T>::from_column_major(wa, rows, cols);
         let wb: Vec<T> = self
             .b
             .iter()
@@ -397,11 +397,11 @@ impl<'a, T: Real> Regression<'a, T> {
         let a = self.a.expect("getWeightedLSEstFloat with A");
         let (rows, cols) = (a.rows, a.cols);
         too_few_rows(g, err, rows, cols)?;
+        // wA column by column (one copy, as above). The official build's operand order (of two
+        // NaNs the first comes out): in float `A * w` for four or more columns, else `w * A`; in
+        // double `A * w` but for the third of the columns after the last multiple of four (the
+        // first three when there are fewer than four), `w * A`
         let mut wa = vec![0.0f32; rows * cols];
-        // the official build's operand order (of two NaNs the first comes out): in float `A * w`
-        // for four or more columns, else `w * A`; in double `A * w` but for the third of the
-        // columns after the last multiple of four (the first three when there are fewer than
-        // four), `w * A`
         let base = if cols >= 4 { cols / 4 * 4 } else { 0 };
         for rr in 0..rows {
             for cc in 0..cols {
@@ -412,11 +412,10 @@ impl<'a, T: Real> Regression<'a, T> {
                     cc < base || cc - base != 2
                 };
                 let v = if a_first { x.sse_mul(y) } else { y.sse_mul(x) };
-                wa[rr * cols + cc] = v.f32_of();
+                wa[rr + rows * cc] = v.f32_of();
             }
         }
-        let qr = Qr::<f32>::new(&wa, rows, cols);
-        drop(wa);
+        let qr = Qr::<f32>::from_column_major(wa, rows, cols);
         let wb: Vec<f32> = self
             .b
             .iter()
@@ -647,3 +646,4 @@ pub fn get_sqrt_tukey_dia_weights<T: Real>(r: &[T], w: &mut [T], sat: f64) {
         }
     }
 }
+

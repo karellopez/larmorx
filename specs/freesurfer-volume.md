@@ -14,9 +14,11 @@ Made ready for the clean room part by part by the spec finisher (FreeSurfer's fo
 7a (§33) by its relay 11 (2026-11-18, with the clean room's questions on parts 6b and 6c and the cubic
 B-spline paths of §29 and §31 now that `fs.bspline` exists), part 7b (§34-35) and §54's change of a
 transform array from physical-voxel to RAS-to-RAS with `LTAfillInverse` by its relay 12 (2026-11-20, with
-the clean room's questions on part 7a and fs.bspline)**:
+the clean room's questions on part 7a and fs.bspline), part 8 (§37-40) and §54's other changes between
+the voxel, RAS-to-RAS and physical-voxel types by its relay 13 (2026-11-22, with the clean room's
+questions on part 7b)**:
 the black-box validation plan (§69) with its open probe, a read-through as a clean-room reader, the
-defects' texts in `larmorx_core::defects` checked. The sections after §35 (but §54's two parts named) are
+defects' texts in `larmorx_core::defects` checked. The sections after §40 (but §54's parts named) are
 not yet read through that way: their validation plans still name the replica's closed probe, which the implementer does
 not open (§69 says what to do meanwhile). What black-box runs confirmed is marked **(observed)**.
 
@@ -45,9 +47,11 @@ box and the transform reader; part 5 (§23-24) the CMA labels; part 6a (§25-26)
 fills, resampling by whole factors and changes of type; part 6b (§27-30) the frame-range samplers, the
 trilinear kernel and splatting, derivatives, gradients, neighbour counts and linear transforms; part 6c
 (§31-32) resampling onto a template and replacing a value; part 7a (§33) statistics, orientation strings
-and voxel-to-RAS matrices; part 7b (§34-35) slices as 2-D images, neighbourhoods and labels. Then the rest
-of the module (§37-68; of §54, `LTAfillInverse` and the change from physical-voxel to RAS-to-RAS are
-ready).
+and voxel-to-RAS matrices; part 7b (§34-35) slices as 2-D images, neighbourhoods and labels; part 8
+(§37-40) the partial-volume count of a label, random and constant volumes, frames, orders, fractions,
+difference lists and mri2.cpp's voxelwise operations. Then the rest of the module (§41-68; of §54,
+`LTAfillInverse` and `LTAchangeType`'s changes between the voxel, RAS-to-RAS and physical-voxel types
+are ready).
 
 ## 1. Conventions
 
@@ -1988,7 +1992,7 @@ them as that function does).
   is read past, memory); per frame `f`, the voxels as `float`s directly (rows, then columns, then slices): a power
   within 0.00001 of 1 (`|p - 1.0| < 0.00001` in `double`) leaves the frame; within 0.00001 of 0.5 each voxel becomes
   `sqrtf` of it; any other (2 included) `powf(v, p)` (glibc's with `reproduce`, correctly rounded by default; GLIBC-07
-  where they differ). Returns 0.
+  (whose register entry covers the single-precision functions too) where they differ). Returns 0.
 - `mri_binarize(vol, thresh, tail, invert, bin, &nover)`: no tail is `positive`; a tail whose first three letters are
   `pos`, `neg` or `abs` (any case) selects that tail; any other (a shorter one too, **(observed)**: `po`, the empty
   string): `mri_binarize: tail = <tail> unrecoginzed` + `\n` on standard error and `NULL`, the count not written.
@@ -3152,12 +3156,12 @@ both or none, into a new array, another array of 0 to 2 transforms or the source
 `reproduce` but where the original reads memory it does not own or crashes (FS-504, FS-957, the shared voxel defects),
 counted and not compared; the default differs only with a notice (FS-954, FS-956, FS-957 and the shared ones).
 
-## 69. Validation plan (black box), parts 1 to 7b
+## 69. Validation plan (black box), parts 1 to 8
 
 ### 69.1 The probe
 
 The open probe folder `validation/investigations/freesurfer-volume-probe/` holds the probe's source
-(calls of the functions of §2 to §35 and of §54's `LTAchangeType` by name, and of fs.bspline's) and the
+(calls of the functions of §2 to §35, §37 to §39 and of §54's `LTAchangeType` by name, and of fs.bspline's) and the
 comparison loop; its README lists every
 command, its arguments and what it prints, and the encodings (every float and double as its bits;
 the volumes, geometries, matrices, colour tables and MINC transforms as the fs.mri probe encodes
@@ -3229,7 +3233,11 @@ for `vresamp` after its sources were given a good RAS in most cases, `fs-volume-
 | `vrules9` | 34, 35 | 34 | 12 | 3 | 0 | `cb1d6e4736502d9f8a764afbccd94a8c394df884f7a3025a760acb4db1aebc12` |
 | `vrules10` | 54 | 65 | 0 | 37 | 0 | `ed97d91b7155228360504d70666db8ff29aff06e07b851b971b63b8a8fad3276` |
 | `vrules11` | 35 | 28 | 0 | 0 | 0 | `0ac19e58db95e47e5c81e32d185f94a101dfd51d96fcf1223d77a86b6357e6f4` |
-| all | | 13,858 | 1,457 | 720 | 13 | |
+| `vpvlab` | 37 | 90 | 4 | 0 | 0 | `5d455f4b00a60da63a4fbba719ede528d2e5320d1b991a0995365a6fe2da6857` |
+| `vfr8` | 38 | 490 | 18 | 6 | 0 | `d6f331d37d60dac0db2f42003246cdeba15bc9c202ca5d8b2e4df343d554f88b` |
+| `vmri2` | 39 | 390 | 9 | 0 | 0 | `2895f2e6da5e2f714760e18bc0bfffd5aae0f235e549f02931478d7fb2086c90` |
+| `vrules12` | 37-39 | 112 | 10 | 3 | 0 | `06edcc6932caee09486d04babbd672a2231ecde14c3230bb95b09c27fd3e4cf4` |
+| all | | 14,940 | 1,498 | 729 | 13 | |
 
 The probe's groups `vbspline` and `vbsrules` are fs.bspline's (`specs/freesurfer-bspline.md` §9).
 
@@ -3412,6 +3420,39 @@ log `oracles/logs/fs-volume-probe-r13-vrules11-2026-11-22.log`) holds §35's NaN
 five label means (the spread where it is given) and `MRIcomputeLabelNbhd` with half-widths 0 and 1 of four
 2 x 2 x 1 float volumes of chosen NaN payloads (and one infinity with its opposite), all labelled 0.
 
+Part 8's groups (relay 13, 2026-11-22: the prebuilt probe rebuilt from commit 1536bbbb, part 8's commands; the
+same bytes twice; every earlier group's hash unchanged, `vrules10` and `vrules11` included; the new groups the same
+cold, warm and twice without the cache; the probe as its own candidate: no unexplained line in either mode; log
+`oracles/logs/fs-volume-probe-r13-final-2026-11-22.log`): `vpvlab` (§37: 90 partial-volume counts of float,
+byte and short label volumes of small labels in blocks with a few painted, intensity volumes of chosen values with
+a few NaN and infinite ones, labels present and absent, label limits above the labels and a few at or below them,
+the mixing and neighbour volumes given or not, given border volumes of 1 to 3 frames), `vfr8` (§38: 40 random and
+constant volumes, new and given of every type, matching and not; 60 normalisations; 45 sorts with masks into new,
+in-place, fitting and other volumes; 30 slice reversals with b-tables of a row per frame; 20 clones of another type;
+30 orders and permutations; 40 non-maximum suppressions with thresholds and directions -1, 0, 1, 2; 25 padded
+extractions; 30 root mean squares into float, byte and short volumes; 30 volume fractions through scalings and
+shifts of segmentations of the labels 1 to the frame count and one more; 30 distance-transform combinations; 35
+difference lists and 35 applications of them with colour tables, masks and entries past the extent; 25 TIV estimates
+of transform files; 15 dimension comparisons), `vmri2` (§39: 30 frame powers; 45 binarisations of every tail and
+case; 30 reshapes, counts kept and changed, RGB included; 40 squares and roots with masks of 0, 0.5 and 1; 25
+maxima; 30 constants; 25 frame binarisations; 35 votes of small integer frames, given results of the wrong type and
+frame count; 30 crops; 25 slice reversals; 25 end cuts; 25 label lists; 25 half-cosine weightings) and `vrules12`
+(§37 to §39's fixed cases: the NaN orders of `MRInormalizeSequence`'s, the frame normalisations' and `MRIrms`'s sums
+and of `MRIrandn`'s draw; `MRInormalizeSequence`'s zero test; `MRIconst` of 300, -1, 40000.5, -2.5, 2.5, 3e9 and NaN
+into every integer type, float and RGB (FS-472); `MRIvote`'s runs, zeros excluded, the last run of zeros (FS-480),
+NaN frames, an `int` volume; `MRIorderIndices` past 255 (FS-474); the partial-volume count's limit message, FS-470's
+missing values, FS-471's limits 0 and -3, FS-469's own label past the table; `MRIestimateTIV` without a file and
+with a file of no transform (FS-479); fewer powers than frames; b-tables of one row (FS-473); `MRIapplyDiffVect` at
+the extent (FS-477) and in place with a colour table (FS-478); `MRIcomputeVolumeFractions`' label 0 (FS-475), last
+label (FS-476) and a singular matrix; `MRIcloneDifferentType` to a bitmap and a tensor; a volume without its cached
+matrices (FS-252); one slice weighted by the half cosine; an end cut of -1; a crop whose end is before its start;
+the binarisation's short and empty tails). Part 8's generators keep every volume's cached matrices (a volume without
+them makes FreeSurfer's header copies crash, FS-252: `vrules12` holds it once). Their memory and crash lines: the
+partial-volume count's FS-469 and FS-470, the powers read past their array, FS-473, FS-475, FS-479, given
+destinations of another extent written outside (FS-53), the end cut's reads outside; their exits: the singular
+fractions matrix (status 252), `MRIestimateTIV`'s missing transforms (255), a bitmap's allocation (1), the
+transform readers' errors for names that are not `.lta` files.
+
 `vrules` (relay 7, 2026-11-17: the prebuilt probe unchanged; log
 `oracles/logs/fs-volume-probe-r7-refs-2026-11-17.log`, the same hash from the cache and without it,
 the other groups' hashes unchanged) holds fixed cases of single statements: FS-291 with tensor
@@ -3489,9 +3530,11 @@ line of `vrules7` and `vbsvol` identical in both modes, `vstat7` and `vrules8` a
 (7 and 3: FS-330's printed values, FS-463's strings); no unexplained difference in either mode; relay 12
 (the prebuilt probe from 0b5c7bb6): the same for every earlier group, and every line of `vimage`, `vltapv`
 and `vrules9` identical in both modes, `vnbhd` all but one memory line; no unexplained difference in either
-mode.
+mode; relay 13 (the prebuilt probes from 0b5c7bb6 and 1536bbbb): the same for every earlier group, and every
+line of `vrules10`, `vrules11` and `vrules12` identical in both modes, `vpvlab`, `vfr8` and `vmri2` all but 1 to
+3 memory lines each; no unexplained difference in either mode.
 
-### 69.4 The defects of parts 1 to 7b (index)
+### 69.4 The defects of parts 1 to 8 (index)
 
 | Defect | § | Defect | § | Defect | § |
 |---|---|---|---|---|---|
@@ -3514,20 +3557,25 @@ mode.
 | FS-330 | 33 | FS-462 | 33 | FS-463 | 33 |
 | FS-464 | 33 | FS-465 | 34 | FS-466 | 34 |
 | FS-467 | 35 | FS-468 | 35 | FS-505 | 54 |
-| FS-506 | 54 | | | | |
+| FS-506 | 54 | FS-469 | 37 | FS-470 | 37 |
+| FS-471 | 37 | FS-472 | 38 | FS-473 | 38 |
+| FS-474 | 38 | FS-475 | 38 | FS-476 | 38 |
+| FS-477 | 38 | FS-478 | 38 | FS-479 | 38 |
+| FS-480 | 39 | FS-481 | 39 | | |
 
 Others' defects these parts meet: FS-12 (`nint`, `specs/freesurfer-core.md`), FS-52 (§35's second volumes), FS-53 and FS-58
 (`specs/freesurfer-mri.md`; FS-252, its header copy without cached matrices, in part 4), FS-47 and
 ITK-112 (`specs/freesurfer-maths.md` §17); FS-252 again in part 5 (segmentations copied without their
-cached matrices).
+cached matrices) and in part 8 (`vrules12`: a volume without its cached matrices sorted); GLIBC-07 (`powf`,
+`cos`) in part 8.
 
-### 69.5 Beyond the probe, and the sections after §35
+### 69.5 Beyond the probe, and the sections after §40
 
 - **The replays** of the programs that use these functions with `reproduce`, on the recorded heads,
   when they are ported.
 - **Every platform:** the clean room's own golden checks (its results on the other five platforms
   are its Linux results; a NaN's bits as x86-64 gives them).
-- **§37 to §68** (but §54's `LTAfillInverse` and `LTAchangeType`'s changes between the voxel, RAS-to-RAS
+- **§41 to §68** (but §54's `LTAfillInverse` and `LTAchangeType`'s changes between the voxel, RAS-to-RAS
   and physical-voxel types, in `vltapv` and `vrules10`) are not yet in the open probe: until they are, their clean room checks them against the
   official programs as black boxes and against the replays; their validation plans name the replica's
   probe, which the implementer does not open.

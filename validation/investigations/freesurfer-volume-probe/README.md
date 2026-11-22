@@ -1,7 +1,7 @@
-# FreeSurfer 8.2.0's volume functions and B-splines, as a black box (fs.volume parts 1 to 7b, fs.bspline)
+# FreeSurfer 8.2.0's volume functions and B-splines, as a black box (fs.volume parts 1 to 8, fs.bspline)
 
 The probe behind the **(observed)** marks and the validation plan (§69) of
-[`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 7b (§1 to §35, and §54's changes of a transform array between the voxel, RAS-to-RAS and physical-voxel types:
+[`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 8 (§1 to §35, §37 to §39, and §54's changes of a transform array between the voxel, RAS-to-RAS and physical-voxel types:
 the volume-geometry text block, its copies, matrices, comparison and printer; the voxel
 arithmetic; coordinates, orientation, the Talairach point, centre of mass, principal components,
 the running average, the header comparison, determinant and dump; the samplers, the moves, the
@@ -9,7 +9,8 @@ head's box and the transform reader; the CMA label tests and the segmentation fu
 planes, fills, resampling by whole factors and changes of type; the frame-range samplers, the trilinear
 kernel and splatting, derivatives, gradients, neighbour counts, linear transforms; resampling onto a
 template and replacing a value; statistics, orientation strings and voxel-to-RAS matrices; slices as 2-D
-images; neighbourhoods and labels), and of
+images; neighbourhoods and labels; the partial-volume count of a label, random and constant volumes, frames,
+orders, fractions, difference lists and mri2.cpp's voxelwise operations), and of
 [`specs/freesurfer-bspline.md`](../../../specs/freesurfer-bspline.md) (§9: the B-spline coefficients,
 their sampling, the transforms through them and the factor-of-two pyramids). **Open to the clean-room
 implementer of that spec**: the files here hold only calls of FreeSurfer's functions (and of the C
@@ -22,7 +23,7 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 |---|---|
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 26 groups of seeded cases and ten of fixed cases (`vrules`, `vrules4` to `vrules11`, `vbsrules`; 14,340 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 29 groups of seeded cases and eleven of fixed cases (`vrules`, `vrules4` to `vrules12`, `vbsrules`; 15,422 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 | `models.py` | statements of the spec checked as models of the probe's printed results: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
@@ -184,6 +185,36 @@ The spec's sections in brackets.
 | `mskz W W P D` | `MRImaskZero` (the source, the painted mask, the destination) | the result |
 | `clipwm W W P` | `MRIclipBrightWM` (the T1 volume, the painted white-matter volume) | its value, the T1 volume |
 | `ltachg LTA i` | `LTAchangeType` (the type) [§54] | `self` when it returns the array, then the array (LTA) |
+| `pvlab W P W\|null P i i W\|null W\|null W\|null P` | the label volume painted, the values (painted) or none, label, maxlabels, the mixing and neighbour-label volumes or none, the border volume (painted) or none: `MRIvoxelsInLabelWithPartialVolumeEffects` [§37] | the float, then the mixing and the neighbour volumes (`null` when none) |
+| `randn i i i i f f i W\|null` | `srand48` of the seed, then `MRIrandn` (columns, rows, slices, frames, avg, stddev) into the given volume or none [§38] | the result (`given` when it is the given one) |
+| `const i i i i f W\|null` | `MRIconst` (columns, rows, slices, frames, the value) | the result |
+| `nseq W P i f`, `nfr W P k f` | `MRInormalizeSequence` (the target); k 0 `MRInormalizeFrames`, 1 `MRInormalizeFramesMean`, 2 `MRInormalizeFramesFirst` (the integer and the float are read and not used where the call takes none) | its value, the volume |
+| `sort W P W\|null P D` | `MRIsort` (the mask painted, or none) | the result |
+| `revsl W P M\|null M\|null i D` | the b-value and b-vector tables and the b-vector space set on the volume, then `MRIreverseSliceOrder` | the result, then its two tables (M) and b-vector space |
+| `cdtype W i` | `MRIcloneDifferentType` (the type) | the volume |
+| `ordidx W P i`, `vperm W P i` | `MRIorderIndices`; `setRandomSeed` of the integer, then `MRIcomputeVoxelPermutation`, into three `short` arrays of one entry per voxel set to -7 | its value, then the x, the y and the z entries |
+| `nonmax W P D f i` | `MRInonMaxSuppress` (thresh, dir) | the result |
+| `xrpad W P R i` | `MRIextractRegionAndPad` (the region or `null`, pad; no destination) | the volume |
+| `rms W P W` | `MRIrms` into the second | the second volume |
+| `vfrac W M W P W` | `MRIcomputeVolumeFractions` (the source, the vox2vox matrix, the segmentation painted, the fractions) | its value, the fractions |
+| `cdt W P W P D` | `MRIcombineDistanceTransforms` | the result |
+| `diffv W P W P W\|null P d` | `MRIdiff2Vect` (the mask painted or none, the threshold) | `null`, or the row count and each row's five doubles |
+| `applyv W P W\|null P n (d×5)×n D` | `MRIapplyDiffVect` of the n rows (the mask painted or none) into D | the count applied (unset -7), then the result |
+| `tiv x x\|nofile i d i` | the second string written to a file named by the first (`nofile`: none), `USE_AVERAGE305` as in `ltaread`, then `MRIestimateTIV` (the scale; the determinant asked for: 1, or not: 0) | the double, the determinant (unset 7.0) |
+| `dimmis W W i` | `MRIdimMismatch` (frames compared: 1) | its value |
+| `fpow W P n f×n` | `mri_framepower` with an array of exactly n powers [§39] | its value, the volume |
+| `mbin W P D f x\|null i` | `mri_binarize` (thresh, the tail or none, invert) | the count (unset -7), the result |
+| `reshape W P i i i i` | `mri_reshape` (columns, rows, slices, frames) | the volume, then the source's frame count |
+| `msq k W P W\|null P D` | k 0 `MRIsquare`, 1 `MRIsquareRoot` (the mask painted or none), 2 `MRIsqrt` (the mask read and not used) | the result |
+| `mmax W P W P D` | `MRImax` | the result |
+| `mconst W P d i D` | 1 `MRImultiplyConst`, 0 `MRIaddConst` (the constant) | the result |
+| `fbin W P d W\|null P` | `MRIframeBinarize` (thresh; the mask painted, or none) | the result (`given` when it is the given mask) |
+| `vote W P W\|null P D i` | `MRIvote` (the mask painted or none; exclude0) | the result, then the source (sorted in place) |
+| `crop W P i×6` | `MRIcrop` (c1 r1 s1 c2 r2 s2) | the volume |
+| `revs W P D` | `MRIreverseSlices` | the result |
+| `cutend W P i` | `MRIcutEndSlices` (n) | the volume |
+| `segids W P i i` | the frame, then 1 `MRIsegIdListNot0` or 0 `MRIsegIdList` | the count, then the list |
+| `hcos W P d D` | `MRIhalfCosBias` (alpha) | the result |
 
 ## The models
 
@@ -304,7 +335,15 @@ the nearest non-zero voxel at points outside, on lines of their own, planes not 
 `vrules10` (§54: `LTAchangeType`'s six changes between the voxel, RAS-to-RAS and physical-voxel types with two
 transforms and with none, singular geometries as source and destination, voxel sizes 0 and NaN, the validity
 checks, the targets the three types do not support, arrays of other types, a diagnostic level), the fixed
-cases of `vrules11` (§35: the label sums' NaN order, volumes of chosen NaN payloads), and fs.bspline's `vbspline` (the coefficients of volumes of the six numeric types, degrees 2
+cases of `vrules11` (§35: the label sums' NaN order, volumes of chosen NaN payloads), part 8's `vpvlab` (§37:
+partial-volume counts of label volumes in blocks, intensity volumes of chosen values, border volumes given),
+`vfr8` (§38: random and constant volumes, the normalisations, sorts, slice reversals, orders and permutations,
+non-maximum suppression, padded extractions, root mean squares, volume fractions, distance-transform combinations,
+difference lists, TIV estimates), `vmri2` (§39: frame powers, binarisations, reshapes, squares and roots, maxima,
+constants, frame binarisations, votes, crops, slice reversals, end cuts, label lists, half-cosine weightings) and
+the fixed cases of `vrules12` (§37 to §39: the NaN orders of the normalisations', the root mean square's and the
+random draw's sums, the zero test, the integer stores past their range, the vote's runs, the defects' cases on
+lines of their own), and fs.bspline's `vbspline` (the coefficients of volumes of the six numeric types, degrees 2
 to 9 and 0, 1, 10, -1, given B-splines with fitting, other or no coefficients; sampling at points inside,
 at and past the edges, NaN and infinite, frames -1 to one past; the frame-range sampler; coefficients
 sampled as given with degrees -2 to 12; the linear, RAS and transform-array transforms; the pyramids into
@@ -400,3 +439,10 @@ cached matrices as allocated, recomputed or dropped.
   cache and without it (log `oracles/logs/fs-volume-probe-r13-ltatypes-2026-11-22.log`). The new fixed group
   `vrules11` (28 calls: §35's NaN order of the label sums) the same cold, warm and twice without the cache,
   identical in both modes as its own candidate (log `oracles/logs/fs-volume-probe-r13-vrules11-2026-11-22.log`).
+- Relay 13 (2026-11-22, later): the prebuilt probe rebuilt from commit `1536bbbb` (part 8's commands; its build
+  in `BUILD_INFO.txt`, the same bytes twice; the 0b5c7bb6 build kept in
+  `<workspace>/archive/2026-11-22-fs-volume-probe-0b5c7bb6/`): every earlier group's hash unchanged; the new groups
+  `vpvlab` (90 calls), `vfr8` (490), `vmri2` (390) and `vrules12` (112) the same cold, warm and twice without the
+  cache; the probe as its own candidate: no unexplained difference in either mode; every model as before, none
+  different (log `oracles/logs/fs-volume-probe-r13-final-2026-11-22.log`). Part 8's generators keep every volume's
+  cached matrices (FS-252 would end the line; `vrules12` holds it once).

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //! FreeSurfer 8.2.0's volume functions (`fs.volume`), a clean room of
-//! `specs/freesurfer-volume.md` parts 1 to 7a: the volume-geometry text block (§2, §3), the
+//! `specs/freesurfer-volume.md` parts 1 to 8: the volume-geometry text block (§2, §3), the
 //! geometry's copies, matrices, comparison and printer (§4), the voxel arithmetic (§6-§11),
 //! coordinates and geometry (§13-§16), the samplers (§18), the moves (§19), the head's box (§20),
 //! the reader of linear transforms (§21), the CMA labels and segmentation functions (§23),
@@ -9,8 +9,11 @@
 //! gradients and neighbour counts (§28, `deriv`), linear transforms of a volume (§29, `linear`)
 //! and resampling onto a template's grid and replacing a value (§31, `regrid`); statistics,
 //! orientation strings and voxel-to-RAS matrices (§33, `info`); slices as 2-D images (§34,
-//! `image`), neighbourhoods and labels (§35, `nbhd`); and of §54's parts ready for the clean
-//! room, the inverses' fill and the change from physical-voxel to RAS-to-RAS (`ltaops`).
+//! `image`), neighbourhoods and labels (§35, `nbhd`); the partial-volume count of a label (§37,
+//! `pvlabel`), random and constant volumes, frames, orders, fractions and difference lists (§38,
+//! `seqops`) and voxelwise operations (§39, `voxelwise`); and of §54's parts ready for the clean
+//! room, the inverses' fill and the changes between the voxel, RAS-to-RAS and physical-voxel
+//! types (`ltaops`).
 //!
 //! Functions that take a destination (§6) take a [`Dst`]: none (the function makes one), the
 //! first source itself, the second source itself, or the caller's volume; they return a
@@ -31,12 +34,15 @@ pub mod ltaops;
 pub mod ltaread;
 pub mod moves;
 pub mod nbhd;
+pub mod pvlabel;
 pub mod regrid;
 pub mod resample;
 pub mod sample;
+pub mod seqops;
 pub mod skull;
 pub mod stats;
 pub mod vgcopy;
+pub mod voxelwise;
 
 use larmorx_core::defects::{FS_289, FS_290, FS_960};
 

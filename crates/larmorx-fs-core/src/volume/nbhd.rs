@@ -75,7 +75,7 @@ impl Process {
     }
 
     /// The same window, x outermost, then y, z.
-    fn window_xyz(
+    pub(crate) fn window_xyz(
         &mut self,
         m: &Mri,
         whalf: i32,
@@ -98,13 +98,13 @@ impl Process {
     }
 
     /// Frame 0's voxel at a place (`MRIgetVoxVal`).
-    fn v0(&mut self, m: &Mri, (x, y, z): (i32, i32, i32)) -> Result<f32, Stop> {
+    pub(crate) fn v0(&mut self, m: &Mri, (x, y, z): (i32, i32, i32)) -> Result<f32, Stop> {
         self.vf(m, (x, y, z), 0)
     }
 
     /// Frame `f`'s voxel at a place (`MRIgetVoxVal`; inside the volume through the flat reader,
     /// where no message or defect can arise).
-    fn vf(&mut self, m: &Mri, (x, y, z): (i32, i32, i32), f: i32) -> Result<f32, Stop> {
+    pub(crate) fn vf(&mut self, m: &Mri, (x, y, z): (i32, i32, i32), f: i32) -> Result<f32, Stop> {
         match m.inside_vox_val(x, y, z, f) {
             Some(v) => Ok(v),
             None => self.mri_get_vox_val(m, x, y, z, f, 0),
@@ -587,8 +587,10 @@ impl Process {
 
     /// `MRIcomputeLabelNbhd(labels, vals, x, y, z, counts, means, whalf, max_labels)` (§35): the
     /// counts of the labels `0..max_labels` in the window (x outermost, then y, z), and with
-    /// `vals` the labels' means of its values. `max_labels` is the counts' length (the means' at
-    /// most as long); values without means are not read (FreeSurfer crashes there).
+    /// `vals` the labels' means of its values (each sum `v + sum`: the new value first). `max_labels`
+    /// is the counts' length, and the means, when given, have the same length (a shorter means
+    /// array holds only its entries); a label is `(int)` of the voxel (FS-12), counted only in
+    /// `[0, max_labels)`; values without means are not read (FreeSurfer crashes there).
     #[allow(clippy::too_many_arguments)]
     pub fn mri_compute_label_nbhd(
         &mut self,

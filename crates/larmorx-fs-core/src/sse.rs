@@ -80,6 +80,11 @@ pub fn div64(a: f64, b: f64) -> f64 {
 pub fn sqrt64(a: f64) -> f64 {
     pick64(a.sqrt(), a, a)
 }
+/// `sqrtf(a)` (`sqrtss`).
+#[inline]
+pub fn sqrt32(a: f32) -> f32 {
+    pick32(a.sqrt(), a, a)
+}
 /// A float widened to double (a NaN keeps its sign and payload, quieted).
 #[inline]
 pub fn widen(a: f32) -> f64 {

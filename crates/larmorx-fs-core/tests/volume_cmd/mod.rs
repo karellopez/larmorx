@@ -16,6 +16,7 @@ pub mod args;
 
 mod bspline;
 mod part7b;
+mod part8;
 
 use std::io::Write;
 use std::sync::{Arc, Mutex};
@@ -1327,7 +1328,7 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
             l.putg(&a.geom, false);
         }
         _ => {
-            if !bspline::call(p, l, &c)? && !part7b::call(p, l, &c)? {
+            if !bspline::call(p, l, &c)? && !part7b::call(p, l, &c)? && !part8::call(p, l, &c)? {
                 args::bad("unknown command")
             }
         }

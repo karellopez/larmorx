@@ -389,9 +389,15 @@ def whole_path_texts(args: Sequence[str]) -> list[str]:
 #: that reads its volumes through ``MRIread`` (``mri_identify``'s extension of the whole name) or
 #: its transforms through ``LTAread`` (``TransformFileNameType``'s): ``mri_make_uchar`` (relay 51
 #: of track D), ``mri_mask`` (relay 52 of track D), the others and the unit oracle's harness
-#: ``fsunit`` (relay 51 of track A).
+#: ``fsunit`` (relay 51 of track A) and ``mri_robust_register`` (relay 52 of track A, which also
+#: checked ``mri_mask``'s entries: none had an input whose name the old key could confuse; one
+#: entry re-keyed, run fresh: the same result). ``validation/tests/test_oracle_cache.py`` fails when a
+#: program registered in larmorx-freesurfer (its crates' ``PROGRAMS``) is missing here;
+#: ``fs_temp_file`` and ``getfullpath`` read no file but are listed, so the rule has no exception.
 EXTENSION_FROM_WHOLE_PATH = (
+    "fs_temp_file",
     "fsunit",
+    "getfullpath",
     "lta_convert",
     "mri_add_xform_to_header",
     "mri_binarize",
@@ -400,6 +406,7 @@ EXTENSION_FROM_WHOLE_PATH = (
     "mri_make_uchar",
     "mri_mask",
     "mri_normalize",
+    "mri_robust_register",
     "mri_segstats",
     "mris_calc",
 )

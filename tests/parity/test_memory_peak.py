@@ -18,8 +18,9 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 2026-11-22), ``mri_info`` (``MRI_INFO_CASES``, 2026-11-22), ``mris_calc`` (``MRIS_CALC_CASES``,
 2026-11-22), ``mri_add_xform_to_header`` (``MRI_ADD_XFORM_CASES``, 2026-11-22), ``mri_make_uchar``
 (``MRI_MAKE_UCHAR_CASES``, 2026-11-22), ``lta_convert`` (``LTA_CONVERT_CASES``, 2026-11-22),
-``mri_robust_register`` (``MRI_ROBUST_REGISTER_CASES``, 2026-11-22) and ``mri_mask``
-(``MRI_MASK_CASES``, 2026-11-22).
+``mri_robust_register`` (``MRI_ROBUST_REGISTER_CASES``, 2026-11-22), ``mri_mask``
+(``MRI_MASK_CASES``, 2026-11-22), ``fs_temp_file`` (``FS_TEMP_FILE_CASES``, 2026-11-22) and
+``getfullpath`` (``GETFULLPATH_CASES``, 2026-11-22).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -2909,4 +2910,113 @@ def test_mri_robust_register_replica_needs_no_more_memory_than_freesurfer(tmp_pa
         )
         assert (r_dir / "reg.lta").read_bytes() == (o_dir / "reg.lta").read_bytes(), (
             f"{name} ({mode})"
+        )
+
+
+#: ``fs_temp_file``'s calls (track A relay 52): recon-all's (no option, before its version check)
+#: and the scripts' (``--suffix .txt``), each making its file in a folder of the test's own
+#: (``TMPDIR``). The official program's runs are never stored by the oracle-output cache: its
+#: output holds six random letters.
+FS_TEMP_FILE_CASES = [("recon-all", []), ("suffix", ["--suffix", ".txt"])]
+
+
+@pytest.mark.parametrize(("name", "args"), FS_TEMP_FILE_CASES)
+def test_fs_temp_file_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, args):
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / "fs_temp_file" if ws else None
+    if exe is None or not exe.is_file():
+        pytest.skip("FreeSurfer 8.2.0 was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+
+    def env_in(d: Path) -> dict[str, str]:
+        d.mkdir()
+        return {"PATH": f"{exe.parent}:/usr/bin:/bin", "LC_ALL": "C", "LANG": "C",
+                "OMP_NUM_THREADS": "1", "USER": "memory", "FS_DISABLE_LANG": "1",
+                "TMPDIR": str(d), **freesurfer_env()}  # fmt: skip
+
+    o_dir = tmp_path / "freesurfer"
+    env = env_in(o_dir)
+    policy = oracle_cache.Policy(
+        threads=1, family="freesurfer", never="fs_temp_file's name holds six random letters"
+    )
+    peaks = []
+    for _ in range(3):
+        done = oracle_cache.run(
+            ["fs_temp_file", *args], env=env, policy=policy, runner="memory-peak", peak=True
+        )
+        assert done.returncode == 0
+        peaks.append(done.peak_mib)
+    fs_mib = statistics.median(peaks)
+    made = sorted(p.name[10:] for p in o_dir.iterdir())
+    assert made == [args[-1] if args else ""] * 3, made
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "fs_temp_file", *args]
+        code, mib = _peak(cmd, env_in(r_dir), r_dir)
+        assert code == 0
+        print(f"fs_temp_file {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"fs_temp_file {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        files = list(r_dir.iterdir())
+        assert [f.name[10:] for f in files] == [args[-1] if args else ""], files
+        assert [f.stat().st_mode & 0o777 for f in files] == [0o600], files
+
+
+#: ``getfullpath``'s calls (track A relay 52): seg2cc's (an absolute name in the subject's ``mri``
+#: folder) and a relative one, on ds000005 sub-01's recording, read in place. The official script
+#: is tcsh with ``dirname``, ``pwd`` and ``basename``: its peak is the largest of them.
+GETFULLPATH_CASES = [("seg2cc", "{mri}/aseg.auto_noCCseg.mgz"), ("relative", "norm.mgz")]
+
+
+@pytest.mark.parametrize(("name", "arg"), GETFULLPATH_CASES)
+def test_getfullpath_replica_needs_no_more_memory_than_freesurfer(name, arg):
+    from larmorx_validation.freesurfer_unit import FS_HOME
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / "getfullpath" if ws else None
+    mri = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / "ds000005-sub-01-classic" / "subjects"
+        / "sub-01" / "mri"
+        if ws
+        else None
+    )  # fmt: skip
+    if exe is None or not exe.is_file() or not (mri / "norm.mgz").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    env = {"PATH": f"{exe.parent}:/usr/bin:/bin", "LC_ALL": "C", "LANG": "C"}
+    word = arg.format(mri=mri)
+    policy = oracle_cache.Policy(
+        threads=1, family="freesurfer", never="tcsh's patterns read the folder's listing"
+    )
+    peaks, out = [], b""
+    for _ in range(3):
+        done = oracle_cache.run(
+            ["getfullpath", word], env=env, cwd=mri, policy=policy, runner="memory-peak", peak=True
+        )
+        assert done.returncode == 0
+        peaks.append(done.peak_mib)
+        out = done.stdout_bytes
+    fs_mib = statistics.median(peaks)
+    for mode in ("reproduce", "fix"):
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "getfullpath", word]
+        p = subprocess.run(cmd, env=env, cwd=mri, capture_output=True, check=False)
+        assert (p.returncode, p.stdout) == (0, out), name
+        code, mib = _peak(cmd, env, mri)
+        assert code == 0
+        print(f"getfullpath {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"getfullpath {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
         )

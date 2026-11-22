@@ -1,0 +1,60 @@
+{
+ "name": "freesurfer-fs-temp-file",
+ "tool": "fs_temp_file (FreeSurfer 8.2.0)",
+ "status": "experimental",
+ "larmorx_commit": "d68bc7fc8120",
+ "generated": "2026-11-22",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/fs_temp_file/), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/fs_temp_file) and recon-all's reference runs (oracles/freesurfer-8.2.0/runs/)",
+ "probe": {
+  "cases": 73,
+  "identical": 73,
+  "different": 0,
+  "fix_differs": 6,
+  "fix_unexplained": 0,
+  "unix_only": 8
+ },
+ "probe_sha256": {
+  "unix": "9b48c19f7925c9e8759e1213076f4a3528b04c96a91b9d37f730f1c668ea86b9",
+  "no_modes": "c6a52f31e869154fe8547db1c92031e04b835c080808653878105d5e01f2884f"
+ },
+ "golden": {
+  "cases": 5,
+  "identical": 5,
+  "sha256": "86cabb9413e2e4ea4a6e8e71d0b3deb60d765c146f3094b09e755c91f7d15930",
+  "sha256_no_modes": "82aae397170e37b780c2291927bd50c8cb0acdbdcfa9e549b499fbfe4fc5a8d2"
+ },
+ "recon_all_call": {
+  "runs": 18,
+  "names": {
+   "/tmp/tmp.XXXXXX": 18
+  }
+ },
+ "memory": [
+  {
+   "case": "recon-all",
+   "mode": "reproduce",
+   "larmorx_mib": 3.8,
+   "freesurfer_mib": 4.2
+  },
+  {
+   "case": "recon-all",
+   "mode": "fix",
+   "larmorx_mib": 3.8,
+   "freesurfer_mib": 4.2
+  },
+  {
+   "case": "suffix",
+   "mode": "reproduce",
+   "larmorx_mib": 3.8,
+   "freesurfer_mib": 4.5
+  },
+  {
+   "case": "suffix",
+   "mode": "fix",
+   "larmorx_mib": 3.8,
+   "freesurfer_mib": 4.5
+  }
+ ]
+}

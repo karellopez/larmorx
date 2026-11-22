@@ -14,8 +14,8 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 (``T2SMAP_CASES``, 2026-11-08) and its clean-room original (``T2SMAP_ORIGINAL_CALLS``,
 2026-11-11); FreeSurfer's ``mri_normalize`` against the ``larmorx-freesurfer`` replica
 (``MRI_NORMALIZE_CASES``, 2026-11-19), ``mri_binarize`` (``MRI_BINARIZE_CASES``, 2026-11-21),
-``mri_convert`` (``MRI_CONVERT_CASES``, 2026-11-21) and ``mri_segstats`` (``MRI_SEGSTATS_CASES``,
-2026-11-22).
+``mri_convert`` (``MRI_CONVERT_CASES``, 2026-11-21), ``mri_segstats`` (``MRI_SEGSTATS_CASES``,
+2026-11-22) and ``mri_info`` (``MRI_INFO_CASES``, 2026-11-22).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -2333,3 +2333,62 @@ def test_mri_segstats_replica_needs_no_more_memory_than_freesurfer(tmp_path, nam
                 o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out
             )
             assert c.same, f"mri_segstats {name} ({mode}): {out}: {c.verdict} {c.detail}"
+
+
+#: ``mri_info``'s calls (track A relay 49): the report recon-all prints (the header only), and the
+#: three options that read every voxel of the conformed volume (their answer in ``--o``'s file).
+MRI_INFO_CASES = [
+    ("report", ["{mri}/orig.mgz"]),
+    ("stats", ["--o", "out.txt", "--stats", "{mri}/orig.mgz"]),
+    ("voxvolsum", ["--o", "out.txt", "--voxvolsum", "{mri}/rawavg.mgz"]),
+    ("entropy", ["--o", "out.txt", "--entropy", "{mri}/orig.mgz"]),
+]
+
+
+@pytest.mark.parametrize(("name", "args"), MRI_INFO_CASES)
+def test_mri_info_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, args):
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / "mri_info" if ws else None
+    mri = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / "ds000005-sub-01-classic" / "subjects"
+        / "sub-01" / "mri"
+        if ws
+        else None
+    )  # fmt: skip
+    if exe is None or not exe.is_file() or not (mri / "orig.mgz").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    words = [a.format(mri=mri) for a in args]
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        **freesurfer_env(),
+    }
+    o_dir = tmp_path / "freesurfer"
+    o_dir.mkdir()
+    code, fs_mib = _original_peak(
+        ["mri_info", *words], env, "freesurfer", _emptier(o_dir), o_dir, (), "freesurfer"
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_info", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(f"mri_info {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"mri_info {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        if "out.txt" in words:
+            assert (r_dir / "out.txt").read_bytes() == (o_dir / "out.txt").read_bytes(), name

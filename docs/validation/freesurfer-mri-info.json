@@ -1,0 +1,115 @@
+{
+ "name": "freesurfer-mri-info",
+ "tool": "mri_info (FreeSurfer 8.2.0)",
+ "status": "experimental",
+ "larmorx_commit": "a23787a8af95",
+ "generated": "2026-11-22",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_info/), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's recon-all runs (oracles/freesurfer-8.2.0/runs/: their logs) and its official program ($FREESURFER_HOME/bin/mri_info)",
+ "replay": {
+  "runs": 18,
+  "calls": 72,
+  "per_call": {
+   "rawavg": {
+    "calls": 18,
+    "official": 18,
+    "fix": 18,
+    "logged": 18,
+    "log": 18
+   },
+   "orig": {
+    "calls": 18,
+    "official": 18,
+    "fix": 18,
+    "logged": 18,
+    "log": 18
+   },
+   "nframes": {
+    "calls": 18,
+    "official": 18,
+    "fix": 18,
+    "logged": 0,
+    "log": 0
+   },
+   "seg2cc": {
+    "calls": 18,
+    "official": 18,
+    "fix": 18,
+    "logged": 18,
+    "log": 18
+   }
+  }
+ },
+ "probe": [
+  {
+   "seed": 1,
+   "cases": 600,
+   "identical": 587,
+   "different": 0,
+   "skipped": 13,
+   "fix_different_with_notice": 104,
+   "fix_different_without_notice": 0
+  },
+  {
+   "seed": 3,
+   "cases": 1000,
+   "identical": 980,
+   "different": 0,
+   "skipped": 20,
+   "fix_different_with_notice": 196,
+   "fix_different_without_notice": 0
+  }
+ ],
+ "golden_sha256": "e6f79174ec2f4ad0f925e0d1a700ce584e49ab27997ba83ca4f2f15ea0409d7c",
+ "memory": [
+  {
+   "case": "report",
+   "mode": "reproduce",
+   "larmorx_mib": 5.0,
+   "freesurfer_mib": 6.2
+  },
+  {
+   "case": "report",
+   "mode": "fix",
+   "larmorx_mib": 5.0,
+   "freesurfer_mib": 6.2
+  },
+  {
+   "case": "stats",
+   "mode": "reproduce",
+   "larmorx_mib": 20.8,
+   "freesurfer_mib": 22.8
+  },
+  {
+   "case": "stats",
+   "mode": "fix",
+   "larmorx_mib": 21.0,
+   "freesurfer_mib": 22.8
+  },
+  {
+   "case": "voxvolsum",
+   "mode": "reproduce",
+   "larmorx_mib": 16.0,
+   "freesurfer_mib": 17.8
+  },
+  {
+   "case": "voxvolsum",
+   "mode": "fix",
+   "larmorx_mib": 15.8,
+   "freesurfer_mib": 17.8
+  },
+  {
+   "case": "entropy",
+   "mode": "reproduce",
+   "larmorx_mib": 21.2,
+   "freesurfer_mib": 22.8
+  },
+  {
+   "case": "entropy",
+   "mode": "fix",
+   "larmorx_mib": 21.5,
+   "freesurfer_mib": 22.8
+  }
+ ]
+}

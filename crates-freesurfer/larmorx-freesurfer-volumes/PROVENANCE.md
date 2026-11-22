@@ -39,6 +39,8 @@ ported file is audited for third-party code first).
 | `mri_segstats/mri_segstats.cpp` 2300-2364; `include/stats.h` 24-45; `utils/stats.cpp` 1667-1781 (3.2-20) | `LoadStatSumFile`, `DumpStatSumTable`; `STATSUMENTRY`, `SEGSTAT`; `PrintSegStat`; the table without it (`main` 1287-1409) | `src/mri_segstats/table.rs` |
 | `mri_segstats/mri_segstats.cpp` 2376-2714 (3.2-20) | `CountEdits` (FS-1111, FS-1112), `WMAnatStats`, `MRIrescaleBySeg` | `src/mri_segstats/qa.rs` |
 | `utils/gtm.cpp` 306-391, 2516-2551 (3.2-20: only `mri_segstats` reaches them so far; they move to the GTM module with `mri_gtmpvc`) | `GTMdefaultSegReplacmentList`, `GTMloadReplacmentList` (FS-1108) | `src/mri_segstats/gtm.rs` |
+| `mri_info/mri_info.cpp` 56-118, 177-600 (queue item 3.2-08, track A relay 49) | the file statics (`Options`, `Flags`), `parse_commandline` (FS-1146, FS-1149, FS-1150), `print_usage` and `print_help` (their `printf` literals, copied), `print_version`, `check_options`, `usage_exit` | `src/mri_info/options.rs` |
+| `mri_info/mri_info.cpp` 121-174, 603-630, 633-1469 (3.2-08) | `main`, `PrettyMatrixPrint`, `do_file` (FS-1147, FS-1148, FS-1152, FS-1153), `__printTagsToFile` (FS-1150, FS-1151), `__reportWarp`; the program `mri_info` of `larmorx-freesurfer` | `src/mri_info/main.rs` |
 
 Third-party code: none in `mri_normalize.cpp` (FreeSurfer's own file, MGH's notice). Its library
 calls are the other crates' (`larmorx-freesurfer-filter`'s normalisation, `-volume`, `-surf`,
@@ -48,6 +50,12 @@ Third-party code: none in `csv.h`, `stats.cpp`, `fsgdf.cpp` and `mri_convert.cpp
 and is FreeSurfer's). Their library calls are the other crates' (`larmorx-freesurfer-io`'s TSV
 reader, file names, format identification and `MRIwrite`; `-core`'s matrices, version and help;
 `-volume`'s orientation check) and `larmorx-core`'s `strtod`/`strtof` (C's conversions, black box).
+
+Third-party code: none in `mri_info.cpp` (FreeSurfer's own file, MGH's notice). Its library calls are
+the other crates' (`larmorx-freesurfer-io`'s format identification, header and volume reads, the tag
+writer and the colour table's text; `-gca`'s morph reader and `cma_label_to_name`; `-mri`'s
+geometry matrices and `vgprint`; `-volume`'s orientation, slice direction, conformed test,
+tkregister matrices and histogram; `-core`'s matrices and version) and `larmorx-io`'s znzlib.
 
 ## Changes from the originals
 
@@ -89,3 +97,12 @@ reader, file names, format identification and `MRIwrite`; `-core`'s matrices, ve
   `docs/findings/freesurfer-convert.md` Part 3); `run` reads the process's standard error's
   access mode and tracks writes to it (`Globals::stderr`, the C library's `perror`); DICOM inputs
   wait for 3.7-14 (fs.io's not-ported message), outline inputs for relay 48.
+- `mri_info` (relay 49): its file statics are `Options` (the input list a growable list: FS-1149);
+  `fpout` is standard output or `--o`'s file (buffered, flushed on every exit, as `exit()` flushes
+  it). A call FreeSurfer makes with a null pointer where it crashes (FS-1148 with `reproduce`,
+  FS-1150, FS-1152) prints what FreeSurfer printed before the crash where that is defined, then an
+  error, status 1. `--otags` with a file that cannot be created (FS-1151 with `reproduce`): the tag
+  writer's own lines that do not depend on the file (`saving original ras2vox`, the colour table's
+  `CTABwriteIntoBinary: fp was NULL`); its debug lines with `--diag-debug` (positions of a file that
+  is not there, -1) are not printed. `MRIread` of a type given with `-it` (FS-1147's correction) is
+  `MRIread` of `<name>@<type>`, its own way of naming a type.

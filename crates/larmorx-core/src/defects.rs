@@ -2615,6 +2615,22 @@ defects! {
         "mri_convert reading an outline (.otl) series fills each outline's region with a recursion as deep as the region is large: a region of more than about 170,000 places of the outline field (twice the volume's width by twice its height; an outline whose seed lies outside it, or an outline of no points, in a volume 256 voxels wide or more) overflows a default 8 MiB stack and the program crashes; filled in larmorx";
     FS_1145 = "FS-1145", "FreeSurfer", true,
         "mri_convert reading an outline (.otl) series into a volume whose outline field (twice its width by twice its height, 75 bytes a place) passes the machine's memory: FreeSurfer's outcome depends on the machine (an error, or the program killed); refused in larmorx as by a machine without that memory (error allocating claim field)";
+    FS_1146 = "FS-1146", "FreeSurfer", true,
+        "mri_info --ysize and --zsize print the column voxel size (the same as --xsize and --cres), not the row and slice sizes; corrected: --ysize prints the row size as --rres does, --zsize the slice size as --sres does";
+    FS_1147 = "FS-1147", "FreeSurfer", true,
+        "mri_info -it (--in_type) has no effect: each volume is read as the type its name gives; corrected: read as the type given";
+    FS_1148 = "FS-1148", "FreeSurfer", true,
+        "mri_info crashes on a morph whose extension mixes upper and lower case (.M3z, .m3D): its type is a morph, but its report is that of a volume never read (the --format report aside); corrected: reported as a morph, as .m3z and .M3Z are";
+    FS_1149 = "FS-1149", "FreeSurfer", true,
+        "mri_info with more than 100 input volumes writes the names past the 100th over other settings of the program: its result then depends on its build (other options turned on, more messages, or a crash past about a thousand); larmorx reports every input";
+    FS_1150 = "FS-1150", "FreeSurfer", true,
+        "mri_info crashes when -it (--in_type) is the last argument, and when --otags is the last argument and the tag report is reached (no file name follows them)";
+    FS_1151 = "FS-1151", "FreeSurfer", true,
+        "mri_info --otags with a file that cannot be created writes nothing and says nothing: the report follows as if the tags were saved; corrected: ERROR: could not open <file> and status 1";
+    FS_1152 = "FS-1152", "FreeSurfer", true,
+        "mri_info --ras2vox and --ras2vox-tkr crash on a volume whose voxel-to-RAS matrix (or tkregister matrix) cannot be inverted, as with a voxel size of 0";
+    FS_1153 = "FS-1153", "FreeSurfer", true,
+        "mri_info --stats divides each frame's sum by the voxel count of a frame in a 32-bit integer, which wraps past 2,147,483,647 voxels: a wrong (or negative, or infinite) mean; corrected: the count in 64 bits";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

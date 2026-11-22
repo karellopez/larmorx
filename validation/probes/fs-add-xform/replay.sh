@@ -14,7 +14,7 @@ REPO=$(cd "$(dirname "$0")/../../.." && pwd)
 cd "$REPO" || exit 1
 source scripts/orchestration/env.sh >/dev/null 2>&1; unset FSLDIR
 export PYTHONPATH=$REPO/python:$REPO/validation/src
-RUNS=$(cd "$REPO/.." && pwd)/oracles/freesurfer-8.2.0/runs
+RUNS=$(python -c "from larmorx_validation.oracle_cache.store import workspace; print(workspace())")/oracles/freesurfer-8.2.0/runs
 mode=${MODE:-reproduce}; STEPS=${STEPS:-"mri_add_xform_to_header mri_add_xform_to_header:2"}
 mkdir -p "$WORK/replay-$mode"
 one() {

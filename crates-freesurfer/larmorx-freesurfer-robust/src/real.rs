@@ -229,3 +229,35 @@ impl<T: Real> Mat<T> {
         self.data.iter().all(|x| x.finite())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `matrix_x_vector` takes the operand orders of the official library: of two NaNs in a
+    /// float row of four, the product's first operand is the vector's; in a row of three, the
+    /// matrix's.
+    #[test]
+    fn matrix_x_vector_nan_orders() {
+        let (a, b) = (f32::from_bits(0x7fc0_0001), f32::from_bits(0x7fc0_0002));
+        let four = Mat {
+            rows: 1,
+            cols: 4,
+            data: vec![a, 0.0, 0.0, 0.0],
+        };
+        assert_eq!(four.mul_vec(&[b, 1.0, 1.0, 1.0])[0].to_bits(), 0x7fc0_0002);
+        let three = Mat {
+            rows: 1,
+            cols: 3,
+            data: vec![a, 0.0, 0.0],
+        };
+        assert_eq!(three.mul_vec(&[b, 1.0, 1.0])[0].to_bits(), 0x7fc0_0001);
+        let d = Mat::<f64> {
+            rows: 2,
+            cols: 2,
+            data: vec![1.0, 2.0, 3.0, 4.0],
+        };
+        assert_eq!(d.mul_vec(&[1.0, 1.0]), vec![3.0, 7.0]);
+        assert_eq!(f32::narrow(f64::from_bits(0xfff4_0000_0000_0001)).to_bits(), 0xffe0_0000);
+    }
+}

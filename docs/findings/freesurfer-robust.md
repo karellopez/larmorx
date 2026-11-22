@@ -209,3 +209,79 @@ runs each, identical hashes `d0170ae026edfaed`): FreeSurfer's code 0.73-0.75 s (
   FreeSurfer's 0.81 s / 402 MB, `getBlur` 0.66 s / 199 MB against 0.39 s / 202 MB (its remaining time is
   `MRIconvolveGaussian`'s two `MRIcopyFrame`s in fs.volume's `arith.rs`: a follow-up for a speed relay, bit
   for bit).
+
+## 6. The registration step (queue 3.2-03 part 1; track C, relay 42, 2026-11-22)
+
+What was ported (`crates-freesurfer/larmorx-freesurfer-robust`): `RobustGaussian.cpp` (every function:
+`quick_select(I)`, `kth_smallest(I)`, `median(I)`, `mad`; `src/robust_gauss.rs`), `Regression.cpp` (the
+functions the programs reach: `getRobustEst(W)` with `getRobustEstWAB` and `getRobustEstWB`, `getLSEst`,
+`getWeightedLSEst(Float)`, `getSigmaMAD`, `getSqrtTukeyDiaWeights`; not `getTukeyPartialSat`,
+`plotPartialSat`, `VectorMedian` and the free `getTukeyBiweight`, which nothing calls; `src/regression.rs`),
+`Quaternion.h`'s functions the transformation models use (`src/quaternion.rs`), all fifteen models of
+`Transformation.h` (`src/transformation.rs`), `RegistrationStep.h` (`computeRegistrationStep`,
+`constructAb`; `constructR` only serves `rtype == 2`, and `rtype` is always 1; `src/regstep.rs`), and
+`src/real.rs` (the two element types and VNL's `matrix_x_vector` as ITK 4.13.2's library computes it).
+The registration (`RegRobust`, `Registration.cpp` 77-678 and 1315-4545) follows in relay 43.
+
+Reached by (read by hand, as §1): `RegRobust::iterativeRegistrationHelper<T>` makes one
+`RegistrationStep<T>` (T float unless `--doubleprec`) with `setFloatSVD(true)` and calls
+`computeRegistrationStep` at every iteration; `RegRobust::estimateIScale` solves `Regression<double>`
+with the float SVD (`getRobustEst`); `MultiRegistration`'s `--average 2` the location `Regression<float>(b)`
+(`getRobustEstWB`), `--average 3` `Regression<float>(A, b)`, `medianI` for `--average 1` (the default);
+`mri_robust_register.cpp`'s `testRegression` (unreachable from the options) both solvers.
+
+**The probe** (`validation/probes/fs-robust`, family `regstep`: commands `rgauss`, `regress`, `trans`,
+`quat`, `rstep`; `fsrobust.cpp` opens `Regression`'s, `RegistrationStep`'s and `RegRobust`'s members with
+`#define private public` / `protected public` around their headers, and `build.sh` now compiles
+`Registration.cpp`, `RegRobust.cpp` and `RegPowell.cpp` too): seeds 1 (1,000 cases), 7 (1,000), 13
+(2,000): 3,676 identical, 305 `SKIP`, 19 `NOTPORTED` (FS-1067's least squares under `reproduce`), 0
+different; `fix` differs only with notices. Seed 1's hash `401667eb...` is
+`tests/fs_robust_official.rs`'s `reproduce_gives_the_official_registration_steps`.
+
+**The official build's operand orders** (they decide which of two NaNs comes out; read from the probe's
+objects, compiled with the official flags, and ITK 4.13.2's `libitkvnl` objects):
+- `vnl_vector<float>(M, v, vnl_tag_mul)` (`matrix_x_vector`, `VNL_CONFIG_ENABLE_SSE2 0`, GCC 8 vectorises
+  the products, not the sums): rows of four or more numbers in blocks of four, `mulps v, m` (the
+  vector's number first), the sum `addss` as `p0 + s`, `p1 + s`, `s + p2`, `s + p3`; the rest (rows of
+  three or fewer entirely) `movss m; mulss v` and `s + p`. In `double`: pairs `mulpd v, m`, `s + p`; the
+  odd last `m * v`.
+- `getRobustEstWAB`'s error: `swr += t1 * t2` is compiled `t2 * t1` (the residual's square first).
+- `getRobustEstWB` (inlined in `getRobustEstW`): `d1 += wi * b[i]` is `b[i] * wi`; in `float`, `wi =
+  w[i] * w[i]` is a `float` product widened.
+- `getWeightedLSEst`'s `wA`: `A * w` where GCC vectorises the row (4 columns or more in `float`, 3 in
+  `double`), `w * A` in the scalar fallback; `getWeightedLSEstFloat<double>`: `A * w` but the third
+  remainder column `w * A`; `wb = b * w`.
+- `Transform2dIsoscale::getGradient`'s `-fx * y + fy * x` is compiled `fy * x - fx * y` (exact).
+
+**FS-1063 observed**: `setParameters(vnl_vector<double>)` of `DOF + 1` numbers: `parameters = v` resizes
+the vector to `DOF + 1`, then `set_size(DOF)` frees and reallocates it, unwritten: the official probe
+prints `00000005e2c796d5 0000000000000000 0000000000000000` for a 3-DOF model (vnl_alloc's free-list link
+in the first number). Reached by every step of `--doubleprec --iscale`.
+
+**FS-1062 (rule D)**: `constructAb` passes the grid's `x, y, z` (not `xp1, yp1, zp1`) to `getGradient`,
+so a subsampled step's rotation, scale and shear columns use half positions; the older commented code
+used `xp1`. Measured at `mri_robust_register`'s replays (relay 44 on), with FS-963.
+
+**Memory (a finding about the whole port)**: the first bench of the step at 128^3 held 17-25 % more memory
+than FreeSurfer's (rigid 119 MB against 102 MB; affine with `iscale` 180 MB against 145 MB) with the same
+live data. `strace` showed why: fs.core's `alloc::zeroed` (track A's file, every image and matrix buffer
+of the port) asked the system with a probe `Vec` it freed at once; glibc raises its dynamic mmap
+threshold to the size of a freed mmapped chunk (up to 32 MiB, `DEFAULT_MMAP_THRESHOLD_MAX`), so after
+the first image every image-sized buffer came from the heap, whose freed buffers stay resident (the top
+cannot be trimmed past live ones). FreeSurfer's `calloc` raises it only when it frees its first image, after
+the step's outputs are mapped. `zeroed` now probes only above 32 MiB (where the threshold does not move;
+below, the system never refuses): rigid 97.8 MB, affine 139.6 MB (FreeSurfer 101.4, 144.8), `getPartials`
+67.9 MB against 71.5 MB, `getBlur` 26.9 against 30.0 (128^3); the same at 160^3. Other programs'
+measured peaks (`tests/parity/test_memory_peak.py`) can only go down. Also: `vnl_qr`'s input built column
+by column (`Qr::from_column_major`, larmorx-core) so the weighted solves hold one copy of `wA` where
+FreeSurfer holds `wA` and VNL's transposed copy (no change of the numbers).
+
+**Speed** (one thread, identical hashes; `bench rstep|rstepa <n>` against `fs_robust_bench`): one robust
+rigid step at 128^3 0.45 s (FreeSurfer) against 0.66 s, affine with `iscale` 0.76 s against 1.06 s; at
+160^3 0.72 against 1.07 s and 1.09 against 1.55 s. About half of the port's time is the QR solves (LINPACK
+with the official operand orders' tables), the rest `constructAb`'s two passes (direct voxel reads; the
+gradient rows without allocation). A speed relay later, bit for bit.
+
+**Open items**: the double SVD's NaN bits (the probe's `SVDNAN` marker, as FS-968's); FS-1067's least
+squares of fewer rows than columns under `reproduce` (LINPACK's `dsvdc` with `rows < cols`: `vnl_svd_full`
+requires `rows >= cols`); FS-1062's measurement; the step's speed.

@@ -474,3 +474,44 @@ fn copy3(ret: &mut Mat4, m: &VnlMatrix, t: &[f64; 3]) {
     }
     ret[3][3] = 1.0;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    /// Every model's identity is the identity matrix (but the 3-D isotropic scale's, which
+    /// FreeSurfer never implemented).
+    #[test]
+    fn identities() {
+        let mut g = Globals::new(UpstreamDefects::Reproduce);
+        let mut e = Vec::new();
+        for kind in Kind::ALL {
+            let t = Transformation::new(kind);
+            assert_eq!(t.parameters.len(), kind.dof());
+            assert_eq!(t.steps().len(), kind.dof());
+            match t.matrix(&mut g, &mut e) {
+                Ok(m) => assert_eq!(m, identity4(), "{kind:?}"),
+                Err(_) => assert_eq!(kind, Kind::Isoscale3d),
+            }
+        }
+    }
+
+    #[test]
+    fn a_rigid_quarter_turn_and_its_rows() {
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let mut e = Vec::new();
+        let mut t = Transformation::new(Kind::Rigid3d);
+        let half_pi = std::f64::consts::FRAC_PI_2;
+        t.set_parameters(&mut g, &[1.0f64, 2.0, 3.0, 0.0, 0.0, half_pi], false);
+        let m = t.matrix(&mut g, &mut e).unwrap();
+        assert!((m[0][1] + 1.0).abs() < 1e-15 && (m[1][0] - 1.0).abs() < 1e-15);
+        assert_eq!([m[0][3], m[1][3], m[2][3]], [1.0, 2.0, 3.0]);
+        let r = t.gradient(&mut e, 2, 1.0, 3, 0.5, 4, 0.25).unwrap();
+        assert_eq!(r, vec![1.0, 0.5, 0.25, -1.25, 3.5, -2.0]);
+        // a vector of another length (FS-1063): its first parameters
+        t.set_parameters(&mut g, &[0.5f64; 7], false);
+        assert_eq!(t.parameters, vec![0.5; 6]);
+        assert_eq!(g.notices.as_slice()[0].defect.id, "FS-1063");
+    }
+}

@@ -202,3 +202,46 @@ pub fn mad<T: Real>(g: &mut Globals, a: &mut [T], d: T) -> T {
     let mm = median(g, &mut t);
     d.sse_mul(mm)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    /// The robust median of `float`s is fs.core's `median` (utils.cpp's, the same selections).
+    #[test]
+    fn the_float_median_is_utils_median() {
+        let mut g = Globals::new(UpstreamDefects::Reproduce);
+        let mut s = 0x2545_f491_4f6c_dd1du64;
+        for n in 1..40usize {
+            let v: Vec<f32> = (0..n)
+                .map(|_| {
+                    s ^= s << 13;
+                    s ^= s >> 7;
+                    s ^= s << 17;
+                    ((s % 41) as f32 - 20.0) / 4.0
+                })
+                .collect();
+            let (mut a, mut b) = (v.clone(), v);
+            let m = median(&mut g, &mut a);
+            let u = larmorx_freesurfer_core::utils::median(&mut g, &mut b);
+            assert_eq!(m.to_bits(), u.to_bits(), "n {n}");
+            assert_eq!(a, b, "the same reordering, n {n}");
+        }
+    }
+
+    #[test]
+    fn mad_positions_and_the_empty_list() {
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let mut a = [1.0f64, 2.0, 4.0, 100.0];
+        // median 3, deviations 2, 1, 1, 97: median 1.5
+        assert_eq!(mad(&mut g, &mut a, 1.4826), 1.4826 * 1.5);
+        let mut b = [3.0f32, 1.0, 2.0];
+        assert_eq!(median_i(&mut g, &mut b), (2.0, 2.0));
+        let mut c = [5.0f32, 1.0, 4.0, 2.0];
+        // 2 (from position 3) and 4 (from position 2)
+        assert_eq!(median_i(&mut g, &mut c), (3.0, 2.5));
+        assert!(median::<f32>(&mut g, &mut []).is_nan());
+        assert_eq!(g.notices.as_slice()[0].defect.id, "FS-1064");
+    }
+}

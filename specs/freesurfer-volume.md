@@ -2050,9 +2050,11 @@ them as that function does).
   `depth - n - 1` copied in order (columns, rows, slices, frames; a negative `n` reads outside the volume).
 - `MRIsegIdList(seg, &n, frame)`: the voxels' `(int)` values of the frame (FS-12; columns, rows, slices), sorted
   ascending (`int`s), duplicates removed; the count into `n`. `MRIsegIdListNot0`: the same list without 0.
-- `MRIhalfCosBias(in, alpha, out)`: `MRIcopy(in, out)`; slice `s` of the copy becomes each voxel `w * v` with `w =
-  (alpha * cos((pi * s) / (depth - 1.0)) + (2.0 - alpha)) / 2.0` (`double`; glibc's `cos` with `reproduce`); a volume
-  of one slice: `w` NaN (0 / 0, **(observed)**: the default NaN).
+- `MRIhalfCosBias(in, alpha, out)`: `MRIcopy(in, out)`; slice `s` of the copy becomes each voxel `v * w` (`double`,
+  the voxel the first operand: where both are NaN the voxel's NaN is kept) with `w = (alpha * cos((pi * s) / (depth -
+  1.0)) + (2.0 - alpha)) / 2.0` (`double`; glibc's `cos` with `reproduce`); a volume of one slice: `w` NaN (0 / 0,
+  **(observed)**: the default NaN; `vmri2`'s one-slice line: the voxels that are NaN keep their own payloads,
+  `7fc12345`, and `7f800001` quieted to `7fc00001`, the others take `w`'s default NaN).
 
 ## 40. Validation plan (sections 37 to 39)
 Sections 37 to 39 (part 8, made ready by the spec finisher's relay 13): §69's groups `vpvlab`, `vfr8`, `vmri2` and

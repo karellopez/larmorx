@@ -32,9 +32,7 @@ fn hex(s: &str) -> String {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
-        Some("cases") if args.len() == 2 => {
-            cases::all_cases().iter().for_each(|l| println!("{l}"))
-        }
+        Some("cases") if args.len() == 2 => cases::all_cases().iter().for_each(|l| println!("{l}")),
         Some("cases") if args.len() == 4 => {
             let seed: u64 = args[2].parse().expect("seed");
             let n: usize = args[3].parse().expect("n");

@@ -249,13 +249,14 @@ pub fn all_cases() -> Vec<String> {
 /// case's folder or one of its folders.
 pub fn random_cases(seed: u64, n: usize) -> Vec<String> {
     const PIECES: [&str; 40] = [
-        "d1", "x.mgz", "y", "a b", "q r", "*", "?", "[x]", "[^x]", "[a-c]", "{a,b}", "{x,y}",
-        "{}", "~", "=1", "=0", "\\t", "\\c", "\\0101", "/", "/", "/", ".", "..", "-", "+1",
-        "+", "mgz", "_c", "B", "real", "sub", "mri", "aseg.mgz", "afile", " ", "  ", "y=z", "#",
-        "$HOME",
+        "d1", "x.mgz", "y", "a b", "q r", "*", "?", "[x]", "[^x]", "[a-c]", "{a,b}", "{x,y}", "{}",
+        "~", "=1", "=0", "\\t", "\\c", "\\0101", "/", "/", "/", ".", "..", "-", "+1", "+", "mgz",
+        "_c", "B", "real", "sub", "mri", "aseg.mgz", "afile", " ", "  ", "y=z", "#", "$HOME",
     ];
     const FOLDERS: [&str; 6] = ["", "", "d1", "sub/mri", "sp ace", "a  b"];
-    let mut state = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    let mut state = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     let mut next = |m: usize| {
         state = state
             .wrapping_mul(6364136223846793005)
@@ -383,8 +384,7 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
     };
     let text = format!("EXIT {} | {} | {}", o.status, mask(&out), mask(&o.stderr));
     let mut ids: Vec<&'static str> = g.notices.as_slice().iter().map(|n| n.defect.id).collect();
-    if g
-        .notices
+    if g.notices
         .as_slice()
         .iter()
         .any(|n| n.detail.contains("is not reproduced"))

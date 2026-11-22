@@ -224,7 +224,12 @@ pub fn all_cases() -> Vec<String> {
         (vec!["b"], vec![], a(&["-b", "<D>/b"]), false),
         (vec!["b"], vec![], a(&["--base", "b"]), false),
         (vec!["b"], vec![], a(&["-b", "<D>/b/"]), false),
-        (vec!["t"], e(&[("TMPDIR", t)]), a(&["-b", "<D>/missing"]), false),
+        (
+            vec!["t"],
+            e(&[("TMPDIR", t)]),
+            a(&["-b", "<D>/missing"]),
+            false,
+        ),
         (vec![], vec![], a(&["-b", "<D>/missing"]), true),
         (vec!["t"], e(&[("TMPDIR", t)]), a(&["-b", ""]), false),
         (
@@ -563,7 +568,12 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
         .collect();
     top.sort_by_key(|p| e_name(p).into_bytes());
     for p in top {
-        if p.is_dir() && !std::fs::symlink_metadata(&p).unwrap().file_type().is_symlink() {
+        if p.is_dir()
+            && !std::fs::symlink_metadata(&p)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        {
             let m = std::fs::metadata(&p).unwrap();
             if m.permissions().readonly() || mode_of(&m) == "555" {
                 set_mode(&p, 0o755);

@@ -88,7 +88,11 @@ fn plain_names_give_the_official_outputs_everywhere() {
         if mode == UpstreamDefects::Reproduce && !cfg!(unix) {
             continue;
         }
-        assert_eq!((n, hex(h).as_str()), (PLAIN, OFFICIAL_SHA256_PLAIN), "{mode:?}");
+        assert_eq!(
+            (n, hex(h).as_str()),
+            (PLAIN, OFFICIAL_SHA256_PLAIN),
+            "{mode:?}"
+        );
     }
 }
 

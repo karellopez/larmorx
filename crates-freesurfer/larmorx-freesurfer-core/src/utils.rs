@@ -1043,6 +1043,7 @@ fn make_unique(base: &Path, suffix: &str, directory: bool) -> Option<PathBuf> {
     for attempt in 0..238_328u64 {
         let p = base.join(format!("tmp.{}{suffix}", temp_letters(attempt)));
         let made = if directory {
+            #[allow(unused_mut)] // set only on Unix
             let mut b = std::fs::DirBuilder::new();
             #[cfg(unix)]
             std::os::unix::fs::DirBuilderExt::mode(&mut b, 0o700);

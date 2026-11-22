@@ -164,9 +164,9 @@ pub fn has_range(w: &str) -> bool {
 /// Whether a word holds a pattern: `*`, `?`, or a `[` with a `]` after it.
 pub fn has_pattern(w: &str) -> bool {
     let b = w.as_bytes();
-    b.iter().enumerate().any(|(i, &c)| {
-        c == b'*' || c == b'?' || (c == b'[' && b[i + 1..].contains(&b']'))
-    })
+    b.iter()
+        .enumerate()
+        .any(|(i, &c)| c == b'*' || c == b'?' || (c == b'[' && b[i + 1..].contains(&b']')))
 }
 
 /// One name against one pattern piece (no `/`).
@@ -280,7 +280,9 @@ impl Shell<'_> {
         // the last piece's existence (a literal last piece after a pattern)
         let mut out: Vec<String> = found
             .into_iter()
-            .filter(|p| std::fs::symlink_metadata(self.at(p.trim_end_matches('/'))).is_ok() || p == "/")
+            .filter(|p| {
+                std::fs::symlink_metadata(self.at(p.trim_end_matches('/'))).is_ok() || p == "/"
+            })
             .collect();
         out.sort_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
         out
@@ -313,8 +315,7 @@ impl Shell<'_> {
                         .map(|h| h.to_string_lossy().into_owned())
                         .ok_or_else(|| Fail::new("No $home variable set."))?
                 } else {
-                    passwd_home(user)
-                        .ok_or_else(|| Fail::new(&format!("Unknown user: {user}.")))?
+                    passwd_home(user).ok_or_else(|| Fail::new(&format!("Unknown user: {user}.")))?
                 };
                 b = format!("{home}{tail}");
             } else if let Some(rest) = b.strip_prefix('=') {

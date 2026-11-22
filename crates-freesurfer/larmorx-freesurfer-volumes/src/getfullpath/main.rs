@@ -45,9 +45,32 @@ pub const NAME: &str = "getfullpath";
 /// The variables tcsh 6.21 sets at its start (`tcsh -f`, from the environment): a subscripted
 /// assignment to one of them is not reproduced.
 const TCSH_VARIABLES: [&str; 26] = [
-    "addsuffix", "anyerror", "autoexpand", "csubstnonl", "cwd", "dirstack", "echo_style", "edit",
-    "gid", "group", "history", "home", "killring", "loginsh", "owd", "path", "prompt", "prompt2",
-    "prompt3", "promptchars", "shell", "shlvl", "status", "tcsh", "term", "user",
+    "addsuffix",
+    "anyerror",
+    "autoexpand",
+    "csubstnonl",
+    "cwd",
+    "dirstack",
+    "echo_style",
+    "edit",
+    "gid",
+    "group",
+    "history",
+    "home",
+    "killring",
+    "loginsh",
+    "owd",
+    "path",
+    "prompt",
+    "prompt2",
+    "prompt3",
+    "promptchars",
+    "shell",
+    "shlvl",
+    "status",
+    "tcsh",
+    "term",
+    "user",
 ];
 
 /// What a run gives: its exit status and the bytes of its two streams.
@@ -131,13 +154,15 @@ pub fn main(g: &mut Globals, env: &Environment, cwd: &Path, args: &[String]) -> 
 /// Which defect made tcsh's result differ.
 fn cause(args: &[String], literal: &Outcome) -> (&'static Defect, &'static str) {
     let name = &args[0];
-    let special = |s: &str| {
-        s.contains([' ', '\t', '*', '?', '{']) || csh::has_pattern(s) || s.is_empty()
-    };
+    let special =
+        |s: &str| s.contains([' ', '\t', '*', '?', '{']) || csh::has_pattern(s) || s.is_empty();
     let folder = csh::dirname(name);
     let stack = folder.starts_with('+') && folder[1..].chars().all(|c| c.is_ascii_digit());
     if name.starts_with('-') && name != "-" {
-        (&FS_1175, "a name starting with '-' is taken as dirname's options")
+        (
+            &FS_1175,
+            "a name starting with '-' is taken as dirname's options",
+        )
     } else if special(name) || name.starts_with(['~', '=']) || stack {
         (
             &FS_1173,
@@ -311,7 +336,11 @@ fn script(env: &Environment, cwd: &Path, args: &[String]) -> Model {
                 );
             }
             // the subscript a number, a range of numbers or `*` (`r[^x]`: an error)
-            let sub = if closed { &name[k + 1..name.len() - 1] } else { "" };
+            let sub = if closed {
+                &name[k + 1..name.len() - 1]
+            } else {
+                ""
+            };
             let number = |t: &str| t.chars().all(|c| c.is_ascii_digit());
             let valid = sub == "*"
                 || (!sub.is_empty()
@@ -405,7 +434,11 @@ fn script(env: &Environment, cwd: &Path, args: &[String]) -> Model {
                     return Model::Unmodelled("an expression with a number");
                 }
                 if op == "/" || op == "%" {
-                    let what = if op == "/" { "Division by 0." } else { "Mod by 0." };
+                    let what = if op == "/" {
+                        "Division by 0."
+                    } else {
+                        "Mod by 0."
+                    };
                     return failed(Vec::new(), stderr, Fail::new(what));
                 }
             }

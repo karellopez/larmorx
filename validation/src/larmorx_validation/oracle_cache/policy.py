@@ -388,7 +388,8 @@ def whole_path_texts(args: Sequence[str]) -> list[str]:
 #: key, and the cache served the one's run for the other). Every program of larmorx-freesurfer
 #: that reads its volumes through ``MRIread`` (``mri_identify``'s extension of the whole name) or
 #: its transforms through ``LTAread`` (``TransformFileNameType``'s): ``mri_make_uchar`` (relay 51
-#: of track D), the others and the unit oracle's harness ``fsunit`` (relay 51 of track A).
+#: of track D), ``mri_mask`` (relay 52 of track D), the others and the unit oracle's harness
+#: ``fsunit`` (relay 51 of track A).
 EXTENSION_FROM_WHOLE_PATH = (
     "fsunit",
     "lta_convert",
@@ -397,6 +398,7 @@ EXTENSION_FROM_WHOLE_PATH = (
     "mri_convert",
     "mri_info",
     "mri_make_uchar",
+    "mri_mask",
     "mri_normalize",
     "mri_segstats",
     "mris_calc",

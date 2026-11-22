@@ -225,8 +225,8 @@ The registration (`RegRobust`, `Registration.cpp` 77-678 and 1315-4545) follows 
 
 Reached by (read by hand, as §1): `RegRobust::iterativeRegistrationHelper<T>` makes one
 `RegistrationStep<T>` (T float unless `--doubleprec`) with `setFloatSVD(true)` and calls
-`computeRegistrationStep` at every iteration; `RegRobust::estimateIScale` solves `Regression<double>`
-with the float SVD (`getRobustEst`); `MultiRegistration`'s `--average 2` the location `Regression<float>(b)`
+`computeRegistrationStep` at every iteration; `RegRobust::estimateIScale` would solve `Regression<double>`
+with the float SVD (`getRobustEst`), but nothing calls it (relay 43); `MultiRegistration`'s `--average 2` the location `Regression<float>(b)`
 (`getRobustEstWB`), `--average 3` `Regression<float>(A, b)`, `medianI` for `--average 1` (the default);
 `mri_robust_register.cpp`'s `testRegression` (unreachable from the options) both solvers.
 
@@ -285,3 +285,56 @@ gradient rows without allocation). A speed relay later, bit for bit.
 **Open items**: the double SVD's NaN bits (the probe's `SVDNAN` marker, as FS-968's); FS-1067's least
 squares of fewer rows than columns under `reproduce` (LINPACK's `dsvdc` with `rows < cols`: `vnl_svd_full`
 requires `rows >= cols`); FS-1062's measurement; the step's speed.
+
+## 7. The registration (queue 3.2-03 part 2; track C, relay 43, 2026-11-22)
+
+What was ported (`crates-freesurfer/larmorx-freesurfer-robust/src/registration.rs`, `RegRobust` with the fields
+and code of its base `Registration`): `Registration.cpp` 77-678 (`clear`, `computeIterativeRegistration`,
+`computeMultiresRegistration`), 2893-3053 (`getGPLimits`, `buildGPLimits`), 3169-3403 (`initializeTransform`),
+3533-3735 (`reorientSource`, `setTransformation`), 3736-4012 (`setSourceAndTarget`, `setName`), 4013-4709
+(`needReslice`, `makeIsotropic`, the centroids, `getFinalVox2Vox`, `getHalfWayMaps`, `getMinitResampled`,
+`checkSqrtM`, `mapToNewSpace`, `convertP2Md`), `Registration.h`'s setters, `RegRobust.cpp` (`clear`,
+`computeIterativeRegistrationFull`, `findSatMultiRes`, `findSaturation`) and `RegRobust.h`'s
+`iterativeRegistrationHelper<T>`. Not reached by either program (read by hand, as §1): `flipInputs`,
+`init_scaling` ("NOT TESTED"), `buildGaussianPyramid` (only `testRobust`), `setSource`, `setTarget`,
+`RegRobust::estimateIScale` (no caller: §6's sentence corrected). `testRobust` (`--test`, 1,160 lines with
+`constructAb2`) and the `debug > 0` paths (the intermediate images written with `MRIwrite`, the waits for a
+key on standard input) come with `mri_robust_register` (3.2-13); until then a debug level above 0 ends with
+`Registration: the debug output (--debug) is not ported yet`.
+
+**The probe** (`validation/probes/fs-robust`, family `reg`, command `rreg`): `fsrobust.cpp` sets up a
+`RegRobust` as `mri_robust_register`'s `initRegistration` does (same order of setters), calls
+`setSourceAndTarget` and then `findSaturation` + `computeMultiresRegistration`, `computeIterativeRegistration`
+or `computeMultiresRegistration`, and prints the images as set (FNV-1a of their voxels), `Rsrc`, `Rtrg`,
+`resample`, the saturation found, `getFinalVox2Vox`, `getFinalIscale`, `getConverged`, `sat`, `wcheck`,
+`Mfinal`, `getHalfWayMaps`, both weights and the three centroids, beside the standard output. The volumes are
+analytic pictures (`get_blob`: blobs `amp r2 / (r2 + d^2)`, a background, an integer texture, under a 3 x 4
+voxel transform; the same `double` expressions in `fsrobust.cpp` and `tests/fs_robust/cases.rs`, so both sides
+hold the same bits). `rreg` lines get 60 s (the probe's alarm, 5 s for the other commands). Results: seed 1,
+60 cases: 55 identical, 5 `SKIP`; seed 7, 300: 288 identical, 12 `SKIP`; seed 13, 1,000: 931 identical, 69 `SKIP`
+(21 of them identical all the same); 0 different, `fix` different only with notices. `SKIP`: FS-1063 (the
+`double` step with `iscale`, §6), FS-1069, FS-163/FS-290 (an intensity-only registration without symmetry of
+images of different extents: FreeSurfer aborts). Seed 1's first 40 (36 identical, 4 `SKIP`):
+`tests/fs_robust_official.rs`'s `reproduce_gives_the_official_registrations` (`5485548405ae...`), 51 s for the
+crate's seven official tests in a debug build.
+
+**The probe's own memory reads, kept out**: `wcheck` is never initialised in `RegRobust`'s constructor; with
+`highit 0` and a single level no step runs and the official probe printed `000070e5e68600c8` there. The
+programs never read it before a step (every path runs one first), so the probe prints it only after one.
+`getHalfWayMaps` before any iteration reads empty `vnl_matrix` objects (FS-1068); the probe asks for them only
+after one.
+
+**Defects**: FS-1068 (a, crash), FS-1069 (a, memory: `constructAb`'s size asserts are compiled out); texts in
+`larmorx_core::defects`, register rows in the handoff. Not defects: `setSourceAndTarget` reads the input
+target's height (`t->ysize`, `t->depth`) where it means the copy's: the same numbers (only the source is
+reordered).
+
+**The official build's orders**: the iteration composes `vnl_matrix_fixed<double, 4, 4>` products
+(`vnl_matrix_fixed_mat_mat_mult`: the first term, then `+=`), `vnl_inverse` of fixed and dynamic 4 x 4
+matrices (closed forms), and `vnl_matrix` products (from `+0`) for `Rsrc`, `Rtrg`, `Minit`; every case of the
+probe agreed bit for bit with these, finite values only (a NaN in a transform ends the step first: §13's
+check of `A` and `b`).
+
+**Speed**: the port's 300 seed-7 registrations ran in 8.4 s (release, one thread) against the official probe's
+43 s (each case a forked child with FreeSurfer's start-up); the per-registration bench at realistic sizes is
+part of 3.2-13 (`mri_robust_register`'s replays).

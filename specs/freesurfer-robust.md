@@ -25,8 +25,10 @@ Schur form and the matrix square root (§4.5, §4.6; relay 41, 2026-11-20). The 
 registration itself, its transformations, steps and robust regression) follows with queue item 3.2-03:
 its **first part** (relay 42, 2026-11-22) is §9 to §15, the robust statistics, the robust and
 least-squares solvers, the quaternions, the fifteen transformation models and the registration step;
-the registration's loop (`RegRobust`, `Registration`) follows. What black-box runs confirmed is marked
-**(observed)**.
+its **second part** (relay 43, 2026-11-22) is §16 to §18, the registration itself (`RegRobust` with
+`Registration`'s code: the images' set-up, the pyramids, the initial transforms, the iterations, the
+multiresolution registration, the saturation search and the results). What black-box runs confirmed is
+marked **(observed)**.
 
 ## 1. Conventions
 
@@ -670,3 +672,262 @@ model's (§12).
   FS-163's 2-frame images), the `double` least squares of non-finite matrices identical but for the
   NaNs' bits. One step of the robust rigid (affine with `iscale`) registration of a 128^3 float image
   pair at one thread: FreeSurfer 0.45 s (0.76 s), peak 101 MB (145 MB).
+
+## 16. The registration (`RegRobust`; part 4, relay 43)
+
+The registration keeps two images, the source (movable) and the target (destination), their Gaussian
+pyramids, the transformation model, the initial and final voxel transforms (`Minit`, `Mfinal`, 4 x 4
+`double`, either may be empty), the intensity scales (`iscaleinit` 1, `iscalefinal`), the resampling
+matrices `Rsrc` and `Rtrg` (from each resampled image's voxels back to its input's), the half-way maps
+`mov2weights` and `dst2weights`, the saturation `sat` (-1: §13's 4.685), the weight limit `wlimit` (0.16)
+and the weights. Its settings and defaults: rigid (the other models: translation only, isotropic scale,
+affine, intensity scale only; choosing one clears the others; intensity only also sets `iscale` and
+clears the three initialisations), `iscale` off, symmetric (`symmetry` on), `float` steps (`doubleprec`
+off), the robust cost, subsampling off (-1), `minsize` and `maxsize` -1, `highit` -1, verbosity 1 (set
+clipped to 0..2; a debug level above 0 sets verbosity 2), `inittransform` on, `initorient` and
+`initscaling` off. A sample type other than trilinear (1): `ERROR Registration:setSampleType: <st> not
+supported type!` on standard output and status 1. The name: its part after the last `/` is kept apart.
+`clear()` sets the robust cost, `iscale` off, subsampling -1, `initorient` off, debug 0, saturation -1,
+empties `Minit`, `Mfinal` and the half-way maps, and drops the weights (images, pyramids, resampling
+matrices and model stay).
+
+All `double` arithmetic below is IEEE double with no fused operations, in the order written; the 4 x 4
+products of the fixed matrices start from the first term (`a(i,0) b(0,j)`, then `+ a(i,k) b(k,j)`), those
+of `Rsrc`, `Rtrg`, `Minit`, `Mfinal` and the half-way maps from `+0` (`larmorx_core::vnl_matrix`); the
+inverses and determinants of 4 x 4 matrices are `larmorx_core::vnl_fixed`'s closed forms; `log` and `exp`
+glibc's under `reproduce` and correctly rounded by default (GLIBC-07), `pow` likewise, `acos` correctly
+rounded in both modes. Prints go to standard output unless said otherwise; numbers printed "as C++" use
+`%g` with 6 significant digits.
+
+### 16.1 Setting the images (`setSourceAndTarget(S, T, keeptype)`)
+
+1. Verbosity >= 1: `Registration::setSourceAndTarget(MRI s, MRI t, keeptype = TRUE )` (or `FALSE`). If
+   the two types differ, `keeptype` becomes false. Verbosity >= 1: `   Type Source : <s>  Type Target :
+   <t>` followed by `  keeping type ` or `  ensure both FLOAT (3)` and a newline.
+2. `Rsrc` and `Rtrg` become the identity; the source and the target become copies of the inputs.
+3. **The source's axes reordered**: the voxel transform from source to target (`Minit` as it is, or the
+   images' own voxel-to-voxel transform from their voxel-to-RAS matrices, `float` as `specs/freesurfer-
+   volume.md` computes it, widened). For each of its first three columns the row of the largest absolute
+   entry among the first three (`>` comparisons: the first row wins ties; the third only when larger
+   than both others), signed by that entry's sign, gives the new axis (1, 2, 3 for x, y, z). If they are
+   1, 2, 3 nothing happens. If their absolute values do not multiply to 6 (two columns want the same
+   axis): `  Registration::reorientSource: reorder not clear, solving conflict ...`, the transform printed
+   (`v2v = [ ...` in VNL's long format, a blank line after), then: if x wants 2 and y wants 1, z keeps 3;
+   else if x wants 3 and z wants 1, y keeps 2; else if y wants 3 and z wants 2, x keeps 1; else all three
+   keep their places (each signed by its diagonal entry). Then `   Reordering axes in mov to better fit
+   dst... ( <x> <y> <z> )`, the source reordered (`MRIreorder`), `resample` set, `Rsrc` multiplied on the
+   right by the voxel transform from the reordered source to the old one, and ` Determinant after swap :
+   <det>` of the new source-to-target transform (`Minit` resampled, or the images' own). A negative
+   determinant with `symmetry`: `ERROR: vox2vox det: <det> < 0`, the matrix (`v2v`), three lines
+   (`       Symmetry does not work with flipped volumes.`, `       Make sure volumes are in same voxel
+   orientation.`, `       Or run with --nosym flag.`) and status 1.
+4. **The isotropic size**: each image's smallest absolute voxel side (the depth's only when deeper than
+   one slice; for the target the height compared is the input target's); the larger of the two is
+   `isosize`. Each image's covering extent at that size (§2.7, `conform` off); with `symmetry` each axis
+   takes the larger of the two. Verbosity >= 1: `   Mov: (<xs>, <ys>, <zs>)mm  and dim (<w>, <h>, <d>)`,
+   `   Dst: ...` and `   Asserting both images: <isosize>mm isotropic `.
+5. **Each image resliced if needed** (source first, then target): it needs it unless its type stays
+   (`keeptype`, or already `float`) and its voxels stay (no size asked and isotropic, or every side
+   within 1e-4 of the size and either no dimensions asked or the dimensions equal; a 2-D image's depth
+   side counted as its height). Verbosity >= 1: `    - reslicing Mov ...` (`Dst`) or `    - no Mov
+   reslice necessary`. The reslice: a copy; verbosity 2: `     - will resample image or adjust type`; the
+   size (or the smallest side when none is given); the covering extent (§2.7), printed at verbosity 2 as
+   `     - conform dim: <w> <h> <d>`; each given dimension below the covering one: `Registration::
+   makeConform specified xdim too small to cover image` (`ydim`, `zdim`) on standard error and status 1,
+   else it replaces it. The template: a `float` header of that extent with the image's header copied,
+   then the extent, `imnr0` 1, `imnr1` the depth, thickness, pixel size and the three sides the size (a
+   2-D image keeps its depth side), `xstart = -w/2`, `xend = w/2` (integer halves), likewise y and z; the
+   directions and centre as the image's. Another type without `keeptype`: `       -- changing data type
+   from <t> to 3 (noscale = 0)...` and the copy converted to `float` with `MRISeqchangeType` (no scaling,
+   0 and 0.999); a failure: `ERROR: MRISeqchangeType` and status 1. If a side differs by more than 1e-5
+   (`float` differences) or an extent differs: `resample` set, the resampling matrix `MRIgetResampleMatrix`
+   (copy, template) widened, `       -- Original : (<xs>, <ys>, <zs>)mm and (<w>, <h>, <d>) voxels.`,
+   `       -- Resampled: ...` (`%g`), `       -- Reslicing using cubic bspline ` and the copy resampled
+   onto the template with the cubic B-spline (`MRIresample`, `specs/freesurfer-bspline.md`); no result:
+   `makeIsotropic: MRIresample did not return MRI` on standard error and status 1. Otherwise
+   `makeIsotropic WARNING: not different enough, won't reslice!` on standard error, the resampling matrix
+   the identity. `Rsrc` (`Rtrg`) is multiplied on the right by it; the result replaces the image.
+6. **The background**: each image's suspected background (§2.8); where it is not its outside value:
+   `    - WARNING: src mri outside_val = <outside>  but suspected background: <bg>` and `               If
+   background is black or darkgray, ignore this. If white, pass --whitebgmov` (`trg`, `--whitebgdst`).
+7. The pyramids and centroids are dropped; the model is chosen (§12) for 2-D when either input is one
+   slice deep: translation, rigid, isotropic scale, affine, else the identity, which needs `iscale`
+   (`Registration::setTransformation please specify either --iscale or a transformation model`,
+   `ERROR_BADPARM`). Verbosity 2: ` DONE setSourceAndTarget `.
+
+### 16.2 The initial transform
+
+`Minit` resampled (`Rtrg^-1 Minit Rsrc` after a resampling, `Minit` itself otherwise), or computed from the
+two images: verbosity >= 1 `   - computing centroids `; both centroids (§3.1, kept for §16.6), printed at
+verbosity 2 as `        Centroid S: <x>, <y>, <z>` and `        Centroid T: ...`. Then:
+- `inittransform` off: `   - initialize transform based on RAS` (verbosity >= 1) and `T_v2r^-1 S_v2r` of
+  the two voxel-to-RAS matrices (`float`, widened).
+- else `   - computing initial transform` (verbosity >= 1), and with `initscaling`: with `symmetry`
+  ` ERROR: initscaling only meaningful with --nosym (else image sizes will agree)!` and status 1; else
+  the ratios of the target's to the source's width, height and depth, and the diagonal `pow(rw rh rd,
+  1/3)` three times (both deeper than one slice) or `sqrt(rw rh)` twice, printed as `     -- adjusting
+  image sizes ( <s> ) `.
+- else with `initorient`: `     -- trying to use orientation info (--initorient) `; both images' principal
+  axes (§3.2: target first), printed on standard error at verbosity 2 (`evT`, `evS`); for each column
+  the dot product of the two axes (from 0): below 0.1 in absolute value `       WARNING: Over 84 degree
+  difference ( <360 acos(|d|) / pi> ) in column <c>, skipping pre-orientation` and orientation is given
+  up; negative: the source's axis negated (`       --- flipping column <c+1> ` at verbosity 2). If still
+  on: `     -- using orientation info`, the transform's translation minus the source centroid, then
+  `(E_T E_S^-1) M` with the axes as 4 x 4 blocks, then plus the target centroid.
+- else (or when orientation was given up): `     -- using translation info` and the identity with the
+  translation `centroid_T - centroid_S`.
+
+### 16.3 The pyramids
+
+The levels' limits: the smallest side of the two images (a pair both one slice deep: width and height
+only); below `max(16, minsize)`: a blank line, ` Input image is smaller than min dimension: <s> < <min>`,
+` Input dimensions (after conformalizing) MOV: <w> <h> <d>`, `... DST: ...`, ` Specify larger minimum ...`
+and status 1. `maxsubdiv`: how often `s/2` (integer) can be halved while above the minimum (start from
+`s/2`, count halvings until not above). Without `maxsize`: (0, maxsubdiv); else the largest of the
+per-axis smaller sides halved until below `maxsize`, at most `maxsubdiv` times: (that count, maxsubdiv).
+Verbosity >= 1 prints `   - Get Gaussian Pyramid Limits ( min size: <min> max size: <max> ) ` and, per
+image, `   - Build Gaussian Pyramid ( Limits min steps: <a> max steps: <b> ) ` (verbosity 2 also `        dim:
+<w> <h> <d>`). A pyramid has `b - a + 1` levels, finest first: the image halved `a` times, then each next
+level from the one before; a halving is the blur with the 5-tap kernel 1/16, 1/4, 3/8, 1/4, 1/16
+(`MRIconvolveGaussian`, `specs/freesurfer-filter.md`) followed by `MRIdownsample2BSpline`
+(`specs/freesurfer-bspline.md`); every level takes the input's outside value. Built only when not built
+yet (the saturation search builds them first). Then the finest levels' sides: the target's below the
+minimum or the source's below 16 (a side, or the depth unless 1): `Input images must be larger than 16^3.`
+(`ERROR_BADFILE`).
+
+### 16.4 One registration at a level (the iteration)
+
+Given the level's two images, an initial transform (the initial transform of §16.2 when none is given)
+and an initial intensity scale (when 1, `iscaleinit`), with `T` `float` unless `doubleprec`:
+1. `iscalefinal` = the scale; the log scale `log(iscalefinal)`. Verbosity 2: `   - initial iscale: <s>`,
+   `   - initial transform:` and the matrix (`Minit`, a blank line after). The step (§13) takes the
+   registration's settings now (its `iscalefinal` stays this one) and the `float` SVD.
+2. Up to `nmax` iterations while not converged: verbosity >= 1 ` Iteration(f): <i>` (`d` for `double`); at
+   verbosity 1 with subsampling where the image's width and height are above it and its depth above it or
+   1: ` (subsample <n>) `; verbosity 2 a blank line.
+   - **The half-way space**: intensity only: both maps the identity, the source scaled by
+     `sqrt(iscalefinal)` and the target by its inverse (`MRIvalscale`, into the images of the previous
+     iteration when there are some); symmetric: `mh = sqrt(M)` (§4.6), checked (below), `mhi = mh M^-1`,
+     the source mapped by `mh` and the target by `mhi`, both onto the source's grid (`MRIlinearTransform`
+     with the `float` matrices), then with `iscale` scaled by `sqrt(iscalefinal)` and its inverse; not
+     symmetric: the source mapped by `M` onto the target's grid, `mhi` the identity, the target copied once
+     (the first iteration's copy kept), the source scaled by `iscalefinal` with `iscale`. Each mapped image
+     takes its input's outside value. Verbosity 2: ` Registration::mapToNewSpace ` and `   - adjusting only
+     intensity ( <s> ) `, `   - resampling MOV and DST (sqrt)`, `   - resampling MOV to DST `, `   -
+     adjusting intensity ( <s> ) `.
+   - **The square root's check** (symmetric only), on its upper 3 x 3 block: when rigid and no `Minit`, its
+     polar decomposition `R S` (§4.3): a negative diagonal entry of `S`: `Internal Error: Matrix Sqrt
+     produced reflection.`; `|S - I|_F` above 1e-6: `Internal Error: ` and ` Sqrt of Rotation should not
+     scale ( fnorm(S-I) = <f> )`, ` Debug Info: ` and the matrices `A`, `R`, `S` (each with a blank line) on
+     standard error, then `Internal Error: Sqrt of Rotation should not scale.`; `|A - R|_F` above 1e-6:
+     `Internal Error: Sqrt should be a rotation.`; otherwise the second decomposition's scales (§4.3): a
+     negative one `Internal Error: Matrix Sqrt produced reflection.`, one below 0.001 `Internal Error:
+     Matrix Sqrt produced near projection.`; each with `ERROR_OUT_OF_BOUNDS`.
+   - The step (§13) of the two mapped images; its weight checks kept. Verbosity 2: `   - compute new
+     registration`, `   - recieved matrix update `, the update (`Mupdate`), `   - store old transform`, the
+     old one (`Mold`), after the update `   - updated full transform` and `Mnew`.
+   - The new transform: symmetric `(mhi^-1 U) mh` (the update `U`), else `U M`. With `iscale`: the log
+     scale minus the step's intensity parameter, `iscalefinal = exp(log scale)`, `idiff` its absolute
+     value, verbosity >= 1 `     -- intensity log diff: abs(<p>) ` followed by ` <= 0.001  :-)` when
+     `idiff <= 0.001`.
+   - The change: (not rigid) `|M_new - M_old|_F`, (rigid) `sqrt` of §4.4's rigid distance of the two
+     (computed for its messages and side effects), printed at verbosity 2 as `     -- old diff. to prev.
+     transform: <d>`; then the change used: `sqrt(` §4.4's affine distance of the two with radius 100 `)`,
+     printed at verbosity >= 1 as `     -- diff. to prev. transform: <d>` followed by `  <= <epsit>   :-)`
+     when at most `epsit`, else ` max it: <nmax> reached!` on the last iteration.
+   - Converged when the change is at most `epsit` and `idiff` at most 0.001 (`idiff` stays 0 without
+     `iscale`).
+3. After the loop: converged when the change is at most `epsit`. The robust cost keeps a copy of the
+   step's weights (half-way space); then the weights in the target's space: a `float` image of the level
+   target's extent and header, outside value 1, the half-way weights mapped by `mhi^-1` (symmetric and not
+   intensity only) or copied. Verbosity 2: `     -- adjusting half-way maps `. The half-way maps:
+   `mov2weights = sqrt(M)`, `dst2weights = sqrt(M) M^-1`. `Mfinal = M`.
+
+### 16.5 The multiresolution registration (`computeMultiresRegistration(stopres, n, epsit)`)
+
+Verbosity >= 1: two blank lines and ` Registration::computeMultiresRegistration `. The initial transform
+(§16.2) and the scale `iscaleinit`; the pyramids (§16.3, with their checks). Verbosity >= 1: `   - initial
+transform:`, the matrix (`Ti`), `   - initial iscale:  Ii =<s>`. The translation halved `maxsubdiv`
+times (verbosity 2: `   - initial adjusted:`, `Tia`). Fewer levels than `stopres + 1`: `Input images have
+insufficient resoltuion.` (`ERROR_BADFILE`). From the coarsest level down to `stopres`: verbosity >= 1 a
+blank line and `Resolution: <r>  S( <w> <h> <d> )  T( <w> <h> <d> )`; verbosity 2 `- compute new
+iterative registration`; at the finest level with `highit` 0: `  skipping (highit == 0) ...` and the loop
+ends; with `highit` above 0 the finest level runs `highit` iterations, every other `n`; §16.4 from the
+current transform and scale; verbosity 2 a blank line, ` current : Matrix: `, `Tc`, ` intens:  Ic = <s>` and
+` equiv trans on highres: <tx> <ty> <tz>` (the translation doubled `r` times); above level 0 the
+translation doubled; the result becomes the current transform (verbosity 2: a blank line, ` Matrix: `,
+`Tcpost`, ` intens: Icpost = <s>`). After the loop the translation is doubled `stopres - 1` (0 when
+`stopres` is 0) plus `minsubdiv` times. Verbosity exactly 1: a blank line, `   - final transform: `, `Tf`,
+`   - final iscale:  If = <s>`. Not converged (the last level's) and verbosity >= 1: a blank line, a row of
+58 `*`, `*`, `* WARNING: Registration did not converge in <n> steps! `, `*          Problem might be ill
+posed. `, `*          Please inspect output manually!`, `*`, the row of `*`. `Mfinal` and `iscalefinal`
+are the result. The iterative registration (`computeIterativeRegistration(n, epsit)`) is §16.4 on the
+full images from `Minit` resampled (or §16.2) and `iscaleinit`.
+
+### 16.6 The saturation (`findSaturation()`)
+
+Verbosity >= 1: two blank lines and ` Registration::findSaturation `. The initial transform and scale as
+§16.5, the pyramids and the finest levels' checks (source, then target, against the minimum). The
+search's finest level `stopres`: from the coarsest level down, the first with a side of at least 64
+voxels, else level 0. A side of it below 32: a blank line, a row of ` ` and 72 `=`, ` WARNING: image might
+be too small (or ill shaped) for --satit to work.`, `          Try to manually specify --sat # if not
+satisfied with result! `, the row and a blank line. Then a blank line, `   - Max Resolution used:
+<stopres>`, `     -- gpS ( <w> , <h> , <d> )`, `     -- gpT ( ... )`; verbosity 2 `   - initial transform:`,
+`Ti`, `   - initial iscale:   Ii = <s>`; the translation halved `levels - 1` times (verbosity 2 `Tia`);
+`   - running loop to estimate saturation parameter:`. The search: `satmin = satmax = 0`, `wmin = wmax =
+-1`; while either is 0 or they differ by more than 0.5: the saturation 16 (both 0), half `satmax` (no
+`satmin`), twice `satmin` (no `satmax`), else their mean; verbosity >= 1 from the second try `         min
+sat: <satmin> ( <wmin> ), max sat: <satmax> ( <wmax> ), sat diff: <d>, (wlimit=<wlimit>)`, and `     --
+Iteration: <k>  trying sat: <sat>`. A try: from the coarsest level down to `stopres`, §16.4 with three
+iterations (one at `stopres`) and `epsit` 0.05, verbosity 1 silenced to 0 meanwhile (verbosity 2: a blank
+line, `Resolution: <r>`, ` gpS ( ... )`, ` gpT ( ... )`, then after it ` current Matrix: `, `Tc`, ` intens: Ic
+= <s>`, ` equiv trans on highres: ...`), the translation doubled above level 0 and, at `stopres`, multiplied
+by 4 for each level from `stopres` down to 2 (verbosity 2: ` Matrix: `, `T`, ` Intensity:  I = <s>`). The
+last step's weight check above `wlimit` makes this saturation the minimum, else the maximum; a saturation
+below 6 with a check below 0.04 ends the search with both. The result: the maximum when its check is at
+most `wlimit`, else the minimum, printed as `   - final SAT: <sat> ( it: <k> , weight check <w> <= <wlimit>
+)`, and kept as the registration's saturation.
+
+### 16.7 The results
+
+- The final voxel transform: `Mfinal`, or after a resampling `Adjusting final transform due to initial
+  resampling (voxel or size changes) ...` and `Rtrg Mfinal Rsrc^-1`.
+- The half-way maps: `mov2weights Rsrc^-1` and `dst2weights Rtrg^-1` (themselves without a resampling).
+  Before any iteration FS-1068.
+- The centroids mapped back to the inputs: `Rsrc (c_S, 1)`, `Rtrg (c_T, 1)` (products from 0), and the
+  source's in the target: the final voxel transform times the first (from the first term).
+- The weights in the target's space and in the half-way space (§16.4); a model's matrix of a parameter
+  list (`convertP2Md`: the last parameter the intensity's with `iscale`; the list set as §12's `double`
+  lists are, FS-1063).
+
+## 17. Defects of part 4 (`larmorx_core::defects`)
+
+- **FS-1068** (crash): the half-way maps of a registration that ran no iteration (the finest level skipped
+  by `highit` 0 with no coarser level) are read from empty matrices; an error in both modes
+  (`Registration::getHalfWayMaps: no half-way maps, the registration ran no iteration (FreeSurfer crashes
+  here)`, status 1), noted.
+- **FS-1069** (memory): a step of two images of different extents, frames or types (intensity scaling
+  only, without symmetry, of images of different extents) reads past one of them; an error in both modes
+  (`RegistrationStep::constructAb: the source (<w> x <h> x <d>, <n> frames, type <t>) and the target (...)
+  differ (FreeSurfer reads past one of them here)`, status 1), noted.
+- The weight check before the first step is never written (memory contents): it is only read after one
+  (every path runs at least one step before reading it).
+
+## 18. Validation plan of part 4 (black box)
+
+- **The official programs**: `mri_robust_register` (and `mri_robust_template`'s pairwise registrations)
+  run §16 with `--mov`, `--dst` and the options that set its fields (`--affine`, `--transonly`,
+  `--isoscale`, `--iscale`, `--iscaleonly`, `--nosym`, `--sat`, `--satit`, `--wlimit`, `--nomulti`,
+  `--maxit`, `--epsit`, `--highit`, `--minsize`, `--maxsize`, `--subsample`, `--noinit`, `--initorient`,
+  `--initscaling`, `--doubleprec`, `--floattype`, `--ixform`, `--verbose`); its standard output holds §16's
+  lines and the final transform.
+- **Reference numbers (observed)**: pairs of analytic volumes (two or three blobs `amp r2 / (r2 + |p -
+  c|^2)` over a background, a texture of `(int)(3 px) + (int)(5 py) + (int)(7 pz)` modulo 7, the target
+  the source's picture under a small rational rotation-like transform and shift, of 16 to 33 voxels a
+  side, 2-D and 3-D, `float`, `uchar` and `short`, unit, anisotropic and 2 mm voxels, identity, LIA,
+  sagittal and 45-degree directions), every model, symmetric or not, `float` and `double`, the saturation
+  search, the iterative path, `highit` 0 to 2, subsampling, `minsize`, `maxsize`, the three
+  initialisations, `Minit`, `iscaleinit`, verbosities 0 to 2: 1,360 cases (seeds 1, 7 and 13), every line
+  FreeSurfer's (the standard output, the final transforms, scales, convergence, saturation, weight check,
+  half-way maps, the weights' voxels, the centroids) but where FreeSurfer reads memory it does not own or
+  crashes (FS-1063's `double` steps with `iscale`, FS-1069, FS-163).

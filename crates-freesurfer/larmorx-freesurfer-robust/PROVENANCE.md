@@ -58,9 +58,23 @@ third-party code.
 - `src/real.rs`: larmorx's own (the two element types, `vnl_matrix<T>`'s product and
   `matrix_x_vector` as ITK 4.13.2's VNL computes them, BSD).
 
-Not yet: `RegRobust.cpp`/`.h` and `Registration.cpp` 77-678 and 1315-4545 (the registration's loop, its
-pyramid, initialisation and saturation search: relay 43); the functions only one program reaches (its
-item).
+Queue item 3.2-03, part 2 (track C, relay 43, 2026-11-22), of `mri_robust_register/` `Registration.cpp`
+(`67d96ed05d0c`), `Registration.h` (`d81a648e1cf7`), `RegRobust.cpp` (`bed4f484dea5`), `RegRobust.h`
+(`7fa07ed9fc61`); by Martin Reuter, MGH, under FreeSurfer's licence; no third-party code.
+
+- `src/registration.rs`: `RegRobust` with `Registration`'s fields: the constructors' defaults, `clear`
+  (both), the setters of `Registration.h`, `setSampleType`, `setName`, `setTransformation`,
+  `setSourceAndTarget`, `reorientSource`, `needReslice`, `makeIsotropic`, `getMinitResampled`,
+  `getFinalVox2Vox`, `getHalfWayMaps`, `getCentroidS`, `getCentroidT`, `getCentroidSinT`, `convertP2Md`,
+  `initializeTransform`, `getGPLimits`, `buildGPLimits`, `computeIterativeRegistration`,
+  `computeIterativeRegistrationFull`, `iterativeRegistrationHelper<T>`, `mapToNewSpace`, `checkSqrtM`,
+  `computeMultiresRegistration`, `findSatMultiRes`, `findSaturation`; VNL's fixed 4 x 4 product
+  (`vnl_matrix_fixed_mat_mat_mult`, BSD, ITK 4.13.2).
+
+Not yet: `testRobust` and `constructAb2` (`--test`) and the `debug > 0` paths (with `mri_robust_register`,
+3.2-13); not reached by either program: `flipInputs`, `init_scaling`, `buildGaussianPyramid`, `setSource`,
+`setTarget`, `RegRobust::estimateIScale`; `RegPowell` (the other costs) and the functions only one program
+reaches (their items).
 
 ## Changes from the originals
 
@@ -99,3 +113,8 @@ item).
 - Speed: `getPartials`, `getBlur` are 3.9x FreeSurfer's time at 256^3 (fs.filter's `MRIconvolve1d`),
   the others 1.3-2x; memory within 3 % but `getPartials` (+15 %) and `getBlur` (+63 %), both from
   `MRIconvolve1d`'s output buffer (`docs/findings/freesurfer-robust.md` §5).
+- **FS-1068** (`registration::get_half_way_maps`): the half-way maps before any iteration (FreeSurfer reads
+  empty matrices): an error in both modes, noted. **FS-1069** (`regstep::construct_ab`): a step of two
+  images of different extents, frames or types (FreeSurfer reads past one): an error in both modes, noted.
+- A debug level above 0 (`--debug`): `Registration: the debug output (--debug) is not ported yet` and
+  status 1 (its writes and key waits come with 3.2-13).

@@ -18,6 +18,7 @@ mod bspline;
 mod lta54;
 mod part7b;
 mod part8;
+mod segcrop;
 
 use std::io::Write;
 use std::sync::{Arc, Mutex};
@@ -1333,6 +1334,7 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                 && !part7b::call(p, l, &c)?
                 && !part8::call(p, l, &c)?
                 && !lta54::call(p, l, &c)?
+                && !segcrop::call(p, l, &c)?
             {
                 args::bad("unknown command")
             }

@@ -100,6 +100,9 @@ pub struct Process {
     /// The `.xfm` reader's count of `minctracc` lines' `.mnc` words (0 at the start of the
     /// program: `specs/freesurfer-volume.md` §21, step 5).
     pub mnc_count: i32,
+    /// The tissue type the last tissue-type vote of `MRIaseg2vol` chose (0 at the start of the
+    /// program: `specs/freesurfer-volume.md` §55, FS-267's `reproduce`).
+    pub(crate) aseg_vote_type: i32,
 }
 
 impl Process {
@@ -140,6 +143,7 @@ impl Process {
             maths: Default::default(),
             derivative_sign: 1.0,
             mnc_count: 0,
+            aseg_vote_type: 0,
         }
     }
 

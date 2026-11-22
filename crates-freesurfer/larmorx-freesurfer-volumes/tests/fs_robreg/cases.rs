@@ -726,8 +726,9 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
 }
 
 /// The golden cases (`tests/mri_robust_register_golden.rs`): 32^3 images (integer arithmetic),
-/// fMRIPrep's call with every output, an affine registration with its half-way outputs, and one
-/// of a short source onto a float target with anisotropic voxels.
+/// fMRIPrep's call with every output, an affine registration with its half-way outputs, one of a
+/// short source onto a float target with anisotropic voxels, and the entropy images of a short
+/// source and a byte target (`--cost ROBENT`, both written).
 pub fn golden_cases() -> Vec<String> {
     let mut g = Gen::new(32);
     let mut a = Img::base(32, MRI_UCHAR);
@@ -790,6 +791,11 @@ pub fn golden_cases() -> Vec<String> {
         s(&[
             "--mov", "smov.mgz", "--dst", "fdst.mgz", "--lta", "reg.lta", "--satit", "--iscale",
             "--mapmov", "mm.mgz",
+        ]),
+        // relay 45: the entropy images (the default radius 5 on the short source)
+        s(&[
+            "--mov", "smov.mgz", "--dst", "dst.mgz", "--lta", "reg.lta", "--cost", "ROBENT",
+            "--sat", "4", "--entmov", "em.mgz", "--entdst", "ed.mgz",
         ]),
     ]
     .iter()

@@ -2710,7 +2710,17 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
   `MRItkreg2FSL`, `MRIfsl2TkReg` and `RASFromSurfaceRAS_` are `specs/freesurfer-mri.md` §9's (their messages, their
   reading of `FSLOUTPUTTYPE` and their ends of the program included), each called with the transform's destination
   as the reference and its source as the moving volume; "copied into `M`" is `MatrixCopy(new, M)`
-  (`specs/freesurfer-maths.md` §2.4). For each transform in order:
+  (`specs/freesurfer-maths.md` §2.4). A transform without a matrix (none) is passed as none: the conversions take it
+  as §9 says (`MRItkRegMtx` and `MRItkReg2Native` as the identity; `MRItkreg2FSL` ends the program in its second
+  product, `m2 is null`, after its `FSLOUTPUTTYPE` lines; `MRIfsl2TkReg` in its inverse, `MatrixInverse: NULL input
+  matrix!`, after its lines; coronal RAS's `C · M` ends it, `m2 is null`); a result copied into none is a new matrix
+  that nothing keeps, so the transform stays without a matrix, and the inverses' fill ends the program
+  (`MatrixInverse: NULL input matrix!`, status 252), in both modes (**(observed)**: `vrules14`, relay 15: RAS to
+  REGISTER_DAT and to FSL (its lines first), REGISTER_DAT to RAS (at the diagnostic level 1, the `transformed matrix:`
+  line and `MatrixPrint`'s error `MatrixPrint: mat = NULL!` first, the program going on), the second of two from
+  REGISTER_DAT to RAS (in both modes: FS-507's repeated change leaves it untouched; changed once, it is still none);
+  REGISTER_DAT to FSL, FSL to REGISTER_DAT and coronal RAS to RAS end in the conversion as above). For each
+  transform in order:
   - RAS to REGISTER_DAT (1 to 14): `MRItkRegMtx(dst, src, M)` copied into `M`.
   - RAS to FSL (1 to 15): `R = MRItkRegMtx(dst, src, M)`, then `MRItkreg2FSL(dst, src, R)` copied into `M`
     (**(observed)**: `FSLOUTPUTTYPE` unset ends the program with §9's two lines, status 1; set empty, `ANALYZE` or

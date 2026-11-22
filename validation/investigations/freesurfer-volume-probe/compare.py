@@ -3462,6 +3462,11 @@ class Gen12(Gen11):
         L.append(f"{nz}ltachg {arr(14, [(sing, g1, g2), (m2, gz, g3)])} 15")
         L.append(f"+gdiagno=1 {nz}ltachg {arr(14, [(sing, g1, g2)])} 15")
         L.append(f"+gdiagno=1 {nz}ltachg {arr(14, [(m1, g1, g2), (sing, g2, g3)])} 15")
+        # a transform without a matrix: a conversion's result copied into none is kept nowhere
+        for ty, tg in ((1, 14), (1, 15), (14, 1), (14, 15), (15, 14), (21, 1)):
+            L.append(f"{nz}ltachg {arr(ty, [('null', g1, g2)])} {tg}")
+        L.append(f"+gdiagno=1 {nz}ltachg {arr(14, [('null', g1, g2)])} 1")
+        L.append(f"{nz}ltachg {arr(14, [(m1, g1, g2), ('null', g2, g3)])} 1")
         # FS-198, FS-504, FS-508: FreeSurfer reads a freed matrix or a transform the array does not
         # hold, the same bytes in every run of the probe: a line noting one may differ in both modes
         return [Batch("vrules14", "vrules14", L, both="FS-198,FS-504,FS-508")]

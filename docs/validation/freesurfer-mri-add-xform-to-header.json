@@ -1,0 +1,89 @@
+{
+ "name": "freesurfer-mri-add-xform-to-header",
+ "tool": "mri_add_xform_to_header (FreeSurfer 8.2.0)",
+ "status": "experimental",
+ "larmorx_commit": "df5538a42810",
+ "generated": "2026-11-22",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_add_xform_to_header/), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's recon-all runs (oracles/freesurfer-8.2.0/runs/: every step recorded) and its official program ($FREESURFER_HOME/bin/mri_add_xform_to_header)",
+ "replay": {
+  "reproduce": {
+   "steps": 24,
+   "runs": 12,
+   "verdicts": {
+    "reproduced": 24
+   },
+   "seconds_recorded": 11.6,
+   "seconds_replayed": 9.5
+  },
+  "fix": {
+   "steps": 24,
+   "runs": 12,
+   "verdicts": {
+    "reproduced": 24
+   },
+   "seconds_recorded": 11.6,
+   "seconds_replayed": 10.8
+  }
+ },
+ "probe": [
+  {
+   "set": "seed 1",
+   "cases": 600,
+   "identical": 564,
+   "different": 0,
+   "skipped": 36,
+   "fix_different_with_notice": 351,
+   "fix_different_without_notice": 0
+  },
+  {
+   "set": "seed 3",
+   "cases": 1000,
+   "identical": 933,
+   "different": 0,
+   "skipped": 67,
+   "fix_different_with_notice": 618,
+   "fix_different_without_notice": 0
+  },
+  {
+   "set": "extra",
+   "cases": 5,
+   "identical": 3,
+   "different": 0,
+   "skipped": 2,
+   "fix_different_with_notice": 3,
+   "fix_different_without_notice": 0
+  }
+ ],
+ "golden_sha256": {
+  "official_and_reproduce": "2567fcf6473bb9d950e5e67611cf29e83b09f924e74402af2480c0d60cbcf167",
+  "fix": "d54bcc35c1dbe29994a1d12cc461d4033f9adcfa25e984230ea3ac1dc29faecf"
+ },
+ "memory": [
+  {
+   "case": "recon-all",
+   "mode": "reproduce",
+   "larmorx_mib": 21.2,
+   "freesurfer_mib": 22.5
+  },
+  {
+   "case": "recon-all",
+   "mode": "fix",
+   "larmorx_mib": 21.0,
+   "freesurfer_mib": 22.5
+  },
+  {
+   "case": "read",
+   "mode": "reproduce",
+   "larmorx_mib": 20.8,
+   "freesurfer_mib": 22.8
+  },
+  {
+   "case": "read",
+   "mode": "fix",
+   "larmorx_mib": 21.0,
+   "freesurfer_mib": 22.8
+  }
+ ]
+}

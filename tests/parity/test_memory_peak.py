@@ -16,7 +16,8 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 (``MRI_NORMALIZE_CASES``, 2026-11-19), ``mri_binarize`` (``MRI_BINARIZE_CASES``, 2026-11-21),
 ``mri_convert`` (``MRI_CONVERT_CASES``, 2026-11-21), ``mri_segstats`` (``MRI_SEGSTATS_CASES``,
 2026-11-22), ``mri_info`` (``MRI_INFO_CASES``, 2026-11-22), ``mris_calc`` (``MRIS_CALC_CASES``,
-2026-11-22) and ``mri_add_xform_to_header`` (``MRI_ADD_XFORM_CASES``, 2026-11-22).
+2026-11-22), ``mri_add_xform_to_header`` (``MRI_ADD_XFORM_CASES``, 2026-11-22) and
+``mri_robust_register`` (``MRI_ROBUST_REGISTER_CASES``, 2026-11-22).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -2550,3 +2551,92 @@ def test_mri_add_xform_to_header_replica_needs_no_more_memory_than_freesurfer(tm
         assert (r_dir / out).read_bytes() == (o_dir / out).read_bytes(), f"{name} ({mode})"
         c = fsfiles.compare(o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out)
         assert c.same, f"mri_add_xform_to_header {name} ({mode}): {c.verdict} {c.detail}"
+
+
+#: ``mri_robust_register``'s call (track C relay 44): fMRIPrep's (sMRIPrep's ``RobustRegister``:
+#: ``--satit --iscale``), the subject's ``T1.mgz`` onto its T1w (``rawavg.mgz``) of ds000228
+#: pixar008 (the quickest of the six recorded heads: about 20 s in FreeSurfer).
+MRI_ROBUST_REGISTER_CASES = [
+    (
+        "fmriprep",
+        [
+            "--satit",
+            "--iscale",
+            "--mov",
+            "{mri}/T1.mgz",
+            "--dst",
+            "{mri}/rawavg.mgz",
+            "--lta",
+            "reg.lta",
+        ],
+    ),
+]
+
+
+@pytest.mark.parametrize(("name", "args"), MRI_ROBUST_REGISTER_CASES)
+def test_mri_robust_register_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, args):
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / "mri_robust_register" if ws else None
+    mri = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / "ds000228-sub-pixar008-classic"
+        / "subjects" / "sub-pixar008" / "mri"
+        if ws
+        else None
+    )  # fmt: skip
+    if exe is None or not exe.is_file() or not (mri / "T1.mgz").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000228 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    words = [a.format(mri=mri) for a in args]
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        "FS_DISABLE_LANG": "1",
+        "FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING": "Thu Jan  1 00:00:00 1970",
+        **freesurfer_env(),
+    }
+
+    def fresh(d: Path):
+        def reset() -> None:
+            if d.exists():
+                shutil.rmtree(d)
+            d.mkdir()
+
+        reset()
+        return reset
+
+    o_dir = tmp_path / "freesurfer"
+    code, fs_mib = _original_peak(
+        ["mri_robust_register", *words],
+        env,
+        "freesurfer",
+        fresh(o_dir),
+        o_dir,
+        (r"Registration took \d+ minutes and \d+ seconds\.",),
+        "freesurfer",
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        fresh(r_dir)
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_robust_register", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(
+            f"mri_robust_register {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}"
+        )
+        assert mib <= allowance(fs_mib), (
+            f"mri_robust_register {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        assert (r_dir / "reg.lta").read_bytes() == (o_dir / "reg.lta").read_bytes(), (
+            f"{name} ({mode})"
+        )

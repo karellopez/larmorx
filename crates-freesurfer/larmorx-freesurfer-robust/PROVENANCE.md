@@ -52,7 +52,10 @@ third-party code.
 - `src/quaternion.rs`: `Quaternion`'s constructors, `importRotVec` (both), `importZYXAngles`,
   `operator*`, `getNormalized`, `getRotMatrix3d`.
 - `src/transformation.rs`: `Transformation` and its fifteen models (`getDOF`, `setParameters` (the three
-  kinds), `setIdentity`, `getSteps`, `getMatrix`, `getGradient`).
+  kinds), `setIdentity`, `getSteps`, `getMatrix`, `getGradient`). Relay 44: FS-1073, the `double`
+  `setParameters` of a longer vector whose block glibc 2.35's allocator hands straight back
+  (`set_size` reallocates without keeping the contents): its first two words, the allocator's,
+  modelled with `reproduce` (`docs/findings/freesurfer-robust-register.md` §2).
 - `src/regstep.rs`: `RegistrationStep<T>` (its constructor from the registration's settings,
   `setFloatSVD`, `computeRegistrationStep`, `constructAb`, the getters); `Registration::Cost`.
 - `src/real.rs`: larmorx's own (the two element types, `vnl_matrix<T>`'s product and

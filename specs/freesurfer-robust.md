@@ -634,6 +634,16 @@ model's (§12).
   `double` with `iscale` passes `DOF + 1`) is left with memory contents (**(observed)**: the first
   parameter a pointer's bits, the others 0 or earlier values); from a shorter list of the other kinds
   FreeSurfer reads past it. Both modes take the list's first `DOF` numbers (0 for missing ones), noted.
+- **FS-1073** (memory; relay 44, from `mri_robust_register`'s probe): FS-1063's longer `double` list
+  where a list of `n` and one of `DOF` doubles fall in the same size class of glibc 2.35's allocator
+  (the class of `8 n` bytes: `(8 n + 8 + 15)` rounded down to a multiple of 16, at least 32; rigid 3-D,
+  affine 2-D and 3-D, isotropic scale 2-D, translation 2-D with `iscale`): FreeSurfer's model gets
+  the list's numbers but its first two: a positive subnormal number (the allocator's word) and 0
+  (**(observed)**: the step's matrix prints `0.0000000000000` and `0` as its x and y translations,
+  its rotation and z translation the solution's). With `reproduce`: those two values (any positive
+  subnormal number: it vanishes in every later sum; larmorx takes the one of bits
+  `0x0000555555555000`), noted; by default the list's first `DOF` numbers, noted. The other models
+  stay FS-1063's.
 - **FS-1064** (memory): §9's median, `medianI` and `mad` of an empty list read memory that is not theirs;
   NaN in both modes, noted.
 - **FS-1065** (crash): the robust location (§10) writes its weights past a shorter vector (its only

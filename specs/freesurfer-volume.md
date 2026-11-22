@@ -49,7 +49,7 @@ trilinear kernel and splatting, derivatives, gradients, neighbour counts and lin
 (§31-32) resampling onto a template and replacing a value; part 7a (§33) statistics, orientation strings
 and voxel-to-RAS matrices; part 7b (§34-35) slices as 2-D images, neighbourhoods and labels; part 8
 (§37-40) the partial-volume count of a label, random and constant volumes, frames, orders, fractions,
-difference lists and mri2.cpp's voxelwise operations. Then the rest of the module (§41-68; of §54,
+difference lists and voxelwise operations. Then the rest of the module (§41-68; of §54,
 `LTAfillInverse` and `LTAchangeType`'s changes between the voxel, RAS-to-RAS and physical-voxel types
 are ready).
 
@@ -1984,7 +1984,7 @@ probe's `pvlab`.)
   transform: an error (FreeSurfer crashes).
 - `MRIdimMismatch(a, b, frames)`: 1, 2, 3 for width, height, depth, 4 for frames (when asked), else 0.
 
-## 39. Voxelwise operations of mri2.cpp (3.1-37, piece d, part 1)
+## 39. Voxelwise operations: powers, binarising, reshaping, squares, maxima, votes, crops (3.1-37, piece d, part 1)
 (Made ready for the clean room by the spec finisher's relay 13: §69.2's groups `vmri2` and `vrules12`.)
 Unless said, voxels are read with `MRIgetVoxVal` and written with `MRIsetVoxVal` (the destination's type converts
 them as that function does).

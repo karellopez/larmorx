@@ -2554,7 +2554,7 @@ def ifill(vals) -> str:
 
 class Gen11(Gen10):
     """Part 8 (§37 to §39): the partial-volume count of a label; random and constant volumes,
-    frames, orders, fractions, difference lists; mri2.cpp's voxelwise operations."""
+    frames, orders, fractions, difference lists; voxelwise operations."""
 
     def cvol(self, r: random.Random, shape: str | None = None, **kw) -> str:
         """``rvol`` with its cached matrices always recomputed: a volume without them crashes

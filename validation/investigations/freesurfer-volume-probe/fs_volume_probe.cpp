@@ -1944,7 +1944,7 @@ static void call(const std::string &c)
     putlta(r);
   }
   // part 8 (§37 to §39): the partial-volume count of a label; random and constant volumes,
-  // frames, orders, fractions, difference lists; mri2.cpp's voxelwise operations
+  // frames, orders, fractions, difference lists; voxelwise operations
   else if (c == "pvlab") {
     MRI *l = getw();
     paint(l);

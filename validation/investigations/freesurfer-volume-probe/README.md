@@ -10,7 +10,7 @@ planes, fills, resampling by whole factors and changes of type; the frame-range 
 kernel and splatting, derivatives, gradients, neighbour counts, linear transforms; resampling onto a
 template and replacing a value; statistics, orientation strings and voxel-to-RAS matrices; slices as 2-D
 images; neighbourhoods and labels; the partial-volume count of a label, random and constant volumes, frames,
-orders, fractions, difference lists and mri2.cpp's voxelwise operations), and of
+orders, fractions, difference lists and voxelwise operations), and of
 [`specs/freesurfer-bspline.md`](../../../specs/freesurfer-bspline.md) (§9: the B-spline coefficients,
 their sampling, the transforms through them and the factor-of-two pyramids). **Open to the clean-room
 implementer of that spec**: the files here hold only calls of FreeSurfer's functions (and of the C

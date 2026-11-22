@@ -3222,7 +3222,13 @@ A relative name is the program's working directory's. Matrices are printed with 
   order. When `|W| < 1e-15` the first transform's matrix is copied. Otherwise for each transform in order, with share
   `w / W`: a share below `0.1 / n` is skipped, else the matrix times the share (as a `float`, each element's product in
   `float`) is added to the result element by element (`float`). More than 4,096 transforms: FS-886 (an error in both
-  modes). The C library's `exp`: glibc's with `reproduce`, correctly rounded by default (GLIBC-07).
+  modes). The C library's `exp`: glibc's with `reproduce`, correctly rounded by default (GLIBC-07). `errno`: each
+  weight's `exp` sets it to `ERANGE` (34) where its finite argument gives 0 (an underflow: `d / (2 s s)` above about
+  745.13) or an infinity, and leaves it as it was otherwise (a subnormal result, an argument of `-inf`, `+inf`, NaN or
+  0), in both modes, on the result the mode's `exp` gives; nothing else of the call sets or clears it. So a later
+  message that prints `errno`'s text (`ErrorPrintf`'s line, `specs/freesurfer-core.md` §2) after a point far from every
+  transform's centre shows `Numerical result out of range` (**(observed)**: glibc 2.35's `exp` as a black box,
+  `validation/investigations/freesurfer-make-uchar-errno/`; `mri_make_uchar`'s per-voxel errors print it).
 - **`LTAtransformInterp(src, dst, lta, interp)`** (`LTAtransform`: trilinear):
   1. A `REGISTER_DAT` array: `warning: changing input transform type from REGISTER_DAT to VOX_TO_VOX` on standard output,
      the array changed to `LINEAR_VOX_TO_VOX` (section 54).

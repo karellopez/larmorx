@@ -3169,6 +3169,12 @@ defects! {
         "the half-way maps of a robust registration that ran no iteration (the finest level skipped with no coarser one) are read from empty matrices: a crash or memory contents; an error in both modes";
     FS_1069 = "FS-1069", "FreeSurfer", true,
         "a robust registration step of two images of different sizes (intensity scaling only, without symmetry, of images of different extents) reads past the smaller one: a crash or memory contents; an error in both modes";
+    FS_1070 = "FS-1070", "FreeSurfer", true,
+        "mri_robust_register given an option that takes an argument as its last argument crashes: it aborts (an uncaught std::logic_error, status 134) for a name and dies of a segmentation fault for a number; by default an error naming the option, status 1";
+    FS_1071 = "FS-1071", "FreeSurfer", true,
+        "mri_robust_register given an --lta name of 1,024 bytes or more aborts (*** buffer overflow detected ***, status 134) after printing its results, without writing the transform; by default the name is used";
+    FS_1072 = "FS-1072", "FreeSurfer", true,
+        "mri_robust_register given a non-linear initial transform (--ixform of a morph) reads the morph as a linear transform array: memory it does not own; an error in both modes";
 }
 
 /// The register entry with ID `id`.

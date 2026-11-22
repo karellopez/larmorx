@@ -349,6 +349,18 @@ pub fn matlab_print_long(m: &VnlMatrix, name: &str) -> String {
     s
 }
 
+/// `vnl_matlab_print(os, D, name, vnl_matlab_print_format_long)` of a `vnl_diag_matrix<double>`
+/// (`vnl_matlab_print.hxx`): `<name> = diag([ `, each diagonal element (`vnl_svd::matlab_long`),
+/// ` ])` and a newline.
+pub fn matlab_print_long_diag(d: &[f64], name: &str) -> String {
+    let mut s = format!("{name} = diag([ ");
+    for &v in d {
+        s.push_str(&crate::vnl_svd::matlab_long(v));
+    }
+    s.push_str(" ])\n");
+    s
+}
+
 /// [`matlab_print_long`] of a `vnl_matrix<std::complex<double>>` ([`matlab_long_complex`]).
 pub fn matlab_print_long_complex(m: &VnlCMatrix, name: &str) -> String {
     let mut s = format!("{name} = [ ...\n");

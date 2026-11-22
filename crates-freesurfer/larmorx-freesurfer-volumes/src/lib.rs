@@ -23,6 +23,7 @@ pub mod mri_add_xform_to_header;
 pub mod mri_binarize;
 pub mod mri_convert;
 pub mod mri_info;
+pub mod mri_robust_register;
 pub mod mri_segstats;
 pub mod mris_calc;
 
@@ -47,6 +48,10 @@ pub const PROGRAMS: &[Program] = &[
     Program {
         name: mri_normalize::main::NAME,
         run: mri_normalize::main::run,
+    },
+    Program {
+        name: mri_robust_register::main::NAME,
+        run: mri_robust_register::main::run,
     },
     Program {
         name: mri_segstats::main::NAME,

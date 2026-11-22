@@ -325,6 +325,7 @@ pub fn make_fixture(dir: &Path) {
 
 /// The fixture's read-only folder made removable again.
 pub fn unmake_fixture(dir: &Path) {
+    let _ = dir; // used on Unix only
     #[cfg(unix)]
     if dir.join("noperm").exists() {
         set_mode(&dir.join("noperm"), 0o755);

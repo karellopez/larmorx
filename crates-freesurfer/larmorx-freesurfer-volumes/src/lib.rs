@@ -22,6 +22,7 @@ use larmorx_freesurfer_core::run::Program;
 pub mod mri_binarize;
 pub mod mri_convert;
 pub mod mri_segstats;
+pub mod mris_calc;
 
 /// The programs of this crate, by their original names.
 pub const PROGRAMS: &[Program] = &[
@@ -40,5 +41,9 @@ pub const PROGRAMS: &[Program] = &[
     Program {
         name: mri_segstats::main::NAME,
         run: mri_segstats::main::run,
+    },
+    Program {
+        name: mris_calc::main::NAME,
+        run: mris_calc::main::run,
     },
 ];

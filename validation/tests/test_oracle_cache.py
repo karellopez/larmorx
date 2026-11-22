@@ -1160,6 +1160,51 @@ def test_the_key_keeps_a_whole_paths_extension_for_freesurfers_readers(tmp_path_
     assert plain.key == keys[2] and "text" not in plain.parts
 
 
+def larmorx_freesurfer_programs() -> list[str]:
+    """The programs larmorx-freesurfer registers: the ``PROGRAMS`` of each crate its command line
+    lists (``REGISTRIES`` in ``larmorx-freesurfer-cli/src/main.rs``), each entry's ``name`` a
+    literal or a module's ``NAME`` constant, read from the Rust sources."""
+    import re
+
+    root = Path(__file__).resolve().parents[2] / "crates-freesurfer"
+    cli = (root / "larmorx-freesurfer-cli" / "src" / "main.rs").read_text(encoding="utf-8")
+    registries = re.search(r"const REGISTRIES[^=]*=\s*&\[(.*?)\];", cli, re.S)
+    assert registries, "REGISTRIES not found in larmorx-freesurfer-cli/src/main.rs"
+    crates = re.findall(r"(larmorx_freesurfer_\w+)::PROGRAMS", registries.group(1))
+    assert crates, "no registry in REGISTRIES"
+    names = []
+    for crate in crates:
+        src = root / crate.replace("_", "-") / "src"
+        lib = (src / "lib.rs").read_text(encoding="utf-8")
+        block = re.search(r"pub const PROGRAMS: &\[Program\] = &\[(.*?)\];", lib, re.S)
+        assert block, f"{crate}: no PROGRAMS"
+        for value in re.findall(r"\bname:\s*([^,]+),", block.group(1)):
+            value = value.strip()
+            if value.startswith('"'):
+                names.append(value.strip('"'))
+                continue
+            module, _, const = value.rpartition("::")
+            assert const == "NAME", f"{crate}: a program's name {value!r} is not a NAME constant"
+            parts = module.split("::")
+            files = [src.joinpath(*parts).with_suffix(".rs"), src.joinpath(*parts, "mod.rs")]
+            text = next(f.read_text(encoding="utf-8") for f in files if f.is_file())
+            found = re.search(r'pub const NAME: &str = "([^"]+)";', text)
+            assert found, f"{crate}: no NAME in {module}"
+            names.append(found.group(1))
+    return names
+
+
+def test_every_larmorx_freesurfer_program_reads_formats_from_the_whole_path():
+    """Every program larmorx-freesurfer registers reads its files through FreeSurfer's readers
+    (``MRIread``, ``LTAread``), which take a format from the whole name's last dot: each must be in
+    ``policy.EXTENSION_FROM_WHOLE_PATH``, or the cache may serve one name's run for another (relay
+    52 of FreeSurfer's track A: ``mri_robust_register`` and ``mri_mask`` had been left out)."""
+    programs = larmorx_freesurfer_programs()
+    assert "mri_convert" in programs and "lta_convert" in programs
+    missing = sorted(set(programs) - set(oc.policy.EXTENSION_FROM_WHOLE_PATH))
+    assert not missing, f"add to policy.EXTENSION_FROM_WHOLE_PATH: {missing}"
+
+
 def test_bet_temporary_folders_hold_no_option_text(tmp_path):
     pytest.importorskip("larmorx_testdata")
     from larmorx_validation.parity import fsl_bet

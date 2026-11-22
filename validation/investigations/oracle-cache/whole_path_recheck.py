@@ -193,8 +193,73 @@ def scan_golden(example: Path) -> int:
     return 0
 
 
+def scan_cache(programs: list[str], listing: Path | None) -> int:
+    """Without running anything: the entries of the named programs in the oracle-output cache
+    (``LARMORX_ORACLE_CACHE``, else the workspace's; ``listing``: a file of entry paths, one per
+    line, to read only those), and for each program (relay 52 of FreeSurfer's track A, when
+    ``mri_mask`` and ``mri_robust_register`` joined ``policy.EXTENSION_FROM_WHOLE_PATH``):
+
+    - ``rekeyed``: the entries whose key the tuple changes (a path the key replaces by its role
+      holds a text of ``policy.whole_path_texts``; a name the key keeps as written, an output's
+      ``a.b/c``, already decides its key);
+    - ``could_be_served_another``: the entries another run could have been served under the old
+      key, those with an input whose key suffix is empty or ``.gz`` (only such a name can hide a
+      whole-path text from its suffix: a name with a suffix of its own ends the whole path's text
+      with it); none means no run of the program ever got another name's result."""
+    import shlex
+
+    from larmorx_validation.oracle_cache import policy, rerun
+    from larmorx_validation.oracle_cache.store import location
+
+    root = location() / "entries"
+    paths = (
+        [Path(x) for x in listing.read_text(encoding="utf-8").split()]
+        if listing
+        else sorted(root.rglob("*.json"))
+    )
+    wanted = {f'/bin/{p}"' for p in programs}
+    home = str(Path.home())
+    rows: dict[str, dict] = {}
+    for path in paths:
+        raw = path.read_text(encoding="utf-8")
+        if not any(w in raw for w in wanted):
+            continue
+        entry = json.loads(raw)
+        program = str(entry.get("launcher", {}).get("program", "")).rsplit("/", 1)[-1]
+        if program not in programs:
+            continue
+        row = rows.setdefault(program, {"entries": 0, "runners": {}, "rekeyed": [],
+                                        "could_be_served_another": []})  # fmt: skip
+        row["entries"] += 1
+        runner = entry.get("runner", "")
+        row["runners"][runner] = row["runners"].get(runner, 0) + 1
+        template = entry.get("template", [])
+        words = [home + w[1:] if w.startswith("~") else w for w in shlex.split(entry["command"])]
+        ran = words[-len(template) :] if template else []
+        texts = policy.whole_path_texts(ran)
+        for t, a in zip(template, ran, strict=True):
+            if rerun._PLACEHOLDER.search(t):
+                kept = rerun._PLACEHOLDER.sub("", t)
+                if found := [x for x in texts if x in a and x not in kept]:
+                    row["rekeyed"].append({"entry": path.name, "argument": a, "texts": found})
+        odd = [i["suffix"] for i in entry["parts"]["inputs"] if i["suffix"] in ("", ".gz")]
+        if odd:
+            row["could_be_served_another"].append({"entry": path.name,
+                                                   "command": entry["command"][:200]})  # fmt: skip
+    for program in programs:
+        row = rows.get(program, {"entries": 0})
+        print(json.dumps({"program": program, **row,
+                          "rekeyed_n": len(row.get("rekeyed", [])),
+                          "could_be_served_another_n": len(row.get("could_be_served_another",
+                                                                   []))}))  # fmt: skip
+    return 0
+
+
 def main() -> int:
     argv = sys.argv[1:]
+    if argv[:1] == ["--scan-cache"]:
+        listing = Path(argv[3]) if argv[2:3] == ["--list"] else None
+        return scan_cache(argv[1].split(","), listing)
     if argv[:1] == ["--scan-open"]:
         return scan_open(Path(argv[1]).resolve(), [int(s) for s in argv[2].split(",")])
     if argv[:1] == ["--scan-golden"]:

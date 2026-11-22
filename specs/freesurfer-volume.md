@@ -1944,7 +1944,9 @@ probe's `pvlab`.)
   row, and the values 300.7, 2 and -1.5 ordered as 2, 44, 255.
   `MRIcomputeVoxelPermutation(mri, xs, ys, zs)`: with `n` the voxel count, entries `(i % w, (i / w) % h, (i / (w h))
   % d)` (as `short`s), then for each `i` from 0 in turn, entry `i` exchanged with entry `(int)randomNumber(0, n -
-  0.0001)` (`specs/freesurfer-core.md` §9). Returns `NO_ERROR`.
+  0.0001)` (`specs/freesurfer-core.md` §9). Returns `NO_ERROR`. After `setRandomSeed(0)` (the probe's `vperm` with
+  the integer 0) the draws take FS-04's seed (core §9): the clock's with `reproduce`, so such a result changes from
+  run to run; cases meant to be compared use other seeds.
 - `MRInonMaxSuppress(src, sup, thresh, dir)`: `MRIcopy(src, sup)` (§7); then each voxel of frame 0 (x outermost,
   then y, z): `v = val * dir` (`double`); `v <= thresh`: the voxel 0 in the copy. Else the gradient `(Ix, Iy, Iz)`
   (`MRIsampleVolumeGradient`, §28) picks, of the directions `n` = (0, 0, 1), (0, 1, 0), (1, 0, 0) in that order, the

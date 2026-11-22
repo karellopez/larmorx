@@ -229,6 +229,14 @@ const GOLDEN: &[(&str, &str)] = &[
         "ltapv.reproduce",
         "39efdf79eb4a39d4353631d0fc2f208da784b394840efc9007358eb6554e7745",
     ),
+    (
+        "ltatypes.fix",
+        "b2bc745208eec2a832b8ccf6b89023960999e2d2c64b3e0471d91a0d7d73c750",
+    ),
+    (
+        "ltatypes.reproduce",
+        "078a4d6b39e0066c95ae84f37d034204af6e9ae64226197c73bdb93f1da835ac",
+    ),
 ];
 
 fn check(name: &str, bytes: &[u8]) {
@@ -2354,6 +2362,22 @@ const LTAPV: &[(&str, Make)] = &[("ltachg", |g| {
     )
 })];
 
+/// `ltachg` between the voxel, RAS-to-RAS and physical-voxel types (§54's six changes), a target
+/// those types do not support and an array of another type.
+const LTATYPES: &[(&str, Make)] = &[("ltachg", |g| {
+    let n = g.pick(&["1", "1", "2", "0"]).to_owned();
+    let k: usize = n.parse().unwrap_or(1);
+    let ty = g.pick(&["0", "1", "2", "0", "1", "2", "5"]).to_owned();
+    let target = g.pick(&["0", "1", "2", "0", "1", "2", "3"]).to_owned();
+    let fw: Vec<String> = (0..k).map(|_| chlt(g, false)).collect();
+    let inv: Vec<String> = (0..k).map(|_| chlt(g, true)).collect();
+    format!(
+        "{n} {ty} 3f800000 x {} {} {target}",
+        fw.join(" "),
+        inv.join(" ")
+    )
+})];
+
 fn group(name: &str, table: &[(&str, Make)], per: usize) {
     let seed = name.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
         (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
@@ -2509,4 +2533,9 @@ fn neighbourhoods_and_labels() {
 #[test]
 fn transform_arrays_changed_to_ras() {
     group("ltapv", LTAPV, 16);
+}
+
+#[test]
+fn transform_arrays_between_types() {
+    group("ltatypes", LTATYPES, 24);
 }

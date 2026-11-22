@@ -587,8 +587,10 @@ impl Process {
 
     /// `MRIcomputeLabelNbhd(labels, vals, x, y, z, counts, means, whalf, max_labels)` (§35): the
     /// counts of the labels `0..max_labels` in the window (x outermost, then y, z), and with
-    /// `vals` the labels' means of its values. `max_labels` is the counts' length (the means' at
-    /// most as long); values without means are not read (FreeSurfer crashes there).
+    /// `vals` the labels' means of its values (each sum `v + sum`: the new value first). `max_labels`
+    /// is the counts' length, and the means, when given, have the same length (a shorter means
+    /// array holds only its entries); a label is `(int)` of the voxel (FS-12), counted only in
+    /// `[0, max_labels)`; values without means are not read (FreeSurfer crashes there).
     #[allow(clippy::too_many_arguments)]
     pub fn mri_compute_label_nbhd(
         &mut self,

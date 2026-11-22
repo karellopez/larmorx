@@ -781,6 +781,31 @@ fn fs505_fs506_a_physical_voxel_array_changed_to_ras() {
     assert!(!fix.contains(inv), "{fix}");
 }
 
+/// §54 (`vrules10`'s lines): a target the RAS-to-RAS type does not support ends the program
+/// (status 252) with its message, also for an array of no transforms; an array of another type
+/// keeps its type; an array of no transforms takes a supported target and nothing else. The same
+/// in both modes.
+#[test]
+fn lta_change_type_targets_and_other_types() {
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let (r, _) = run("ltachg 0 1 3f800000 x  5", mode);
+        assert!(r.starts_with("EXIT 252 | x "), "{r}");
+        assert!(
+            r.contains("error: LTAchangeType: you are requesting ras-to-ras to 5 "),
+            "{r}"
+        );
+        let (r, _) = run("ltachg 0 2 3f800000 x  -1", mode);
+        assert!(
+            r.contains("LTAchangeType: you are requesting physvox-to-physvox to -1 "),
+            "{r}"
+        );
+        let (r, _) = run("ltachg 0 10 3f800000 x  1", mode);
+        assert!(r.starts_with("self 0 10 3f800000 x |"), "{r}");
+        let (r, _) = run("ltachg 0 0 3f800000 x  2", mode);
+        assert!(r.starts_with("self 0 2 3f800000 x |"), "{r}");
+    }
+}
+
 // ---- part 7b (§34, §35)
 
 /// FS-465: a slice of 3 x 2 floats copied into a given image of one byte (`MRItoImage`): only the

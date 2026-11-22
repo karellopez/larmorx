@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-22-freesurfer-batch-90",
+ "dossier": "2026-11-22-freesurfer-batch-91",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 527531,
+  "accesses": 528342,
   "agents": 563,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 936,
-  "archived_files": 936,
+  "archive_checksums_matched": 938,
+  "archived_files": 938,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -582,9 +582,13 @@
    "2026-11-22-session-transcripts-freesurfer-batch-90": {
     "files": 5,
     "sha256": "16701aa37b8d9ada586f84cf1b43cd175f6175f395d9c5f93d75083c01db5f43"
+   },
+   "2026-11-22-session-transcripts-freesurfer-batch-91": {
+    "files": 2,
+    "sha256": "91b6d8a8f064015c4a7f72089865f40a221896e6bb50f4d04ee0632addc435ff"
    }
   },
-  "commits_printed": 5493,
+  "commits_printed": 5505,
   "distinct_transcripts": 567,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
@@ -593,17 +597,17 @@
    "calls_without_result": 130,
    "compaction_parent_missing": 9,
    "compactions": 89,
-   "refused_calls": 1745,
+   "refused_calls": 1746,
    "refused_calls_restricted_accesses": 743,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 10081
+   "unresolved_paths": 10086
   },
-  "last_record": "2026-11-22 21:18 UTC",
+  "last_record": "2026-11-22 22:30 UTC",
   "live_files": 567,
   "live_files_also_archived": 566,
   "sessions": 4,
-  "tool_calls": 148187,
+  "tool_calls": 148360,
   "tool_calls_by_tool": [
    [
     "Agent",
@@ -619,7 +623,7 @@
    ],
    [
     "Bash",
-    130231
+    130392
    ],
    [
     "CronCreate",
@@ -631,7 +635,7 @@
    ],
    [
     "Edit",
-    4981
+    4984
    ],
    [
     "EnterWorktree",
@@ -687,12 +691,12 @@
    ],
    [
     "Write",
-    7296
+    7305
    ]
   ],
-  "transcript_bytes": 32606606911,
-  "transcript_files": 1503,
-  "unique_paths": 96819
+  "transcript_bytes": 32860042181,
+  "transcript_files": 1505,
+  "unique_paths": 97021
  },
  "levels": [
   [
@@ -773,7 +777,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "ea0c53b0"
+  "verdicts_repository": "7bba1086"
  },
  "overview": {
   "agents_by_role": [

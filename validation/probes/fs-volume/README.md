@@ -355,3 +355,12 @@ and a volume without the label), 7 FreeSurfer's crashes (`SKIP`, FS-471). Both f
 relay 43; the earlier binary in `<workspace>/archive/2026-11-22-fsvolume-closed-probe-before-r43/`): seed 1,
 5,720 cases: hash `a2c71444...` unchanged (436 `SKIP`, 24 `HEAVY`); seed 7, the 609 `lmeans`, `lnbhd` and `pvlab`
 cases of 58,000: 540 identical, 69 not comparable, 0 different (logs `oracles/logs/fs-found-c-r43-*`).
+
+Measured 2026-11-23 (relay 45 of track C: track E's R16.5, FS-268 in `MRIcropAroundRAS`, FS-515's
+`reproduce`, FS-269 decided in `REGIONgetBoundingBox(M)`, FS-270 in `MRIaseg2volMU`; `check.py`'s `SKIP`
+gains FS-270): `--only crras,ccrs,rgbb,maskup,a2vmu`, seeds 7 and 13 (500 cases each of 28,600; log
+`oracles/logs/fs-found-c-r45-volume-crops.log`): `reproduce` 0 different (457 and 470 identical, 43
+and 30 not comparable); `fix` different only with notices (FS-268 15 and 9 times, FS-269 105 and 112).
+Seed 1's 5,720 cases: hash `a2c71444...` unchanged (436 `SKIP`, 24 `HEAVY`). FS-515's `reproduce` lines
+stay `SKIP`: this probe's `fsvolume` children see other stack contents than 0 in the unset field of view
+(1693078050 among them, and allocation failures).

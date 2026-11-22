@@ -12,7 +12,12 @@ plan is in `specs/mri_robust_register.md` §7.
   folder) and by the port in both modes; compares exit status, standard output and error (the
   time taken masked) and every file written. `--golden`: the golden cases' official SHA-256.
   Relay 44: seeds 1, 7, 13 (300 cases each): 839 identical, 0 different, 25 undefined (`SKIP`), 36
-  not ported; the recorded test (`tests/fs_robreg_official.rs`) holds seed 1's first 120.
+  not ported; the recorded test (`tests/fs_robreg_official.rs`) holds seed 1's first 120. Relay 45:
+  the entropy images ported, 17 entropy cases after the prelude (`entropy_cases`), the entropy
+  image's time masked as the registration's (in the lines only; the cache's policy unchanged):
+  seeds 1, 7, 13: 839 identical (every `ROBENT` case among them, FS-1074's abort compared as the
+  port's status 134 against the official child's SIGABRT), 0 different, 25 undefined, 36 not
+  ported (the ten Powell costs, `--debug`, `--test`); seed 1's first 120 re-recorded.
 - `real.py [--heads a,b] [--outputs] [--json out.json]`: fMRIPrep's call (`--satit --iscale`) on the
   six recorded heads' `T1.mgz` onto `rawavg.mgz`, official against the port in both modes, with
   times and peaks; `--outputs` adds every output option. Relay 44: the transform identical on all

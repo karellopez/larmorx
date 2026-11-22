@@ -17,7 +17,7 @@ use sha2::{Digest, Sha256};
 /// Recorded 2026-11-22 from the official program (`check.py --seed 1 --n 600`): 600 cases, 564
 /// lines identical, 36 hashed as `SKIP`.
 const N: usize = 600;
-const OFFICIAL_SHA256: &str = "7ae8257416ec8d5007f88953cb3a86992caf9f6d620dcb9e283aa00ae6911eb2";
+const OFFICIAL_SHA256: &str = "127e76331cdacae344bbdf5fdb744d1d097dc0912904216846bc9fc7da97360d";
 const SKIPPED: usize = 36;
 
 /// `check.py`'s `SKIP`.

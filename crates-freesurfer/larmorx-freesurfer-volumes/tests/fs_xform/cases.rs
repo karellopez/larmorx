@@ -219,19 +219,60 @@ fn base_inputs(g: &mut Gen) -> Inputs {
     Inputs { files, dirs }
 }
 
-/// A case line.
+/// The transform files a volume's header names (each one of the volumes above, and its copies
+/// under other names).
+fn tag_files(name: &str) -> &'static [&'static str] {
+    match name {
+        "v.mgz" | "U.MGZ" | "noext" | "trail." | "a.b/c" | "v.nii.gz" | "r.mgz" | "r.mgh" => {
+            &["t.xfm"]
+        }
+        "y.mgz" => &["bad.xfm"],
+        "z.mgz" => &["part.xfm"],
+        _ => &[],
+    }
+}
+
+/// Whether the argument `a` names the file or folder `f`: itself, a file in it, the name `.xfm`
+/// completes.
+fn names(a: &str, f: &str) -> bool {
+    let a = a.trim_end_matches('/');
+    !a.is_empty()
+        && (f == a
+            || f.strip_prefix(a).is_some_and(|r| r.starts_with('/'))
+            || f.strip_suffix(".xfm") == Some(a))
+}
+
+/// A case line: the inputs' files and folders the arguments name (and the transform files the
+/// volumes named name), so that each case writes only what it reads.
 fn line(env: Option<&str>, i: &Inputs, args: &[String]) -> String {
+    let mut wanted: Vec<&str> = Vec::new();
+    for (f, _) in &i.files {
+        if args.iter().any(|a| names(a, f)) {
+            wanted.push(f);
+            wanted.extend_from_slice(tag_files(f));
+        }
+    }
+    let files: Vec<&(String, Vec<u8>)> = i
+        .files
+        .iter()
+        .filter(|(f, _)| wanted.contains(&f.as_str()))
+        .collect();
+    let dirs: Vec<&String> = i
+        .dirs
+        .iter()
+        .filter(|d| args.iter().any(|a| names(a, d)))
+        .collect();
     let mut t = vec![
         "xform".to_owned(),
         env.map_or("-".to_owned(), |e| hex(e.as_bytes())),
-        i.files.len().to_string(),
+        files.len().to_string(),
     ];
-    for (f, c) in &i.files {
+    for (f, c) in files {
         t.push(f.clone());
         t.push(hex(c));
     }
-    t.push(i.dirs.len().to_string());
-    for d in &i.dirs {
+    t.push(dirs.len().to_string());
+    for d in dirs {
         t.push(hex(d.as_bytes()));
     }
     t.push(args.len().to_string());

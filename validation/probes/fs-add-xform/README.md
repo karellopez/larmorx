@@ -36,9 +36,9 @@ Seed 1, 600 cases: 564 identical with `reproduce`, 36 `SKIP`, 0 different; `fix`
 each with a notice (FS-01, FS-1155, FS-1157, FS-1158). Seed 3, 1,000 cases: 933 identical, 67
 `SKIP`, 0 different. Extra cases: 5, 3 identical (a name ending in a dot), 2 `SKIP` (FS-1156: the
 official build aborts, measured). Recorded: `tests/fs_xform_official.rs` (seed 1, 600 cases, 36
-`SKIP`, `7ae82574...`; debug about 10 s; Windows x64 checked with
+`SKIP`, `127e7633...`; debug about 2 s; Windows x64 checked with
 `validation/investigations/windows-cross-check/`: every case's line as Linux's). Golden: 5 cases,
-`92ff34ba...` with `reproduce` (the official value), `8c733367...` by default (FS-1158). The
+`2567fcf6...` with `reproduce` (the official value), `d54bcc35...` by default (FS-1158). The
 recorded steps: 24 on 12 runs, all reproduced, both modes.
 
     scripts/orchestration/boxed.sh 16 python -P validation/probes/fs-add-xform/check.py --seed 1 --n 600

@@ -16,9 +16,9 @@ use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
 /// Recorded 2026-11-22 by `check.py --golden` from the official program on Linux x64: 5 cases.
-const OFFICIAL_SHA256: &str = "92ff34ba55079c9cccf3b68a3f86b6ebbf3927a435c384d802153acd51d847cb";
+const OFFICIAL_SHA256: &str = "2567fcf6473bb9d950e5e67611cf29e83b09f924e74402af2480c0d60cbcf167";
 /// The port's default on Linux x64 (FS-1158 writes the COR folder's transform name with `-c`).
-const FIX_SHA256: &str = "8c733367fad9a2d1e0e584d3960dbe8280b527b0df4f00e7b1590a8a37ebcdbf";
+const FIX_SHA256: &str = "d54bcc35c1dbe29994a1d12cc461d4033f9adcfa25e984230ea3ac1dc29faecf";
 
 fn cases_digest(mode: UpstreamDefects) -> String {
     let mut h = Sha256::new();

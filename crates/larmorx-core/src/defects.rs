@@ -2657,6 +2657,30 @@ defects! {
         "mri_add_xform_to_header writing a COR folder's COR-.info writes the pixel size as the slice thickness (thick): a volume whose slices are thicker or thinner than its pixels reads back with the pixel size as its thickness; corrected: the slice thickness";
     FS_1158 = "FS-1158", "FreeSurfer", true,
         "mri_add_xform_to_header writing a COR folder's COR-.info writes the transform's name (its xform line) only when a transform was loaded: with -c (copy the name only) the name is lost unless the folder's own transform had loaded, and an empty name gives the line xform with nothing after it; corrected: the line is written whenever the name is not empty";
+    FS_1159 = "FS-1159", "FreeSurfer", true,
+        "lta_convert with an option that takes a value given last aborts (an option naming a file or the subject: basic_string::_M_construct null not valid, status 134) or crashes (--srcupsample, --srcdownsample, --trgupsample, --trgdownsample, --srcconform-size, --trgconform-size: status 139); corrected: ERROR: Option: <option> needs a value, status 1";
+    FS_1160 = "FS-1160", "FreeSurfer", true,
+        "lta_convert --srcconform-size and --trgconform-size read their value but do not step over it: the reading of the options stops at the value, and every option after it is ignored without a message (an --outlta after it writes nothing, and the program says successful); corrected: the value is stepped over";
+    FS_1161 = "FS-1161", "FreeSurfer", true,
+        "lta_convert --initk (ITK text transforms) takes the end of a file that ends with white space (the usual new line after the last line) as a repeat of its last line: a last FixedParameters line with a centre other than 0 applies the centre twice (a wrong translation), a last Parameters line rewrites the matrix with the last three numbers, a last Transform line or comment ends the program as an unknown line; corrected: the reading ends at the end of the file";
+    FS_1162 = "FS-1162", "FreeSurfer", true,
+        "lta_convert --initk never ends when a number of a Parameters or FixedParameters line is not a number and is not at the end of the file: the program repeats the line for ever; larmorx ends with ERROR readITK: cannot read <file>, status 1";
+    FS_1163 = "FS-1163", "FreeSurfer", true,
+        "lta_convert --inniftyreg, --inniftyreg2d, --initk and --invox given a file with fewer numbers than they need, or with text that is not a number, go on: a number not read keeps the value read before it (a row repeats the row before it), one before any number read is memory contents; corrected: ERROR <reader>: cannot read <file>, status 1";
+    FS_1164 = "FS-1164", "FreeSurfer", true,
+        "lta_convert with a transform that cannot be inverted (a singular NiftyReg, ITK or voxel-space input, --invert, --outniftyreg, --outitk, --outvox) goes on without its matrix and crashes where it writes it (status 139), or prints MatrixPrint: mat = NULL! and says successful when nothing is written; a singular voxel-space input gives the inverse's leftovers silently; corrected: ERROR <step>: the matrix cannot be inverted, status 1";
+    FS_1165 = "FS-1165", "FreeSurfer", true,
+        "lta_convert --infsl and --inreg given a file that does not read, and an .lta without a transform, go on and crash (status 139) after reading both volumes; corrected: ERROR <reader>: cannot read <file>, status 1";
+    FS_1166 = "FS-1166", "FreeSurfer", true,
+        "lta_convert's --srcupsample, --srcdownsample, --trgupsample and --trgdownsample accept factors that make no sense: a downsampling factor of 0 divides by 0 (status 136), a factor below 1 or one that makes a size pass 2,147,483,647 writes a geometry of sizes 0 or below, and a downsampling factor that does not divide every size prints ERROR: MRIdownsampleN: ... and goes on with the geometry unchanged (status 0); corrected: ERROR, status 1";
+    FS_1167 = "FS-1167", "FreeSurfer", true,
+        "lta_convert --srcconform-dc and --trgconform-dc on a geometry whose orientation does not give each axis its own main direction (an unknown orientation ???, as a transform without its volume's geometry has, or two axes along the same direction) read memory past the geometry's three axes: the conformed geometry holds memory contents; corrected: ERROR, status 1";
+    FS_1168 = "FS-1168", "FreeSurfer", true,
+        "lta_convert --subject with a name of 1,024 bytes or more copies it past the room the transform has for it (memory corruption: names of a few thousand bytes crash the program); larmorx keeps the whole name";
+    FS_1169 = "FS-1169", "FreeSurfer", true,
+        "lta_convert --sqrt (which prints the matrix's singular value decomposition, MATRIX SQRT not supported yet) puts the decomposition's left factor in place of the transform: every output written after the .lta (--outfsl, --outmni, --outreg, --outniftyreg, --outitk, --outvox) holds that factor instead of the transform; corrected: the outputs keep the transform";
+    FS_1170 = "FS-1170", "FreeSurfer", true,
+        "lta_convert stops reading its options at the first argument that does not start with a dash, without a message: that argument and every option after it are ignored, and the program goes on with what it read; corrected: ERROR: Option: <argument> unknown, status 1";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

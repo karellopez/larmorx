@@ -41,6 +41,9 @@ ported file is audited for third-party code first).
 | `utils/gtm.cpp` 306-391, 2516-2551 (3.2-20: only `mri_segstats` reaches them so far; they move to the GTM module with `mri_gtmpvc`) | `GTMdefaultSegReplacmentList`, `GTMloadReplacmentList` (FS-1108) | `src/mri_segstats/gtm.rs` |
 | `mri_info/mri_info.cpp` 56-118, 177-600 (queue item 3.2-08, track A relay 49) | the file statics (`Options`, `Flags`), `parse_commandline` (FS-1146, FS-1149, FS-1150), `print_usage` and `print_help` (their `printf` literals, copied), `print_version`, `check_options`, `usage_exit` | `src/mri_info/options.rs` |
 | `mri_info/mri_info.cpp` 121-174, 603-630, 633-1469 (3.2-08) | `main`, `PrettyMatrixPrint`, `do_file` (FS-1147, FS-1148, FS-1152, FS-1153), `__printTagsToFile` (FS-1150, FS-1151), `__reportWarp`; the program `mri_info` of `larmorx-freesurfer` | `src/mri_info/main.rs` |
+| `mri_add_xform_to_header/mri_add_xform_to_header.cpp` 45-221 (queue item 3.2-10, track A relay 50) | `main` (FS-1154, FS-1155), `get_option`, `usage_exit`, `print_usage`; the program `mri_add_xform_to_header` of `larmorx-freesurfer` | `src/mri_add_xform_to_header/main.rs` |
+| `mri_add_xform_to_header/mri_add_xform_to_header.help.xml` (3.2-10) | the help text, copied unchanged (`print_usage` renders it) | `src/mri_add_xform_to_header/mri_add_xform_to_header.help.xml` |
+| `utils/mriio.cpp` 11852-11905 (3.2-10; decided for the program's crate: no other program on the default paths calls it) | `MRIwriteInfo` (FS-1156, FS-1157, FS-1158) | `src/mri_add_xform_to_header/write_info.rs` |
 
 Third-party code: none in `mri_normalize.cpp` (FreeSurfer's own file, MGH's notice). Its library
 calls are the other crates' (`larmorx-freesurfer-filter`'s normalisation, `-volume`, `-surf`,
@@ -56,6 +59,12 @@ the other crates' (`larmorx-freesurfer-io`'s format identification, header and v
 writer and the colour table's text; `-gca`'s morph reader and `cma_label_to_name`; `-mri`'s
 geometry matrices and `vgprint`; `-volume`'s orientation, slice direction, conformed test,
 tkregister matrices and histogram; `-core`'s matrices and version) and `larmorx-io`'s znzlib.
+
+Third-party code: none in `mri_add_xform_to_header.cpp` and `MRIwriteInfo` (FreeSurfer's own,
+MGH's notice). Their library calls are the other crates' (`larmorx-freesurfer-io`'s file tests,
+`MRIreadInfo`, `MRIread`, `MRIwrite` and FreeSurfer's `.xfm` reader on `larmorx_io::xfm`, MINC's
+volume_io: MNI's notice; `-mri`'s transform matrices; `-volume`'s slice direction; `-core`'s
+version, help and error messages).
 
 ## Changes from the originals
 
@@ -106,3 +115,10 @@ tkregister matrices and histogram; `-core`'s matrices and version) and `larmorx-
   `CTABwriteIntoBinary: fp was NULL`); its debug lines with `--diag-debug` (positions of a file that
   is not there, -1) are not printed. `MRIread` of a type given with `-it` (FS-1147's correction) is
   `MRIread` of `<name>@<type>`, its own way of naming a type.
+- `mri_add_xform_to_header` (relay 50): the transform file is read with
+  `input_transform_file_ex` (what C's `transform` argument holds after a failure, and `errno`),
+  the volume keeping a partial transform as C's does; a transform never read gives no matrices
+  (C's zeroed `General_transform`: type `LINEAR` with null pointers). FS-1154 and FS-1156 with
+  `reproduce` print the C library's `*** buffer overflow detected ***: terminated` and end with
+  status 134 (the official build's fortified copy aborts); standard output as written (C's buffer,
+  lost at the abort when it is not a terminal, is not modelled).

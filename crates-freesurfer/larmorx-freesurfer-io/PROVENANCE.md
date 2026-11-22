@@ -146,6 +146,14 @@ own: MATLAB's version 4 and 5 formats read by their definition (MATLAB's MAT-fil
 Third-party code: `packages/minc` is MNI's volume_io reworked by FreeSurfer (MNI's permissive notice); `minc.rs`
 carries both licence names. No other third-party code in these lines.
 
+Changes of relay 50 (track A, `mri_add_xform_to_header`): `minc.rs`'s `input_transform_file_ex`
+gives what C's `transform` argument holds after a failed read (`minc_volume_io.c` 1443-1452: the
+transforms read before the failure) and sets `errno` as the read's own file operations leave it;
+`mghRead`'s tag reader and `corRead` keep that partial transform in the volume (their matrices
+cleared, the name emptied, as `mriio.cpp` 12303-12307 and 1720-1725 do). A relative name read in
+the program's folder no longer shows that folder in volume_io's messages (FreeSurfer opens the name
+in its working directory and prints it as given).
+
 Changes for part 7 (relay 17, Bruker's readers): `BrukerTransform`'s and the readers' outputs held as
 `Option`s (`None`: never written, FS-401, 0 in both modes); the line buffer as the C string `fgets`
 gives (its first NUL ends it); the `sscanf` calls through `larmorx_freesurfer_core::cscan::Scanf`;

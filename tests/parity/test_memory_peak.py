@@ -15,7 +15,8 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 2026-11-11); FreeSurfer's ``mri_normalize`` against the ``larmorx-freesurfer`` replica
 (``MRI_NORMALIZE_CASES``, 2026-11-19), ``mri_binarize`` (``MRI_BINARIZE_CASES``, 2026-11-21),
 ``mri_convert`` (``MRI_CONVERT_CASES``, 2026-11-21), ``mri_segstats`` (``MRI_SEGSTATS_CASES``,
-2026-11-22) and ``mri_info`` (``MRI_INFO_CASES``, 2026-11-22).
+2026-11-22), ``mri_info`` (``MRI_INFO_CASES``, 2026-11-22) and ``mri_add_xform_to_header``
+(``MRI_ADD_XFORM_CASES``, 2026-11-22).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -2392,3 +2393,83 @@ def test_mri_info_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, a
         )
         if "out.txt" in words:
             assert (r_dir / "out.txt").read_bytes() == (o_dir / "out.txt").read_bytes(), name
+
+
+#: ``mri_add_xform_to_header``'s calls (track A relay 50): recon-all's (the conformed volume's
+#: header gets the transform's name in place, the transform not read) and the same with the
+#: transform read, into another file; the volume a copy of ds000005 sub-01's ``orig.mgz`` in the
+#: run's folder.
+MRI_ADD_XFORM_CASES = [
+    ("recon-all", ["-c", "{mri}/transforms/talairach.xfm", "orig.mgz", "orig.mgz"]),
+    ("read", ["{mri}/transforms/talairach.xfm", "orig.mgz", "out.mgz"]),
+]
+
+
+@pytest.mark.parametrize(("name", "args"), MRI_ADD_XFORM_CASES)
+def test_mri_add_xform_to_header_replica_needs_no_more_memory_than_freesurfer(
+    tmp_path, name, args
+):
+    from larmorx_validation.freesurfer import files as fsfiles
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / "mri_add_xform_to_header" if ws else None
+    mri = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / "ds000005-sub-01-classic" / "subjects"
+        / "sub-01" / "mri"
+        if ws
+        else None
+    )  # fmt: skip
+    if exe is None or not exe.is_file() or not (mri / "orig.mgz").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    words = [a.format(mri=mri) for a in args]
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        **freesurfer_env(),
+    }
+
+    def fresh(d: Path):
+        def reset() -> None:
+            if d.exists():
+                shutil.rmtree(d)
+            d.mkdir()
+            shutil.copyfile(mri / "orig.mgz", d / "orig.mgz")
+
+        reset()
+        return reset
+
+    o_dir = tmp_path / "freesurfer"
+    code, fs_mib = _original_peak(
+        ["mri_add_xform_to_header", *words],
+        env,
+        "freesurfer",
+        fresh(o_dir),
+        o_dir,
+        (),
+        "freesurfer",
+    )
+    assert code == 0
+    out = words[-1]
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        fresh(r_dir)
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_add_xform_to_header", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(f"mri_add_xform_to_header {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"mri_add_xform_to_header {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        assert (r_dir / out).read_bytes() == (o_dir / out).read_bytes(), f"{name} ({mode})"
+        c = fsfiles.compare(o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out)
+        assert c.same, f"mri_add_xform_to_header {name} ({mode}): {c.verdict} {c.detail}"

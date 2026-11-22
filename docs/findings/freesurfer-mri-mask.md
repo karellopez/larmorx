@@ -92,10 +92,14 @@ probes do.
 atlas, the input in the head: `Inverting transform to match MRI geometries`, `GCAMinvert` on the
 256^3 head) was ended by a 4 GiB memory box in both programs (relay 52, exit 137 for each). Not run
 again in a larger box (the rule); `real.py` runs the forward direction only (6 calls on 3 classic
-runs, identical in both modes; official 20.8 s, the port 26.7 s for the six).
+runs, identical in both modes; the first, uncached run: official 20.8 s, the port 26.7 s for the
+six: a speed item for later).
 
 ## 6. The recorded calls
 
-recon-all's `mri_mask` steps (relay 51's replays: the 24 recorded steps reproduced in both modes)
-and the v8 stream's further calls (`-bb 3` on `orig.mgz`, the venous-sinus and MCA-dura masks,
-`-T .001 -crop 0`, `-T .001 -crop-to-fov-mm 80 80 80`, `-oval 1 -invert` in place): see the record.
+recon-all's `mri_mask` steps (24: `-T 5` in both streams, the v8 stream's two `-oval 1 -invert`
+calls; relay 51's replays reproduced them in both modes, relay 52's record redoes them) and, from
+the v8 stream's scripts, the calls whose inputs the runs keep (`T1.mgz` masked by `synthstrip.mgz`,
+`-bb 3` on `orig.mgz` into NIfTI: `real.py`, identical in both modes on 3 runs). The scripts' other
+calls (`-T .001 -crop 0` and `-T .001 -crop-to-fov-mm 80 80 80` on priors in temporary folders)
+read files the runs do not keep; the probe covers their options.

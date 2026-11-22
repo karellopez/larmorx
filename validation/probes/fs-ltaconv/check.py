@@ -14,6 +14,7 @@ every file and folder after the run): ``reproduce`` must give FreeSurfer's on ev
 where FreeSurfer crashes, never ends or reads memory contents (``SKIP``), which are counted, not
 compared; ``fix`` may differ only where a defect it corrects changed the result (its notices).
 Prints the counts and the hash the port's recorded test checks (``tests/fs_ltaconv_official.rs``).
+``--extra``: the cases only Linux's file names hold (a name ending in a dot, which Windows drops).
 
 The official side runs with ``FS_DISABLE_LANG=1`` (``docs/findings/freesurfer-info.md``: the
 locale and ``errno``). No case sets ``DIAG_NO``.
@@ -164,6 +165,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--n", type=int, default=400)
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--json", type=Path)
+    ap.add_argument("--extra", action="store_true", help="the cases only Linux's names hold")
     ap.add_argument("--dump", type=Path, help="a folder for the official, reproduce, fix lines")
     ap.add_argument("--show", type=int, default=5, help="differing cases to print")
     ap.add_argument(
@@ -185,9 +187,15 @@ def main(argv: list[str] | None = None) -> int:
     )  # fmt: skip
     inputs = ws / "oracles" / "inputs" / "fs-ltaconv"
     inputs.mkdir(parents=True, exist_ok=True)
-    tag = "golden" if a.golden else f"{a.seed}-{a.n}"
+    tag = "golden" if a.golden else "extra" if a.extra else f"{a.seed}-{a.n}"
     cases_path = inputs / f"cases-{tag}.txt"
-    gen = ["golden-cases"] if a.golden else ["cases", str(a.seed), str(a.n)]
+    gen = (
+        ["golden-cases"]
+        if a.golden
+        else ["extra-cases"]
+        if a.extra
+        else ["cases", str(a.seed), str(a.n)]
+    )
     text = subprocess.run([EXAMPLE, *gen], check=True, capture_output=True, text=True).stdout
     cases_path.write_text(text, encoding="utf-8")
     cases = text.splitlines()

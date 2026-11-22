@@ -430,7 +430,7 @@ const INPUTS: &[(&str, &[&str])] = &[
 
 const VOLUMES: &[&str] = &[
     "s.mgz", "s.mgz", "t.mgz", "t.mgz", "obl.mgz", "s.nii", "t.nii", "big.mgz", "d45.mgz",
-    "bad.mgz", "z0.mgz", "gone.mgz", "c.mgz", "noext", "a.b/c", "trail.", "U.MGZ",
+    "bad.mgz", "z0.mgz", "gone.mgz", "c.mgz", "noext", "a.b/c", "U.MGZ",
 ];
 
 const OUTPUTS: &[(&str, &[&str])] = &[
@@ -824,6 +824,39 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
         out.push(seeded(&mut g, &i));
     }
     out.truncate(n);
+    out
+}
+
+/// The cases only Linux's names hold (not in the recorded test: Windows drops a name's last dot):
+/// a volume named `trail.`.
+pub fn extra_cases() -> Vec<String> {
+    let i = base_inputs();
+    let mut out = Vec::new();
+    for args in [
+        s(&[
+            "--inlta",
+            "identity.nofile",
+            "--src",
+            "trail.",
+            "--trg",
+            "t.mgz",
+            "--outlta",
+            "o.lta",
+        ]),
+        s(&["--inlta", "r.lta", "--trg", "trail.", "--outlta", "o.lta"]),
+        s(&[
+            "--initk",
+            "itk_r.txt",
+            "--src",
+            "s.mgz",
+            "--trg",
+            "trail.",
+            "--outlta",
+            "o.lta",
+        ]),
+    ] {
+        out.push(line(&[FSL], &i, &args));
+    }
     out
 }
 

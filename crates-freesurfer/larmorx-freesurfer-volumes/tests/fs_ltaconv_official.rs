@@ -14,11 +14,11 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-22 from the official program (`check.py --seed 1 --n 400`): 400 cases, 365
-/// lines identical, 35 hashed as `SKIP`.
+/// Recorded 2026-11-22 from the official program (`check.py --seed 1 --n 400`): 400 cases, 366
+/// lines identical, 34 hashed as `SKIP`.
 const N: usize = 400;
-const OFFICIAL_SHA256: &str = "08437e78cc5b306ab0eefc90e771ee582b9c7e1928c94967398f378ab7c60e2a";
-const SKIPPED: usize = 35;
+const OFFICIAL_SHA256: &str = "aee8a6cf8d9a473d55651446fefc724270265aaa65a478e11c40b152d93c31c9";
+const SKIPPED: usize = 34;
 
 /// `check.py`'s `SKIP` (the port's pseudo-notices `CRASH` and `MEMORY` included).
 const SKIP: [&str; 5] = ["CRASH", "MEMORY", "FS-1162", "FS-1168", "FS-167"];

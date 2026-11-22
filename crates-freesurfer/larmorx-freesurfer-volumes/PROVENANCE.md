@@ -47,6 +47,11 @@ ported file is audited for third-party code first).
 | `mri_add_xform_to_header/mri_add_xform_to_header.cpp` 45-221 (queue item 3.2-10, track A relay 50) | `main` (FS-1154, FS-1155), `get_option`, `usage_exit`, `print_usage`; the program `mri_add_xform_to_header` of `larmorx-freesurfer` | `src/mri_add_xform_to_header/main.rs` |
 | `mri_add_xform_to_header/mri_add_xform_to_header.help.xml` (3.2-10) | the help text, copied unchanged (`print_usage` renders it) | `src/mri_add_xform_to_header/mri_add_xform_to_header.help.xml` |
 | `utils/mriio.cpp` 11852-11905 (3.2-10; decided for the program's crate: no other program on the default paths calls it) | `MRIwriteInfo` (FS-1156, FS-1157, FS-1158) | `src/mri_add_xform_to_header/write_info.rs` |
+| `lta_convert/lta_convert.cpp` 116-1441 (queue item 3.2-09, track A relay 51) | `main` (FS-1164, FS-1168, FS-1169), `parseNextCommand` (FS-1159, FS-1160), `parseCommandLine` (FS-1170), `printUsage`; the program `lta_convert` of `larmorx-freesurfer` | `src/lta_convert/main.rs` |
+| `lta_convert/lta_convert.cpp` 196-921 (3.2-09) | `shallowCopyLTA`, `readLTA`, `readFSL`, `readMNI`, `readREG`, `readNIFTYREG`, `readITK`, `readVOX`, `writeFSL`, `writeMNI`, `writeREG`, `writeNIFTYREG`, `writeITK`, `writeVOX` (FS-1161 to FS-1165) | `src/lta_convert/formats.rs` |
+| `lta_convert/lta_convert.cpp` 116-193, `utils/transform.cpp` 5665-5794 (3.2-09; `conformGeom` decided for the program's crate: no other program on the default paths calls it) | `upsampleGeom`, `downsampleGeom` (FS-1166), `conformGeom` (FS-1167) | `src/lta_convert/geom.rs` |
+| libstdc++'s `std::ifstream` `>>` (`float`, words), `peek`, `getline` and `std::ofstream` `<<` with `precision` in the "C" locale (behaviour as C++ defines it and as measured on the official program; no library code) | the program's NiftyReg, ITK and voxel-space text | `src/lta_convert/cxx.rs` |
+| `lta_convert/lta_convert.help.xml` (3.2-09) | the help text, copied unchanged (`printUsage` renders it) | `src/lta_convert/lta_convert.help.xml` |
 
 Third-party code: none in `mri_normalize.cpp` (FreeSurfer's own file, MGH's notice). Its library
 calls are the other crates' (`larmorx-freesurfer-filter`'s normalisation, `-volume`, `-surf`,
@@ -62,6 +67,11 @@ the other crates' (`larmorx-freesurfer-io`'s format identification, header and v
 writer and the colour table's text; `-gca`'s morph reader and `cma_label_to_name`; `-mri`'s
 geometry matrices and `vgprint`; `-volume`'s orientation, slice direction, conformed test,
 tkregister matrices and histogram; `-core`'s matrices and version) and `larmorx-io`'s znzlib.
+
+Third-party code: none in `lta_convert.cpp` (FreeSurfer's own, MGH's notice; Martin Reuter's) and
+`conformGeom` (FreeSurfer's own). Their library calls are the other crates' (`larmorx-freesurfer-volume`'s
+`LTAreadEx`, `LTAchangeType`, `LTAprint`, `LTAwrite`, the conformed sizes; `-io`'s `MRIreadHeader`;
+`-mri`'s geometry; `-core`'s matrices, version and help; `-gca`'s readers behind the `.lta` reader).
 
 Third-party code: none in `mri_add_xform_to_header.cpp` and `MRIwriteInfo` (FreeSurfer's own,
 MGH's notice). Their library calls are the other crates' (`larmorx-freesurfer-io`'s file tests,

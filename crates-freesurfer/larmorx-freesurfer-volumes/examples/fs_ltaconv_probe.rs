@@ -4,6 +4,7 @@
 //! The port's side of the fs-ltaconv probe (`validation/probes/fs-ltaconv/`):
 //!
 //!     fs_ltaconv_probe cases <seed> <n>            the case file, on standard output
+//!     fs_ltaconv_probe extra-cases                 the cases only Linux's names hold
 //!     fs_ltaconv_probe golden-cases                the golden cases
 //!                                                (`tests/lta_convert_golden.rs`)
 //!     fs_ltaconv_probe run <cases> fix|reproduce   one line per case: the output, a tab, the
@@ -29,6 +30,11 @@ fn main() {
         }
         Some("golden-cases") => {
             for line in cases::golden_cases() {
+                println!("{line}");
+            }
+        }
+        Some("extra-cases") => {
+            for line in cases::extra_cases() {
                 println!("{line}");
             }
         }
@@ -59,7 +65,7 @@ fn main() {
         }
         _ => {
             eprintln!(
-                "usage: fs_ltaconv_probe cases <seed> <n> | golden-cases | run <cases> fix|reproduce | run-seed <seed> <n> fix|reproduce"
+                "usage: fs_ltaconv_probe cases <seed> <n> | golden-cases | extra-cases | run <cases> fix|reproduce | run-seed <seed> <n> fix|reproduce"
             );
             std::process::exit(2);
         }

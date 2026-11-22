@@ -878,6 +878,7 @@ pub fn golden_cases() -> Vec<String> {
         files.extend(write_as(&mut m, name));
     }
     files.push(("talairach.xfm".to_owned(), info::XFM.to_vec()));
+    files.push(("register.lta".to_owned(), lta_text(1, ROT, 1)));
     files.push((
         "reg.txt".to_owned(),
         itk(
@@ -932,7 +933,7 @@ pub fn golden_cases() -> Vec<String> {
             "--outreg",
             "bold2t1.dat",
         ]),
-        s(&["--inlta", "rawavg2orig.lta", "--outitk", "x.txt"]),
+        s(&["--inlta", "register.lta", "--outitk", "x.txt"]),
         s(&[
             "--initk",
             "reg.txt",

@@ -29,7 +29,9 @@ pub const N: i32 = 32;
 /// volume (an error per voxel, `errno`'s message first, FS-1130); no output name (FS-1127).
 pub const CASES: [&[&str]; 7] = [
     &["vf.mgz", "tal.xfm", "out.mgz"],
-    &["-h", "h.txt", "-v", "rad.mgz", "-r", "30", "vf.mgz", "tal.xfm", "out.mgz"],
+    &[
+        "-h", "h.txt", "-v", "rad.mgz", "-r", "30", "vf.mgz", "tal.xfm", "out.mgz",
+    ],
     &["vu.mgz", "tal.xfm", "out.mgz"],
     &["-r", "0", "-h", "h.txt", "vf.mgz", "tal.xfm", "out.mgz"],
     &["vn.mgz", "tal.xfm", "out.mgz"],
@@ -99,7 +101,11 @@ const RAS: [[f32; 3]; 3] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
 /// An intensity as integer arithmetic makes it: 0 at some voxels, else `40 + k / 2` (exact).
 fn intensity(x: i32, y: i32, z: i32) -> f32 {
     let k = (x * 7 + y * 13 + z * 29) % 211;
-    if k % 9 == 0 { 0.0 } else { 40.0 + k as f32 / 2.0 }
+    if k % 9 == 0 {
+        0.0
+    } else {
+        40.0 + k as f32 / 2.0
+    }
 }
 
 /// Writes `vf.mgz` (`float`), `vu.mgz` (`uchar`, the same values cut to 255), `vn.mgz` (`float`
@@ -181,10 +187,13 @@ pub fn volume_digest(path: &Path) -> String {
     h.finalize().iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// A written file's digest by its kind: a volume (`.mgz`), else its bytes.
+/// A written file's digest by its kind: a volume (`.mgz`), else its bytes; `absent` for a file
+/// the run did not write.
 pub fn digest(path: &Path) -> String {
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    if name.ends_with(".mgz") {
+    if !path.exists() {
+        "absent".to_owned()
+    } else if name.ends_with(".mgz") {
         volume_digest(path)
     } else {
         let b = std::fs::read(path).expect("a file");

@@ -18,8 +18,9 @@ use sha2::{Digest, Sha256};
 /// `reproduce` gave the same): seven cases, 32^3 and 8^3 volumes.
 const OFFICIAL_SHA256: &str = "97ad8284812a22b22c8e5108ba76442c176d0eb55bc9f67a275ba0ecf9dadb01";
 /// The port's default on Linux x64 (`cases_digest(Fix)`): no error per voxel for the axial volume
-/// (FS-1130), the usage for a missing output name (FS-1127).
-const FIX_SHA256: &str = "8577e71f97d449d135e4a8cee2e6c22420ef03c64272428b2b5550d5b774eb62";
+/// (FS-1130), an error for the empty ball (FS-1131), the usage for a missing output name
+/// (FS-1127).
+const FIX_SHA256: &str = "f7d645a03966a44a9bdf0f30cadc9ad7e2fdba57df1e3913e3672b3e62568183";
 
 fn cases_digest(mode: UpstreamDefects) -> String {
     let dir = tempfile::tempdir().expect("a folder");

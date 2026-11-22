@@ -36,6 +36,9 @@
 //! - **FS-1129**: an output (or `-v`'s volume, or `-h`'s histogram) that cannot be written still
 //!   ends with status 0. By default status 1 after the writer's messages (the timing line left
 //!   out).
+//! - **FS-1131**: a mapping that is not finite (both percentiles in bins of one value: an empty
+//!   ball, a ball of one intensity; a percentile that is no number): FreeSurfer writes a volume
+//!   of zeros (its NaNs converted) with status 0. By default an error, status 1, nothing written.
 //! - **FS-1130**: an input that is not coronal prints `MRIvoxelToTalairachVoxel: unsupported slice
 //!   direction <d>` (with `errno`'s message first) for every voxel, although the Talairach point
 //!   is never used. By default no such message.
@@ -44,7 +47,7 @@ use std::io::Write;
 
 use larmorx_core::cfmt;
 use larmorx_core::cscan::sscanf_f64;
-use larmorx_core::defects::{FS_1127, FS_1128, FS_1129, FS_1130};
+use larmorx_core::defects::{FS_1127, FS_1128, FS_1129, FS_1130, FS_1131};
 use larmorx_freesurfer_core::diag::diag_init;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::histo::{
@@ -451,6 +454,28 @@ pub fn convert_to_uchar(
     let y2 = DESIRED_WHITE_MATTER_VALUE;
     let m = div64(sub64(y2, y1), sub64(x2, x1));
     let b = sub64(y2, mul64(x2, m));
+    if !(m.is_finite() && b.is_finite()) {
+        // FS-1131: both percentiles in bins of one value (an empty ball, one intensity), or a
+        // percentile that is no number: no line maps the intensities
+        g.notices.add(
+            &FS_1131,
+            if g.notices.reproduce() {
+                "mri_make_uchar: the ball's histogram gives no finite mapping: a volume of zeros, as in FreeSurfer"
+            } else {
+                "mri_make_uchar: the ball's histogram gives no finite mapping: an error, status 1 (FreeSurfer writes a volume of zeros)"
+            },
+        );
+        if g.notices.fix() {
+            let _ = writeln!(
+                r.err,
+                "{NAME}: no finite mapping to uchar (bins {i1} and {i2}: {} and {}; slope {}): nothing written",
+                cfmt::g(x1, 6),
+                cfmt::g(x2, 6),
+                cfmt::g(m, 6)
+            );
+            return Err(Fatal::Exit(1));
+        }
+    }
     let (mut nzero, mut nsat) = (0i64, 0i64);
     for x in 0..w {
         for y in 0..h {

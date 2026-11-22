@@ -54,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     runs = sorted(p for p in (ws / "oracles" / "freesurfer-8.2.0" / "runs").iterdir() if p.is_dir())
     rows = []
     for run in runs:
-        subj = [p for p in (run / "subjects").iterdir() if p.name != "fsaverage"][0]
+        subj = next(p for p in (run / "subjects").iterdir() if p.name != "fsaverage")
         mri = subj / "mri"
         log = (subj / "scripts" / "recon-all.log").read_text(encoding="utf-8", errors="replace")
         s2c = subj / "scripts" / "seg2cc.log"

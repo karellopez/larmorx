@@ -2249,6 +2249,7 @@ def test_mri_convert_replica_needs_no_more_memory_than_freesurfer(tmp_path, name
         c = fsfiles.compare(o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out)
         assert c.same, f"mri_convert {name} ({mode}): {c.verdict} {c.detail}"
 
+
 #: ``mri_info``'s calls (track A relay 49): the report recon-all prints (the header only), and the
 #: three options that read every voxel of the conformed volume (their answer in ``--o``'s file).
 MRI_INFO_CASES = [

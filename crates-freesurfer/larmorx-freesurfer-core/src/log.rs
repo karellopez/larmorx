@@ -172,6 +172,7 @@ pub fn error(g: &Globals, err: &mut dyn Write, message: &str) {
 }
 
 fn error_bytes(g: &Globals, err: &mut dyn Write, message: &[u8]) {
+    g.stderr.mark_cxx_message();
     let _ = err.write_all(b"error: ");
     let _ = err.write_all(message);
     let _ = err.write_all(b"\n");

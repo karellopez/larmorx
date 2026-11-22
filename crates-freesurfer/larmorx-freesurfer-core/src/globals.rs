@@ -16,7 +16,7 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use larmorx_core::defects::{Notices, UpstreamDefects};
 use larmorx_core::drand48::Drand48;
@@ -151,6 +151,11 @@ pub struct StderrState {
     pub read_write: bool,
     /// Something was written to standard error ([`crate::log::TrackedErr`] and `perror` set it).
     pub written: Arc<AtomicBool>,
+    /// The messages written through the C++ error stream (`fs::error()`, so `ErrorPrintf` and
+    /// `ErrorExit` too: [`crate::log::error`]): `std::cerr` is tied to `std::cout`, which writes
+    /// through the C library's standard output, so each one flushes standard output's buffer
+    /// first (what a later crash keeps of it).
+    pub cxx_messages: Arc<AtomicUsize>,
 }
 
 impl StderrState {
@@ -162,6 +167,16 @@ impl StderrState {
     /// Marks standard error as written to.
     pub fn mark_written(&self) {
         self.written.store(true, Ordering::Relaxed);
+    }
+
+    /// The number of messages written through the C++ error stream so far.
+    pub fn cxx_messages(&self) -> usize {
+        self.cxx_messages.load(Ordering::Relaxed)
+    }
+
+    /// Counts a message written through the C++ error stream.
+    pub fn mark_cxx_message(&self) {
+        self.cxx_messages.fetch_add(1, Ordering::Relaxed);
     }
 }
 

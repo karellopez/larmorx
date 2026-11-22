@@ -2035,6 +2035,12 @@ defects! {
         "mri_make_uchar whose ball around the Talairach origin gives both percentiles in histogram bins of one value (no voxel in the ball, one intensity in it) or whose percentile is not a number divides by zero: its intensity line is not finite and it writes a volume of zeros with status 0: larmorx ends with an error (status 1) and writes no output";
     FS_1132 = "FS-1132", "FreeSurfer", true,
         "mri_mask given an option that takes numbers or a file (-dilate, -erode, -T, -threshold, -crop-to-fov, -crop-to-fov-mm, -BB, -crop-crs, -BBM, -BBMM, -BBEQ, -transfer, -oval, -lta_src, -lta_dst, -DEBUG_VOXEL, -bgnoise) as its last arguments, without all its values, reads past its arguments and crashes (signal 11): larmorx prints that the option needs its values and the help, status 1";
+    FS_1133 = "FS-1133", "FreeSurfer", true,
+        "mri_mask -BBEQ whose bounding box cannot be made square with an odd number of slices (its columns more than the volume's rows, its rows more than the volume's columns, or an even number of slices spanning the whole depth from the first) prints its ERROR line and crashes (signal 11; what it printed to a file or pipe is lost): larmorx ends with an error, status 1";
+    FS_1134 = "FS-1134", "FreeSurfer", true,
+        "mri_mask -xform with a transform file of several transforms that do not chain (each one's source or destination the previous one's destination) prints 'ERROR: LTAreduce(): LTs <n> and <n+1> do not match' and crashes (signal 11): larmorx ends with an error, status 1";
+    FS_1135 = "FS-1135", "FreeSurfer", true,
+        "mri_mask -xform with a transform that inverts but whose voxel-to-voxel form for the two volumes is singular in single precision prints 'MRIlinearTransform: xform is singular' and goes on without a mask: it crashes (signal 11) with -T, -threshold, -invert, -samseg, -lh, -rh, the crops or -dilate, else ends with 'must have a valid MRI (src)' (status 252): larmorx ends with an error at once, status 1";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

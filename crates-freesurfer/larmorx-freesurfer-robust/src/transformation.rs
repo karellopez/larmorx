@@ -533,9 +533,19 @@ mod tests {
         assert_eq!([m[0][3], m[1][3], m[2][3]], [1.0, 2.0, 3.0]);
         let r = t.gradient(&mut e, 2, 1.0, 3, 0.5, 4, 0.25).unwrap();
         assert_eq!(r, vec![1.0, 0.5, 0.25, -1.25, 3.5, -2.0]);
-        // a vector of another length (FS-1063): its first parameters
+        // a longer vector whose block the allocator hands back (FS-1073): by default its first
+        // parameters; `reproduce` the allocator's two words first
         t.set_parameters(&mut g, &[0.5f64; 7], false);
         assert_eq!(t.parameters, vec![0.5; 6]);
-        assert_eq!(g.notices.as_slice()[0].defect.id, "FS-1063");
+        assert_eq!(g.notices.as_slice()[0].defect.id, "FS-1073");
+        let mut r = Globals::new(UpstreamDefects::Reproduce);
+        t.set_parameters(&mut r, &[0.5f64; 7], false);
+        assert_eq!(t.parameters[0].to_bits(), 0x5555_5555_5000);
+        assert_eq!(&t.parameters[1..], &[0.0, 0.5, 0.5, 0.5, 0.5]);
+        // another size class (FS-1063): the first parameters in both modes
+        let mut u = Transformation::new(Kind::Translate3d);
+        u.set_parameters(&mut r, &[0.25f64; 4], false);
+        assert_eq!(u.parameters, vec![0.25; 3]);
+        assert_eq!(r.notices.as_slice()[1].defect.id, "FS-1063");
     }
 }

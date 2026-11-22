@@ -23,7 +23,7 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 |---|---|
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 29 groups of seeded cases and eleven of fixed cases (`vrules`, `vrules4` to `vrules12`, `vbsrules`; 15,422 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 29 groups of seeded cases and twelve of fixed cases (`vrules`, `vrules4` to `vrules13`, `vbsrules`; 15,435 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 | `models.py` | statements of the spec checked as models of the probe's printed results: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
@@ -344,7 +344,7 @@ difference lists, TIV estimates), `vmri2` (§39: frame powers, binarisations, re
 constants, frame binarisations, votes, crops, slice reversals, end cuts, label lists, half-cosine weightings) and
 the fixed cases of `vrules12` (§37 to §39: the NaN orders of the normalisations', the root mean square's and the
 random draw's sums, the zero test, the integer stores past their range, the vote's runs, the defects' cases on
-lines of their own), and fs.bspline's `vbspline` (the coefficients of volumes of the six numeric types, degrees 2
+lines of their own) and of `vrules13` (§37: FS-471's negative label limits off and on the border), and fs.bspline's `vbspline` (the coefficients of volumes of the six numeric types, degrees 2
 to 9 and 0, 1, 10, -1, given B-splines with fitting, other or no coefficients; sampling at points inside,
 at and past the edges, NaN and infinite, frames -1 to one past; the frame-range sampler; coefficients
 sampled as given with degrees -2 to 12; the linear, RAS and transform-array transforms; the pyramids into
@@ -447,3 +447,7 @@ cached matrices as allocated, recomputed or dropped.
   cache; the probe as its own candidate: no unexplained difference in either mode; every model as before, none
   different (log `oracles/logs/fs-volume-probe-r13-final-2026-11-22.log`). Part 8's generators keep every volume's
   cached matrices (FS-252 would end the line; `vrules12` holds it once).
+- Relay 14 (2026-11-22): the prebuilt probe from `1536bbbb` unchanged; the new fixed group `vrules13` (13 calls: §37's
+  FS-471 with negative label limits) the same cold, warm and twice without the cache, the probe as its own candidate
+  identical in both modes (log `oracles/logs/fs-volume-probe-r14-vrules13-2026-11-22.log`). The loop lets a `vpvlab`
+  line noting FS-469 differ in both modes (a label's mean read beside the table, the same in all four runs).

@@ -3083,6 +3083,32 @@ class Gen11(Gen10):
             L.append(f"mbin {fw(2, 1, 1, 1, [-3.0, 2.0])} 0 new {f32(1.0)} {xs(tl)} 0")
         return [Batch("vrules12", "vrules12", L)]
 
+    @staticmethod
+    def vrules13() -> list[Batch]:
+        """§37's fixed cases of relay 14: a negative maxlabels (FS-471) with a label below it, on
+        volumes whose counted voxels all lie off the border (FreeSurfer finishes for -1 to -3 and
+        crashes from -4) and on a volume with border voxels (a crash for every negative number);
+        the label absent. Each on a line of its own."""
+        L = []
+
+        def fw(w, h, d, vals) -> str:
+            return fixed_w(w, h, d, 3, 1, fill=ifill(vals))
+
+        inner = fw(3, 2, 2, [-200.0])
+        vals = fw(3, 2, 2, [10.0, 50.0, 60.0])
+        for m in (-1, -2, -3, -4, -5, -17):
+            L.append(f"pvlab {inner} 0 {vals} 0 -200 {m} null null null")
+        for m in (-1, -3, -4):
+            L.append(
+                f"pvlab {fw(1, 1, 1, [-200.0])} 0 {fw(1, 1, 1, [7.0])} 0 -200 {m} null null null"
+            )
+        edge = fw(3, 1, 1, [-200.0, 0.0, -200.0])
+        evals = fw(3, 1, 1, [10.0, 50.0, 60.0])
+        for m in (-1, -2, -4):
+            L.append(f"pvlab {edge} 0 {evals} 0 -200 {m} null null null")
+        L.append(f"pvlab {fw(3, 1, 1, [0.0])} 0 {evals} 0 -200 -2 null null null")
+        return [Batch("vrules13", "vrules13", L)]
+
 
 GROUPS = [
     "vgblock",
@@ -3125,6 +3151,7 @@ GROUPS = [
     "vfr8",
     "vmri2",
     "vrules12",
+    "vrules13",
 ]
 
 # ---- running ------------------------------------------------------------------------------------

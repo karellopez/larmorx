@@ -64,7 +64,10 @@ def main(argv: list[str] | None = None) -> int:
             "seconds_recorded": round(sum(r["seconds"]["recorded"] for r in rows), 1),
             "seconds_replayed": round(sum(r["seconds"]["replayed"] for r in rows), 1),
         }
-    probes = [json.loads(p.read_text(encoding="utf-8")) for p in a.probe]
+    # a summary of check.py --extra (its file named so) is the extra cases', not a seed's
+    probes = [
+        json.loads(p.read_text(encoding="utf-8")) | {"extra": "extra" in p.name} for p in a.probe
+    ]
     real = {}
     if a.real and a.real.is_file():
         r = json.loads(a.real.read_text(encoding="utf-8"))
@@ -94,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
         "replay": replays,
         "probe": [
             {
-                "set": f"seed {p['seed']}",
+                "set": "extra" if p["extra"] else f"seed {p['seed']}",
                 "cases": p["cases"],
                 "identical": p["reproduce_equal"],
                 "different": p["reproduce_differ"],
@@ -168,8 +171,11 @@ def main(argv: list[str] | None = None) -> int:
         "",
     ]
     for p in payload["probe"]:
+        name = (
+            "the extra cases (Linux's names only: a dot last)" if p["set"] == "extra" else p["set"]
+        )
         lines.append(
-            f"- {p['set']}: {p['cases']} cases; `reproduce` {p['identical']} identical, "
+            f"- {name}: {p['cases']} cases; `reproduce` {p['identical']} identical, "
             f"{p['different']} different, {p['skipped']} counted; `fix` "
             f"{p['fix_different_with_notice']} different with a notice, "
             f"{p['fix_different_without_notice']} without."

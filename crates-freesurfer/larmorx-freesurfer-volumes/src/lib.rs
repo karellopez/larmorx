@@ -19,7 +19,9 @@ pub mod mri_normalize;
 
 use larmorx_freesurfer_core::run::Program;
 
+pub mod csh;
 pub mod fs_temp_file;
+pub mod getfullpath;
 pub mod lta_convert;
 pub mod mri_add_xform_to_header;
 pub mod mri_binarize;
@@ -36,6 +38,10 @@ pub const PROGRAMS: &[Program] = &[
     Program {
         name: fs_temp_file::main::NAME,
         run: fs_temp_file::main::run,
+    },
+    Program {
+        name: getfullpath::main::NAME,
+        run: getfullpath::main::run,
     },
     Program {
         name: lta_convert::main::NAME,

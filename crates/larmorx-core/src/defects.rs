@@ -2699,6 +2699,14 @@ defects! {
         "lta_convert stops reading its options at the first argument that does not start with a dash, without a message: that argument and every option after it are ignored, and the program goes on with what it read; corrected: ERROR: Option: <argument> unknown, status 1";
     FS_1171 = "FS-1171", "FreeSurfer", true,
         "fs_temp_file --base with a folder that does not exist, cannot be written or is empty makes its file elsewhere without a message: in the folder of the next of TMPDIR, TMP, TEMP and TEMPDIR that is set and writable, else in /tmp; corrected: Can not write to temporary directory <base>, status 1";
+    FS_1173 = "FS-1173", "FreeSurfer", true,
+        "getfullpath reads its name again as shell words: blanks split it (the first word is used, the next ones are taken as variable assignments or end the program with set: Variable name must begin with a letter. or ... must contain alphanumeric characters.), patterns (*, ?, [...], {...}) are matched against the files (set: No match., or if: Expression Syntax. for several), a leading ~ or =N is a home folder or the directory stack, a folder named +N is taken as the directory stack (pushd: Directory stack not that deep.), and an empty name ends with dirname's and if's errors, status 1; corrected: the name as given";
+    FS_1174 = "FS-1174", "FreeSurfer", true,
+        "getfullpath prints its result through tcsh's echo, which reads backslash sequences in it: a name or folder holding \\t, \\n, \\c, \\0nnn and the like prints a tab, a new line, nothing after it, a byte; corrected: the path as it is";
+    FS_1175 = "FS-1175", "FreeSurfer", true,
+        "getfullpath given a name that starts with a dash (other than - alone) passes it to dirname as options: dirname: invalid option, unrecognized option or missing operand, then if: Missing file name., status 1; corrected: the name as given";
+    FS_1176 = "FS-1176", "FreeSurfer", true,
+        "getfullpath reads the physical path of the name's folder again as shell words: several blanks or a tab in it print as one space, and pattern characters in it are matched against the files (echo: No match., status 1, when nothing matches); corrected: the path as it is";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

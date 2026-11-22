@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-22-freesurfer-batch-80",
+ "dossier": "2026-11-22-freesurfer-batch-81",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 517417,
+  "accesses": 517988,
   "agents": 553,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 907,
-  "archived_files": 907,
+  "archive_checksums_matched": 909,
+  "archived_files": 909,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -542,9 +542,13 @@
    "2026-11-22-session-transcripts-freesurfer-batch-80": {
     "files": 3,
     "sha256": "3a0395f0788b61bd56e73fcfcd2460df9873be59fdf78ba9636c03cfa5097d99"
+   },
+   "2026-11-22-session-transcripts-freesurfer-batch-81": {
+    "files": 3,
+    "sha256": "3151cc1f063f5594456bb831088cbecd8ea45e226784d2e0171983b3780a0d6c"
    }
   },
-  "commits_printed": 5382,
+  "commits_printed": 5391,
   "distinct_transcripts": 557,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
@@ -557,13 +561,13 @@
    "refused_calls_restricted_accesses": 743,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 9953
+   "unresolved_paths": 9955
   },
-  "last_record": "2026-11-22 08:12 UTC",
+  "last_record": "2026-11-22 09:12 UTC",
   "live_files": 557,
-  "live_files_also_archived": 555,
+  "live_files_also_archived": 556,
   "sessions": 4,
-  "tool_calls": 145564,
+  "tool_calls": 145686,
   "tool_calls_by_tool": [
    [
     "Agent",
@@ -579,7 +583,7 @@
    ],
    [
     "Bash",
-    128028
+    128146
    ],
    [
     "CronCreate",
@@ -623,7 +627,7 @@
    ],
    [
     "SubagentHandback",
-    584
+    585
    ],
    [
     "TaskOutput",
@@ -647,12 +651,12 @@
    ],
    [
     "Write",
-    7221
+    7224
    ]
   ],
-  "transcript_bytes": 30056985936,
-  "transcript_files": 1464,
-  "unique_paths": 95319
+  "transcript_bytes": 30302571416,
+  "transcript_files": 1466,
+  "unique_paths": 95397
  },
  "levels": [
   [
@@ -733,7 +737,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "c1d48607"
+  "verdicts_repository": "fd0c6d2b"
  },
  "overview": {
   "agents_by_role": [

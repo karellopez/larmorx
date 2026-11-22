@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+run() { printf '== [%s]\n' "$*"; env -i PATH=/usr/bin:/bin HOME=/nonexistent-home timeout 10 tcsh -f $P "$@" 2>&1 | sed 's/^/  /'; }
+P=$1
+run 'd1/*.mgz'
+run '{a,b}'
+run 'd1/{x,y}.mgz'
+run 'd1/{x,zz}.mgz'
+run 'd1/{zz,yy}.mgz'
+run 'x d1/*.mgz'
+run 'x yy*'
+run 'd1/x.mgz yy*'
+run 'x{'
+run 'x}'
+run '{}'
+run 'x{a}'
+run '{,}'
+run 'a{b,c'
+run 'x['
+run 'x[a'
+run '[]x]'
+run 'd1/*.mgz ab'

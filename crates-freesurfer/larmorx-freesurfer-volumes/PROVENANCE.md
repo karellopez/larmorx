@@ -47,6 +47,7 @@ ported file is audited for third-party code first).
 | `mri_add_xform_to_header/mri_add_xform_to_header.cpp` 45-221 (queue item 3.2-10, track A relay 50) | `main` (FS-1154, FS-1155), `get_option`, `usage_exit`, `print_usage`; the program `mri_add_xform_to_header` of `larmorx-freesurfer` | `src/mri_add_xform_to_header/main.rs` |
 | `mri_add_xform_to_header/mri_add_xform_to_header.help.xml` (3.2-10) | the help text, copied unchanged (`print_usage` renders it) | `src/mri_add_xform_to_header/mri_add_xform_to_header.help.xml` |
 | `utils/mriio.cpp` 11852-11905 (3.2-10; decided for the program's crate: no other program on the default paths calls it) | `MRIwriteInfo` (FS-1156, FS-1157, FS-1158) | `src/mri_add_xform_to_header/write_info.rs` |
+| `mri_convert/mri_make_uchar.cpp` 52-285 (queue item 3.2-22, track D relay 51) | `main` (FS-1127, FS-1129), `get_option` (FS-1128), `usage_exit` (its `printf` literals, copied), `MRIconvertToUchar` (FS-1130, FS-1131; the operand order and NaNs of the official build's object code: `255 * FIRST_PERCENTILE`, `x2 * m`, `val * m + b`, `(-b) / m`); `include/mrinorm.h` `DEFAULT_DESIRED_WHITE_MATTER_VALUE`; `utils/transform.cpp` `LTAtransformPoint` (1496-1503, inline: its static matrix kept by the caller); the program `mri_make_uchar` of `larmorx-freesurfer` | `src/mri_make_uchar/main.rs` |
 
 Third-party code: none in `mri_normalize.cpp` (FreeSurfer's own file, MGH's notice). Its library
 calls are the other crates' (`larmorx-freesurfer-filter`'s normalisation, `-volume`, `-surf`,
@@ -127,6 +128,12 @@ version, help and error messages).
   in both modes, `fmodf` as glibc's measured results (`ops::fmodf_glibc`); `stat` and `strtof`'s
   `errno` modelled (the fatal errors print it); `atof`'s `ERANGE` from fs.core's scanner;
   `docs/findings/freesurfer-mris-calc.md`.
+- `mri_make_uchar` (relay 51): standard output is held until the end (FreeSurfer's buffer, never
+  flushed before), so that a crash in `reproduce` (FS-1127, FS-1128) loses what it would; the
+  per-voxel `MRIvoxelToTalairach` of a coronal volume, whose point is never used, is called only
+  while the geometry's matrices are not cached yet (its only other effect; an input that is not
+  coronal calls it at every voxel in `reproduce` for its error); `docs/findings/
+  freesurfer-mri-make-uchar.md`.
 - `mri_add_xform_to_header` (relay 50): the transform file is read with
   `input_transform_file_ex` (what C's `transform` argument holds after a failure, and `errno`),
   the volume keeping a partial transform as C's does; a transform never read gives no matrices

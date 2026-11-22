@@ -232,7 +232,10 @@ here); `include/macros.h`'s `MAX`; the official build's operand orders from the 
   `LTAtransformInterp` (912-1155), `LTAtransformAtPoint` (1388-1430), `LTAvoxelTransformToCoronalRasTransform`
   (1946-1976), `FixMNITal` (1983-2016), `DevolveXFM` (2027-2030), `DevolveXFMWithSubjectsDir` (2032-2124),
   `LTAmodifySrcDstGeom` (3582-3641); `include/mri.h` `VOL_GEOM`'s member initialisers (185-202). Changes: FS-504,
-  FS-886, FS-887 (errors).
+  FS-886, FS-887 (errors). Relay 51 of track D (`mri_make_uchar`, a call per voxel): `LTAtransformAtPoint` sets
+  `errno` to `ERANGE` where the C library's `exp` does (a finite exponent giving 0 or an infinity; glibc 2.35
+  observed with `validation/investigations/freesurfer-make-uchar-errno/`), which the official program's errors
+  print; its weights on the stack and the first matrix copied without a clone (no allocation per call).
 - `src/rotmat.rs` (3.1-40; relay 34): `utils/transform.cpp` `MRIangles2RotMat` (4591-4652), `LTAmat2RotMat`
   (4956-4977), `RMSregDiffMJ` (4989-5024), `TranformAffineParams2Matrix` (5228-5289), `TranformExtractAffineParams`
   (5298-5361; the official object code's `atan2f` for its two `float`-argument angles). Changes: FS-504 (error).

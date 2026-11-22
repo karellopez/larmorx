@@ -11,7 +11,7 @@ where a defect it corrects is noted. Queue item 3.2-08 (track A, relay 49).
 
 ## Files
 
-- `check.py --seed <s> --n <n>`: the port's example `fs_info_probe` generates the cases (271
+- `check.py --seed <s> --n <n>`: the port's example `fs_info_probe` generates the cases (270
   fixed ones: every option on two volumes, every format, morphs and warp fields, failures; then
   seeded); the official `mri_info` (`$FREESURFER_HOME/bin`, with `FS_DISABLE_LANG=1`:
   `docs/findings/freesurfer-info.md`, the locale and `errno`) runs each in a folder of its own

@@ -1336,3 +1336,22 @@ fn transform_array_targets_prints_and_nan_elements() {
         out_of(&r)
     );
 }
+
+/// §54's `LTAreduce` as its text reads: each next transform compared with the previous
+/// transform's own destination. G1 to G2, then G3 to G2 (taken inverted: a warning), then G3 to G1:
+/// its source G3 is not the previous transform's destination G2, nor is its destination: the
+/// mismatch (reading the chain's end instead would have matched G3). The probe's groups do not
+/// tell the two readings apart; asked of the spec writer (relay 15).
+#[test]
+fn lta_reduce_compares_with_the_previous_transforms_destination() {
+    let line = format!(
+        "ltared {}",
+        arr54(1, &[(M1, G1, G2), (M2, G3, G2), (M1, G3, G1)])
+    );
+    let (r, _) = run(&line, UpstreamDefects::Reproduce);
+    assert!(r.starts_with("null "), "{r}");
+    assert_eq!(
+        out_of(&r),
+        "WARNING: LTAreduce(): inverting LT 1 to match geometry\nERROR: LTAreduce(): LTs 1 and 2 do not match\n"
+    );
+}

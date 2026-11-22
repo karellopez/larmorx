@@ -185,13 +185,17 @@ impl Process {
         out.fscale = copy.fscale;
         out.subject = subject_of(&copy).to_vec();
         self.lt_copy(&copy.xforms[0], Some(&mut out.xforms[0]));
+        // the reduced transform's destination: the last transform's (its source when inverted);
+        // each next transform is compared with the previous transform's own destination (§54's
+        // text; the probe's groups do not tell the two readings apart)
         let mut end: VolGeom = copy.xforms[0].dst.clone();
         for k in 1..copy.xforms.len() {
+            let prev = copy.xforms[k - 1].dst.clone();
             let t: &LinearTransform = &copy.xforms[k];
-            let m = if self.vg_is_equal(&t.src, &end, VG_IS_EQUAL_THRESHOLD) != 0 {
+            let m = if self.vg_is_equal(&t.src, &prev, VG_IS_EQUAL_THRESHOLD) != 0 {
                 end = t.dst.clone();
                 t.m_l.clone()
-            } else if self.vg_is_equal(&t.dst, &end, VG_IS_EQUAL_THRESHOLD) != 0 {
+            } else if self.vg_is_equal(&t.dst, &prev, VG_IS_EQUAL_THRESHOLD) != 0 {
                 self.put_out(
                     format!("WARNING: LTAreduce(): inverting LT {k} to match geometry\n")
                         .as_bytes(),

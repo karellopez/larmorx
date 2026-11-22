@@ -913,12 +913,209 @@ def physvox(runner, scratch: Path) -> int:
     return 1 if bad else 0
 
 
+def read_mn(tok: list[str], k: int) -> tuple[np.ndarray | None, int]:
+    """M (README.md's encodings) or ``null``."""
+    if tok[k] == "null":
+        return None, k + 1
+    return read_m(tok, k)
+
+
+def read_lt_in(tok: list[str], k: int) -> tuple[tuple, int]:
+    """An LT as compare.py writes it: its matrix and the 24 tokens of each geometry."""
+    m, k = read_mn(tok, k + 4)
+    _, k = read_mn(tok, k)
+    _, k = read_mn(tok, k)
+    k += 2
+    gs = []
+    for _ in range(2):
+        gs.append(tok[k : k + 24])
+        _, k = read_mn(tok, k + 25)
+    return (m, gs[0], gs[1]), k
+
+
+def read_lt_out(tok: list[str], k: int) -> tuple[np.ndarray | None, int]:
+    """A printed LT: its matrix; the geometries printed (G, the cache, two matrices) skipped."""
+    m, k = read_mn(tok, k + 4)
+    _, k = read_mn(tok, k)
+    _, k = read_mn(tok, k)
+    k += 2
+    for _ in range(2):
+        k += 24
+        k += 1 if tok[k] == "null" else 17
+        _, k = read_mn(tok, k)
+        _, k = read_mn(tok, k)
+    return m, k
+
+
+#: §54's changes between the voxel (0), RAS-to-RAS (1) and physical-voxel (2) types, the RAS-to-voxel
+#: matrix each needs (of the source or the destination), and the message when it is absent.
+LTA_CHANGES = {
+    (1, 0): ("dst", "LTAgetV2V: passed volumes did not have the info on i_to_r or r_to_i."),
+    (1, 2): ("dst", "LTAgetV2V: passed volumes did not have the info on i_to_r or r_to_i."),
+    (0, 1): ("src", "LTAgetR2R: passed volumes did not have the info on r_to_i or i_to_r"),
+    (0, 2): (None, ""),
+    (2, 0): (None, ""),
+    (2, 1): ("dst", "LTAgetV2V: passed volumes did not have the info on i_to_r or r_to_i."),
+}
+
+
+def lta_change(pair: tuple, m, src, dst, vm: dict, ivm: dict) -> np.ndarray:
+    """§54's product for one transform (``reproduce`` for physical-voxel to RAS-to-RAS)."""
+
+    def sz(g, inv):
+        s = np.eye(4, dtype=np.float32)
+        for q in range(3):
+            x = np.float64(F32(hexf(g[4 + q])))
+            s[q, q] = F32(1.0 / x) if inv else F32(x)
+        return s
+
+    ks, kd = " ".join(src), " ".join(dst)
+    if pair == (1, 0):
+        return mprod(ivm[kd], mprod(m, vm[ks]))
+    if pair == (1, 2):
+        vox = mprod(ivm[kd], mprod(m, vm[ks]))
+        return mprod(sz(dst, False), mprod(vox, sz(src, True)))
+    if pair == (0, 1):
+        return mprod(vm[kd], mprod(m, ivm[ks]))
+    if pair == (0, 2):
+        return mprod(sz(dst, False), mprod(m, sz(src, True)))
+    if pair == (2, 0):
+        return mprod(sz(dst, True), mprod(m, sz(src, False)))
+    return mprod(sz(dst, True), mprod(mprod(ivm[kd], mprod(m, vm[ks])), sz(src, False)))
+
+
+def ltatypes(runner, scratch: Path) -> int:
+    """§54's changes of a transform array between voxel, RAS-to-RAS and physical-voxel (``ltachg``):
+    every such line of the groups vltapv and vrules10 and 180 seeded arrays (30 per change, one or
+    two transforms, valid geometries, general affine matrices), against the products of §54 with the
+    geometries' matrices from the probe's own ``vgi2r`` and ``vgr2i``, the validity checks first, the
+    end of the program where an inverse it needs is absent, the array's new type."""
+    import random
+
+    old = []
+    for b in lines_of(["vltapv", "vrules10"], "ltachg"):
+        old += b.lines
+    gen = C.Gen10(7)
+    r = random.Random("7:ltatypes")
+    own = []
+    zero = C.f32(0.0)
+    for pair in LTA_CHANGES:
+        for _ in range(30):
+            n = r.choice([1, 1, 2])
+            fw, inv = [], []
+            for _ in range(n):
+                src, dst = (gen.geom(r, ext=(1, 5)).split(" ") for _ in range(2))
+                src[0] = dst[0] = "1"
+                a, b2 = " ".join(src) + " 1 null", " ".join(dst) + " 1 null"
+                fw.append(" ".join([zero] * 4 + [gen.affine(r), "null", "null", "0", "0", a, b2]))
+                inv.append(" ".join([zero] * 4 + [gen.affine(r), "null", "null", "0", "0", b2, a]))
+            own.append(f"ltachg {n} {pair[0]} {C.f32(1.0)} x {' '.join(fw + inv)} {pair[1]}")
+    cases = []
+    geos: dict[str, None] = {}
+    for line in old + own:
+        tok = line.split(" ")
+        n, ty, tg = int(tok[1]), int(tok[2]), int(tok[-1])
+        k, items = 5, []
+        for _ in range(n):
+            it, k = read_lt_in(tok, k)
+            items.append(it)
+        cases.append((n, ty, tg, items))
+        for _, a, b2 in items:
+            geos[" ".join(a)] = None
+            geos[" ".join(b2)] = None
+    glist = list(geos)
+    gl = [f"vgi2r {g}" for g in glist] + [f"vgr2i {g}" for g in glist]
+    lines = old + own + gl
+    b = C.Batch("ltatypes", "ltatypes", lines)
+    plain, memory = runner.probe_runs(b, C.write_batch(scratch, b))
+    if any(memory):
+        print(f"ltatypes: {sum(memory)} memory lines (left out)")
+    outg = [ln.decode("latin-1").rpartition(" | ")[0].split(" ") for ln in plain[len(cases) :]]
+    vm, ivm = {}, {}
+    for i, g in enumerate(glist):
+        vm[g] = read_m(outg[i], 0)[0]
+        o = outg[len(glist) + i]
+        ivm[g] = None if o[0] == "null" else read_m(o, 0)[0]
+    tally: Counter[str] = Counter()
+    bad = 0
+    for i, (n, ty, tg, items) in enumerate(cases):
+        if memory[i]:
+            continue
+        res, _, err = C.decode(plain[i])
+        got = res.decode("latin-1").split(" ")
+        pair = (ty, tg)
+        if pair not in LTA_CHANGES:
+            tally["other changes (outside the model)"] += 1
+            continue
+        which, msg = LTA_CHANGES[pair]
+        want_err = None
+        for _, a, b2 in items:
+            if a[0] == "0":
+                want_err = "LTAchangeType: src geometry must be valid\n"
+            elif b2[0] == "0":
+                want_err = "LTAchangeType: dst geometry must be valid\n"
+            if want_err:
+                break
+        if want_err is None and any(
+            m is None or m.shape != (4, 4) for m, _, _ in items
+        ):  # §8.1's messages for other sizes
+            tally["matrices of another size (outside the model)"] += 1
+            continue
+        if want_err is None and which:
+            for _, a, b2 in items:
+                if ivm[" ".join(a if which == "src" else b2)] is None:
+                    want_err = msg
+                    break
+        if want_err is not None:
+            ok = got[:2] == ["EXIT", "252"] and err.startswith(b"error: " + want_err.encode())
+            tally["ended as the model"] += ok
+            bad += not ok
+            continue
+        with np.errstate(all="ignore"):
+            want = [lta_change(pair, m, a, b2, vm, ivm) for m, a, b2 in items]
+        finite = all(np.isfinite(w).all() for w in want) and all(
+            np.isfinite(m).all() for m, _, _ in items
+        )
+        if got[:2] == ["EXIT", "252"] and err.startswith(b"error: TransformInvert"):
+            if not finite or any(abs(np.linalg.det(w.astype(np.float64))) < 1e-6 for w in want):
+                tally["ended at the inverses' fill (a result not finite or singular)"] += 1
+            else:
+                bad += 1
+                print(f"DIFFERS (fill ends): line {i + 1}")
+            continue
+        if got[0] != "self" or int(got[1]) != n or int(got[2]) != tg:
+            bad += 1
+            print(f"DIFFERS (head): line {i + 1}: {' '.join(got[:4])}")
+            continue
+        k, ms = 5, []
+        for _ in range(n):
+            mm, k = read_lt_out(got, k)
+            ms.append(mm)
+        same = all(
+            mm is not None and np.array_equal(w.view(np.uint32), mm.view(np.uint32))
+            for w, mm in zip(want, ms, strict=True)
+        )
+        key = "as the model" if finite else "as the model, non-finite values"
+        if same:
+            tally[f"{key} {pair[0]}->{pair[1]}"] += 1
+        elif not finite:
+            tally["non-finite values, other NaN bits (outside the model)"] += 1
+        else:
+            bad += 1
+            print(f"DIFFERS: line {i + 1} {pair}")
+    for k2, v in sorted(tally.items()):
+        print(f"ltatypes: {k2}: {v}")
+    print(f"ltatypes: differ from the model: {bad}")
+    return 1 if bad else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     ap.add_argument(
-        "command", choices=["fs291", "skull", "cma", "view", "smooth", "nearest", "physvox"]
+        "command",
+        choices=["fs291", "skull", "cma", "view", "smooth", "nearest", "physvox", "ltatypes"],
     )
     ap.add_argument("--probe", type=Path, required=True)
     ap.add_argument("--scratch", type=Path, required=True)
@@ -935,6 +1132,7 @@ def main() -> int:
         "smooth": smooth,
         "nearest": nearest,
         "physvox": physvox,
+        "ltatypes": ltatypes,
     }[a.command](runner, scratch)
 
 

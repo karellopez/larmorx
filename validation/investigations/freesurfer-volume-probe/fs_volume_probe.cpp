@@ -45,6 +45,7 @@
 #include "error.h"
 #include "matrix.h"
 #include "mri.h"
+#include "mri2.h"
 #include "transform.h"
 #include "utils.h"
 
@@ -1941,6 +1942,314 @@ static void call(const std::string &c)
     fflush(stdout);
     out(r == lta ? "self" : "other");
     putlta(r);
+  }
+  // part 8 (§37 to §39): the partial-volume count of a label; random and constant volumes,
+  // frames, orders, fractions, difference lists; voxelwise operations
+  else if (c == "pvlab") {
+    MRI *l = getw();
+    paint(l);
+    MRI *v = take("null") ? NULL : getw();
+    if (v) paint(v);
+    int label = geti(), maxl = geti();
+    MRI *mix = take("null") ? NULL : getw();
+    MRI *nbr = take("null") ? NULL : getw();
+    MRI *sb = take("null") ? NULL : getw();
+    if (sb) paint(sb);
+    putf(MRIvoxelsInLabelWithPartialVolumeEffects(l, v, label, mix, nbr, maxl, sb));
+    putv(mix);
+    putv(nbr);
+  }
+  else if (c == "randn" || c == "const") {
+    int n[4];
+    for (int &x : n) x = geti();
+    float a = getf(), b = c == "randn" ? getf() : 0.0f;
+    long seed = c == "randn" ? geti() : 0;
+    MRI *g = take("null") ? NULL : getw();
+    if (c == "randn") srand48(seed);
+    MRI *r = c == "randn" ? MRIrandn(n[0], n[1], n[2], n[3], a, b, g) : MRIconst(n[0], n[1], n[2], n[3], a, g);
+    putres(r, NULL, NULL, g);
+  }
+  else if (c == "nseq" || c == "nfr") {
+    MRI *a = getw();
+    paint(a);
+    int k = geti();
+    float t = getf();
+    puti(c == "nseq"  ? MRInormalizeSequence(a, t)
+         : k == 0     ? MRInormalizeFrames(a)
+         : k == 1     ? MRInormalizeFramesMean(a)
+                      : MRInormalizeFramesFirst(a));
+    putv(a);
+  }
+  else if (c == "sort") {
+    MRI *a = getw();
+    paint(a);
+    MRI *m = take("null") ? NULL : getw();
+    if (m) paint(m);
+    MRI *d = getdst(a, m);
+    MRI *r = MRIsort(a, m, d);
+    putres(r, a, m, d);
+  }
+  else if (c == "revsl") {
+    MRI *a = getw();
+    paint(a);
+    a->bvals = getm();
+    a->bvecs = getm();
+    a->bvec_space = geti();
+    MRI *d = getdst(a);
+    MRI *r = MRIreverseSliceOrder(a, d);
+    putres(r, a, NULL, d);
+    if (r) {
+      putm(r->bvals);
+      putm(r->bvecs);
+      puti(r->bvec_space);
+    }
+  }
+  else if (c == "cdtype") {
+    MRI *a = getw();
+    int type = geti();
+    MRI *r = MRIcloneDifferentType(a, type);
+    putv(r);
+  }
+  else if (c == "ordidx" || c == "vperm") {
+    MRI *a = getw();
+    paint(a);
+    long seed = geti();
+    long n = (long)a->width * a->height * a->depth;
+    size_t na = n > 0 ? (size_t)n : 1;
+    short *xs = (short *)malloc(na * sizeof(short)), *ys = (short *)malloc(na * sizeof(short)),
+          *zs = (short *)malloc(na * sizeof(short));
+    for (size_t i = 0; i < na; i++) xs[i] = ys[i] = zs[i] = -7;
+    if (c == "vperm") setRandomSeed(seed);
+    puti(c == "ordidx" ? MRIorderIndices(a, xs, ys, zs) : MRIcomputeVoxelPermutation(a, xs, ys, zs));
+    for (short *p : {xs, ys, zs})
+      for (long i = 0; i < n; i++) puti(p[i]);
+  }
+  else if (c == "nonmax") {
+    MRI *a = getw();
+    paint(a);
+    MRI *d = getdst(a);
+    float t = getf();
+    int dir = geti();
+    MRI *r = MRInonMaxSuppress(a, d, t, dir);
+    putres(r, a, NULL, d);
+  }
+  else if (c == "xrpad") {
+    MRI *a = getw();
+    paint(a);
+    MRI_REGION reg, *rp = getreg(&reg);
+    int pad = geti();
+    MRI *r = MRIextractRegionAndPad(a, NULL, rp, pad);
+    putv(r);
+  }
+  else if (c == "rms") {
+    MRI *a = getw();
+    paint(a);
+    MRI *o = getw();
+    MRIrms(a, o);
+    putv(o);
+  }
+  else if (c == "vfrac") {
+    MRI *a = getw();
+    MATRIX *m = getm();
+    MRI *s = getw();
+    paint(s);
+    MRI *f = getw();
+    puti(MRIcomputeVolumeFractions(a, m, s, f));
+    putv(f);
+  }
+  else if (c == "cdt") {
+    MRI *a = getw();
+    paint(a);
+    MRI *b = getw();
+    paint(b);
+    MRI *d = getdst(a, b);
+    MRI *r = MRIcombineDistanceTransforms(a, b, d);
+    putres(r, a, b, d);
+  }
+  else if (c == "diffv") {
+    MRI *a = getw();
+    paint(a);
+    MRI *b = getw();
+    paint(b);
+    MRI *m = take("null") ? NULL : getw();
+    if (m) paint(m);
+    double t = getd();
+    std::vector<std::vector<double>> *dv = MRIdiff2Vect(a, b, t, m);
+    if (!dv)
+      out("null");
+    else {
+      puti((long long)dv->size());
+      for (const std::vector<double> &row : *dv)
+        for (double x : row) putd(x);
+    }
+  }
+  else if (c == "applyv") {
+    MRI *a = getw();
+    paint(a);
+    MRI *m = take("null") ? NULL : getw();
+    if (m) paint(m);
+    int n = geti();
+    std::vector<std::vector<double>> dv;
+    for (int i = 0; i < n; i++) {
+      std::vector<double> row(5);
+      for (double &x : row) x = getd();
+      dv.push_back(row);
+    }
+    MRI *d = getdst(a, m);
+    int napply = -7;
+    MRI *r = MRIapplyDiffVect(a, m, dv, &napply, d);
+    puti(napply);
+    putres(r, a, m, d);
+  }
+  else if (c == "tiv") {
+    std::string name = getx();
+    bool have = !take("nofile");
+    std::string bytes = have ? getx() : std::string();
+    int avg = geti();  // USE_AVERAGE305: 0 unset, 1 set to "true", 2 set and empty
+    double scale = getd();
+    int pdet = geti();
+    if (avg) setenv("USE_AVERAGE305", avg == 1 ? "true" : "", 1);
+    else unsetenv("USE_AVERAGE305");
+    unlink(name.c_str());
+    if (have) {
+      FILE *fp = fopen(name.c_str(), "wb");
+      if (!fp) bad("cannot write the transform file");
+      fwrite(bytes.data(), 1, bytes.size(), fp);
+      fclose(fp);
+    }
+    double det = UNSETD;
+    std::vector<char> nm(name.begin(), name.end());
+    nm.push_back('\0');
+    putd(MRIestimateTIV(nm.data(), scale, pdet ? &det : NULL));
+    putd(det);
+    if (have) unlink(name.c_str());
+  }
+  else if (c == "dimmis") {
+    MRI *a = getw(), *b = getw();
+    int f = geti();
+    puti(MRIdimMismatch(a, b, f));
+  }
+  else if (c == "fpow") {
+    MRI *a = getw();
+    paint(a);
+    int n = geti();
+    // exactly n powers (one when n is 0), so that a read past them is a read past the allocation
+    float *p = (float *)malloc((n > 0 ? (size_t)n : 1) * sizeof(float));
+    p[0] = UNSET;
+    for (int i = 0; i < n; i++) p[i] = getf();
+    puti(mri_framepower(a, p));
+    putv(a);
+  }
+  else if (c == "mbin") {
+    MRI *a = getw();
+    paint(a);
+    MRI *d = getdst(a);
+    float t = getf();
+    std::string tail;
+    bool ht = !take("null");
+    if (ht) tail = getx();
+    int inv = geti();
+    int nover = -7;
+    MRI *r = mri_binarize(a, t, ht ? tail.c_str() : NULL, inv, d, &nover);
+    puti(nover);
+    putres(r, a, NULL, d);
+  }
+  else if (c == "reshape") {
+    MRI *a = getw();
+    paint(a);
+    int n[4];
+    for (int &x : n) x = geti();
+    MRI *r = mri_reshape(a, n[0], n[1], n[2], n[3]);
+    putv(r);
+    puti(a->nframes);
+  }
+  else if (c == "msq") {
+    int k = geti();
+    MRI *a = getw();
+    paint(a);
+    MRI *m = take("null") ? NULL : getw();
+    if (m) paint(m);
+    MRI *d = getdst(a, m);
+    MRI *r = k == 0 ? MRIsquare(a, m, d) : k == 1 ? MRIsquareRoot(a, m, d) : MRIsqrt(a, d);
+    putres(r, a, m, d);
+  }
+  else if (c == "mmax") {
+    MRI *a = getw();
+    paint(a);
+    MRI *b = getw();
+    paint(b);
+    MRI *d = getdst(a, b);
+    MRI *r = MRImax(a, b, d);
+    putres(r, a, b, d);
+  }
+  else if (c == "mconst") {
+    MRI *a = getw();
+    paint(a);
+    double k = getd();
+    int mul = geti();
+    MRI *d = getdst(a);
+    MRI *r = mul ? MRImultiplyConst(a, k, d) : MRIaddConst(a, k, d);
+    putres(r, a, NULL, d);
+  }
+  else if (c == "fbin") {
+    MRI *a = getw();
+    paint(a);
+    double t = getd();
+    MRI *m = take("null") ? NULL : getw();
+    if (m) paint(m);
+    MRI *r = MRIframeBinarize(a, t, m);
+    putres(r, a, NULL, m);
+  }
+  else if (c == "vote") {
+    MRI *a = getw();
+    paint(a);
+    MRI *m = take("null") ? NULL : getw();
+    if (m) paint(m);
+    MRI *d = getdst(a, m);
+    int ex = geti();
+    MRI *r = MRIvote(a, m, d, ex);
+    putres(r, a, m, d);
+    putv(a);
+  }
+  else if (c == "crop") {
+    MRI *a = getw();
+    paint(a);
+    int p[6];
+    for (int &x : p) x = geti();
+    putv(MRIcrop(a, p[0], p[1], p[2], p[3], p[4], p[5]));
+  }
+  else if (c == "revs") {
+    MRI *a = getw();
+    paint(a);
+    MRI *d = getdst(a);
+    MRI *r = MRIreverseSlices(a, d);
+    putres(r, a, NULL, d);
+  }
+  else if (c == "cutend") {
+    MRI *a = getw();
+    paint(a);
+    int n = geti();
+    putv(MRIcutEndSlices(a, n));
+  }
+  else if (c == "segids") {
+    MRI *a = getw();
+    paint(a);
+    int frame = geti(), not0 = geti();
+    int n = -7;
+    int *l = not0 ? MRIsegIdListNot0(a, &n, frame) : MRIsegIdList(a, &n, frame);
+    puti(n);
+    if (!l)
+      out("null");
+    else
+      for (int i = 0; i < n; i++) puti(l[i]);
+  }
+  else if (c == "hcos") {
+    MRI *a = getw();
+    paint(a);
+    double al = getd();
+    MRI *d = getdst(a);
+    MRI *r = MRIhalfCosBias(a, al, d);
+    putres(r, a, NULL, d);
   }
   else
     bad("unknown command");

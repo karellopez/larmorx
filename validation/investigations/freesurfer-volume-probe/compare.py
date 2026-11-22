@@ -2436,6 +2436,650 @@ class Gen10(Gen9):
         L.append(f"lnbhd {v} 0 null 0 0 0 1 0 1")
         return [Batch("vrules9", "vrules9", L)]
 
+    @staticmethod
+    def vrules10() -> list[Batch]:
+        """§54's fixed cases of LTAchangeType between voxel, RAS-to-RAS and physical-voxel arrays:
+        each of the six changes with two transforms and with none; a geometry whose inverse fails
+        where the change needs that inverse and where it does not (the inverses' fill then ends the
+        program); voxel sizes of 0 and NaN; the validity checks (an invalid source, a later
+        transform's invalid destination, before an unsupported target, for an array of another
+        type, none for the same type); the unsupported targets; arrays of another type; a
+        diagnostic level."""
+        L = []
+        zero = f32(0.0)
+
+        def geo(
+            valid: int = 1,
+            dims: tuple = (3, 3, 3),
+            sizes: tuple = (f32(1.0), f32(1.0), f32(1.0)),
+            cos: tuple = (1, 0, 0, 0, 1, 0, 0, 0, 1),
+            c: tuple = (0.0, 0.0, 0.0),
+        ) -> str:
+            f = [str(valid), *map(str, dims), *sizes, "1", *(f32(v) for v in cos)]
+            f += [*(f32(v) for v in c), zero, zero, zero, xs("")]
+            return " ".join(f) + " 1 null"
+
+        def aff(a: tuple) -> str:
+            return "4 4 " + " ".join(f32(v) for v in (*a, 0.0, 0.0, 0.0, 1.0))
+
+        ident = aff((1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0))
+
+        def lt(m: str, a: str, b: str) -> str:
+            return " ".join([zero] * 4 + [m, "null", "null", "0", "0", a, b])
+
+        def arr(ty: int, items: list, target: int, pre: str = "") -> str:
+            fw = [lt(m, a, b) for m, a, b in items]
+            inv = [lt(ident, b, a) for _, a, b in items]
+            n = len(items)
+            return f"{pre}ltachg {n} {ty} {f32(1.0)} {xs('')} {' '.join(fw + inv)} {target}"
+
+        g1 = geo(
+            dims=(4, 3, 2),
+            sizes=(f32(2.0), f32(1.5), f32(0.5)),
+            cos=(0, 1, 0, -1, 0, 0, 0, 0, 1),
+            c=(10.0, -5.0, 3.0),
+        )
+        g2 = geo(dims=(3, 5, 2), sizes=(f32(1.0), f32(3.0), f32(1.0)), c=(-1.0, 2.0, 7.0))
+        g3 = geo(
+            dims=(2, 2, 6),
+            sizes=(f32(0.9375), f32(1.0), f32(1.25)),
+            cos=(0.6, 0.8, 0.0, -0.8, 0.6, 0.0, 0.0, 0.0, 1.0),
+            c=(0.5, 0.25, -3.0),
+        )
+        gs = geo(cos=(1, 0, 0, 1, 0, 0, 0, 0, 1))  # a singular voxel-to-RAS matrix
+        gz = geo(sizes=(zero, f32(1.0), f32(2.0)))
+        gn = geo(sizes=(f32(1.0), QNAN, f32(2.0)))
+        gbad = geo(valid=0)
+        m1 = aff((1.1, 0.2, 0.0, 5.0, -0.1, 0.9, 0.3, -2.0, 0.0, 0.1, 1.2, 4.0))
+        m2 = aff((0.0, -1.0, 0.0, 12.5, 1.0, 0.0, 0.0, -3.0, 0.0, 0.0, 2.0, 0.75))
+        pairs = [(0, 1), (0, 2), (1, 0), (1, 2), (2, 0), (2, 1)]
+        for ty, tg in pairs:
+            L.append(arr(ty, [(m1, g1, g2), (m2, g2, g3)], tg))
+            L.append(arr(ty, [], tg))
+        # a singular geometry as the source, then as the destination
+        for ty, tg in pairs:
+            L.append(arr(ty, [(m1, gs, g2)], tg))
+            L.append(arr(ty, [(m1, g1, gs)], tg))
+        # voxel sizes of 0 and NaN where the changes through physical voxels scale
+        for ty, tg in [(0, 2), (1, 2), (2, 0), (2, 1)]:
+            for g in (gz, gn):
+                L.append(arr(ty, [(m1, g, g2)], tg))
+                L.append(arr(ty, [(m1, g1, g)], tg))
+        # the validity checks
+        L.append(arr(1, [(m1, gbad, g2)], 0))
+        L.append(arr(0, [(m1, g1, g2), (m2, g2, gbad)], 2))
+        L.append(arr(1, [(m1, gbad, g2)], 5))
+        L.append(arr(10, [(m1, g1, gbad)], 1))
+        L.append(arr(1, [(m1, gbad, gbad)], 1))
+        L.append(arr(2, [(m1, g1, gbad)], 2))
+        # the unsupported targets
+        for ty, tg in [(1, 5), (1, 21), (0, 3), (0, 21), (2, 21), (2, 12), (0, -1), (1, 99)]:
+            L.append(arr(ty, [(m1, g1, g2)], tg))
+        L.append(arr(1, [], 5))
+        # arrays of another type: the matrices kept, the inverses filled
+        for ty, tg in [(10, 1), (5, 0), (99, 2), (-1, 1), (11, 0), (12, 1), (3, 2)]:
+            L.append(arr(ty, [(m1, g1, g2)], tg))
+        L.append(arr(10, [], 1))
+        # a diagnostic level prints nothing for these changes
+        L.append(arr(0, [(m1, g1, g2)], 1, "+gdiag=1 "))
+        L.append(arr(2, [(m1, g1, g2)], 0, "+gdiag=1 "))
+        return [Batch("vrules10", "vrules10", L)]
+
+    @staticmethod
+    def vrules11() -> list[Batch]:
+        """§35's NaN order of the label sums: the five label means and MRIcomputeLabelNbhd (half-widths
+        0 and 1) of 2 x 2 x 1 float volumes whose voxels are chosen NaN payloads, labels all 0: the
+        result's payload tells the walk's order and each addition's operand order apart."""
+        L = []
+        one, a, b, c, d = 0x3F800000, 0x7FC0000A, 0x7FC0000B, 0x7FC0000C, 0x7FC0000D
+        lab = fixed_w(2, 2, 1, 0, fill=-1)
+        for ws in (
+            [one, b, c, d],
+            [one, a, b, one],
+            [a, b, c, d],
+            [0x7F800000, 0xFF800000, one, a],
+        ):
+            src = fixed_w(2, 2, 1, 3, fill="i" + ",".join(str(x) for x in ws))
+            for k, whalf, spread in ((0, 0, 0), (1, 0, 0), (2, 0, 1), (3, 1, 1), (4, 1, 0)):
+                L.append(f"lmeans {k} {src} {lab} 0 0 0 0 0 {whalf} {spread}")
+            for whalf in (0, 1):
+                L.append(f"lnbhd {lab} 0 {src} 0 0 0 {whalf} 1 1")
+        return [Batch("vrules11", "vrules11", L)]
+
+
+def ifill(vals) -> str:
+    """The ``i`` fill (README.md, W) of a list of floats: their bit patterns, repeated."""
+    return "i" + ",".join(str(int(v if isinstance(v, str) else f32(v), 16)) for v in vals)
+
+
+class Gen11(Gen10):
+    """Part 8 (§37 to §39): the partial-volume count of a label; random and constant volumes,
+    frames, orders, fractions, difference lists; voxelwise operations."""
+
+    def cvol(self, r: random.Random, shape: str | None = None, **kw) -> str:
+        """``rvol`` with its cached matrices always recomputed: a volume without them crashes
+        FreeSurfer's header copies (FS-252), which §37 to §39 make on every path; vrules12 holds
+        that case once."""
+        t = self.rvol(r, shape=shape, **kw).split(" ")
+        t[44] = "1"
+        return " ".join(t)
+
+    def cdst(self, r: random.Random, shape: str) -> str:
+        k = r.random()
+        if k < 0.4:
+            return "new"
+        if k < 0.55:
+            return "self"
+        return self.cvol(r, shape=shape if k < 0.93 else None, ct=0.0)
+
+    def cdst2(self, r: random.Random, shape: str, two: bool = False) -> str:
+        k = r.random()
+        if k < 0.4:
+            return "new"
+        if k < 0.55:
+            return "self"
+        if two and k < 0.65:
+            return "other"
+        return self.cvol(r, shape=shape if k < 0.93 else None, ct=0.0)
+
+    def fvals(self, r: random.Random, n: int, special: float = 0.05, lo=0.0, hi=100.0) -> list:
+        """n floats (or special bit patterns) for an ``i`` fill."""
+        out = []
+        for _ in range(n):
+            if r.random() < special:
+                out.append(f"{r.choice(SPECIAL):08x}")
+            elif r.random() < 0.3:
+                out.append(float(r.randint(int(lo), int(hi))))
+            else:
+                out.append(r.uniform(lo, hi))
+        return out
+
+    def ivol(self, r: random.Random, shape: str, vals: list, **kw) -> str:
+        """W of the shape with an ``i`` fill of the values."""
+        t = self.cvol(r, shape=shape, ct=0.0, **kw).split(" ")
+        t[6] = ifill(vals)
+        return " ".join(t)
+
+    def vpvlab(self) -> list[Batch]:
+        """§37: MRIvoxelsInLabelWithPartialVolumeEffects on label volumes of small labels in blocks
+        (floats, bytes, shorts), intensity volumes of chosen values (a few NaN and infinite), labels
+        present and absent, maxlabels above the labels, the mixing and neighbour volumes given or
+        not, given border volumes whose later frames hold neighbour labels."""
+        r = self.rng("vpvlab")
+        L = []
+        for _ in range(90):
+            dims = [r.randint(2, 5) for _ in range(3)]
+            t = r.choice([3, 3, 3, 0, 4])
+            s = f"{dims[0]} {dims[1]} {dims[2]} {t} 1 0"
+            labs = [float(r.choice([0, 1, 1, 2, 2, 3])) for _ in range(r.randint(1, 9))]
+            lab = self.ivol(r, s, labs, special=0.0) if t == 3 else self.cvol(r, shape=s, ct=0.0)
+            if t != 3:
+                lab = " ".join([*lab.split(" ")[:6], "-1", *lab.split(" ")[7:]])
+            paint = self.labpaint(r, s, labels=(0, 1, 2, 3))
+            vs = " ".join([*s.split()[:3], "3", "1", "0"])
+            vals = (
+                "null"
+                if r.random() < 0.03
+                else self.ivol(r, vs, self.fvals(r, r.randint(3, 13), special=0.03), special=0.0)
+            )
+            vp = "" if vals == "null" else " 0"
+            label = r.choice([0, 1, 1, 2, 2, 3, 3]) if r.random() < 0.92 else r.choice([7, -1])
+            maxl = r.choice([4, 4, 5, 8, label + 1]) if r.random() < 0.92 else r.choice([3, 1])
+            mix = "null" if r.random() < 0.4 else self.cvol(r, shape=vs, ct=0.0)
+            nbr = "null" if r.random() < 0.4 else self.cvol(r, shape=vs, ct=0.0)
+            if r.random() < 0.2:
+                sb_s = " ".join([*s.split()[:3], "3", str(r.choice([1, 2, 3])), "0"])
+                sbv = [float(r.choice([0, 0, 1, 2, 3])) for _ in range(r.randint(2, 7))]
+                sb = f"{self.ivol(r, sb_s, sbv, special=0.0)} {self.labpaint(r, s, labels=(0, 1))}"
+            else:
+                sb = "null"
+            L.append(f"pvlab {lab} {paint} {vals}{vp} {label} {maxl} {mix} {nbr} {sb}")
+        return [Batch("vpvlab", "vpvlab", L)]
+
+    def vfr8(self) -> list[Batch]:
+        """§38: MRIrandn and MRIconst (new and given volumes of every type, dimensions matching
+        and not, values past each type's range); the three frame normalisations and
+        MRInormalizeSequence; MRIsort (masks, new, given and in-place results); MRIreverseSliceOrder
+        (b-value and b-vector tables, in place); MRIcloneDifferentType; MRIorderIndices and
+        MRIcomputeVoxelPermutation; MRInonMaxSuppress; MRIextractRegionAndPad; MRIrms;
+        MRIcomputeVolumeFractions; MRIcombineDistanceTransforms; MRIdiff2Vect and MRIapplyDiffVect;
+        MRIestimateTIV; MRIdimMismatch."""
+        r = self.rng("vfr8")
+        L = []
+        for _ in range(40):
+            dims = [r.randint(1, 3) for _ in range(3)] + [r.randint(1, 2)]
+            cmd = r.choice(["randn", "const", "const"])
+            k = r.random()
+            if k < 0.5:
+                g = "null"
+            else:
+                t = 3 if cmd == "randn" and k < 0.8 else r.choice([*NUMERIC, 5, 9])
+                gd = list(dims) if r.random() < 0.85 else [d + 1 for d in dims]
+                g = self.cvol(r, shape=f"{gd[0]} {gd[1]} {gd[2]} {t} {gd[3]} 0", ct=0.0)
+            d = " ".join(map(str, dims))
+            if cmd == "randn":
+                L.append(f"randn {d} {self.fv(r)} {self.fv(r, 0.05)} {r.randint(0, 99999)} {g}")
+            else:
+                v = self.fillv(r) if r.random() < 0.5 else self.fv(r, 0.05, scale=70000.0)
+                L.append(f"const {d} {v} {g}")
+        for _ in range(60):
+            s = self.vshape(r, types=[*NUMERIC, 9], ext=(1, 3), frames=(1, 4))
+            a = self.cvol(r, shape=s, special=0.05, ct=0.0)
+            if r.random() < 0.4:
+                L.append(f"nseq {a} 0 0 {self.fv(r, 0.05)}")
+            else:
+                L.append(f"nfr {a} 0 {r.choice([0, 1, 2])} {f32(0.0)}")
+        for _ in range(45):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 3), frames=(1, 6))
+            a = self.cvol(r, shape=s, special=0.08, ct=0.0)
+            ms = " ".join([*s.split()[:3], "3", "1", "0"])
+            m = (
+                "null"
+                if r.random() < 0.5
+                else f"{self.cvol(r, shape=ms, ct=0.0)} {self.labpaint(r, ms, labels=(0, 1, 0.5))}"
+            )
+            dd = r.choice(["new", "new", "self", "w", "w", "new"]) if r.random() < 0.93 else "x"
+            if dd == "w":
+                dd = self.cvol(r, shape=s, ct=0.0)
+            elif dd == "x":
+                dd = self.cvol(r, ct=0.0)
+            L.append(f"sort {a} 0 {m} {dd}")
+        for _ in range(30):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 3), frames=(1, 3))
+            nf = int(s.split()[4])
+            a = self.cvol(r, shape=s, special=0.05, ct=0.0)
+            bv = "null" if r.random() < 0.4 else self.mat(r, nf, 1)
+            bc = "null" if r.random() < 0.4 else self.mat(r, nf, 3)
+            dd = r.choice(["new", "new", "new", "self", "w"])
+            if dd == "w":
+                dd = self.cvol(r, shape=s, ct=0.0)
+            L.append(f"revsl {a} 0 {bv} {bc} {r.choice([0, 1, 2, -1])} {dd}")
+        for _ in range(20):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 3), frames=(1, 2))
+            L.append(f"cdtype {self.cvol(r, shape=s, ct=0.2)} {r.choice(SIZED)}")
+        for _ in range(30):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 2))
+            a = self.cvol(r, shape=s, special=0.08, ct=0.0)
+            cmd = r.choice(["ordidx", "vperm"])
+            L.append(f"{cmd} {a} 0 {r.randint(0, 99999)}")
+        for _ in range(40):
+            s = self.vshape(r, types=[3, 3, 3, 0, 4], ext=(2, 4), frames=(1, 2))
+            a = self.cvol(r, shape=s, special=0.04, ct=0.0)
+            dd = r.choice(["new", "new", "self", "w"])
+            if dd == "w":
+                dd = self.cvol(r, shape=s, ct=0.0)
+            L.append(f"nonmax {a} 0 {dd} {self.fv(r, 0.03)} {r.choice([1, 1, -1, 0, 2])}")
+        for _ in range(25):
+            s = self.vshape(r, types=NUMERIC, ext=(2, 4), frames=(1, 2))
+            a = self.cvol(r, shape=s, special=0.03, ct=0.0)
+            w, h, d = (int(x) for x in s.split()[:3])
+            if r.random() < 0.3:
+                reg = "null"
+            else:
+                x0, y0, z0 = (r.randint(0, e - 1) for e in (w, h, d))
+                reg = f"{x0} {y0} {z0} {r.randint(1, w - x0)} {r.randint(1, h - y0)} {r.randint(1, d - z0)}"
+            L.append(f"xrpad {a} 0 {reg} {r.choice([0, 1, 1, 2])}")
+        for _ in range(30):
+            s = self.vshape(r, types=[3, 3, 3, 0, 4, 1], ext=(1, 3), frames=(1, 4))
+            a = self.cvol(r, shape=s, special=0.05, ct=0.0)
+            os_ = " ".join([*s.split()[:3], str(r.choice([3, 3, 3, 0, 4])), "1", "0"])
+            L.append(f"rms {a} 0 {self.cvol(r, shape=os_, ct=0.0)}")
+        for _ in range(30):
+            ss = self.vshape(r, types=[3], ext=(2, 4), frames=(1, 1))
+            src = self.cvol(r, shape=ss, ct=0.0)
+            gs = self.vshape(r, types=[3], ext=(2, 5), frames=(1, 1))
+            nf = r.choice([1, 2, 3])
+            # labels 1 to the frame count and one more (FS-476); label 0 (FS-475: FreeSurfer reads
+            # and writes outside) only in vrules12
+            seg = self.ivol(r, gs, [float(r.randint(1, nf + 1)) for _ in range(r.randint(1, 5))])
+            sp = self.labpaint(r, gs, labels=tuple(range(1, nf + 1)))
+            fs = " ".join([*ss.split()[:3], "3", str(nf), "0"])
+            fr = self.cvol(r, shape=fs, ct=0.0).split(" ")
+            fr[6] = "-1"
+            sc = [r.choice([1.0, 0.5, 2.0, 1.0]) for _ in range(3)]
+            sh = [r.choice([0.0, 0.0, 0.5, -1.0, 1.25]) for _ in range(3)]
+            m = [sc[0], 0, 0, sh[0], 0, sc[1], 0, sh[1], 0, 0, sc[2], sh[2], 0, 0, 0, 1]
+            mm = "4 4 " + " ".join(f32(v) for v in m)
+            L.append(f"vfrac {src} {mm} {seg} {sp} {' '.join(fr)}")
+        for _ in range(30):
+            s = self.vshape(r, types=[3, 3, 0, 4], ext=(1, 3), frames=(1, 2))
+            a = self.ivol(r, s, self.fvals(r, r.randint(2, 7), 0.05, -50, 50))
+            b = self.ivol(r, s, self.fvals(r, r.randint(2, 7), 0.05, -50, 50))
+            L.append(f"cdt {a} 0 {b} 0 {self.cdst2(r, s, two=True)}")
+        for _ in range(35):
+            s = self.vshape(r, types=[3, 3, 0, 4], ext=(1, 3), frames=(1, 2))
+            a = self.ivol(r, s, self.fvals(r, r.randint(2, 7), 0.05, -50, 50))
+            bs = s if r.random() < 0.9 else self.vshape(r, types=[3], ext=(1, 3))
+            b = self.ivol(r, bs, self.fvals(r, r.randint(2, 7), 0.05, -50, 50))
+            ms = " ".join([*s.split()[:3], "3", "1", "0"])
+            m = "null" if r.random() < 0.5 else f"{self.cvol(r, shape=ms, ct=0.0)} 0"
+            L.append(f"diffv {a} 0 {b} 0 {m} {self.dv(r, 0.05)}")
+        for _ in range(35):
+            s = self.vshape(r, types=[3, 3, 0, 4], ext=(1, 3), frames=(1, 2))
+            a = self.cvol(r, shape=s, special=0.03, ct=0.3)
+            w, h, d = (int(x) for x in s.split()[:3])
+            ms = " ".join([*s.split()[:3], "3", "1", "0"])
+            m = "null" if r.random() < 0.6 else f"{self.cvol(r, shape=ms, ct=0.0)} 0"
+            n = r.randint(0, 4)
+            rows = []
+            for _ in range(n):
+                c = [r.randint(0, w - 1), r.randint(0, h - 1), r.randint(0, d - 1)]
+                if r.random() < 0.1:
+                    c[r.randrange(3)] = r.choice([-1, w + 1])
+                rows.append(
+                    " ".join(
+                        [
+                            *(f64(float(x) + r.choice([0.0, 0.25])) for x in c),
+                            self.dv(r),
+                            self.dv(r, 0.05),
+                        ]
+                    )
+                )
+            dd = r.choice(["new", "new", "self", "w", "w", "new"]) if r.random() < 0.93 else "x"
+            if dd == "w":
+                dd = self.cvol(r, shape=s, ct=0.0)
+            elif dd == "x":
+                dd = self.cvol(r, ct=0.0)
+            L.append(f"applyv {a} 0 {m} {n} {' '.join(rows)} {dd}".replace("  ", " "))
+        for _ in range(25):
+            name = xs(r.choice(["talairach.lta", "talairach.lta", "talairach.lta", "x"]))
+            body = "nofile" if r.random() < 0.08 else xs(self.ltatext(r))
+            L.append(
+                f"tiv {name} {body} {r.choice([0, 0, 1, 2])} {self.dv(r)} {r.choice([1, 1, 0])}"
+            )
+        for _ in range(15):
+            a = self.cvol(r, ct=0.0)
+            b = self.cvol(r, ct=0.0)
+            if r.random() < 0.4:
+                b = self.cvol(r, shape=" ".join(a.split(" ")[:6]), ct=0.0)
+            L.append(f"dimmis {a} {b} {r.choice([0, 1])}")
+        return [Batch("vfr8", "vfr8", L)]
+
+    def vmri2(self) -> list[Batch]:
+        """§39: mri_framepower (powers 1, 0.5, near them, 2, others, NaN), mri_binarize (every tail
+        and case, unknown tails, inverted, new, given and in-place results), mri_reshape (counts kept
+        and changed, every type), MRIsquare, MRIsquareRoot and MRIsqrt (masks, results), MRImax,
+        MRImultiplyConst and MRIaddConst, MRIframeBinarize, MRIvote (small integer frames, masks,
+        given results of the wrong type or extent, zeros excluded), MRIcrop, MRIreverseSlices,
+        MRIcutEndSlices, MRIsegIdList and MRIsegIdListNot0, MRIhalfCosBias."""
+        r = self.rng("vmri2")
+        L = []
+        for _ in range(30):
+            s = self.vshape(r, types=[3], ext=(1, 3), frames=(1, 3))
+            nf = int(s.split()[4])
+            a = self.cvol(r, shape=s, special=0.05, ct=0.0)
+            pw = [
+                r.choice([1.0, 1.000005, 0.5, 0.500004, 2.0, 3.0, -1.0, 0.3, 1.5, 0.0])
+                for _ in range(nf)
+            ]
+            ps = [f32(p) if r.random() < 0.97 else QNAN for p in pw]
+            L.append(f"fpow {a} 0 {nf} {' '.join(ps)}")
+        tails = [
+            "null",
+            "null",
+            "pos",
+            "Positive",
+            "neg",
+            "NEGATIVE",
+            "abs",
+            "absolute",
+            "Abs",
+            "po",
+            "",
+            "x",
+            "negx",
+        ]
+        for _ in range(45):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 3), frames=(1, 3))
+            a = self.cvol(r, shape=s, special=0.05, ct=0.0)
+            tl = r.choice(tails)
+            tl = tl if tl == "null" else xs(tl)
+            L.append(f"mbin {a} 0 {self.cdst(r, s)} {self.fv(r, 0.03)} {tl} {r.choice([0, 1])}")
+        for _ in range(30):
+            s = self.vshape(r, types=[*NUMERIC, 9], ext=(1, 3), frames=(1, 3), hdr=0.0)
+            a = self.cvol(r, shape=s, special=0.03, ct=0.0)
+            w, h, d, _, f, _ = (int(x) for x in s.split())
+            dims = [w, h, d, f]
+            r.shuffle(dims)
+            if r.random() < 0.15:
+                dims[r.randrange(4)] += 1
+            L.append(f"reshape {a} 0 {' '.join(map(str, dims))}")
+        for _ in range(40):
+            k = r.choice([0, 1, 2])
+            s = self.vshape(r, types=NUMERIC, ext=(1, 3), frames=(1, 2))
+            a = self.cvol(r, shape=s, special=0.05, ct=0.0)
+            ms = " ".join([*s.split()[:3], "3", "1", "0"])
+            m = (
+                "null"
+                if k == 2 or r.random() < 0.5
+                else f"{self.cvol(r, shape=ms, ct=0.0)} {self.labpaint(r, ms, labels=(0, 1, 0.5))}"
+            )
+            L.append(f"msq {k} {a} 0 {m} {self.cdst(r, s)}")
+        for _ in range(25):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 3), frames=(1, 2))
+            a = self.cvol(r, shape=s, special=0.05, ct=0.0)
+            v = s.split()
+            bs = s if r.random() < 0.8 else " ".join([*v[:3], str(r.choice(NUMERIC)), *v[4:]])
+            b = self.cvol(r, shape=bs, special=0.05, ct=0.0)
+            dd = r.choice(["new", "new", "self", "other", "w", "w"]) if r.random() < 0.93 else "x"
+            if dd == "w":
+                dd = self.cvol(r, shape=s, ct=0.0)
+            elif dd == "x":
+                dd = self.cvol(r, ct=0.0)
+            L.append(f"mmax {a} 0 {b} 0 {dd}")
+        for _ in range(30):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 3), frames=(1, 2))
+            a = self.cvol(r, shape=s, special=0.05, ct=0.0)
+            L.append(f"mconst {a} 0 {self.dv(r, 0.05)} {r.choice([0, 1])} {self.cdst(r, s)}")
+        for _ in range(25):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 3), frames=(1, 3))
+            a = self.cvol(r, shape=s, special=0.05, ct=0.0)
+            ms = " ".join([*s.split()[:3], "3", "1", "0"])
+            m = (
+                "null"
+                if r.random() < 0.5
+                else f"{self.cvol(r, shape=ms, ct=0.0)} {self.labpaint(r, ms, labels=(0, 1, 0.5))}"
+            )
+            L.append(f"fbin {a} 0 {self.dv(r)} {m}")
+        for _ in range(35):
+            nf = r.randint(1, 6)
+            t = r.choice([3, 3, 0, 4])
+            s = f"{r.randint(1, 3)} {r.randint(1, 3)} {r.randint(1, 3)} {t} {nf} 0"
+            vals = [float(r.choice([0, 0, 1, 2, 3])) for _ in range(r.randint(2, 11))]
+            if t == 3:
+                a = self.ivol(r, s, vals if r.random() < 0.9 else [*vals, QNAN])
+            else:  # words of small bytes or shorts
+                per = 4 if t == 0 else 2
+                words = []
+                for _ in range(r.randint(1, 5)):
+                    parts = [r.choice([0, 0, 1, 2, 3]) for _ in range(per)]
+                    words.append(sum(x << (32 // per * i) for i, x in enumerate(parts)))
+                a = self.cvol(r, shape=s, ct=0.0).split(" ")
+                a[6] = "i" + ",".join(map(str, words))
+                a = " ".join(a)
+            ms = " ".join([*s.split()[:3], "3", "1", "0"])
+            m = (
+                "null"
+                if r.random() < 0.6
+                else f"{self.cvol(r, shape=ms, ct=0.0)} {self.labpaint(r, ms, labels=(0, 1))}"
+            )
+            k = r.random()
+            if k < 0.6:
+                dd = "new"
+            elif k < 0.8:
+                dd = self.cvol(r, shape=" ".join([*s.split()[:4], "2", "0"]), ct=0.0)
+            elif k < 0.9:
+                dd = self.cvol(
+                    r, shape=" ".join([*s.split()[:3], "3" if t != 3 else "0", "2", "0"]), ct=0.0
+                )
+            else:
+                dd = self.cvol(r, shape=" ".join([*s.split()[:4], "3", "0"]), ct=0.0)
+            L.append(f"vote {a} 0 {m} {dd} {r.choice([0, 1])}")
+        for _ in range(30):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 2))
+            a = self.cvol(r, shape=s, special=0.03, ct=0.0)
+            e = [int(x) for x in s.split()[:3]]
+            p1 = [r.randint(0, x - 1) for x in e]
+            p2 = [r.randint(p, x - 1) for p, x in zip(p1, e, strict=True)]
+            if r.random() < 0.15:
+                (p1 if r.random() < 0.5 else p2)[r.randrange(3)] = r.choice([-1, e[0], 9])
+            L.append(f"crop {a} 0 {' '.join(map(str, p1 + p2))}")
+        for _ in range(25):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 2))
+            a = self.cvol(r, shape=s, special=0.03, ct=0.0)
+            L.append(f"revs {a} 0 {self.cdst(r, s)}")
+        for _ in range(25):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 5), frames=(1, 2))
+            a = self.cvol(r, shape=s, special=0.03, ct=0.0)
+            dep = int(s.split()[2])
+            n = r.randint(0, (dep - 1) // 2) if r.random() < 0.85 else r.choice([dep, -1])
+            L.append(f"cutend {a} 0 {n}")
+        for _ in range(25):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 2))
+            a = self.cvol(r, shape=s, special=0.0, ct=0.0).split(" ")
+            a[6] = "-1"
+            nf = int(s.split()[4])
+            L.append(
+                f"segids {' '.join(a)} {self.labpaint(r, s, labels=(0, 1, 2, 17, 255))} "
+                f"{r.randint(0, nf - 1)} {r.choice([0, 1])}"
+            )
+        for _ in range(25):
+            s = self.vshape(r, types=NUMERIC, ext=(1, 4), frames=(1, 2))
+            a = self.cvol(r, shape=s, special=0.03, ct=0.0)
+            al = f64(r.choice([0.0, 0.5, 1.0, 2.0, -1.0, 0.25]))
+            L.append(f"hcos {a} 0 {al} {self.cdst(r, s)}")
+        return [Batch("vmri2", "vmri2", L)]
+
+    @staticmethod
+    def vrules12() -> list[Batch]:
+        """§37 to §39's fixed cases: the NaN orders of MRInormalizeSequence's and MRIrms's sums and of
+        MRIrandn's draw; the zero test of MRInormalizeSequence; MRIconst's values past each type's
+        range (FS-472); MRIvote's runs (zeros excluded, the last run: FS-480; NaN; an integer
+        volume's fraction); MRIorderIndices past 255 (FS-474); the partial-volume count's
+        errors and ends (FS-469, FS-470, FS-471); MRIestimateTIV without a file and without a
+        transform (FS-479); fewer powers than frames; short b-value tables (FS-473);
+        MRIapplyDiffVect at the extent (FS-477) and in place with a colour table (FS-478);
+        MRIcomputeVolumeFractions' label 0 (FS-475) and last label (FS-476), and a singular
+        matrix; MRIcloneDifferentType to a bitmap and a tensor; a volume without its cached
+        matrices (FS-252); one slice weighted by the half cosine;
+        MRIcutEndSlices by a negative count; MRIcrop's end before its start. Points that read
+        memory FreeSurfer does not own, and crashes, are on lines of their own."""
+        L = []
+        one = f32(1.0)
+        na, nb = 0x7FC0000A, 0x7FC0000B
+
+        def fw(w, h, d, f, vals, t=3) -> str:
+            return fixed_w(w, h, d, t, f, fill=ifill(vals))
+
+        # MRInormalizeSequence: the sum's NaN order, the zero test, other types
+        L.append(f"nseq {fw(1, 1, 1, 3, [1.0, f'{na:08x}', f'{nb:08x}'])} 0 0 {one}")
+        L.append(f"nseq {fw(1, 1, 1, 3, [f'{na:08x}', 1.0, f'{nb:08x}'])} 0 0 {one}")
+        for v in (3e-6, 7e-8, 5e-8):
+            L.append(f"nseq {fw(1, 1, 1, 2, [v, 0.0])} 0 0 {one}")
+        L.append(f"nseq {fixed_w(2, 1, 1, 0, 2, fill=200)} 0 0 {f32(3.0)}")
+        L.append(f"nseq {fixed_w(2, 1, 1, 1, 2, fill=7)} 0 0 {one}")
+        # the frame normalisations of NaNs and of an integer volume
+        for k in (0, 1, 2):
+            L.append(f"nfr {fw(1, 1, 1, 3, [2.0, f'{na:08x}', f'{nb:08x}'])} 0 {k} {one}")
+            L.append(f"nfr {fixed_w(2, 1, 1, 4, 3, fill=9)} 0 {k} {one}")
+        # MRIrms's sums
+        for vals in ([f"{na:08x}", f"{nb:08x}"], [f"{na:08x}", f"{nb:08x}", 1.0], [3.0, 4.0]):
+            L.append(f"rms {fw(1, 1, 1, len(vals), vals)} 0 {fixed_w(1, 1, 1, 3, 1, fill=-1)}")
+        L.append(
+            f"rms {fw(2, 1, 1, 2, [3.0, 4.0, 300.7, 1.0])} 0 {fixed_w(2, 1, 1, 0, 1, fill=-1)}"
+        )
+        # MRIrandn's draw: the operands' NaN order
+        L.append(f"randn 1 1 1 1 {na:08x} {nb:08x} 5 null")
+        L.append(f"randn 2 1 1 1 {f32(10.0)} {nb:08x} 5 null")
+        # MRIconst past each type's range (FS-472) and nint's halves
+        for t in (0, 4, 10, 1, 2, 3, 9):
+            for v in (300.0, -1.0, 40000.5, -2.5, 2.5, 3e9, float("nan")):
+                L.append(f"const 1 1 1 1 {f32(v)} {fixed_w(1, 1, 1, t, 1, fill=-1)}")
+        # MRIvote's runs
+        for vals, ex in (
+            ([0.0, 0.0, 1.0, 1.0, 1.0], 1),
+            ([0.0, 0.0, 0.0, 1.0, 1.0], 1),
+            ([1.0, 1.0, 0.0, 0.0, 0.0], 1),
+            ([1.0, 1.0, 0.0, 0.0, 0.0], 0),
+            ([2.0, f"{na:08x}", f"{na:08x}"], 0),
+            ([2.0, 2.0, 1.0], 0),
+            ([-1.0, 0.0, 0.0, 0.0], 1),
+            ([0.0, 0.0, -1.0], 1),
+        ):
+            L.append(f"vote {fw(1, 1, 1, len(vals), vals)} 0 null new {ex}")
+        L.append(f"vote {fixed_w(1, 1, 1, 1, 3, fill='i5,5,7')} 0 null new 0")
+        # MRIorderIndices past 255 (FS-474) and a value's low byte
+        L.append(f"ordidx {fixed_w(300, 1, 1, 3, 1, fill='t3')} 0 0")
+        L.append(f"ordidx {fw(3, 1, 1, 1, [300.7, 2.0, -1.5])} 0 0")
+        # the partial-volume count: label past maxlabels; no values at a border voxel (FS-470);
+        # maxlabels 0 and negative (FS-471); an own label past the table (FS-469)
+        lab = fw(3, 1, 1, 1, [1.0, 2.0, 2.0])
+        vals = fw(3, 1, 1, 1, [10.0, 50.0, 60.0])
+        L.append(f"pvlab {lab} 0 {vals} 0 4 4 null null null")
+        L.append(f"pvlab {lab} 0 null 2 4 null null null")
+        L.append(f"pvlab {lab} 0 {vals} 0 -1 0 null null null")
+        L.append(f"pvlab {lab} 0 {vals} 0 -1 -3 null null null")
+        L.append(f"pvlab {fw(3, 1, 1, 1, [1.0, 2.0, 9.0])} 0 {vals} 0 2 4 null null null")
+        L.append(f"pvlab {lab} 0 {vals} 0 2 4 null null null")
+        L.append(f"pvlab {lab} 0 {vals} 0 2 4 {fixed_w(3, 1, 1, 3, 1, fill=-1)} null null")
+        # MRIestimateTIV: no file; a file of no transforms (FS-479)
+        L.append(f"tiv {xs('talairach.lta')} nofile 0 {f64(1755.0)} 1")
+        L.append(
+            f"tiv {xs('talairach.lta')} {xs('type = 1' + chr(10) + 'nxforms = 0' + chr(10))} 0 {f64(1755.0)} 1"
+        )
+        # fewer powers than frames: a read past them
+        L.append(f"fpow {fw(1, 1, 1, 2, [4.0, 9.0])} 0 1 {f32(0.5)}")
+        # b-value and b-vector tables of fewer rows than frames (FS-473)
+        L.append(f"revsl {fw(1, 1, 2, 3, [1.0, 2.0])} 0 1 1 {one} null 0 new")
+        L.append(f"revsl {fw(1, 1, 2, 2, [1.0, 2.0])} 0 null 1 3 {one} {one} {one} 1 new")
+        L.append(f"revsl {fw(1, 1, 2, 2, [1.0, 2.0])} 0 null null 0 self")
+        # MRIapplyDiffVect: an index equal to the extent (FS-477); in place with a colour table
+        # (FS-478)
+        a = fw(3, 1, 1, 1, [1.0, 2.0, 3.0])
+        row = lambda c, v: f"{f64(c)} {f64(0.0)} {f64(0.0)} {f64(0.0)} {f64(v)}"  # noqa: E731
+        L.append(f"applyv {a} 0 null 1 {row(3.0, 9.0)} new")
+        L.append(f"applyv {a} 0 null 2 {row(1.0, 9.0)} {row(-0.5, 7.0)} new")
+        L.append(f"applyv {a} 0 null 2 {row(0.0, 9.0)} {row(-1.0, 7.0)} new")
+        ct = f"1 {xs('')} 0 0 {xs('')} 1 {xs('lab')} 10 20 30 0 {one} {one} {one} {f32(0.0)} 0 0 null"
+        act = a.removesuffix(" null") + " " + ct
+        L.append(f"applyv {act} 0 null 1 {row(1.0, 9.0)} self")
+        L.append(f"applyv {act} 0 null 1 {row(1.0, 9.0)} new")
+        # MRIcomputeVolumeFractions: label 0 (FS-475), the last label (FS-476), a singular matrix
+        ident = "4 4 " + " ".join(one if i % 5 == 0 else f32(0.0) for i in range(16))
+        half = "4 4 " + " ".join(f32(v) for v in (0.5, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1))
+        src = fixed_w(2, 1, 1, 3, 1, fill=-1)
+        fr2 = fixed_w(2, 1, 1, 3, 2, fill=-1)
+        L.append(f"vfrac {src} {ident} {fw(2, 1, 1, 1, [1.0, 0.0])} 0 {fr2}")
+        L.append(f"vfrac {src} {half} {fw(4, 1, 1, 1, [1.0, 2.0, 2.0, 1.0])} 0 {fr2}")
+        L.append(
+            f"vfrac {fixed_w(4, 1, 1, 3, 1, fill=-1)} {half} {fw(2, 1, 1, 1, [1.0, 2.0])} 0 "
+            f"{fixed_w(4, 1, 1, 3, 2, fill=-1)}"
+        )
+        dbl = "4 4 " + " ".join(f32(v) for v in (2, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1))
+        L.append(
+            f"vfrac {fixed_w(4, 1, 1, 3, 1, fill=-1)} {dbl} {fw(2, 1, 1, 1, [2.0, 2.0])} 0 "
+            f"{fixed_w(4, 1, 1, 3, 2, fill=-1)}"
+        )
+        L.append(
+            f"vfrac {src} {'4 4 ' + ' '.join([f32(0.0)] * 16)} {fw(2, 1, 1, 1, [1.0, 1.0])} 0 {fr2}"
+        )
+        # MRIcloneDifferentType to a bitmap and a tensor
+        for t in (5, 6):
+            L.append(f"cdtype {fixed_w(2, 1, 1, 3, 1)} {t}")
+        # a volume without its cached matrices (FS-252)
+        nocache = fixed_w(2, 1, 1, 3, 1).split(" ")
+        nocache[44] = "2"
+        L.append(f"sort {' '.join(nocache)} 0 null new")
+        # MRIhalfCosBias of one slice; MRIcutEndSlices by -1;
+        # MRIcrop's end before its start
+        L.append(f"hcos {fw(2, 1, 1, 1, [2.0, 4.0])} 0 {f64(0.5)} new")
+        L.append(f"cutend {fw(1, 1, 3, 1, [1.0, 2.0, 3.0])} 0 -1")
+        L.append(f"crop {fw(3, 3, 1, 1, [1.0, 2.0])} 0 2 2 0 1 1 0")
+        # mri_binarize's tails: empty and short
+        for tl in ("", "po", "abs", "NEG"):
+            L.append(f"mbin {fw(2, 1, 1, 1, [-3.0, 2.0])} 0 new {f32(1.0)} {xs(tl)} 0")
+        return [Batch("vrules12", "vrules12", L)]
+
 
 GROUPS = [
     "vgblock",
@@ -2472,6 +3116,12 @@ GROUPS = [
     "vnbhd",
     "vltapv",
     "vrules9",
+    "vrules10",
+    "vrules11",
+    "vpvlab",
+    "vfr8",
+    "vmri2",
+    "vrules12",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -2579,7 +3229,7 @@ def mask(b: Batch, line: bytes) -> bytes:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen10) else Gen10(gen.seed)
+    gen = gen if isinstance(gen, Gen11) else Gen11(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

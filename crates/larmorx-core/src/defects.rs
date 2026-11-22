@@ -1967,6 +1967,40 @@ defects! {
         "mri_binarize --crop-around-ras, --dilate-vertex(-sum) and --match-ctab take a number that cannot be read (the centre, the field of view, a value kept or left out, the vertex, the radius or target) from memory contents";
     FS_1027 = "FS-1027", "FreeSurfer", true,
         "mri_binarize --surf and --fix-vol-topo keep about 1.25 GB of address space per tessellation of the volume that they never release: --fix-vol-topo, which tessellates at each of its steps, ends after some tens to hundreds of steps (the address space or the memory limit decides) with `Cannot calloc()` and exit status 0 without writing anything, or with a crash";
+    FS_1101 = "FS-1101", "FreeSurfer", true,
+        "mri_segstats cuts a file name it builds of 1,000 bytes or more (eTIV's talairach.xfm or --talxfm's transform, --euler's lh.orig.nofix) at 999 bytes and prints `main: Truncation on line <n>` on standard error: the shorter name is then read; larmorx reads the whole name";
+    FS_1102 = "FS-1102", "FreeSurfer", true,
+        "mri_segstats writes a file name of 1,000 bytes or more that it builds from the subjects' folder or FREESURFER_HOME (--annot, --slabel, --euler's rh.orig.nofix, the ribbon, --ctab-default; --qa-stats's names of 4,000 bytes or more) past the memory it sets aside for it (undefined behaviour); larmorx uses the whole name";
+    FS_1103 = "FS-1103", "FreeSurfer", true,
+        "mri_segstats --mul, --div and --rescale-by-seg (its target mean or an id) take a number that cannot be read from memory contents";
+    FS_1104 = "FS-1104", "FreeSurfer", true,
+        "mri_segstats --vox with one or two numbers reads past the command line and crashes";
+    FS_1105 = "FS-1105", "FreeSurfer", true,
+        "mri_segstats --annot and --xfm2etiv with too few arguments say that they need 1 argument (they need 3 and 2)";
+    FS_1106 = "FS-1106", "FreeSurfer", true,
+        "mri_segstats --mask writes the mask's frame (--maskframe) on the summary file's MaskInvert line instead of whether the mask was inverted (--maskinvert)";
+    FS_1107 = "FS-1107", "FreeSurfer", true,
+        "mri_segstats --gtm-default-seg-merge-choroid leaves out the default merge list's last two replacements, 62 and 80 into 0 (the right vessel and the non-white-matter hypointensities), as if they were the choroid plexus's, which the list no longer holds: those two labels stay unmerged";
+    FS_1108 = "FS-1108", "FreeSurfer", true,
+        "mri_segstats --replace-file after other replacements (--replace, --gtm-default-seg-merge) counts the earlier ones twice: it prints their total as the number it read, accepts a file of none, and adds as many replacements of 0 into 0 (or of what --gtm-default-seg-merge-choroid left out)";
+    FS_1109 = "FS-1109", "FreeSurfer", true,
+        "mri_segstats keeps at most 1,000 ids (--id), excluded ids (--exclude, --excl-ctxgmwm) and replacements (--replace, --replace-file, --gtm-default-seg-merge): more are written over its other settings (undefined behaviour)";
+    FS_1110 = "FS-1110", "FreeSurfer", true,
+        "mri_segstats --slabel reports segmentation 0 (the surface's vertices outside the label) though it is meant to exclude it: the summary lists it and its ExcludeSegId line names no id";
+    FS_1111 = "FS-1111", "FreeSurfer", true,
+        "mri_segstats crashes when a file it writes cannot be opened: --ctab-out, --sfavg and --qa-stats's file";
+    FS_1112 = "FS-1112", "FreeSurfer", true,
+        "mri_segstats --qa-stats crashes when the subject's aparc+aseg.mgz or norm.mgz cannot be read";
+    FS_1113 = "FS-1113", "FreeSurfer", true,
+        "mri_segstats aborts (std::logic_error) where it reads the brain volume statistics without a subject's name or SUBJECTS_DIR: the surface volumes or --brain-vol-from-seg without --subject (when (null)/(null)/mri/ribbon.mgz exists), --qa-stats without SUBJECTS_DIR";
+    FS_1114 = "FS-1114", "FreeSurfer", true,
+        "mri_segstats --annot of an annotation without a colour table crashes";
+    FS_1115 = "FS-1115", "FreeSurfer", true,
+        "mri_segstats crashes when a step gives no volume and the program goes on with it: --seg-from-input with an input whose header cannot be read";
+    FS_1116 = "FS-1116", "FreeSurfer", true,
+        "mri_segstats --id with a colour table accepts or refuses an id outside the table by the answer for the id before it (by memory contents for the first): an accepted one is reported with an empty name and colour; larmorx refuses it (ERROR: cannot find seg id)";
+    FS_1117 = "FS-1117", "FreeSurfer", true,
+        "mri_segstats --ctab-gca writes a GCA label of 1,000 or more past the list it marks labels in (undefined behaviour), and crashes on a label that FreeSurferColorLUT.txt does not hold; larmorx keeps every label and ends with an error for one the table lacks";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

@@ -2627,7 +2627,11 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
   their reciprocals (`1 / size` in `double` stored as `float`: 0 gives an infinity, a NaN stays NaN), `M` for a
   transform's matrix, src/dst its geometries, and `A · B` for `MatrixMultiply(A, B, ...)` (`specs/freesurfer-maths.md`
   §8.1: an inner product into a new matrix, an outer one into `M` itself; their messages and ends of the program
-  included, so a matrix of another size than 4 x 4 prints their errors and ends at the first absent operand), the
+  included, so a matrix of another size than 4 x 4 prints their errors: an inner product that gives nothing ends the
+  program at the next product, whose operand it is (`m2 is null`), and an outer product that gives nothing leaves `M`
+  as it was, so the change goes on with that matrix (**(observed)**: `vltapv`, a 3 x 4 physical-voxel matrix changed
+  to RAS-to-RAS prints both outer products' `MatrixMultiply(): m1/m2 dim mismatch` lines and errors, then the fill's
+  `MatrixInverse: matrix (3 x 4) is not square` and its end, in both modes)), the
   change is made for each transform in order, each transform's whole change before the next one's (an end of the
   program at a later transform leaves nothing observable), as follows; none prints anything else, whatever
   `Gdiag_no` (**(observed)**: `vrules10` with the diagnostic level 1):

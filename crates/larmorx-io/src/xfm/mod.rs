@@ -38,10 +38,13 @@ mod write;
 
 pub use files::{
     IoType, OpenFile, expand_filename, expand_filename_in, extract_directory, file_exists,
-    open_file, open_file_with_default_suffix, remove_directories_from_filename,
+    open_file, open_file_errno, open_file_with_default_suffix, open_file_with_default_suffix_errno,
+    remove_directories_from_filename,
 };
 pub use gaussian::invert_square_matrix;
-pub use read::{input_transform_file, input_transform_from_bytes};
+pub use read::{
+    TransformFileRead, input_transform_file, input_transform_file_ex, input_transform_from_bytes,
+};
 pub use write::{output_transform, output_transform_file, output_transform_to_string};
 
 use larmorx_core::cfmt::Streams;

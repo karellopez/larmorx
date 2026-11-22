@@ -44,6 +44,9 @@ ported file is audited for third-party code first).
 | `mris_calc/mris_calc.cpp` 62-638, 1627-1824 (queue item 3.2-21, track D relay 50) | `e_operation`, `fn_mul` to `fn_dev`, `Gfn_sum`, `Gfn_prod`, the counts' and minima's statics, `operation_lookup`, `b_outCurvFile_write`; the operand order and NaNs of the official build's object code (its disassembly: `fn_pctdiff`'s `* 0.5`, `fn_bcor`'s `sign * -log10(p)`, the sums' `a + sum`) | `src/mris_calc/ops.rs` |
 | `mris_calc/mris_calc.cpp` 56-60, 72-111, 221-278, 695-1626, 1826-2554, 2556-2628 (3.2-21) | `main`, `options_parse`, `options_print`, `version_print`, `synopsis_show`, `simpleSynopsis_show`, `verbosity_set`, `error_exit` and its callers, `xmalloc`, `output_init`, `fileType_find`, `fileIO_errorHander`, `fileRead`, `fileWrite`, `debuggingInfo_display`, `CURV_set`, `CURV_copy`, the label's `array_compressUsingLabelMask`, `primaryCurvs_backup`, `primaryCurvs_compress`, `label_initialize`, `array_expandUsingLabelMask`, `VOL_fileRead`, `VOL_fileWrite`, `CURV_fileRead`, `ascii_fileWrite`, `CURV_fileWrite`, `CURV_arrayProgress_print`, `CURV_process`, `PrintStatToFile`, `CURV_functionRunABC`, `CURV_functionRunAC` (FS-1119 to FS-1126); the program `mris_calc` of `larmorx-freesurfer` | `src/mris_calc/main.rs` |
 | `mris_calc/mris_calc.help.xml` | the help text `synopsis_show` renders (FreeSurfer's file, copied unchanged) | `src/mris_calc/mris_calc.help.xml` |
+| `mri_add_xform_to_header/mri_add_xform_to_header.cpp` 45-221 (queue item 3.2-10, track A relay 50) | `main` (FS-1154, FS-1155), `get_option`, `usage_exit`, `print_usage`; the program `mri_add_xform_to_header` of `larmorx-freesurfer` | `src/mri_add_xform_to_header/main.rs` |
+| `mri_add_xform_to_header/mri_add_xform_to_header.help.xml` (3.2-10) | the help text, copied unchanged (`print_usage` renders it) | `src/mri_add_xform_to_header/mri_add_xform_to_header.help.xml` |
+| `utils/mriio.cpp` 11852-11905 (3.2-10; decided for the program's crate: no other program on the default paths calls it) | `MRIwriteInfo` (FS-1156, FS-1157, FS-1158) | `src/mri_add_xform_to_header/write_info.rs` |
 
 Third-party code: none in `mri_normalize.cpp` (FreeSurfer's own file, MGH's notice). Its library
 calls are the other crates' (`larmorx-freesurfer-filter`'s normalisation, `-volume`, `-surf`,
@@ -59,6 +62,12 @@ the other crates' (`larmorx-freesurfer-io`'s format identification, header and v
 writer and the colour table's text; `-gca`'s morph reader and `cma_label_to_name`; `-mri`'s
 geometry matrices and `vgprint`; `-volume`'s orientation, slice direction, conformed test,
 tkregister matrices and histogram; `-core`'s matrices and version) and `larmorx-io`'s znzlib.
+
+Third-party code: none in `mri_add_xform_to_header.cpp` and `MRIwriteInfo` (FreeSurfer's own,
+MGH's notice). Their library calls are the other crates' (`larmorx-freesurfer-io`'s file tests,
+`MRIreadInfo`, `MRIread`, `MRIwrite` and FreeSurfer's `.xfm` reader on `larmorx_io::xfm`, MINC's
+volume_io: MNI's notice; `-mri`'s transform matrices; `-volume`'s slice direction; `-core`'s
+version, help and error messages).
 
 ## Changes from the originals
 
@@ -118,3 +127,10 @@ tkregister matrices and histogram; `-core`'s matrices and version) and `larmorx-
   in both modes, `fmodf` as glibc's measured results (`ops::fmodf_glibc`); `stat` and `strtof`'s
   `errno` modelled (the fatal errors print it); `atof`'s `ERANGE` from fs.core's scanner;
   `docs/findings/freesurfer-mris-calc.md`.
+- `mri_add_xform_to_header` (relay 50): the transform file is read with
+  `input_transform_file_ex` (what C's `transform` argument holds after a failure, and `errno`),
+  the volume keeping a partial transform as C's does; a transform never read gives no matrices
+  (C's zeroed `General_transform`: type `LINEAR` with null pointers). FS-1154 and FS-1156 with
+  `reproduce` print the C library's `*** buffer overflow detected ***: terminated` and end with
+  status 134 (the official build's fortified copy aborts); standard output as written (C's buffer,
+  lost at the abort when it is not a terminal, is not modelled).

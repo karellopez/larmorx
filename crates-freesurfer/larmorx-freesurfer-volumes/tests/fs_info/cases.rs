@@ -39,23 +39,23 @@ impl Gen {
     pub fn new(seed: u64) -> Gen {
         Gen(seed)
     }
-    fn next(&mut self) -> u64 {
+    pub fn next(&mut self) -> u64 {
         self.0 = self.0.wrapping_add(0x9e37_79b9_7f4a_7c15);
         let mut z = self.0;
         z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
         z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
         z ^ (z >> 31)
     }
-    fn below(&mut self, n: u64) -> u64 {
+    pub fn below(&mut self, n: u64) -> u64 {
         self.next() % n
     }
-    fn int(&mut self, lo: i64, hi: i64) -> i64 {
+    pub fn int(&mut self, lo: i64, hi: i64) -> i64 {
         lo + self.below((hi - lo + 1) as u64) as i64
     }
-    fn pick<T: Copy>(&mut self, xs: &[T]) -> T {
+    pub fn pick<T: Copy>(&mut self, xs: &[T]) -> T {
         xs[self.below(xs.len() as u64) as usize]
     }
-    fn chance(&mut self, k: u64) -> bool {
+    pub fn chance(&mut self, k: u64) -> bool {
         self.below(k) == 0
     }
 }
@@ -89,7 +89,7 @@ pub fn escape(b: &[u8]) -> String {
     s
 }
 
-fn fnv(b: &[u8]) -> u64 {
+pub fn fnv(b: &[u8]) -> u64 {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
     for &c in b {
         h = (h ^ u64::from(c)).wrapping_mul(0x0100_0000_01b3);
@@ -101,34 +101,34 @@ fn fnv(b: &[u8]) -> u64 {
 
 /// A volume to write: its geometry, scan parameters and the tags of its header.
 #[derive(Clone)]
-struct Spec {
-    dims: [i32; 4],
-    ty: i32,
-    size: [f32; 3],
-    mdc: [f32; 9],
-    c: [f32; 3],
-    good: i32,
-    tr: f32,
-    flip: f64,
-    te: f32,
-    ti: f32,
-    fov: f32,
-    dof: i32,
-    xform: Option<String>,
-    pedir: Option<String>,
-    cmds: Vec<String>,
-    auto_align: Option<[f32; 16]>,
-    orig: Option<[f32; 16]>,
-    field: f32,
+pub struct Spec {
+    pub dims: [i32; 4],
+    pub ty: i32,
+    pub size: [f32; 3],
+    pub mdc: [f32; 9],
+    pub c: [f32; 3],
+    pub good: i32,
+    pub tr: f32,
+    pub flip: f64,
+    pub te: f32,
+    pub ti: f32,
+    pub fov: f32,
+    pub dof: i32,
+    pub xform: Option<String>,
+    pub pedir: Option<String>,
+    pub cmds: Vec<String>,
+    pub auto_align: Option<[f32; 16]>,
+    pub orig: Option<[f32; 16]>,
+    pub field: f32,
     /// frames' label, threshold and name
-    frames: Vec<(i32, f32, String)>,
-    ctab: bool,
-    seg: bool,
+    pub frames: Vec<(i32, f32, String)>,
+    pub ctab: bool,
+    pub seg: bool,
 }
 
-const LUT: &[u8] = b"0 Unknown 0 0 0 0\n2 Left-Cerebral-White-Matter 245 245 245 0\n3 Left-Cerebral-Cortex 205 62 78 0\n17 Left-Hippocampus 220 216 20 0\n41 Right-Cerebral-White-Matter 0 225 0 0\n";
+pub const LUT: &[u8] = b"0 Unknown 0 0 0 0\n2 Left-Cerebral-White-Matter 245 245 245 0\n3 Left-Cerebral-Cortex 205 62 78 0\n17 Left-Hippocampus 220 216 20 0\n41 Right-Cerebral-White-Matter 0 225 0 0\n";
 
-const XFM: &[u8] = b"MNI Transform File\n% avi2talxfm\n\nTransform_Type = Linear;\nLinear_Transform =\n 1.05 0.01 -0.02 -1.5\n -0.01 1.1 0.03 2.25\n 0.02 -0.03 0.95 -3.0;\n";
+pub const XFM: &[u8] = b"MNI Transform File\n% avi2talxfm\n\nTransform_Type = Linear;\nLinear_Transform =\n 1.05 0.01 -0.02 -1.5\n -0.01 1.1 0.03 2.25\n 0.02 -0.03 0.95 -3.0;\n";
 
 /// Direction cosines (`x_r x_a x_s y_r y_a y_s z_r z_a z_s`): a signed permutation (most), an
 /// oblique rotation, a degenerate set or none at all.
@@ -180,7 +180,7 @@ fn rand_mdc(g: &mut Gen) -> [f32; 9] {
     m
 }
 
-fn rand_matrix(g: &mut Gen) -> [f32; 16] {
+pub fn rand_matrix(g: &mut Gen) -> [f32; 16] {
     let mut m = [0f32; 16];
     for (k, v) in m.iter_mut().enumerate() {
         *v = if k % 5 == 0 {
@@ -196,7 +196,7 @@ fn rand_matrix(g: &mut Gen) -> [f32; 16] {
     m
 }
 
-fn rand_spec(g: &mut Gen) -> Spec {
+pub fn rand_spec(g: &mut Gen) -> Spec {
     let sizes = [
         1.0f32,
         1.0,
@@ -279,7 +279,7 @@ fn matrix_of(v: &[f32; 16]) -> Matrix {
 }
 
 /// The volume of a spec, with seeded voxels.
-fn build(g: &mut Gen, s: &Spec) -> Mri {
+pub fn build(g: &mut Gen, s: &Spec) -> Mri {
     let mut fs = Globals::new(UpstreamDefects::Fix);
     let (mut o, mut e) = (Vec::new(), Vec::new());
     let mut m = mri_alloc_sequence(
@@ -346,7 +346,7 @@ fn build(g: &mut Gen, s: &Spec) -> Mri {
 }
 
 /// The files `write` leaves in an empty folder, by name (one level of folders).
-fn collect(dir: &Path) -> Vec<(String, Vec<u8>)> {
+pub fn collect(dir: &Path) -> Vec<(String, Vec<u8>)> {
     let mut files = Vec::new();
     let mut names: Vec<_> = std::fs::read_dir(dir)
         .expect("the folder")
@@ -367,7 +367,7 @@ fn collect(dir: &Path) -> Vec<(String, Vec<u8>)> {
 }
 
 /// The files of `m` written as `name` (`mri_write`; a COR folder for names ending in `.cor`).
-fn write_volume(m: &mut Mri, name: &str) -> Vec<(String, Vec<u8>)> {
+pub fn write_volume(m: &mut Mri, name: &str) -> Vec<(String, Vec<u8>)> {
     let t = tempfile::tempdir().expect("a temporary folder");
     let mut fs = Globals::new(UpstreamDefects::Fix);
     let (mut o, mut e) = (Vec::new(), Vec::new());
@@ -981,7 +981,7 @@ pub fn probe_env() -> Vec<(String, String)> {
 }
 
 /// `b` with every occurrence of `pat` replaced by `<DIR>`.
-fn mask_bytes(b: &[u8], pat: &[u8]) -> Vec<u8> {
+pub fn mask_bytes(b: &[u8], pat: &[u8]) -> Vec<u8> {
     if pat.is_empty() {
         return b.to_vec();
     }

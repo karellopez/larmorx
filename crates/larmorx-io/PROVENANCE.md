@@ -175,6 +175,15 @@ variant is in this crate; FreeSurfer's copy was not read, and what it changes is
 file closed to FreeSurfer's clean-room implementers, `docs/findings/freesurfer-permissive.md`).
 Defects FS-71 to FS-75 (`larmorx_core::defects`).
 
+`input_transform_file_ex` and the `_errno` variants of the open functions (2026-11-22, FreeSurfer's
+track A relay 50, for a caller that needs C's view of the call): MINC 1.5.1's `input_transform`
+assigns its `transform` argument at the first transform read and the concatenation at each later
+one (`MNI_formats/gen_xf_io.c` 646-660), so a file that fails after its first transforms leaves
+those in the caller's transform; `file_exists` is an `fopen` (`Prog_utils/files.c` 103-121) and
+`open_file` an `fopen` and reads, so `errno` after the call is the code of the last one that
+failed. Checked against MINC 1.5.1's own source; a folder opened for reading answers as on Linux on
+every platform (its first read fails with `EISDIR`).
+
 **Identical to MINC 1.5.1** (its files built from the tarball with GCC 8.4.0 at `-O3`):
 `validation/probes/fs-minc-nifti` (families `xfm`, `ops`, `write`), numbers in
 `docs/findings/minc-xfm.md`.

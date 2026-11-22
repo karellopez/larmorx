@@ -19,6 +19,7 @@ pub mod mri_normalize;
 
 use larmorx_freesurfer_core::run::Program;
 
+pub mod mri_add_xform_to_header;
 pub mod mri_binarize;
 pub mod mri_convert;
 pub mod mri_info;
@@ -27,6 +28,10 @@ pub mod mris_calc;
 
 /// The programs of this crate, by their original names.
 pub const PROGRAMS: &[Program] = &[
+    Program {
+        name: mri_add_xform_to_header::main::NAME,
+        run: mri_add_xform_to_header::main::run,
+    },
     Program {
         name: mri_binarize::main::NAME,
         run: mri_binarize::main::run,

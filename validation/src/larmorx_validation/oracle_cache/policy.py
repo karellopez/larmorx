@@ -346,12 +346,24 @@ def path_text(program: str, args: Sequence[str]) -> tuple[str, ...]:
     texts = list(WHITESPACE)
     if Path(program).name == "bet2" and len(args) < 2:
         texts += ["-h", "--help"]
+    if Path(program).name in EXTENSION_FROM_WHOLE_PATH:
+        # the text after an argument's last dot, folders included: the program's extension
+        # (``a.b/c`` has ``b/c``, ``trail.`` none), which a file's suffix does not give
+        texts += [a[a.rfind(".") :] for a in args if "." in a]
     return tuple(texts)
+
+
+#: Programs that read a file's format from the text after the last dot of its whole path
+#: (FreeSurfer's ``fio_extension``: ``a.b/c`` has the extension ``b/c``): the key keeps that
+#: text (relay 50 of FreeSurfer's track A: two inputs of the same content named ``a.b/c`` and
+#: ``trail.`` had one key, and the cache served the one's run for the other).
+EXTENSION_FROM_WHOLE_PATH = ("mri_add_xform_to_header",)
 
 
 __all__ = [
     "CLOCK_SAMPLED_STAGES",
     "CONFIRMATIONS",
+    "EXTENSION_FROM_WHOLE_PATH",
     "IMAGE_MATH_VOXELWISE",
     "VARIES_ABOVE_ONE_THREAD",
     "VARYING_DEFECTS",

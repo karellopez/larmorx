@@ -20,6 +20,9 @@ use super::Dialect;
 /// volume_io's compressed endings, in its order.
 const COMPRESSED_ENDINGS: [&[u8]; 3] = [b".z", b".Z", b".gz"];
 
+/// Linux's `EISDIR`.
+const EISDIR: i32 = 21;
+
 /// A file name's bytes as a path.
 pub(crate) fn to_path(name: &[u8]) -> PathBuf {
     #[cfg(unix)]
@@ -227,10 +230,23 @@ impl<'a> Ctx<'a> {
 
     /// `file_exists`.
     pub(crate) fn file_exists(&mut self, filename: &[u8]) -> bool {
+        self.file_exists_errno(filename, &mut None)
+    }
+
+    /// `file_exists`, with the C library's `errno` as its `fopen` leaves it: a failed open sets
+    /// `errno` to its code (Linux's on every platform), a successful one leaves it.
+    pub(crate) fn file_exists_errno(&mut self, filename: &[u8], errno: &mut Option<i32>) -> bool {
         // fopen(name, "r"): Unix opens a folder (its reads fail), Windows refuses it; Linux's
         // answer on every platform
         let p = to_path(&self.expand(filename));
-        std::fs::File::open(&p).is_ok() || (!cfg!(unix) && p.is_dir())
+        match std::fs::File::open(&p) {
+            Ok(_) => true,
+            Err(_) if !cfg!(unix) && p.is_dir() => true,
+            Err(e) => {
+                *errno = Some(errno_of(&e));
+                false
+            }
+        }
     }
 
     /// `remove_directories_from_filename`.
@@ -419,17 +435,42 @@ pub fn open_file(
     streams: &mut dyn Streams,
     notices: &mut Notices,
 ) -> Result<OpenFile, ()> {
+    open_file_errno(filename, io, dialect, streams, notices, &mut None)
+}
+
+/// [`open_file`], with the C library's `errno` as its own calls leave it (`None`: unchanged):
+/// each failed `fopen` (the existence checks', the open's) sets it to its code, Linux's on every
+/// platform; a read that fails sets it to the read's code (a folder opened for reading:
+/// `EISDIR`, on every platform). The decompression's shell commands are not modelled.
+pub fn open_file_errno(
+    filename: &[u8],
+    io: IoType,
+    dialect: &dyn Dialect,
+    streams: &mut dyn Streams,
+    notices: &mut Notices,
+    errno: &mut Option<i32>,
+) -> Result<OpenFile, ()> {
     let mut ctx = Ctx::new(dialect, notices);
     let mut expanded = ctx.expand(filename);
     let mut gzipped = false;
     if io == IoType::Read {
         gzipped = COMPRESSED_ENDINGS.iter().any(|e| ends_in(&expanded, e));
-        if !gzipped
-            && !ctx.file_exists(&expanded)
-            && let Some(c) = ctx.file_exists_as_compressed(&expanded)
-        {
-            expanded = c;
-            gzipped = true;
+        if !gzipped && !ctx.file_exists_errno(&expanded, errno) {
+            // file_exists_as_compressed: one existence check per ending, in order
+            let mut found = None;
+            let e = ctx.expand(&expanded);
+            for ending in COMPRESSED_ENDINGS {
+                let mut c = e.clone();
+                c.extend_from_slice(ending);
+                if ctx.file_exists_errno(&c, errno) {
+                    found = Some(c);
+                    break;
+                }
+            }
+            if let Some(c) = found {
+                expanded = c;
+                gzipped = true;
+            }
         }
     }
     if gzipped && expanded.iter().any(|c| SHELL_SPECIAL.contains(c)) {
@@ -446,7 +487,14 @@ pub fn open_file(
         IoType::Read => {
             let mut file = match std::fs::File::open(&path) {
                 Ok(f) => f,
+                // a folder: Linux's fopen opens it and its first read fails (EISDIR); Windows
+                // refuses the open, answered as on Linux
+                Err(_) if !gzipped && !cfg!(unix) && path.is_dir() => {
+                    *errno = Some(EISDIR);
+                    return Ok(OpenFile::Read(Vec::new()));
+                }
                 Err(e) if !gzipped => {
+                    *errno = Some(errno_of(&e));
                     dialect.print_error(
                         &format!("Error:  could not open file \"{}\".  ", lossy(&expanded)),
                         streams,
@@ -461,7 +509,9 @@ pub fn open_file(
             };
             let mut data = Vec::new();
             // A read error ends the stream where it happens, as fgetc's end of file would.
-            let _ = file.read_to_end(&mut data);
+            if let Err(e) = file.read_to_end(&mut data) {
+                *errno = Some(errno_of(&e));
+            }
             if !gzipped {
                 return Ok(OpenFile::Read(data));
             }
@@ -483,6 +533,7 @@ pub fn open_file(
             match o.open(&path) {
                 Ok(f) => Ok(OpenFile::Write(f)),
                 Err(e) => {
+                    *errno = Some(errno_of(&e));
                     dialect.print_error(
                         &format!("Error:  could not open file \"{}\".  ", lossy(&expanded)),
                         streams,
@@ -516,6 +567,28 @@ pub fn open_file_with_default_suffix(
     streams: &mut dyn Streams,
     notices: &mut Notices,
 ) -> Result<OpenFile, ()> {
+    open_file_with_default_suffix_errno(
+        filename,
+        default_suffix,
+        io,
+        dialect,
+        streams,
+        notices,
+        &mut None,
+    )
+}
+
+/// [`open_file_with_default_suffix`], with `errno` as [`open_file_errno`] keeps it (the default
+/// suffix's existence checks included).
+pub fn open_file_with_default_suffix_errno(
+    filename: &[u8],
+    default_suffix: &[u8],
+    io: IoType,
+    dialect: &dyn Dialect,
+    streams: &mut dyn Streams,
+    notices: &mut Notices,
+    errno: &mut Option<i32>,
+) -> Result<OpenFile, ()> {
     let mut ctx = Ctx::new(dialect, &mut *notices);
     let expanded = ctx.expand(filename);
     let with_suffix = || {
@@ -526,9 +599,9 @@ pub fn open_file_with_default_suffix(
     };
     let used = if io == IoType::Read {
         let mut used = expanded.clone();
-        if !ctx.file_exists(&expanded) && ctx.has_no_extension(&expanded) {
+        if !ctx.file_exists_errno(&expanded, errno) && ctx.has_no_extension(&expanded) {
             let u = with_suffix();
-            if ctx.file_exists(&u) {
+            if ctx.file_exists_errno(&u, errno) {
                 used = u;
             }
         }
@@ -538,5 +611,5 @@ pub fn open_file_with_default_suffix(
     } else {
         expanded.clone()
     };
-    open_file(&used, io, dialect, streams, notices)
+    open_file_errno(&used, io, dialect, streams, notices, errno)
 }

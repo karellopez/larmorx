@@ -1286,6 +1286,18 @@ later row's multiple subtracted, then multiplied by `1 / a_ii`); x86-64's double
 NaNs. A failure prints `invert_4x4_matrix failed, <reason>` on standard output and the transform
 is the identity both ways.
 
+What a read leaves (relay 50 of track A, measured through `mri_add_xform_to_header`): the
+transform the caller passes is assigned as the file is read, at its first transform and at each
+concatenation after it, so a file that fails after one or more transforms leaves those
+(concatenated: two linear transforms make one linear transform) in the caller's transform, and a
+file that fails before any (it cannot be opened, a wrong header, a first transform that does not
+read) leaves the caller's transform as it was; `MRIread`'s and `corRead`'s transform keeps that
+partial transform too, without its matrices (they are cleared, and the transform's name emptied).
+`errno` after the read is what its own file operations leave: each failed existence check (an
+open for reading: the name, the name with `.xfm` when it has no extension and does not exist, the
+name with `.z`, `.Z`, `.gz` when it does not exist) and a failed open set it to that failure's
+code; a folder opens and its first read fails (`EISDIR`); a read that succeeds leaves it as it was.
+
 ## 46. Registration files (`regio_read_register`)
 
 - A name whose last extension is `lta` in any case (FS-11's limits): `regio_read_register: loading

@@ -382,26 +382,97 @@ pub fn input_transform_file(
     dir: Option<&Path>,
     filename: &[u8],
 ) -> Option<GeneralTransform> {
-    let mut streams = Std { out, err };
-    let path: Vec<u8> = match dir {
-        Some(d)
-            if !filename.is_empty()
-                && !pathsep::is_absolute_name(filename)
-                && filename[0] != b'~' =>
-        {
-            let mut p = d.to_string_lossy().into_owned().into_bytes();
-            if cfg!(windows) && !p.starts_with(b"\\\\?\\") {
-                for c in p.iter_mut().filter(|c| **c == b'\\') {
-                    *c = b'/';
-                }
-            }
-            p.push(b'/');
-            p.extend_from_slice(filename);
-            p
-        }
-        _ => filename.to_vec(),
+    let (path, prefix) = in_dir(dir, filename);
+    let mut streams = InDir {
+        inner: Std { out, err },
+        prefix,
     };
     larmorx_io::xfm::input_transform_file(&path, &FsVolumeIo, &mut streams, &mut g.notices).ok()
+}
+
+/// `input_transform_file(filename, &transform)` as its caller sees C's call: [`input_transform_file`]
+/// with what the `transform` argument holds afterwards (a file that fails after its first
+/// transforms leaves those; `None`: never assigned, the caller's value stays) and `errno` as the
+/// call's own system calls leave it (set in `g`: the last failed existence check, open or read).
+pub fn input_transform_file_ex(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    filename: &[u8],
+) -> (Result<(), ()>, Option<GeneralTransform>) {
+    let (path, prefix) = in_dir(dir, filename);
+    let mut streams = InDir {
+        inner: Std { out, err },
+        prefix,
+    };
+    let r =
+        larmorx_io::xfm::input_transform_file_ex(&path, &FsVolumeIo, &mut streams, &mut g.notices);
+    if let Some(e) = r.errno {
+        g.errno = e;
+    }
+    (r.status, r.transform)
+}
+
+/// The C streams of a read whose name holds the program's directory: that directory as
+/// FreeSurfer prints it (a relative name: not at all, FreeSurfer opens it in its working directory;
+/// a name the port built from the working directory: the directory as written, its separators as
+/// they were before [`in_dir`] wrote them as `/`).
+struct InDir<'a> {
+    inner: Std<'a>,
+    /// The directory as given to volume_io, and as FreeSurfer prints it.
+    prefix: Option<(String, String)>,
+}
+
+impl InDir<'_> {
+    fn strip(&self, text: &str) -> String {
+        match &self.prefix {
+            Some((from, to)) => text.replace(from.as_str(), to),
+            None => text.to_owned(),
+        }
+    }
+}
+
+impl Streams for InDir<'_> {
+    fn out(&mut self, text: &str) {
+        let t = self.strip(text);
+        self.inner.out(&t);
+    }
+    fn err(&mut self, text: &str) {
+        let t = self.strip(text);
+        self.inner.err(&t);
+    }
+}
+
+/// A name as volume_io opens it in the program's directory `dir` (see [`input_transform_file`]),
+/// and the text its messages hold for that directory (see [`InDir`]): a relative name is put in
+/// `dir`; on Windows, a name that starts with `dir` (one the port built from the working
+/// directory, as `mri_read` does) has that part's backslashes written as `/`.
+fn in_dir(dir: Option<&Path>, filename: &[u8]) -> (Vec<u8>, Option<(String, String)>) {
+    let Some(d) = dir else {
+        return (filename.to_vec(), None);
+    };
+    let orig = d.to_string_lossy().into_owned();
+    let mut conv = orig.clone().into_bytes();
+    if cfg!(windows) && !conv.starts_with(b"\\\\?\\") {
+        for c in conv.iter_mut().filter(|c| **c == b'\\') {
+            *c = b'/';
+        }
+    }
+    if !filename.is_empty() && !pathsep::is_absolute_name(filename) && filename[0] != b'~' {
+        let mut p = conv;
+        p.push(b'/');
+        let prefix = String::from_utf8_lossy(&p).into_owned();
+        p.extend_from_slice(filename);
+        return (p, Some((prefix, String::new())));
+    }
+    if conv != orig.as_bytes() && filename.starts_with(orig.as_bytes()) {
+        let shown = String::from_utf8_lossy(&conv).into_owned();
+        let mut p = conv;
+        p.extend_from_slice(&filename[orig.len()..]);
+        return (p, Some((shown, orig)));
+    }
+    (filename.to_vec(), None)
 }
 
 #[cfg(test)]

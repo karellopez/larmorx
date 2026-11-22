@@ -342,3 +342,16 @@ made the port's `fix` run grow past its 24 GiB box, `docs/findings/freesurfer-vo
 26,580 identical, 2,020 not comparable (524 identical all the same), 0 different. The speed and memory against
 FreeSurfer's own code:
 `validation/probes/fs-bspline-bench/`.
+
+Measured 2026-11-22 (relay 43: the label sums' operand order and FS-471's negative limits; two commands
+`lmeansp` and `lnbhdp`, `lmeans` and `lnbhd` with the source painted, used only by hand cases: the seeded
+cases are unchanged). `nan_hand_cases.txt` (`hand_cases.py nan`): the five label means and
+`MRIcomputeLabelNbhd` of 2 x 2 x 1 float volumes holding two to four NaN payloads, infinities of both signs and
+a signalling NaN: 72 of 72 identical with `reproduce`, `fix` the same (FreeSurfer keeps the last NaN value met;
+relays 19 and 20 kept the first). `pv471_hand_cases.txt` (`hand_cases.py pv471`, track E's open group
+`vrules13` in this probe's form): 8 of 15 identical (limits -1 to -3 with every counted voxel off the border,
+and a volume without the label), 7 FreeSurfer's crashes (`SKIP`, FS-471). Both files' official hashes are
+`tests/fs_volume_official.rs`'s `hand_cases_give_the_official_outputs`. With the probe rebuilt (`fsvolume` from
+relay 43; the earlier binary in `<workspace>/archive/2026-11-22-fsvolume-closed-probe-before-r43/`): seed 1,
+5,720 cases: hash `a2c71444...` unchanged (436 `SKIP`, 24 `HEAVY`); seed 7, the 609 `lmeans`, `lnbhd` and `pvlab`
+cases of 58,000: 540 identical, 69 not comparable, 0 different (logs `oracles/logs/fs-found-c-r43-*`).

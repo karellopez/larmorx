@@ -471,7 +471,8 @@ pub fn mri_mean_in_label_multispectral(
                 for z in 0..src.vg.depth {
                     if label_at(g, err, labeled, x, y, z)? == label {
                         let val = mri_get_vox_val(g, err, src, x, y, z, f, 0)?;
-                        mean = add64(mean, f64::from(val));
+                        // the value just read is the first operand (its NaN kept: FreeSurfer's order)
+                        mean = add64(f64::from(val), mean);
                         nvox += 1;
                     }
                 }
@@ -532,8 +533,9 @@ fn in_label(
                 }
                 if label_at(g, err, labeled, x, y, z)? == label {
                     let val = mri_get_vox_val(g, err, src, x, y, z, 0, 0)?;
-                    r.mean = add64(r.mean, f64::from(val));
-                    r.var = add64(r.var, f64::from(mul(val, val)));
+                    // the value just read is the first operand (its NaN kept: FreeSurfer's order)
+                    r.mean = add64(f64::from(val), r.mean);
+                    r.var = add64(f64::from(mul(val, val)), r.var);
                     if f64::from(val) > r.max {
                         r.max = f64::from(val);
                     }
@@ -762,7 +764,8 @@ pub fn mri_compute_label_nbhd(
                 counts[label as usize] += 1;
                 if let Some((m, means)) = vals.as_mut() {
                     let val = mri_get_vox_val(g, err, m, xi, yi, zi, 0, 0)?;
-                    means[label as usize] = add(means[label as usize], val);
+                    // the value just read is the first operand (its NaN kept: FreeSurfer's order)
+                    means[label as usize] = add(val, means[label as usize]);
                 }
             }
         }
@@ -809,7 +812,7 @@ fn label_window(
                 e.0 += 1;
                 if let Some(m) = vals {
                     let val = mri_get_vox_val(g, err, m, xi, yi, zi, 0, 0)?;
-                    e.1 = add(e.1, val);
+                    e.1 = add(val, e.1);
                 }
             }
         }
@@ -857,7 +860,9 @@ const STACK_BYTES: i64 = 8 << 20;
 /// - FS-469: a border voxel's own label outside `[0, maxlabels)`: both modes use that label's
 ///   mean in its wide window (FreeSurfer reads memory), noted. FS-470: no `vals` at a border voxel
 ///   it weighs: an error (FreeSurfer crashes). FS-471: a negative `maxlabels` at the first counted
-///   voxel: an error (FreeSurfer crashes); tables beyond the stack: counted all the same, noted.
+///   voxel on the border, or at the first counted voxel from -4 down: an error (FreeSurfer
+///   crashes); with -1 to -3 a voxel off the border counts as usual (FreeSurfer finishes); tables
+///   beyond the stack: counted all the same, noted.
 ///
 /// FreeSurfer writes the border volume to `b.mgz` when `Gdiag` has `DIAG_WRITE` and verbose
 /// output is on: a diagnostic this port does not write.
@@ -919,8 +924,11 @@ pub fn mri_voxels_in_label_with_partial_volume_effects(
                         continue;
                     }
                 }
-                // FreeSurfer's three tables of `maxlabels` entries on the stack, every voxel here
-                if maxlabels < 0 {
+                // FreeSurfer's three tables of `maxlabels` entries on the stack, every voxel here:
+                // a negative number ends the program at a voxel on the border (the neighbourhoods
+                // clear the tables) and, from -4 down, at any voxel (the stack itself); -1 to -3
+                // leave a voxel off the border counted as usual
+                if maxlabels < 0 && (border != 0 || maxlabels <= -4) {
                     g.notices.add(
                         &FS_471,
                         format!(

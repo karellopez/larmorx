@@ -88,9 +88,12 @@ def args_of(mri: Path, outputs: bool) -> list[str]:
     return a
 
 
-def official(exe: Path, mri: Path, d: Path, outputs: bool) -> dict:
+def official(exe: Path, mri: Path, d: Path, outputs: bool, preload: Path | None = None) -> dict:
     env = {"PATH": f"{exe.parent}:/usr/bin:/bin", "FS_DISABLE_LANG": "1", **FIXED,
            **freesurfer_env()}  # fmt: skip
+    if preload is not None:
+        # relay 45 of track C: the decided cabs and csqrt (decided_complex.sh)
+        env["LD_PRELOAD"] = str(preload)
     if any(k.startswith("DIAG") for k in env):
         raise SystemExit("DIAG_NO would print the licence file")
     if d.exists():
@@ -153,6 +156,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--parallel", type=int, default=6)
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--json", type=Path)
+    ap.add_argument(
+        "--preload",
+        type=Path,
+        help="a library for the official program's LD_PRELOAD (decided_complex.sh's: the decided "
+        "cabs and csqrt); its outputs in real-preload/",
+    )
     a = ap.parse_args(argv)
     ws = workspace()
     if ws is None:
@@ -167,13 +176,15 @@ def main(argv: list[str] | None = None) -> int:
     root = (
         ws / "oracles" / "inputs" / "fs-robust-register" / ("real-outputs" if a.outputs else "real")
     )
+    if a.preload is not None:
+        root = root.with_name(root.name + "-preload")
     heads = a.heads.split(",")
     runs = ws / "oracles" / "freesurfer-8.2.0" / "runs"
 
     def one(head: str) -> dict:
         sub = head.split("-", 1)[1]
         mri = runs / f"{head}-classic" / "subjects" / sub / "mri"
-        o = official(exe, mri, root / head / "official", a.outputs)
+        o = official(exe, mri, root / head / "official", a.outputs, a.preload)
         rep = port(mri, root / head / "reproduce", "reproduce", a.outputs)
         fix = port(mri, root / head / "fix", "fix", a.outputs)
         same = {

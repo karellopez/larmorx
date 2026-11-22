@@ -96,11 +96,22 @@ The `cout`/`printf` lines share stdout's buffer (`sync_with_stdio`); each option
   identical. Standard output identical on five; on ds004173-sub-603309 the final voxel transform
   printed by `getFinalVox2Vox` (`Rtrg * Mfinal * vnl_inverse(Rsrc)`) differs in its x and z
   translations' last two printed digits (210.6943714626283 against ...285; the half-way maps on
-  standard error likewise). `v2v.py` computes VNL's source arithmetic (zero-started product sums,
-  `vnl_inverse`'s adjugate, `vnl_det`) on the port's three matrices and gives the port's numbers:
-  either `Mfinal`'s last bits differ (its 13 printed decimals agree) or the official build computes
-  the inline `vnl_inverse`/product otherwise. **Open**: a `v2v` command in the fs-robust probe
-  (the matrices in, the official code's product out) settles it.
+  standard error likewise). **Settled (relay 45, rule 8): the project's decided `hypot`, not code
+  generation.** (1) The fs-robust probe's `v2v` command (`fsrobust.cpp`, built into
+  `oracles/freesurfer-8.2.0-probes/fs-robust-v2v/`; `v2v_official.py`) runs the official build's
+  `Registration::getFinalVox2Vox` (with VNL's `vnl_matrix` product and `vnl_inverse` as the official
+  program has them) on the port's three matrices: it gives the port's numbers bit for bit, so the
+  port computes the product as the official build does and the official run's `Mfinal` differed in
+  its last bits. (2) The official program takes `cabs` and `csqrt` from glibc (dynamic symbols
+  `cabs@GLIBC_2.2.5`, `csqrt@GLIBC_2.2.5`; the matrix square root of the symmetric half-way maps,
+  `MyMatrix::MatrixSqrt` on LAPACK's complex Schur form), where the project decided (the user's D4,
+  applied to them 2026-11-18) the correctly rounded `hypot` in both modes. With the decided `cabs` and
+  `csqrt` preloaded into the official program (`decided_complex.sh`: `complexrt.c` with CORE-MATH's
+  `hypot`; `real.py --preload`), all six heads are identical in every byte of standard output, error
+  and files, ds004173-sub-603309 included (log `oracles/logs/fs-found-c-r45-robreg-preload.log`). The
+  last bits of `Mfinal` on that head come from glibc's `hypot` not being correctly rounded on some
+  argument of the square roots: GLIBC-07's expected divergence of the decision; the transform file
+  (`float` values) is identical on every head.
 - Speed (one thread, the same machine): the port takes 41-98 s against FreeSurfer's 20-66 s
   (2.0-2.3x on 256^3 images): the registration step (fs.robust's open item, `freesurfer-robust.md`
   §6) and the B-spline resampling. Peak memory 3-11 % below FreeSurfer's on five heads, 0.4 %

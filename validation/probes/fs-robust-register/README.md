@@ -17,9 +17,17 @@ plan is in `specs/mri_robust_register.md` §7.
   six recorded heads' `T1.mgz` onto `rawavg.mgz`, official against the port in both modes, with
   times and peaks; `--outputs` adds every output option. Relay 44: the transform identical on all
   six heads, every output identical on the two of `--outputs`; ds004173's printed final transform
-  differs in its last two digits (`v2v.py`, open).
+  differs in its last two digits (settled in relay 45: glibc's `hypot`, below).
+  `real.py --preload <lib>` runs the official program with `LD_PRELOAD` (outputs in `real-preload/`).
 - `v2v.py`: VNL's source arithmetic of the final voxel transform on the port's matrices of
   ds004173 (they give the port's numbers).
+- `v2v_official.py` (relay 45): the official build's `Registration::getFinalVox2Vox` on the same
+  matrices (the fs-robust probe's `v2v` command, built with `validation/probes/fs-robust/build.sh
+  <workspace> <workspace>/oracles/freesurfer-8.2.0-probes/fs-robust-v2v`): the port's numbers too.
+- `decided_complex.sh` (relay 45): a preload with the project's decided `cabs` and `csqrt`
+  (`../fs-robust/complexrt.c`, CORE-MATH's correctly rounded `hypot`; the official program takes
+  them from glibc). `real.py --preload` with it: all six heads identical in every byte, ds004173
+  included: its last digits were glibc's `hypot` (GLIBC-07, the user's D4).
 - `record.py`: the validation record `docs/validation/freesurfer-mri-robust-register.{json,md}`
   from the summaries above (from a clean commit).
 
@@ -28,3 +36,6 @@ licence check would print the licence file); the official side runs with `FS_DIS
 
     scripts/orchestration/boxed.sh 10 python -P validation/probes/fs-robust-register/check.py --seed 1 --n 300
     scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-robust-register/real.py --json real.json
+    validation/probes/fs-robust-register/decided_complex.sh <workspace>
+    scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-robust-register/real.py \
+        --preload <workspace>/oracles/freesurfer-8.2.0-probes/fs-complex-decided/libdecidedcomplex.so

@@ -11,7 +11,8 @@
 # with gfortran 11's runtime. Output:
 # <workspace>/oracles/freesurfer-8.2.0-probes/fs-robust/fsrobust.
 #
-#   validation/probes/fs-robust/build.sh [<workspace>]
+#   validation/probes/fs-robust/build.sh [<workspace>] [<output folder>]
+# (an output folder of its own keeps the recorded build, whose outputs the oracle-output cache holds)
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 ws=${1:-$(cd "$here/../../../.." && pwd)}
@@ -23,7 +24,7 @@ tag=$ws/tags/freesurfer-8.2.0
 rr=$tag/mri_robust_register
 itk=$unit/itk-4.13.2
 gcc=$unit/toolchain/bin/g++
-out=$ws/oracles/freesurfer-8.2.0-probes/fs-robust
+out=${2:-$ws/oracles/freesurfer-8.2.0-probes/fs-robust}
 [ -x "$gcc" ] || { echo "no unit oracle toolchain at $unit (build.py all first)" >&2; exit 1; }
 mkdir -p "$out"
 flags=(-DHAVE_OPENGL -DHAVE_OPENMP -DHAVE_ZLIB -DITK_USE_SYSTEM_ZLIB -DLinux -DUSING_DCM2NIIXFSWRAPPER

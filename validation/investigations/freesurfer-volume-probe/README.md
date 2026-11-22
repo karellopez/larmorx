@@ -23,7 +23,7 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 |---|---|
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 30 groups of seeded cases and thirteen of fixed cases (`vrules`, `vrules4` to `vrules14`, `vbsrules`; 15,768 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 33 groups of seeded cases and fourteen of fixed cases (`vrules`, `vrules4` to `vrules15`, `vbsrules`; 16,422 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 | `models.py` | statements of the spec checked as models of the probe's printed results: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
@@ -224,6 +224,23 @@ The spec's sections in brackets.
 | `cutend W P i` | `MRIcutEndSlices` (n) | the volume |
 | `segids W P i i` | the frame, then 1 `MRIsegIdListNot0` or 0 `MRIsegIdList` | the count, then the list |
 | `hcos W P d D` | `MRIhalfCosBias` (alpha) | the result |
+| `a2v W P M W2 d CT` | `MRIaseg2vol` (the segmentation, the registration or `null`, the template, the threshold, the colour table) [§55] | the label volume, then the hit volume (`null` when the label volume is) |
+| `a2vmu W P LTA d n CT` | `MRIaseg2volMU` (the threshold, the upsampling factor) [§55] | the label volume, the hit volume, then the array |
+| `spmw W P LTA W2 P2 lr interp D` | `MRIapplySpmWarp` (the volume, the source array or `null`, the warp, left-right reversal, the sample type; D `new` or a W) [§55] | the result, then the array (`null` without one) |
+| `icode s` | `interpolation_code` and `float2int_code` of the name [§55] | the two codes |
+| `sbound W P` | `MRIsegBoundary` [§56] | the volume |
+| `sborder W P topo` | `MRIsegBorder` [§56] | the largest label (unset -7 before), then the volume |
+| `idxno W P D` | `MRIindexNo` [§56] | the result |
+| `ssrob W P W2 P2 id f pct` | `MRIsegStatsRobust` (the segment, the frame, the percentage, a float) [§56] | the count, then minimum, maximum, range, mean, standard deviation (floats, -7 before) |
+| `sfavg W P W2 P2 id` | `MRIsegFrameAvg` [§56] | the count, then each frame's mean (doubles, -7 before) |
+| `zcat W P W2 P2 nskip D` | `MRIzconcat` (D `new`, `self`, `other` or a W) [§56] | the result |
+| `aedit W P W2 P2 W3 P3 D` | `MRIapplyEdits` (new, old and edited volumes; D `new`, `self` the first, `other` the second, or a W) [§56] | the result |
+| `shdim W P dim n wrap` | `MRIshiftDim` [§56] | the volume |
+| `fento W P W2 P2 level lh rh acj` | `MRIfixEntoWM` (doubles lh, rh) [§56] | the count, then the first volume |
+| `lacj W P topo D` | `LabelAmygalaCortalJunction` (D `new` or a W; the random seed set to 1 first) [§56] | the result (a new one with its colour table of 7,032 places) |
+| `cfov W P c r s d` | `MRIcropToFoV` (the fields of view, the threshold) [§57] | the region's x y z dx dy dz |
+| `ccrs W P c r s fc fr fs n k×n` | `MRIcropAroundCRS` (the centre, doubles; the fields of view; the labels kept) [§57] | the volume |
+| `crras W P valid c r s fc fr fs n k×n LTA` | `MRIcropAroundRAS` (the volume's `valid` flag set first; the RAS centre; the array or `null`) [§57] | the volume, then the array when one was given |
 
 ## The models
 
@@ -359,7 +376,11 @@ lines of their own) and of `vrules13` (§37: FS-471's negative label limits off 
 RAS with each `FSLOUTPUTTYPE` and a diagnostic level, inversions, concatenations, reductions, source and target tests,
 prints) and the fixed cases of `vrules14` (§54: FS-504, FS-507, FS-508 and its place, FS-198's copies, the unsupported
 targets, the diagnostic print, the edges of every operation, the reductions' comparison after an inverted
-transform, transforms without a matrix), and fs.bspline's `vbspline` (the coefficients of volumes of the six numeric types, degrees 2
+transform, transforms without a matrix), §55 to §57's `vaseg` (segmentations onto another grid,
+the colour tables' tissue-type vote, the upsampling factor -1, SPM warps, the codes' names), `vsegs`
+(segment boundaries and borders, index volumes, robust statistics, frame averages, concatenations,
+edits, shifts, the entorhinal fix, the amygdala-cortex junction), `vcrops` (crops to a field of view,
+around a voxel and around an RAS point) and the fixed cases of `vrules15`, and fs.bspline's `vbspline` (the coefficients of volumes of the six numeric types, degrees 2
 to 9 and 0, 1, 10, -1, given B-splines with fitting, other or no coefficients; sampling at points inside,
 at and past the edges, NaN and infinite, frames -1 to one past; the frame-range sampler; coefficients
 sampled as given with degrees -2 to 12; the linear, RAS and transform-array transforms; the pyramids into
@@ -478,3 +499,11 @@ cached matrices as allocated, recomputed or dropped.
   (109: two reductions after a transform taken inverted, five places of FS-508, eight changes of transforms
   without a matrix); its new hash the same cold, warm and twice without the cache, the probe as its own candidate:
   no unexplained difference in either mode (log `oracles/logs/fs-volume-probe-r15-vrules14-2026-11-22.log`).
+- Relay 15, §55 to §57: the prebuilt probe rebuilt from commit `2c4d9f97` (the commands `a2v`, `a2vmu`, `spmw`,
+  `icode`, `sbound`, `sborder`, `idxno`, `ssrob`, `sfavg`, `zcat`, `aedit`, `shdim`, `fento`, `lacj`, `cfov`, `ccrs`,
+  `crras`; its build in `BUILD_INFO.txt`, the same bytes twice; the 84fda65e build kept in
+  `<workspace>/archive/2026-11-22-fs-volume-probe-84fda65e/`): every earlier group's hash unchanged; the new groups
+  `vaseg` (219 calls), `vsegs` (270), `vcrops` (95) and `vrules15` (70, FS-509 allowed in both modes) the same cold,
+  warm and twice without the cache; the probe as its own candidate: no unexplained difference in either mode; every
+  model as before, none different (logs `oracles/logs/fs-volume-probe-r15-final-2026-11-22.log`,
+  `-r15-vrules15-2026-11-22.log`: `vrules15` gained its FS-515 case after the first cold run).

@@ -46,8 +46,8 @@ Each checked against the official program (relay 52's black-box folder, then the
   `LTAfillInverse` (in `LTAreduce`, and again in `LTAchangeType`) before: `vnl_det` of the 4 x 4
   `float` matrix is not 0. The voxel-to-voxel matrix is that matrix through the two volumes'
   `i2r`/`r2i` products in `float`; its determinant can round to exactly 0 where the original's did
-  not. A search (relay 52, `<scratch>`, recorded in the probe as `SINGULAR_V2V` and
-  `SINGULAR_RAS`): 400 random rank-2 3 x 3 matrices moved one to three ulps in one element, on an
+  not. A search (`validation/investigations/freesurfer-mri-mask-singular/search.py`; two of its
+  cases are the probe's `SINGULAR_V2V` and `SINGULAR_RAS`): 400 random rank-2 3 x 3 matrices moved one to three ulps in one element, on an
   oblique 8^3 grid of voxels 1.1 x 0.7 x 1.3 mm: 25 of 400 (voxel to voxel) and 19 of 400 (scanner
   to scanner) reach the NULL, the rest invert or fail at `LTAfillInverse` (`TransformInvert: xform
   noninvertible`, status 252). Diagonal matrices near `vnl_det`'s underflow never reach it (both

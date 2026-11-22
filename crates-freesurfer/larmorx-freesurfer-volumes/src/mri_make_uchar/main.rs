@@ -33,8 +33,9 @@
 //!   usage, status 1, before anything is read.
 //! - **FS-1128** (crash): `-f`, `-w` or `-r` given last: FreeSurfer scans past the arguments
 //!   (status 139). By default the usage, status 1 (as `-h` and `-v` given last).
-//! - **FS-1129**: an output (or `-v`'s volume) that cannot be written still ends with status 0. By
-//!   default status 1 after the writer's messages.
+//! - **FS-1129**: an output (or `-v`'s volume, or `-h`'s histogram) that cannot be written still
+//!   ends with status 0. By default status 1 after the writer's messages (the timing line left
+//!   out).
 //! - **FS-1130**: an input that is not coronal prints `MRIvoxelToTalairachVoxel: unsupported slice
 //!   direction <d>` (with `errno`'s message first) for every voxel, although the Talairach point
 //!   is never used. By default no such message.
@@ -234,6 +235,18 @@ fn get_option(
     }
 }
 
+/// FS-1129: a file asked for that was not written.
+fn unwritten(g: &mut Globals, fname: &str) {
+    g.notices.add(
+        &FS_1129,
+        if g.notices.reproduce() {
+            format!("mri_make_uchar: '{fname}' was not written; status 0, as in FreeSurfer")
+        } else {
+            format!("mri_make_uchar: '{fname}' was not written: status 1 (FreeSurfer ends with 0)")
+        },
+    );
+}
+
 /// `MRIwrite(mri, fname)` with FS-1129: whether the file was written (its messages as the writer
 /// writes them).
 fn write_volume(g: &mut Globals, r: &mut Run, mri: &mut Mri, fname: &str) -> Result<bool, Fatal> {
@@ -249,16 +262,7 @@ fn write_volume(g: &mut Globals, r: &mut Run, mri: &mut Mri, fname: &str) -> Res
         MGZ_INTENT_UNKNOWN,
     )?;
     if status != 0 {
-        g.notices.add(
-            &FS_1129,
-            if g.notices.reproduce() {
-                format!("mri_make_uchar: '{fname}' was not written; status 0, as in FreeSurfer")
-            } else {
-                format!(
-                    "mri_make_uchar: '{fname}' was not written: status 1 (FreeSurfer ends with 0)"
-                )
-            },
-        );
+        unwritten(g, fname);
     }
     Ok(status == 0)
 }
@@ -349,7 +353,7 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
 }
 
 /// `MRIconvertToUchar(mri_in, tal_xform, NULL)`: the `uchar` volume (see the module's text) and
-/// whether `-v`'s volume, when there is one, was written.
+/// whether `-v`'s volume and `-h`'s histogram, when asked for, were written.
 pub fn convert_to_uchar(
     g: &mut Globals,
     r: &mut Run,
@@ -429,8 +433,11 @@ pub fn convert_to_uchar(
     histo_clear_zero_bin(g, &mut hist);
     histo_make_pdf_in_place(&mut hist);
     let hcum = histo_make_cdf(g, r.err, &hist, None)?.unwrap_new();
-    if let Some(hcumfile) = &o.hcumfile {
-        histo_write_txt(&hcum, r.out, r.dir, hcumfile);
+    if let Some(hcumfile) = &o.hcumfile
+        && histo_write_txt(&hcum, r.out, r.dir, hcumfile) != 0
+    {
+        unwritten(g, hcumfile);
+        written = false;
     }
     let i1 = histo_find_bin_with_count(g, &hcum, o.first_percentile as f32);
     let i2 = histo_find_bin_with_count(g, &hcum, o.wm_percentile as f32);

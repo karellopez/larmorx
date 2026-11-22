@@ -2024,7 +2024,7 @@ defects! {
     FS_1128 = "FS-1128", "FreeSurfer", true,
         "mri_make_uchar's -f, -w or -r given as the last argument, without its value, crashes (signal 11): larmorx prints the usage and ends with status 1, as for -h and -v given last";
     FS_1129 = "FS-1129", "FreeSurfer", true,
-        "mri_make_uchar ends with status 0 when its output volume, or the ball volume of -v, cannot be written: larmorx ends with status 1 after the writer's messages";
+        "mri_make_uchar ends with status 0 when its output volume, the ball volume of -v or the histogram file of -h cannot be written: larmorx ends with status 1 after the writer's messages";
     FS_1130 = "FS-1130", "FreeSurfer", true,
         "mri_make_uchar given a volume whose slices are not coronal prints the error 'MRIvoxelToTalairachVoxel: unsupported slice direction' (after the last system error's message) once for every voxel, although the point it fails to compute is never used and the result is right: larmorx prints none";
     FS_974 = "FS-974", "FreeSurfer", true,

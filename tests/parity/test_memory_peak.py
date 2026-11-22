@@ -16,7 +16,8 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 (``MRI_NORMALIZE_CASES``, 2026-11-19), ``mri_binarize`` (``MRI_BINARIZE_CASES``, 2026-11-21),
 ``mri_convert`` (``MRI_CONVERT_CASES``, 2026-11-21), ``mri_segstats`` (``MRI_SEGSTATS_CASES``,
 2026-11-22), ``mri_info`` (``MRI_INFO_CASES``, 2026-11-22), ``mris_calc`` (``MRIS_CALC_CASES``,
-2026-11-22) and ``mri_add_xform_to_header`` (``MRI_ADD_XFORM_CASES``, 2026-11-22).
+2026-11-22), ``mri_add_xform_to_header`` (``MRI_ADD_XFORM_CASES``, 2026-11-22) and
+``mri_make_uchar`` (``MRI_MAKE_UCHAR_CASES``, 2026-11-22).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -2550,3 +2551,92 @@ def test_mri_add_xform_to_header_replica_needs_no_more_memory_than_freesurfer(tm
         assert (r_dir / out).read_bytes() == (o_dir / out).read_bytes(), f"{name} ({mode})"
         c = fsfiles.compare(o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out)
         assert c.same, f"mri_add_xform_to_header {name} ({mode}): {c.verdict} {c.detail}"
+
+
+#: FreeSurfer's ``mri_make_uchar`` against the ``larmorx-freesurfer`` replica (queue item 3.2-22,
+#: 2026-11-22), on a recorded head (ds000005 sub-01's classic run), one thread, both D13 modes:
+#: ``mri_nu_correct.mni``'s call in place on a ``float`` stand-in of its rescaled N3 output (the
+#: run's ``orig.mgz`` times the run's recorded ratio; the runs do not keep that file) and the call
+#: on the run's ``orig.mgz`` into another file; the output identical to FreeSurfer's.
+MRI_MAKE_UCHAR_CASES = [
+    ("nu-in-place", ["nu.mgz", "{mri}/transforms/talairach.xfm", "nu.mgz"]),
+    ("orig", ["{mri}/orig.mgz", "{mri}/transforms/talairach.xfm", "out.mgz"]),
+]
+
+
+@pytest.mark.parametrize(("name", "args"), MRI_MAKE_UCHAR_CASES)
+def test_mri_make_uchar_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, args):
+    import nibabel as nib
+    import numpy as np
+    from larmorx_validation.freesurfer import files as fsfiles
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / "mri_make_uchar" if ws else None
+    mri = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / "ds000005-sub-01-classic" / "subjects"
+        / "sub-01" / "mri"
+        if ws
+        else None
+    )  # fmt: skip
+    if exe is None or not exe.is_file() or not (mri / "orig.mgz").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    words = [a.format(mri=mri) for a in args]
+    # the stand-in: the run's orig.mgz times its recorded rescale ratio, as float
+    standin = tmp_path / "standin.mgz"
+    im = nib.load(str(mri / "orig.mgz"))
+    data = np.asarray(im.dataobj).astype(np.float32) * np.float32(1.50205015575164325309)
+    hdr = im.header.copy()
+    hdr.set_data_dtype(np.float32)
+    nib.save(nib.MGHImage(data, im.affine, hdr), str(standin))
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        "FS_DISABLE_LANG": "1",
+        **freesurfer_env(),
+    }
+
+    def fresh(d: Path):
+        def reset() -> None:
+            if d.exists():
+                shutil.rmtree(d)
+            d.mkdir()
+            if "nu.mgz" in words:
+                shutil.copyfile(standin, d / "nu.mgz")
+
+        reset()
+        return reset
+
+    o_dir = tmp_path / "freesurfer"
+    code, fs_mib = _original_peak(
+        ["mri_make_uchar", *words],
+        env,
+        "freesurfer",
+        fresh(o_dir),
+        o_dir,
+        (r"took \d+ minutes and \d+ seconds",),
+        "freesurfer",
+    )
+    assert code == 0
+    out = words[-1]
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        fresh(r_dir)
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_make_uchar", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(f"mri_make_uchar {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"mri_make_uchar {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        c = fsfiles.compare(o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out)
+        assert c.same, f"mri_make_uchar {name} ({mode}): {c.verdict} {c.detail}"

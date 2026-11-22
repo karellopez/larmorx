@@ -1830,8 +1830,8 @@ pub fn mri_tag_read(
                 let lossy = String::from_utf8_lossy(&name).into_owned();
                 m.transform_fname = name.clone();
                 if utils::file_exists(dir, &lossy) {
-                    match minc::input_transform_file(g, out, err, dir, &name) {
-                        Some(t) => {
+                    match minc::input_transform_file_ex(g, out, err, dir, &name) {
+                        (Ok(()), Some(t)) => {
                             m.linear_transform = Some(mri::get_linear_transform_ptr(err, &t)?);
                             m.inverse_linear_transform =
                                 Some(mri::get_inverse_linear_transform_ptr(err, &t)?);
@@ -1844,7 +1844,13 @@ pub fn mri_tag_read(
                                 let _ = err.write_all(&t);
                             }
                         }
-                        None => {
+                        (_, partial) => {
+                            // the transforms read before the failure stay in the volume's
+                            // `transform` (volume_io assigns its argument as it reads); its
+                            // matrices are not taken
+                            if partial.is_some() {
+                                m.transform = partial;
+                            }
                             g.errno = 0;
                             let mut t = b"error loading transform from ".to_vec();
                             t.extend_from_slice(&name);

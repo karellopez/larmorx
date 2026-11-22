@@ -382,8 +382,70 @@ pub fn input_transform_file(
     dir: Option<&Path>,
     filename: &[u8],
 ) -> Option<GeneralTransform> {
-    let mut streams = Std { out, err };
-    let path: Vec<u8> = match dir {
+    let (path, prefix) = in_dir(dir, filename);
+    let mut streams = InDir {
+        inner: Std { out, err },
+        prefix,
+    };
+    larmorx_io::xfm::input_transform_file(&path, &FsVolumeIo, &mut streams, &mut g.notices).ok()
+}
+
+/// `input_transform_file(filename, &transform)` as its caller sees C's call: [`input_transform_file`]
+/// with what the `transform` argument holds afterwards (a file that fails after its first
+/// transforms leaves those; `None`: never assigned, the caller's value stays) and `errno` as the
+/// call's own system calls leave it (set in `g`: the last failed existence check, open or read).
+pub fn input_transform_file_ex(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    dir: Option<&Path>,
+    filename: &[u8],
+) -> (Result<(), ()>, Option<GeneralTransform>) {
+    let (path, prefix) = in_dir(dir, filename);
+    let mut streams = InDir {
+        inner: Std { out, err },
+        prefix,
+    };
+    let r =
+        larmorx_io::xfm::input_transform_file_ex(&path, &FsVolumeIo, &mut streams, &mut g.notices);
+    if let Some(e) = r.errno {
+        g.errno = e;
+    }
+    (r.status, r.transform)
+}
+
+/// The C streams of a read whose relative name was put in the program's directory: that
+/// directory (FreeSurfer opens the name in its working directory and never prints it) taken out
+/// of the messages, which then name the file as FreeSurfer does.
+struct InDir<'a> {
+    inner: Std<'a>,
+    /// The directory and separator put before the name.
+    prefix: Option<String>,
+}
+
+impl InDir<'_> {
+    fn strip(&self, text: &str) -> String {
+        match &self.prefix {
+            Some(p) => text.replace(p.as_str(), ""),
+            None => text.to_owned(),
+        }
+    }
+}
+
+impl Streams for InDir<'_> {
+    fn out(&mut self, text: &str) {
+        let t = self.strip(text);
+        self.inner.out(&t);
+    }
+    fn err(&mut self, text: &str) {
+        let t = self.strip(text);
+        self.inner.err(&t);
+    }
+}
+
+/// A relative name in `dir` (see [`input_transform_file`]), and the prefix put before it.
+fn in_dir(dir: Option<&Path>, filename: &[u8]) -> (Vec<u8>, Option<String>) {
+    match dir {
         Some(d)
             if !filename.is_empty()
                 && !pathsep::is_absolute_name(filename)
@@ -396,12 +458,12 @@ pub fn input_transform_file(
                 }
             }
             p.push(b'/');
+            let prefix = String::from_utf8_lossy(&p).into_owned();
             p.extend_from_slice(filename);
-            p
+            (p, Some(prefix))
         }
-        _ => filename.to_vec(),
-    };
-    larmorx_io::xfm::input_transform_file(&path, &FsVolumeIo, &mut streams, &mut g.notices).ok()
+        _ => (filename.to_vec(), None),
+    }
 }
 
 #[cfg(test)]

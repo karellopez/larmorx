@@ -15,7 +15,10 @@ use larmorx_core::cfmt::Streams;
 use larmorx_core::cscan;
 use larmorx_core::defects::{self as d, Notices};
 
-use super::files::{Ctx, IoType, OpenFile, lossy, open_file_with_default_suffix};
+use super::files::{
+    Ctx, IoType, OpenFile, lossy, open_file_with_default_suffix,
+    open_file_with_default_suffix_errno,
+};
 use super::{Dialect, GeneralTransform, Status, TransformData, TransformType};
 
 const TRANSFORM_FILE_HEADER: &[u8] = b"MNI Transform File";
@@ -518,6 +521,22 @@ pub(crate) fn input_transform(
     streams: &mut dyn Streams,
     notices: &mut Notices,
 ) -> Result<GeneralTransform, ()> {
+    let mut transform = None;
+    input_transform_into(s, filename, dialect, streams, notices, &mut transform)?;
+    transform.ok_or(())
+}
+
+/// `input_transform(file, filename, &transform)` with C's argument: `transform` is assigned at
+/// the first transform read and at each concatenation, so a file that fails after its first
+/// transforms leaves those in it (volume_io's loop), and one that fails before leaves it as it was.
+pub(crate) fn input_transform_into(
+    s: &mut CStream,
+    filename: Option<&[u8]>,
+    dialect: &dyn Dialect,
+    streams: &mut dyn Streams,
+    notices: &mut Notices,
+    transform: &mut Option<GeneralTransform>,
+) -> Result<(), ()> {
     let (st, line) = input_string(s, 0, 0, dialect);
     if st != Status::Ok {
         dialect.print_error(
@@ -530,28 +549,83 @@ pub(crate) fn input_transform(
         dialect.print_error("input_transform(): invalid header in file.\n", streams);
         return Err(());
     }
-    let mut transform: Option<GeneralTransform> = None;
+    let mut n_transforms = 0;
     let status = loop {
         let (st, next) = input_one_transform(s, filename, dialect, streams, notices);
         if st != Status::Ok {
             break st;
         }
         let next = next.expect("a transform");
-        transform = Some(match transform {
-            None => next,
-            Some(t) => GeneralTransform::concat(&t, &next),
+        *transform = Some(match transform.take() {
+            Some(t) if n_transforms > 0 => GeneralTransform::concat(&t, &next),
+            _ => next,
         });
+        n_transforms += 1;
     };
     if status == Status::Error {
         dialect.print_error("input_transform: error reading transform.\n", streams);
         return Err(());
     }
-    match transform {
-        None => {
-            dialect.print_error("input_transform: no transform present.\n", streams);
-            Err(())
+    if n_transforms == 0 {
+        dialect.print_error("input_transform: no transform present.\n", streams);
+        return Err(());
+    }
+    Ok(())
+}
+
+/// What `input_transform_file(filename, &transform)` leaves besides its result
+/// ([`input_transform_file_ex`]).
+#[derive(Debug)]
+pub struct TransformFileRead {
+    /// The status: `Ok` when the file read whole.
+    pub status: Result<(), ()>,
+    /// What C's `transform` argument holds afterwards: `Some` once a transform was read (a file
+    /// that fails after its first transforms leaves those, concatenated), `None` when the call
+    /// never assigned it (the caller's own value stays).
+    pub transform: Option<GeneralTransform>,
+    /// The C library's `errno` as the call's own system calls leave it (`None`: unchanged): the
+    /// last failed existence check, open or read (Linux's codes on every platform).
+    pub errno: Option<i32>,
+}
+
+/// `input_transform_file(filename, &transform)` as C's caller sees it: the status, what its
+/// `transform` argument holds afterwards and `errno` ([`TransformFileRead`]).
+pub fn input_transform_file_ex(
+    filename: &[u8],
+    dialect: &dyn Dialect,
+    streams: &mut dyn Streams,
+    notices: &mut Notices,
+) -> TransformFileRead {
+    let mut errno = None;
+    let mut transform = None;
+    let opened = open_file_with_default_suffix_errno(
+        filename,
+        b"xfm",
+        IoType::Read,
+        dialect,
+        streams,
+        notices,
+        &mut errno,
+    );
+    let status = match opened {
+        Ok(OpenFile::Read(data)) => {
+            let mut s = CStream::new(&data);
+            input_transform_into(
+                &mut s,
+                Some(filename),
+                dialect,
+                streams,
+                notices,
+                &mut transform,
+            )
         }
-        Some(t) => Ok(t),
+        Ok(OpenFile::Write(_)) => unreachable!("opened for reading"),
+        Err(()) => Err(()),
+    };
+    TransformFileRead {
+        status,
+        transform,
+        errno,
     }
 }
 

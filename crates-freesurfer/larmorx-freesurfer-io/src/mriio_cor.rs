@@ -524,8 +524,8 @@ pub fn cor_read(
             }
         }
         if utils::file_exists(dir, &text(&t)) {
-            match minc::input_transform_file(g, out, err, dir, &t) {
-                Some(tr) => {
+            match minc::input_transform_file_ex(g, out, err, dir, &t) {
+                (Ok(()), Some(tr)) => {
                     m.linear_transform = Some(mri::get_linear_transform_ptr(err, &tr)?);
                     m.inverse_linear_transform =
                         Some(mri::get_inverse_linear_transform_ptr(err, &tr)?);
@@ -539,7 +539,12 @@ pub fn cor_read(
                         let _ = err.write_all(&s);
                     }
                 }
-                None => {
+                (_, partial) => {
+                    // the transforms read before the failure stay in the volume's `transform`
+                    // (volume_io assigns its argument as it reads); its matrices are not taken
+                    if partial.is_some() {
+                        m.transform = partial;
+                    }
                     bad_transform = true;
                     g.errno = 0;
                     let mut s = b"error loading transform from ".to_vec();

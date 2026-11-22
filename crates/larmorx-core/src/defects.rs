@@ -2631,6 +2631,16 @@ defects! {
         "mri_info --ras2vox and --ras2vox-tkr crash on a volume whose voxel-to-RAS matrix (or tkregister matrix) cannot be inverted, as with a voxel size of 0";
     FS_1153 = "FS-1153", "FreeSurfer", true,
         "mri_info --stats divides each frame's sum by the voxel count of a frame in a 32-bit integer, which wraps past 2,147,483,647 voxels: a wrong (or negative, or infinite) mean; corrected: the count in 64 bits";
+    FS_1154 = "FS-1154", "FreeSurfer", true,
+        "mri_add_xform_to_header with a transform name of 1,024 bytes or more passes the room the volume's header has for it: the official build stops with *** buffer overflow detected ***: terminated (status 134, nothing written); corrected: the whole name written";
+    FS_1155 = "FS-1155", "FreeSurfer", true,
+        "mri_add_xform_to_header ends with exit status 0 when its output cannot be written (a folder that does not exist, a file it may not write, an unknown format): only the writer's messages tell; corrected: status 1 after them";
+    FS_1156 = "FS-1156", "FreeSurfer", true,
+        "mri_add_xform_to_header writing a COR folder's COR-.info whose path (the folder's name with /COR-.info) has 1,024 bytes or more passes FreeSurfer's buffer: the official build stops with *** buffer overflow detected ***: terminated (status 134, nothing written); corrected: the file written";
+    FS_1157 = "FS-1157", "FreeSurfer", true,
+        "mri_add_xform_to_header writing a COR folder's COR-.info writes the pixel size as the slice thickness (thick): a volume whose slices are thicker or thinner than its pixels reads back with the pixel size as its thickness; corrected: the slice thickness";
+    FS_1158 = "FS-1158", "FreeSurfer", true,
+        "mri_add_xform_to_header writing a COR folder's COR-.info writes the transform's name (its xform line) only when a transform was loaded: with -c (copy the name only) the name is lost unless the folder's own transform had loaded, and an empty name gives the line xform with nothing after it; corrected: the line is written whenever the name is not empty";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

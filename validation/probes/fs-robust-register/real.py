@@ -16,7 +16,8 @@ and error, and every file written (byte for byte). The LTA's creation line is fi
 ``FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING`` and ``USER`` on both sides; ``FS_DISABLE_LANG=1``
 on the official side (``docs/findings/freesurfer-info.md``); no ``DIAG_NO``.
 
-    python -P validation/probes/fs-robust-register/real.py [--heads a,b] [--outputs] [--json out.json]
+    python -P validation/probes/fs-robust-register/real.py [--heads a,b] [--outputs] [--extra '<args>']
+        [--preload <lib>] [--json out.json]
 """
 
 from __future__ import annotations
@@ -79,9 +80,13 @@ def files(d: Path) -> dict[str, str]:
     }
 
 
+#: relay 45 of track C: arguments added after fMRIPrep's (``--extra``)
+EXTRA: list[str] = []
+
+
 def args_of(mri: Path, outputs: bool) -> list[str]:
     a = ["--mov", str(mri / "T1.mgz"), "--dst", str(mri / "rawavg.mgz"), "--lta", "reg.lta"]
-    a += ["--satit", "--iscale"]
+    a += ["--satit", "--iscale", *EXTRA]
     if outputs:
         for opt, name in OUTS:
             a += [opt, name]
@@ -157,6 +162,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--json", type=Path)
     ap.add_argument(
+        "--extra",
+        default="",
+        help="arguments added after fMRIPrep's, space-separated (e.g. the entropy images: "
+        "'--cost ROBENT --entmov em.mgz --entdst ed.mgz'); outputs in real-extra/",
+    )
+    ap.add_argument(
         "--preload",
         type=Path,
         help="a library for the official program's LD_PRELOAD (decided_complex.sh's: the decided "
@@ -178,6 +189,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     if a.preload is not None:
         root = root.with_name(root.name + "-preload")
+    if a.extra:
+        EXTRA[:] = a.extra.split()
+        root = root.with_name(root.name + "-extra")
     heads = a.heads.split(",")
     runs = ws / "oracles" / "freesurfer-8.2.0" / "runs"
 

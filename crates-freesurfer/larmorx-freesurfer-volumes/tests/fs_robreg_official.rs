@@ -14,11 +14,13 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-22 from the official program (`check.py --seed 1 --n 120`): 120 cases, 100
-/// lines identical, 8 hashed as `SKIP`, 12 as `NOTPORTED` (the Powell costs, the entropy images,
-/// `--debug`; the `--test` mode ends in the command line and is compared).
+/// Recorded 2026-11-22 from the official program (`check.py --seed 1 --n 120`); re-recorded
+/// 2026-11-23 (relay 45: the entropy images ported, the 17 entropy cases after the prelude): 120
+/// cases, 100 lines identical (18 of them `--cost ROBENT`), 8 hashed as `SKIP`, 12 as `NOTPORTED`
+/// (the ten Powell costs, `--debug` and `--test`); the entropy image's time masked as the
+/// registration's.
 const N: usize = 120;
-const OFFICIAL_SHA256: &str = "a5c5d2a66825ec372541477684ae5db94d8843e49d1a0833a93506c74b3a3848";
+const OFFICIAL_SHA256: &str = "58843f03d42190d5c2e5088c23ec57878c48d32d5a28a54089013f4b84a61d94";
 const SKIPPED: usize = 8;
 const NOT_PORTED: usize = 12;
 

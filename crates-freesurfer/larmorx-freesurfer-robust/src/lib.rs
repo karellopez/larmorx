@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 pub mod costs;
+pub mod entropy;
 pub mod mymatrix;
 pub mod mymri;
 pub mod quaternion;

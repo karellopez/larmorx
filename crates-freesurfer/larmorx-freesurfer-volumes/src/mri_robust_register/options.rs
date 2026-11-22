@@ -45,6 +45,8 @@ pub struct Run<'a, 'b> {
     pub err: &'a mut dyn Write,
     pub env: &'b Environment,
     pub dir: Option<&'b std::path::Path>,
+    /// The thread count (0: every logical CPU): `--n-threads` or `OMP_NUM_THREADS`.
+    pub threads: usize,
 }
 
 /// The cost functions `--cost` names: `ROB` (also `ROBENT`, with entropy images) runs the robust

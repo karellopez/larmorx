@@ -72,6 +72,9 @@ SKIP = (
 )
 NOT_PORTED = "not ported yet"
 TIME = re.compile(r"Registration took \d+ minutes and \d+ seconds\.")
+# relay 45: the entropy image's time (the port's debug build takes seconds), masked in the lines
+# only (the cache's policy keeps TIME alone, so the recorded official runs stay its entries)
+ENTROPY_TIME = re.compile(r" Entropy computation took \d+ seconds\.")
 
 MANIFEST = REPO / "crates-freesurfer" / "Cargo.toml"
 EXAMPLE = REPO / "crates-freesurfer" / "target" / "release" / "examples" / "fs_robreg_probe"
@@ -169,9 +172,13 @@ def official_line(exe: Path, line: str, root: Path, k: int) -> str:
 
     def mask(s: str | bytes) -> str:
         b = s.encode("utf-8", "surrogateescape") if isinstance(s, str) else s
-        return TIME.sub(
-            "Registration took <T> minutes and <T> seconds.",
-            escape(b).replace(dd, "<DIR>"),
+        return ENTROPY_TIME.sub(
+            " Entropy computation took <T> seconds.",
+            TIME.sub(
+                "Registration took <T> minutes and <T> seconds.",
+                escape(b).replace(dd, "<DIR>"),
+                count=1,
+            ),
             count=1,
         )
 

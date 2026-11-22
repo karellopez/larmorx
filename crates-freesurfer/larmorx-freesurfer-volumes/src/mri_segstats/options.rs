@@ -250,7 +250,11 @@ pub fn scan_d(g: &mut Globals, s: &str) -> Option<i32> {
     let mut b = Bytes::new(s.as_bytes());
     let mut sc = Scanf::new(&mut b);
     let v = sc.d(&mut g.errno, true);
-    if sc.finish(&mut g.errno) == 1 { v } else { None }
+    if sc.finish(&mut g.errno) == 1 {
+        v
+    } else {
+        None
+    }
 }
 
 /// `sscanf(s, "%lf", &v)`, as [`scan_d`].
@@ -258,7 +262,11 @@ pub fn scan_lf(g: &mut Globals, s: &str) -> Option<f64> {
     let mut b = Bytes::new(s.as_bytes());
     let mut sc = Scanf::new(&mut b);
     let v = sc.lf(&mut g.errno, true);
-    if sc.finish(&mut g.errno) == 1 { v } else { None }
+    if sc.finish(&mut g.errno) == 1 {
+        v
+    } else {
+        None
+    }
 }
 
 /// `sscanf(s, "%f", &v)`, as [`scan_d`].
@@ -266,7 +274,11 @@ pub fn scan_f(g: &mut Globals, s: &str) -> Option<f32> {
     let mut b = Bytes::new(s.as_bytes());
     let mut sc = Scanf::new(&mut b);
     let v = sc.f(&mut g.errno, true);
-    if sc.finish(&mut g.errno) == 1 { v } else { None }
+    if sc.finish(&mut g.errno) == 1 {
+        v
+    } else {
+        None
+    }
 }
 
 /// A number FreeSurfer reads into a variable it never set (FS-1103): its value; or, when it
@@ -877,7 +889,9 @@ pub fn parse_commandline(
 fn short_of(g: &mut Globals, r: &mut Run, option: &str, said: i32, needs: i32) -> Fatal {
     g.notices.add(
         &FS_1105,
-        format!("mri_segstats {option}: the message says {needs} arguments (FreeSurfer's says {said})"),
+        format!(
+            "mri_segstats {option}: the message says {needs} arguments (FreeSurfer's says {said})"
+        ),
     );
     let n = if g.notices.reproduce() { said } else { needs };
     argnerr(r.err, option, n)

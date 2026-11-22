@@ -130,7 +130,12 @@ pub fn count_edits(
     drop(mri);
 
     let (mut n_bm_erase, mut n_bm_clone) = (0i32, 0i32);
-    let bma = name_in(g, r, Buf::Sprintf(4000), format!("{sd}/mri/brainmask.auto.mgz"));
+    let bma = name_in(
+        g,
+        r,
+        Buf::Sprintf(4000),
+        format!("{sd}/mri/brainmask.auto.mgz"),
+    );
     if fio_file_exists_readable(g, r.dir, &bma) != 0 {
         let Some(mri2) = read(g, r, &bma)? else {
             return Ok(1);
@@ -187,7 +192,8 @@ pub fn count_edits(
             g,
             r,
             Buf::Sprintf(4000),
-            format!("{sdn}/{subject}/surf/{hemi}.orig.nofix"));
+            format!("{sdn}/{subject}/surf/{hemi}.orig.nofix"),
+        );
         if let Some(eno) = euler_of(g, &mut sg, r, &name)? {
             holes[h] = 1 - eno / 2;
         }
@@ -198,7 +204,8 @@ pub fn count_edits(
         g,
         r,
         Buf::Sprintf(4000),
-        format!("{sdn}/{subject}/mri/transforms/talairach.xfm"));
+        format!("{sdn}/{subject}/mri/transforms/talairach.xfm"),
+    );
     let atlas_icv = {
         let mut io = GcaLtaIo { env: &r.env };
         mri_estimate_tiv(g, r.out, r.err, r.dir, &xfm, ETIV_SCALE, &mut io)?.0
@@ -228,7 +235,8 @@ pub fn count_edits(
             g,
             r,
             Buf::Sprintf(4000),
-            format!("{sdn}/{subject}/surf/{hemi}.w-g.pct.mgh"));
+            format!("{sdn}/{subject}/surf/{hemi}.w-g.pct.mgh"),
+        );
         if fio_file_exists_readable(g, r.dir, &pct) == 0 {
             let _ = writeln!(r.out, "Cannot find {pct} ... skipping");
             continue;
@@ -240,7 +248,8 @@ pub fn count_edits(
             g,
             r,
             Buf::Sprintf(4000),
-            format!("{sdn}/{subject}/surf/{hemi}.white"));
+            format!("{sdn}/{subject}/surf/{hemi}.white"),
+        );
         let surf = {
             let mut io = Io {
                 out: &mut *r.out,
@@ -256,7 +265,8 @@ pub fn count_edits(
             g,
             r,
             Buf::Sprintf(4000),
-            format!("{sdn}/{subject}/label/{hemi}.cortex.label"));
+            format!("{sdn}/{subject}/label/{hemi}.cortex.label"),
+        );
         let Some(clabel) = label_read(g, &r.env, r.out, r.err, r.dir, None, &lname)? else {
             return Err(Fatal::Exit(1));
         };
@@ -295,7 +305,13 @@ pub fn count_edits(
         ff(wmstats[4], 6, 2)
     );
     let cnr = div64(gwconmean, gwconstd);
-    let _ = writeln!(r.out, "cnrstats: {} {} {}", f3(gwconmean), f3(gwconstd), f3(cnr));
+    let _ = writeln!(
+        r.out,
+        "cnrstats: {} {} {}",
+        f3(gwconmean),
+        f3(gwconstd),
+        f3(cnr)
+    );
 
     if let Some(outfile) = outfile {
         let line = format!(
@@ -366,11 +382,17 @@ pub fn wm_anat_stats(
         g,
         r,
         Buf::Sprintf(4000),
-        format!("{sdn}/{subject}/mri/aparc+aseg.mgz"));
+        format!("{sdn}/{subject}/mri/aparc+aseg.mgz"),
+    );
     let Some(mut apas) = read(g, r, &apn)? else {
         return Ok(None);
     };
-    let wmn = name_in(g, r, Buf::Sprintf(4000), format!("{sdn}/{subject}/mri/{volname}"));
+    let wmn = name_in(
+        g,
+        r,
+        Buf::Sprintf(4000),
+        format!("{sdn}/{subject}/mri/{volname}"),
+    );
     let Some(wmvol) = read(g, r, &wmn)? else {
         return Ok(None);
     };

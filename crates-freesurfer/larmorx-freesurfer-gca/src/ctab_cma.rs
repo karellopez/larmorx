@@ -79,7 +79,11 @@ pub fn gca_color_table_cma(
         let gi = nint(g, x);
         let x = random_number(g, env, out, err, 0.0, 255.0)?;
         let bi = nint(g, x);
-        let Some(name) = ct0.entries.get(n).and_then(|e| e.as_ref()).map(|e| e.name.clone())
+        let Some(name) = ct0
+            .entries
+            .get(n)
+            .and_then(|e| e.as_ref())
+            .map(|e| e.name.clone())
         else {
             g.notices.add(
                 &FS_1117,

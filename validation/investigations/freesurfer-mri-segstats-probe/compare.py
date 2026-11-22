@@ -153,7 +153,8 @@ def subject(d: Path, name: str, rng: np.random.Generator, aff: np.ndarray, full:
              "VentricleChoroidVol, VentricleChoroidVol, Volume of ventricles and choroid plexus"]  # fmt: skip
     vals = rng.uniform(1000.0, 30000.0, len(names))
     (s / "stats" / "brainvol.stats").write_text(
-        "".join(f"# Measure {n}, {v:.12f}, mm^3\n" for n, v in zip(names, vals)), encoding="utf-8"
+        "".join(f"# Measure {n}, {v:.12f}, mm^3\n" for n, v in zip(names, vals, strict=True)),
+        encoding="utf-8",
     )
     (s / "mri" / "transforms" / "talairach.xfm").write_text(
         "MNI Transform File\n%probe\n\nTransform_Type = Linear;\nLinear_Transform =\n"
@@ -233,9 +234,7 @@ def inputs(ws: Path, seed: int) -> dict[str, Path]:
         aff,
     )
     f["mask"] = save(d / "mask_f32_32.mgz", rng.random((32, 32, 32)).astype(np.float32), aff)
-    f["mask2"] = save(
-        d / "mask_f32_32x2.mgz", rng.random((32, 32, 32, 2)).astype(np.float32), aff
-    )
+    f["mask2"] = save(d / "mask_f32_32x2.mgz", rng.random((32, 32, 32, 2)).astype(np.float32), aff)
     aff2 = np.diag([1.2, 0.9, 1.1, 1.0])
     aff2[:3, 3] = [-20.0, -15.0, -14.0]
     f["segb"] = save(d / "seg_40x36x28.mgz", segmentation(rng, (40, 36, 28)), aff2)
@@ -300,6 +299,7 @@ def cases(f: dict[str, Path], fs_home: Path) -> list[tuple[list[str], dict[str, 
     sd = {"SUBJECTS_DIR": str(f["sd"])}
     nosd = {"SUBJECTS_DIR": None}
     gca = str(fs_home / "average" / "face.gca")
+    # fmt: off
     c: list[tuple[list[str], dict[str, str | None]]] = [
         ([], {}),
         (["--help"], {}),
@@ -316,7 +316,7 @@ def cases(f: dict[str, Path], fs_home: Path) -> list[tuple[list[str], dict[str, 
         (["--seg", "@seg", *o, "--in", "@f32", "--snr"], {}),
         (["--seg", "@seg", *o, "--snr"], {}),
         (["--seg", "@seg", *o, "--in", "@u8", "--in-intensity-name", "norm",
-          "--in-intensity-units", "MR"], {}),  # fmt: skip
+          "--in-intensity-units", "MR"], {}),
         (["--seg", "@seg", *o, "--ctab", "@lut"], {}),
         (["--seg", "@seg", *o, "--ctab", "@lut", "--empty"], {}),
         (["--seg", "@seg", *o, "--ctab", "@lut", "--empty", "--nonempty"], {}),
@@ -362,7 +362,7 @@ def cases(f: dict[str, Path], fs_home: Path) -> list[tuple[list[str], dict[str, 
         (["--seg", "@seg", "--in", "@f3", "--sfavg", "sf.dat", "--avgwfvol", "wf.mgz"], {}),
         (["--seg", "@seg", "--in", "@f3", "--avgwf", "wf.dat", "--avgwf-remove-mean"], {}),
         (["--seg", "@seg", "--in", "@f3", "--avgwf", "wf.dat", "--avgwf-norm-mean", "100",
-          "--id", "2", "41"], {}),  # fmt: skip
+          "--id", "2", "41"], {}),
         (["--seg", "@seg", "--avgwf", "wf.dat"], {}),
         (["--seg", "@seg", "--in", "@f3", "--sfavg", "nodir/sf.dat", *o], {}),
         (["--seg", "@seg", *o, "--ctab", "@lut", "--ctab-out", "out.ctab"], {}),
@@ -383,7 +383,7 @@ def cases(f: dict[str, Path], fs_home: Path) -> list[tuple[list[str], dict[str, 
         (["--seg", "@seg", *o, "--replace-file", "nofile.txt"], {}),
         (["--seg", "@seg", *o, "--gtm-default-seg-merge"], {}),
         (["--seg", "@seg", *o, "--gtm-default-seg-merge-choroid", "--empty", "--id", "62", "80",
-          "24"], {}),  # fmt: skip
+          "24"], {}),
         (["--seg", "@seg", *o, "--gtm-default-seg-merge-choroid", "--replace-file", "@rep"], {}),
         (["--seg-from-input", "--in", "@u8", *o], {}),
         (["--seg-from-input", *o], {}),
@@ -400,9 +400,9 @@ def cases(f: dict[str, Path], fs_home: Path) -> list[tuple[list[str], dict[str, 
         (["--seg", "@seg", *o, "--subject", "subj"], nosd),
         (["--sd", "@sd", "--seg", "@seg", *o, "--subject", "subj", "--etiv"], nosd),
         (["--seg", "@seg", *o, "--subject", "subj", "--brain-vol-from-seg", "--etiv",
-          "--brainmask", "@u8", "--subcortgray", "--in", "@u8"], sd),  # fmt: skip
+          "--brainmask", "@u8", "--subcortgray", "--in", "@u8"], sd),
         (["--seg", "@seg", *o, "--subject", "subj", "--surf-wm-vol", "--surf-ctx-vol",
-          "--totalgray", "--supratent"], sd),  # fmt: skip
+          "--totalgray", "--supratent"], sd),
         (["--seg", "@seg", *o, "--subject", "subj", "--supratent"], sd),
         (["--seg", "@seg", *o, "--subject", "subj", "--totalgray"], sd),
         (["--seg", "@seg", *o, "--surf-ctx-vol"], sd),
@@ -452,6 +452,7 @@ def cases(f: dict[str, Path], fs_home: Path) -> list[tuple[list[str], dict[str, 
         (["--seg", "@seg", *o, "--in", "nofile.mgz"], {}),
         (["--seg", "@seg", *o, "--ctab", "nofile.txt"], {}),
     ]
+    # fmt: on
     return [([str(f[a[1:]]) if a.startswith("@") else a for a in x], e) for x, e in c]
 
 
@@ -470,9 +471,7 @@ def notices(text: str) -> list[str]:
 
 
 def written(folder: Path) -> dict[str, Path]:
-    return {
-        str(p.relative_to(folder)): p for p in sorted(folder.rglob("*")) if p.is_file()
-    }
+    return {str(p.relative_to(folder)): p for p in sorted(folder.rglob("*")) if p.is_file()}
 
 
 def official() -> Path:

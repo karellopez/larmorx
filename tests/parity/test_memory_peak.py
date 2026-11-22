@@ -2258,24 +2258,26 @@ def test_mri_convert_replica_needs_no_more_memory_than_freesurfer(tmp_path, name
 #: intensities (the border volume of every label: the program's largest allocation), and the
 #: counts and intensities of every label of the white-matter parcellation; every file written
 #: identical to FreeSurfer's (provenance aside).
+# fmt: off
 MRI_SEGSTATS_CASES = [
     (
         "nu-mean",
         ["--seg-from-input", "--in", "{mri}/orig.mgz", "--sum", "sum.junk", "--avgwf",
          "input.mean.dat"],
-    ),  # fmt: skip
+    ),
     (
         "aseg-pv",
         ["--seg", "{mri}/aseg.mgz", "--sum", "aseg.stats", "--pv", "{mri}/norm.mgz", "--in",
          "{mri}/norm.mgz", "--ctab", "{home}/ASegStatsLUT.txt", "--id", "2", "41", "17", "53",
          "--excludeid", "0"],
-    ),  # fmt: skip
+    ),
     (
         "wmparc",
         ["--seg", "{mri}/wmparc.mgz", "--sum", "wmparc.stats", "--in", "{mri}/norm.mgz",
          "--ctab", "{home}/WMParcStatsLUT.txt", "--excludeid", "0"],
-    ),  # fmt: skip
+    ),
 ]
+# fmt: on
 
 
 @pytest.mark.parametrize(("name", "args"), MRI_SEGSTATS_CASES)

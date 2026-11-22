@@ -39,7 +39,9 @@ use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::cfmt;
-use larmorx_core::defects::{FS_1101, FS_1102, FS_1106, FS_1113, FS_1114, FS_1115, FS_1116, FS_1118};
+use larmorx_core::defects::{
+    FS_1101, FS_1102, FS_1106, FS_1113, FS_1114, FS_1115, FS_1116, FS_1118,
+};
 use larmorx_freesurfer_core::affine::float_to_int;
 use larmorx_freesurfer_core::diag::diag_init;
 use larmorx_freesurfer_core::globals::Globals;
@@ -241,9 +243,7 @@ pub fn brain_vol_stats(
     let Some(sdir) = sdir else {
         return Err(null_string(g, r, "SUBJECTS_DIR"));
     };
-    let mut compute = |_g: &mut Globals, _o: &mut dyn Write, e: &mut dyn Write| {
-        Err(not_ported(e))
-    };
+    let mut compute = |_g: &mut Globals, _o: &mut dyn Write, e: &mut dyn Write| Err(not_ported(e));
     read_cached_brain_volume_stats(g, r.out, r.err, r.dir, subject, sdir, &mut compute)
 }
 
@@ -481,7 +481,12 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
             format!("{sdn}/{subj}/surf/lh.orig.nofix"),
         );
         let lh = read_surf(g, &mut sg, r, &lname)?;
-        let rname = name_in(g, r, Buf::Sprintf(1000), format!("{sdn}/{subj}/surf/rh.orig.nofix"));
+        let rname = name_in(
+            g,
+            r,
+            Buf::Sprintf(1000),
+            format!("{sdn}/{subj}/surf/rh.orig.nofix"),
+        );
         let rh = read_surf(g, &mut sg, r, &rname)?;
         match (&lh, &rh) {
             (Some(l), Some(rr)) => {
@@ -665,10 +670,22 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     } else {
         let iname = o.in_vol_file.clone().unwrap_or_default();
         let _ = writeln!(r.out, "Creating a segmentation of all 1s from {iname}");
-        let Some(h) = mri_read_header(g, r.out, r.err, &r.env, r.dir, &iname, MRI_VOLUME_TYPE_UNKNOWN)?
+        let Some(h) = mri_read_header(
+            g,
+            r.out,
+            r.err,
+            &r.env,
+            r.dir,
+            &iname,
+            MRI_VOLUME_TYPE_UNKNOWN,
+        )?
         else {
             // MRIreadHeader's NULL is read through: FreeSurfer crashes
-            return Err(no_volume(g, r, "reading the input's header (MRIreadHeader)"));
+            return Err(no_volume(
+                g,
+                r,
+                "reading the input's header (MRIreadHeader)",
+            ));
         };
         let dims = [h.vg.width, h.vg.height, h.vg.depth, h.nframes];
         match mri_const(g, r.out, r.err, dims, 1.0, None)? {
@@ -707,7 +724,12 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
         || o.brain_vol_from_seg
         || o.do_sub_cort_gray_vol
     {
-        let rib = name_in(g, r, Buf::Sprintf(1000), format!("{sdn}/{subj}/mri/ribbon.mgz"));
+        let rib = name_in(
+            g,
+            r,
+            Buf::Sprintf(1000),
+            format!("{sdn}/{subj}/mri/ribbon.mgz"),
+        );
         if fio_file_exists_readable(g, r.dir, &rib) != 0 {
             if o.get_cached_brain_vol_stats {
                 let _ = writeln!(r.out, "Getting Brain Volume Statistics");
@@ -781,9 +803,20 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
             iv = tmp;
         }
         if mri_dim_mismatch(&iv, &seg, false) != 0 {
-            let _ = writeln!(r.out, "ERROR: dimension mismatch between input volume and seg");
-            let _ = writeln!(r.out, "  input {} {} {}", iv.vg.width, iv.vg.height, iv.vg.depth);
-            let _ = writeln!(r.out, "  seg   {} {} {}", seg.vg.width, seg.vg.height, seg.vg.depth);
+            let _ = writeln!(
+                r.out,
+                "ERROR: dimension mismatch between input volume and seg"
+            );
+            let _ = writeln!(
+                r.out,
+                "  input {} {} {}",
+                iv.vg.width, iv.vg.height, iv.vg.depth
+            );
+            let _ = writeln!(
+                r.out,
+                "  seg   {} {} {}",
+                seg.vg.width, seg.vg.height, seg.vg.depth
+            );
             return Err(Fatal::Exit(1));
         }
         if o.do_multiply {
@@ -816,8 +849,16 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
         };
         if mri_dim_mismatch(&pv, &seg, false) != 0 {
             let _ = writeln!(r.out, "ERROR: dimension mismatch between PV volume and seg");
-            let _ = writeln!(r.out, "  pvvol {} {} {}", pv.vg.width, pv.vg.height, pv.vg.depth);
-            let _ = writeln!(r.out, "  seg   {} {} {}", seg.vg.width, seg.vg.height, seg.vg.depth);
+            let _ = writeln!(
+                r.out,
+                "  pvvol {} {} {}",
+                pv.vg.width, pv.vg.height, pv.vg.depth
+            );
+            let _ = writeln!(
+                r.out,
+                "  seg   {} {} {}",
+                seg.vg.width, seg.vg.height, seg.vg.depth
+            );
             return Err(Fatal::Exit(1));
         }
         pvvol = Some(pv);
@@ -840,7 +881,10 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
             return Err(Fatal::Exit(1));
         }
         if mri_dim_mismatch(&mv, &seg, false) != 0 {
-            let _ = writeln!(r.out, "ERROR: dimension mismatch between brain volume and seg");
+            let _ = writeln!(
+                r.out,
+                "ERROR: dimension mismatch between brain volume and seg"
+            );
             return Err(Fatal::Exit(1));
         }
         let sign = o.mask_sign.clone().unwrap_or_default();
@@ -856,7 +900,10 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
             &mut nmaskhits,
         )?;
         if nmaskhits == 0 {
-            let _ = writeln!(r.out, "WARNING: no voxels in mask meet thresholding criteria.");
+            let _ = writeln!(
+                r.out,
+                "WARNING: no voxels in mask meet thresholding criteria."
+            );
             let _ = writeln!(r.out, "The output table will be empty.");
             let _ = writeln!(
                 r.out,
@@ -944,7 +991,11 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
                                 format!("mri_segstats --id {id}: outside the colour table (FreeSurfer decides with the id before it)"),
                             );
                         }
-                        valid = if g.notices.reproduce() { valid } else { Some(false) };
+                        valid = if g.notices.reproduce() {
+                            valid
+                        } else {
+                            Some(false)
+                        };
                     }
                 }
                 if !valid.unwrap_or(false) {
@@ -1034,7 +1085,9 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
             continue;
         }
         if g.gdiag_no > 1 {
-            let _ = r.out.write_all(format!("{n:>3}   {:>3}  ", e.id).as_bytes());
+            let _ = r
+                .out
+                .write_all(format!("{n:>3}   {:>3}  ", e.id).as_bytes());
             let pad = 33usize.saturating_sub(e.name.len());
             let _ = r.out.write_all(&b" ".repeat(pad));
             let _ = r.out.write_all(&e.name);
@@ -1114,7 +1167,10 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
         for e in &table {
             let _ = write!(text, "{} ", e.id);
             text.extend_from_slice(&e.name);
-            text.extend(std::iter::repeat_n(b' ', 30usize.saturating_sub(e.name.len())));
+            text.extend(std::iter::repeat_n(
+                b' ',
+                30usize.saturating_sub(e.name.len()),
+            ));
             let _ = writeln!(text, " {:>3} {:>3} {:>3} 0", e.red, e.green, e.blue);
         }
         if std::fs::write(resolve(r.dir, &name), &text).is_err() {
@@ -1348,7 +1404,10 @@ fn no_volume(g: &mut Globals, r: &mut Run, step: &str) -> Fatal {
     if g.notices.reproduce() {
         return Fatal::Exit(139);
     }
-    let _ = writeln!(r.err, "mri_segstats: {step} gave no volume (FreeSurfer crashes here)");
+    let _ = writeln!(
+        r.err,
+        "mri_segstats: {step} gave no volume (FreeSurfer crashes here)"
+    );
     Fatal::Exit(1)
 }
 
@@ -1448,7 +1507,10 @@ fn header(g: &mut Globals, r: &mut Run, fp: &mut Vec<u8>, h: &Header) {
                 "# BrainVolStatsFixed see surfer.nmr.mgh.harvard.edu/fswiki/BrainVolStatsFixed"
             );
         } else {
-            let _ = writeln!(fp, "# BrainVolStatsFixed-NotNeeded because voxelvolume=1mm3");
+            let _ = writeln!(
+                fp,
+                "# BrainVolStatsFixed-NotNeeded because voxelvolume=1mm3"
+            );
         }
     }
     let bv = |i: usize| h.bvs.map(|b| b[i]).unwrap_or(0.0);
@@ -1472,43 +1534,113 @@ fn header(g: &mut Globals, r: &mut Run, fp: &mut Vec<u8>, h: &Header) {
         );
     }
     if o.do_surf_ctx_vol {
-        let _ = writeln!(fp, "# Measure lhCortex, lhCortexVol, Left hemisphere cortical gray matter volume, {}, mm^3", f6(bv(5)));
-        let _ = writeln!(fp, "# Measure rhCortex, rhCortexVol, Right hemisphere cortical gray matter volume, {}, mm^3", f6(bv(6)));
-        let _ = writeln!(fp, "# Measure Cortex, CortexVol, Total cortical gray matter volume, {}, mm^3", f6(bv(7)));
+        let _ = writeln!(
+            fp,
+            "# Measure lhCortex, lhCortexVol, Left hemisphere cortical gray matter volume, {}, mm^3",
+            f6(bv(5))
+        );
+        let _ = writeln!(
+            fp,
+            "# Measure rhCortex, rhCortexVol, Right hemisphere cortical gray matter volume, {}, mm^3",
+            f6(bv(6))
+        );
+        let _ = writeln!(
+            fp,
+            "# Measure Cortex, CortexVol, Total cortical gray matter volume, {}, mm^3",
+            f6(bv(7))
+        );
     }
     if o.do_surf_wm_vol {
-        let _ = writeln!(fp, "# Measure lhCerebralWhiteMatter, lhCerebralWhiteMatterVol, Left hemisphere cerebral white matter volume, {}, mm^3", f6(bv(9)));
-        let _ = writeln!(fp, "# Measure rhCerebralWhiteMatter, rhCerebralWhiteMatterVol, Right hemisphere cerebral white matter volume, {}, mm^3", f6(bv(10)));
-        let _ = writeln!(fp, "# Measure CerebralWhiteMatter, CerebralWhiteMatterVol, Total cerebral white matter volume, {}, mm^3", f6(bv(11)));
+        let _ = writeln!(
+            fp,
+            "# Measure lhCerebralWhiteMatter, lhCerebralWhiteMatterVol, Left hemisphere cerebral white matter volume, {}, mm^3",
+            f6(bv(9))
+        );
+        let _ = writeln!(
+            fp,
+            "# Measure rhCerebralWhiteMatter, rhCerebralWhiteMatterVol, Right hemisphere cerebral white matter volume, {}, mm^3",
+            f6(bv(10))
+        );
+        let _ = writeln!(
+            fp,
+            "# Measure CerebralWhiteMatter, CerebralWhiteMatterVol, Total cerebral white matter volume, {}, mm^3",
+            f6(bv(11))
+        );
     }
     if o.do_sub_cort_gray_vol {
-        let _ = writeln!(fp, "# Measure SubCortGray, SubCortGrayVol, Subcortical gray matter volume, {}, mm^3", f6(bv(4)));
+        let _ = writeln!(
+            fp,
+            "# Measure SubCortGray, SubCortGrayVol, Subcortical gray matter volume, {}, mm^3",
+            f6(bv(4))
+        );
     }
     if o.do_total_gray_vol {
-        let _ = writeln!(fp, "# Measure TotalGray, TotalGrayVol, Total gray matter volume, {}, mm^3", f6(bv(8)));
+        let _ = writeln!(
+            fp,
+            "# Measure TotalGray, TotalGrayVol, Total gray matter volume, {}, mm^3",
+            f6(bv(8))
+        );
     }
     if o.do_supra_tent {
-        let _ = writeln!(fp, "# Measure SupraTentorial, SupraTentorialVol, Supratentorial volume, {}, mm^3", f6(bv(2)));
-        let _ = writeln!(fp, "# Measure SupraTentorialNotVent, SupraTentorialVolNotVent, Supratentorial volume, {}, mm^3", f6(bv(3)));
+        let _ = writeln!(
+            fp,
+            "# Measure SupraTentorial, SupraTentorialVol, Supratentorial volume, {}, mm^3",
+            f6(bv(2))
+        );
+        let _ = writeln!(
+            fp,
+            "# Measure SupraTentorialNotVent, SupraTentorialVolNotVent, Supratentorial volume, {}, mm^3",
+            f6(bv(3))
+        );
     }
     if o.brain_mask_file.is_some() && h.bvs.is_some() {
-        let _ = writeln!(fp, "# Measure Mask, MaskVol, Mask Volume, {}, mm^3", f6(bv(12)));
+        let _ = writeln!(
+            fp,
+            "# Measure Mask, MaskVol, Mask Volume, {}, mm^3",
+            f6(bv(12))
+        );
     }
     if o.do_etiv && o.brain_vol_from_seg {
-        let _ = writeln!(fp, "# Measure BrainSegVol-to-eTIV, BrainSegVol-to-eTIV, Ratio of BrainSegVol to eTIV, {}, unitless", f6(div64(bv(0), h.atlas_icv)));
-        let _ = writeln!(fp, "# Measure MaskVol-to-eTIV, MaskVol-to-eTIV, Ratio of MaskVol to eTIV, {}, unitless", f6(div64(bv(12), h.atlas_icv)));
+        let _ = writeln!(
+            fp,
+            "# Measure BrainSegVol-to-eTIV, BrainSegVol-to-eTIV, Ratio of BrainSegVol to eTIV, {}, unitless",
+            f6(div64(bv(0), h.atlas_icv))
+        );
+        let _ = writeln!(
+            fp,
+            "# Measure MaskVol-to-eTIV, MaskVol-to-eTIV, Ratio of MaskVol to eTIV, {}, unitless",
+            f6(div64(bv(12), h.atlas_icv))
+        );
     }
     if o.do_euler {
         let (lh, rh) = (1 - h.lheno / 2, 1 - h.rheno / 2);
-        let _ = writeln!(fp, "# Measure lhSurfaceHoles, lhSurfaceHoles, Number of defect holes in lh surfaces prior to fixing, {lh}, unitless");
-        let _ = writeln!(fp, "# Measure rhSurfaceHoles, rhSurfaceHoles, Number of defect holes in rh surfaces prior to fixing, {rh}, unitless");
-        let _ = writeln!(fp, "# Measure SurfaceHoles, SurfaceHoles, Total number of defect holes in surfaces prior to fixing, {}, unitless", lh + rh);
+        let _ = writeln!(
+            fp,
+            "# Measure lhSurfaceHoles, lhSurfaceHoles, Number of defect holes in lh surfaces prior to fixing, {lh}, unitless"
+        );
+        let _ = writeln!(
+            fp,
+            "# Measure rhSurfaceHoles, rhSurfaceHoles, Number of defect holes in rh surfaces prior to fixing, {rh}, unitless"
+        );
+        let _ = writeln!(
+            fp,
+            "# Measure SurfaceHoles, SurfaceHoles, Total number of defect holes in surfaces prior to fixing, {}, unitless",
+            lh + rh
+        );
     }
     if o.do_etiv {
-        let _ = writeln!(fp, "# Measure EstimatedTotalIntraCranialVol, eTIV, Estimated Total Intracranial Volume, {}, mm^3", f6(h.atlas_icv));
+        let _ = writeln!(
+            fp,
+            "# Measure EstimatedTotalIntraCranialVol, eTIV, Estimated Total Intracranial Volume, {}, mm^3",
+            f6(h.atlas_icv)
+        );
     }
     if o.do_stiv {
-        let _ = writeln!(fp, "# Measure SegmentedTotalIntraCranialVol, sTIV, Segmented Total Intracranial Volume, {}, mm^3", f6(o.stiv));
+        let _ = writeln!(
+            fp,
+            "# Measure SegmentedTotalIntraCranialVol, sTIV, Segmented Total Intracranial Volume, {}, mm^3",
+            f6(o.stiv)
+        );
     }
     let stamp = |g: &mut Globals, r: &mut Run, name: &str| -> String {
         let _ = g;
@@ -1591,9 +1723,17 @@ fn header(g: &mut Globals, r: &mut Run, fp: &mut Vec<u8>, h: &Header) {
         let _ = writeln!(fp, "# Only reporting non-empty segmentations");
     }
     if !h.mris {
-        let _ = writeln!(fp, "# VoxelVolume_mm3 {} ", cfmt::g(f64::from(h.voxelvolume), 6));
+        let _ = writeln!(
+            fp,
+            "# VoxelVolume_mm3 {} ",
+            cfmt::g(f64::from(h.voxelvolume), 6)
+        );
     } else {
-        let _ = writeln!(fp, "# VertexArea_mm2 {} ", cfmt::g(f64::from(h.voxelvolume), 6));
+        let _ = writeln!(
+            fp,
+            "# VertexArea_mm2 {} ",
+            cfmt::g(f64::from(h.voxelvolume), 6)
+        );
     }
 }
 
@@ -1697,10 +1837,30 @@ fn frame_averages(
         mri_copy_header(g, r.out, r.err, invol, Some(&mut famri))?;
         for f in 0..nf {
             for (n, fa) in favg.iter().enumerate() {
-                mri_set_vox_val(g, r.err, &mut famri, n as i32, 0, 0, f as i32, to_float(fa[f]), 0)?;
+                mri_set_vox_val(
+                    g,
+                    r.err,
+                    &mut famri,
+                    n as i32,
+                    0,
+                    0,
+                    f as i32,
+                    to_float(fa[f]),
+                    0,
+                )?;
             }
         }
-        mri_write(g, r.out, r.err, &r.env, r.dir, &mut famri, &name, None, MGZ_INTENT_UNKNOWN)?;
+        mri_write(
+            g,
+            r.out,
+            r.err,
+            &r.env,
+            r.dir,
+            &mut famri,
+            &name,
+            None,
+            MGZ_INTENT_UNKNOWN,
+        )?;
     }
     Ok(())
 }

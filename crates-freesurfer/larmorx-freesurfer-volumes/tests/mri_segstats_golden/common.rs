@@ -29,23 +29,70 @@ pub const N: i32 = 32;
 /// ratios divide by a deviation of 0 (a NaN for label 0, an infinity for 2).
 pub const CASES: [&[&str]; 7] = [
     &[
-        "--seg", "seg.mgz", "--sum", "s1.stats", "--in", "t1.mgz", "--snr", "--excludeid", "0",
+        "--seg",
+        "seg.mgz",
+        "--sum",
+        "s1.stats",
+        "--in",
+        "t1.mgz",
+        "--snr",
+        "--excludeid",
+        "0",
     ],
     &[
         "--seg", "seg.mgz", "--sum", "s2.stats", "--pv", "t1.mgz", "--in", "t1.mgz", "--id", "2",
         "41", "3", "17", "99", "--empty", "--robust", "10",
     ],
     &[
-        "--seg", "seg.mgz", "--sum", "s3.stats", "--mask", "t1.mgz", "--maskthresh", "50", "--in",
-        "t1.mgz", "--excl-ctxgmwm", "--replace", "17", "53", "--seg-erode", "1",
+        "--seg",
+        "seg.mgz",
+        "--sum",
+        "s3.stats",
+        "--mask",
+        "t1.mgz",
+        "--maskthresh",
+        "50",
+        "--in",
+        "t1.mgz",
+        "--excl-ctxgmwm",
+        "--replace",
+        "17",
+        "53",
+        "--seg-erode",
+        "1",
     ],
     &[
-        "--seg", "seg.mgz", "--in", "t1.mgz", "--avgwf", "wf.txt", "--sfavg", "sf.txt",
-        "--avgwfvol", "wf.mgz", "--sum", "s4.stats", "--no-newprint", "--acc",
+        "--seg",
+        "seg.mgz",
+        "--in",
+        "t1.mgz",
+        "--avgwf",
+        "wf.txt",
+        "--sfavg",
+        "sf.txt",
+        "--avgwfvol",
+        "wf.mgz",
+        "--sum",
+        "s4.stats",
+        "--no-newprint",
+        "--acc",
     ],
-    &["--seg-from-input", "--in", "t1.mgz", "--sum", "s5.stats", "--sqrt"],
     &[
-        "--rescale-by-seg", "t1.mgz", "seg.mgz", "100", "rescaled.mgz", "2", "41",
+        "--seg-from-input",
+        "--in",
+        "t1.mgz",
+        "--sum",
+        "s5.stats",
+        "--sqrt",
+    ],
+    &[
+        "--rescale-by-seg",
+        "t1.mgz",
+        "seg.mgz",
+        "100",
+        "rescaled.mgz",
+        "2",
+        "41",
     ],
     &[
         "--seg", "seg.mgz", "--sum", "s6.stats", "--in", "seg.mgz", "--snr", "--id", "0", "2",
@@ -190,9 +237,15 @@ pub fn text_without_provenance(t: &str) -> String {
     t.lines()
         .filter(|l| {
             !l.contains("TimeStamp")
-                && !["# cmdline", "# sysname", "# hostname", "# machine", "# user"]
-                    .iter()
-                    .any(|k| l.starts_with(k))
+                && ![
+                    "# cmdline",
+                    "# sysname",
+                    "# hostname",
+                    "# machine",
+                    "# user",
+                ]
+                .iter()
+                .any(|k| l.starts_with(k))
         })
         .map(|l| format!("{l}\n"))
         .collect()
@@ -215,7 +268,14 @@ pub fn digest(path: &Path) -> String {
 /// A line of standard output as the golden hash takes it: the report's lines that name the
 /// machine, the user and the command line masked.
 pub fn mask_line(l: &str) -> String {
-    for key in ["cwd ", "cmdline ", "sysname  ", "hostname ", "machine  ", "user     "] {
+    for key in [
+        "cwd ",
+        "cmdline ",
+        "sysname  ",
+        "hostname ",
+        "machine  ",
+        "user     ",
+    ] {
         if l.starts_with(key) {
             return format!("{key}<masked>");
         }

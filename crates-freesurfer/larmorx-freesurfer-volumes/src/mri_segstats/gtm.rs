@@ -2,8 +2,8 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! `utils/gtm.cpp`'s replacement lists, which only `mri_segstats` of the programs ported so far
-//! reaches (`GTMdefaultSegReplacmentList` 306-391, `GTMloadReplacmentList` 2516-2551), and
-//! `utils/utils.cpp`'s `CountItemsInString` (1292-1306). The geometric transfer matrix itself
+//! reaches (`GTMdefaultSegReplacmentList` 306-391, `GTMloadReplacmentList` 2516-2551, with fs.core's
+//! `CountItemsInString`). The geometric transfer matrix itself
 //! (`mri_gtmpvc`) is a later module; these two functions move there with it.
 //!
 //! FreeSurfer keeps the list in two arrays of 1,000 `int` (the program's `SrcReplace` and
@@ -16,12 +16,11 @@
 //! the total as the number it read, and takes an empty file as a list. larmorx counts each once,
 //! prints the number read and refuses an empty file; `reproduce` as FreeSurfer.
 
-
 use larmorx_core::defects::FS_1108;
 use larmorx_freesurfer_core::cscan::{Bytes, Scanf};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{Fatal, errno_of, strerror};
-use larmorx_freesurfer_core::utils::resolve;
+use larmorx_freesurfer_core::utils::{count_items_in_string, resolve};
 
 use super::options::{LIST_ROOM, Run};
 
@@ -100,30 +99,6 @@ pub fn gtm_default_seg_replacment_list(rp: &mut Replacements) {
         nlist += 1;
     }
     rp.n = nlist as i32;
-}
-
-/// `CountItemsInString(str)`: the words separated by blanks (spaces and tabs), up to the first
-/// newline, carriage return or NUL that starts a word.
-pub fn count_items_in_string(s: &[u8]) -> i32 {
-    let blank = |b: u8| b == b' ' || b == b'\t';
-    let len = s.iter().position(|&b| b == 0).unwrap_or(s.len());
-    let (mut n, mut hits) = (0usize, 0i32);
-    while n < len {
-        while n < len && blank(s[n]) {
-            n += 1;
-        }
-        if n >= len {
-            break;
-        }
-        if s[n] == 0 || s[n] == b'\n' || s[n] == b'\r' {
-            break;
-        }
-        while n < len && !blank(s[n]) {
-            n += 1;
-        }
-        hits += 1;
-    }
-    hits
 }
 
 /// The lines `fgets(tmpstr, 1000, fp)` gives: at most 999 bytes each, a line longer than that

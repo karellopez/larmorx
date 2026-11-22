@@ -127,10 +127,22 @@ fn first_columns(fp: &mut dyn Write, is_surf: bool) {
 
 /// The intensity columns' descriptions from column `c` on; the next column's number.
 fn intensity_columns(fp: &mut dyn Write, mut c: usize, name: &str, units: &str) -> usize {
-    col(fp, c, &format!("{name}Mean "), &format!("Intensity {name}Mean"), units);
+    col(
+        fp,
+        c,
+        &format!("{name}Mean "),
+        &format!("Intensity {name}Mean"),
+        units,
+    );
     c += 1;
     for what in ["StdDev", "Min", "Max", "Range"] {
-        col(fp, c, &format!("{name}{what}"), &format!("Intensity {name}{what}"), units);
+        col(
+            fp,
+            c,
+            &format!("{name}{what}"),
+            &format!("Intensity {name}{what}"),
+            units,
+        );
         c += 1;
     }
     c
@@ -198,7 +210,10 @@ pub fn print_old_table(fp: &mut dyn Write, s: &SegStat) {
     }
     let _ = write!(fp, "StructName ");
     if s.do_intensity {
-        let _ = write!(fp, "{name}Mean {name}StdDev {name}Min {name}Max {name}Range  ");
+        let _ = write!(
+            fp,
+            "{name}Mean {name}StdDev {name}Min {name}Max {name}Range  "
+        );
         if s.do_snr {
             let _ = write!(fp, "{name}SNR ");
         }
@@ -253,7 +268,13 @@ pub fn load_stat_sum_file(
         if let Some(v) = sc.s(en, usize::MAX, true) {
             e.name = v;
         }
-        let fields: [&mut f32; 5] = [&mut e.mean, &mut e.std, &mut e.min, &mut e.max, &mut e.range];
+        let fields: [&mut f32; 5] = [
+            &mut e.mean,
+            &mut e.std,
+            &mut e.min,
+            &mut e.max,
+            &mut e.range,
+        ];
         for f in fields {
             sc.text(en, b" ");
             if let Some(v) = sc.f(en, true) {
@@ -270,7 +291,13 @@ pub fn load_stat_sum_file(
 /// range, mean and standard deviation (`%10.4f `) of each row.
 pub fn dump_stat_sum_table(out: &mut dyn Write, table: &[StatSumEntry]) {
     for e in table {
-        let _ = write!(out, "{}  {} {}  ", d(e.id, 3), d(e.nhits, 8), ff(e.vol, 10, 1));
+        let _ = write!(
+            out,
+            "{}  {} {}  ",
+            d(e.id, 3),
+            d(e.nhits, 8),
+            ff(e.vol, 10, 1)
+        );
         name30(out, &e.name);
         let _ = write!(
             out,

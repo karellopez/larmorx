@@ -3447,6 +3447,12 @@ class Gen12(Gen11):
         m34 = "3 4 " + " ".join(f32(v) for v in range(1, 13))
         L.append(f"ltaprt {arr(1, [(m34, g1, g2)])}")
         L.append(f"ltaprt {arr(1, [('5 5 ' + ' '.join(f32(v) for v in range(25)), g1, g2)])}")
+        # relay 15: LTAreduce compares each transform with the previous transform's own destination,
+        # also after that one was taken inverted: G1 to G2, G3 to G2 (inverted), then G3 to G1 (a
+        # mismatch) or G2 to G4 (a match); comparing with the chain's end would decide both the
+        # other way
+        L.append(f"ltared {arr(1, [(m1, g1, g2), (m2, g3, g2), (m3, g3, g1)])}")
+        L.append(f"ltared {arr(1, [(m1, g1, g2), (m2, g3, g2), (m3, g2, g4)])}")
         # FS-198, FS-504, FS-508: FreeSurfer reads a freed matrix or a transform the array does not
         # hold, the same bytes in every run of the probe: a line noting one may differ in both modes
         return [Batch("vrules14", "vrules14", L, both="FS-198,FS-504,FS-508")]

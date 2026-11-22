@@ -2635,7 +2635,8 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
   array. No array, or one without transforms where a transform is read: FS-504.
 - **`LTAreduce(lta)`**: on a copy with its inverses filled, a new array of one transform: the copy's type, `fscale` and
   subject; the first transform copied; for each next transform, when its source equals the previous transform's
-  destination its matrix `M`, else when its destination equals it (`WARNING: LTAreduce(): inverting LT <k> to match
+  destination (that transform's own destination as the copy holds it, also when it was taken inverted: not the end of
+  the chain reduced so far) its matrix `M`, else when its destination equals it (`WARNING: LTAreduce(): inverting LT <k> to match
   geometry`) its inverse's matrix, else `ERROR: LTAreduce(): LTs <k-1> and <k> do not match` and `NULL`; the reduced
   matrix becomes `M * reduced`. Its destination becomes the last transform's destination (its source when that one was
   inverted). The new array's inverse is not filled.
@@ -2770,7 +2771,11 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
   `vrules14`, chains, an inverted array, other types changed first).
 - **`LTAreduce`** beyond the bullet above: the product is `MatrixMultiply(M, reduced, reduced)` (into the reduced matrix
   itself; it keeps its old numbers when the product gives nothing, `m1 is null` when the transform has no matrix);
-  with one transform the result is its copy (**(observed)**: `vrules14`); FS-504: an array of no transforms ends the
+  with one transform the result is its copy (**(observed)**: `vrules14`); the comparison with the previous
+  transform's own destination (**(observed)**: `vrules14`, relay 15: transforms G1 to G2, G3 to G2 (taken inverted,
+  the warning for LT 1), then G3 to G1: `ERROR: LTAreduce(): LTs 1 and 2 do not match` and `NULL`; then G2 to G4
+  instead: taken as it is, the reduced matrix `M3 · (inv(M2) · M1)`, its destination G4; comparing with the chain's
+  end, G3 after the inversion, would decide both cases the other way); FS-504: an array of no transforms ends the
   program as above (`LTAreduce: a transform array without transforms`), after the copy and its fill.
 - **`LTAmriIsSource(lta, mri)`**, **`LTAmriIsTarget(lta, mri)`**: 1 when the volume's geometry (marked valid) equals the
   first transform's source (the last transform's destination), else 0 (`vg_isEqual`, §4) (**(observed)**: `vrules14`, a

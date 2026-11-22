@@ -266,7 +266,7 @@ impl Process {
             self.put_out(b"ASeg2Vol: Sorting \n");
         }
         // glibc's merge sort on a consistent comparator: a stable order
-        pairs.sort_by(|a, b| (a.out, a.label).cmp(&(b.out, b.label)));
+        pairs.sort_by_key(|a| (a.out, a.label));
         if diag > 0 {
             self.put_out(b"ASeg2Vol: Mapping\n");
         }
@@ -440,10 +440,10 @@ impl Process {
         let p: [f32; 3] = [0, 1, 2].map(|j| sse::add32(g.extent(j) as f32 / 2.0, base as f32));
         for r in 0..3 {
             let mut t = 0f32;
-            for j in 0..3 {
+            for (j, &pj) in p.iter().enumerate() {
                 let v = sse::mul32(g.cosine(j)[r], g.size(j));
                 m.set(r as i32 + 1, j as i32 + 1, v);
-                t = sse::add32(t, sse::mul32(v, p[j]));
+                t = sse::add32(t, sse::mul32(v, pj));
             }
             m.set(r as i32 + 1, 4, sse::sub32(g.c[r], t));
         }
@@ -569,7 +569,10 @@ impl Process {
                         }
                         None => {}
                     }
-                    let outside = |v: f32, n: f32| v < 0.0 || !(v < n);
+                    // below 0, or not below the extent (a NaN is not below it)
+                    let outside = |v: f32, n: f32| {
+                        v < 0.0 || v.partial_cmp(&n) != Some(std::cmp::Ordering::Less)
+                    };
                     if outside(x, wf) || outside(y, hf) || outside(z, df) {
                         continue;
                     }

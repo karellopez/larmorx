@@ -4,6 +4,8 @@
 //! `MRIapplyEdits`, `MRIshiftDim` (FS-513), `MRIfixEntoWM` and `LabelAmygalaCortalJunction`
 //! (FS-514). `MRIvol2VolTkRegVSM` waits for §41 (part 9).
 
+use std::cmp::Ordering;
+
 use larmorx_core::defects::{FS_512, FS_513, FS_514};
 use larmorx_core::glibc_qsort::qsort;
 
@@ -182,7 +184,12 @@ impl Process {
         let kept: Vec<f32> = v
             .iter()
             .enumerate()
-            .filter(|&(k, _)| !((k as f64) < lo) && !((k as f64) > hi))
+            // not below `lo` nor above `hi` (a NaN bound keeps every value)
+            .filter(|&(k, _)| {
+                let k = k as f64;
+                k.partial_cmp(&lo) != Some(Ordering::Less)
+                    && k.partial_cmp(&hi) != Some(Ordering::Greater)
+            })
             .map(|(_, &x)| x)
             .collect();
         let m = kept.len();

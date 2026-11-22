@@ -94,7 +94,8 @@ class Batch:
     never: str = ""  # why the probe's runs are never cached
     guards: bool = True  # False: the plain runs only
     # the defects (comma-separated) whose correction holds in both modes because FreeSurfer's value
-    # there is memory it never wrote: a line noting one of them may differ in both modes
+    # there is memory it never wrote, or memory outside the table it reads: a line noting one of them
+    # may differ in both modes
     both: str = ""
 
 
@@ -2634,7 +2635,9 @@ class Gen11(Gen10):
             else:
                 sb = "null"
             L.append(f"pvlab {lab} {paint} {vals}{vp} {label} {maxl} {mix} {nbr} {sb}")
-        return [Batch("vpvlab", "vpvlab", L)]
+        # FS-469: a label outside the tables reads its mean from the stack beside them, which the
+        # call's own steps and the probe's frames fill the same way in every run
+        return [Batch("vpvlab", "vpvlab", L, both="FS-469")]
 
     def vfr8(self) -> list[Batch]:
         """§38: MRIrandn and MRIconst (new and given volumes of every type, dimensions matching

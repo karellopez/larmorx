@@ -1854,7 +1854,11 @@ probe's `pvlab`.)
   label 2 (the border voxel of label 2 weighed 40 / 48.75 against label 1's mean 10 and its own 58.75), the mixing
   volume 0.8205128 there; `vpvlab`.
 - Defects: FS-469 (an own label outside `[0, maxlabels)`: its mean read outside the table; larmorx uses its mean
-  over the wide window, both modes, noted), FS-470 (no `vals` at a border voxel weighed: FreeSurfer crashes; an
+  over the wide window, both modes, noted; what FreeSurfer reads there is the stack beside its tables, which its
+  own steps and its callers' frames fill: the same in every run of one program, so the probe's four runs agree on
+  it, but no input decides it (**(observed)**: `vpvlab`'s lines with a label -1 or 250 on a border voxel of
+  another label give the same result alone, after other lines and in each of the four runs; §69.3 lets a line
+  noting FS-469 differ there in both modes)), FS-470 (no `vals` at a border voxel weighed: FreeSurfer crashes; an
   error), FS-471 (FreeSurfer's per-voxel tables of `maxlabels` entries: negative crashes, an error; tables past the
   stack crash FreeSurfer, larmorx counts all the same, noted). A `maxlabels` of 0 with a negative label counts no
   label: **(observed)** 0 for label -1 on a volume without it.
@@ -3499,7 +3503,8 @@ standard error) are taken out and their IDs kept. Every line must be identical, 
   leave the same bytes there (the runs' fills of the stack before each call do not reach them): FS-300 in `vsample` and `vresamp` (§18, §31: the
   cubic frame sampler's window points FreeSurfer never reads), FS-322 in `vderiv` (§28: a gradient's
   sample never written) and FS-325 in `vlinear` (§29: a linear transform's samples before the first
-  that succeeds);
+  that succeeds); likewise FS-469 in `vpvlab` (§37: a label's mean read outside the table, from the
+  stack beside it);
 - in both modes, the `bvr` line without a cache that FreeSurfer ends at its licence check (§23:
   `EXIT 255` with the licence message; LARMORX performs none).
 

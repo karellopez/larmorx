@@ -249,7 +249,8 @@ the candidate noted a defect whose value in FreeSurfer is memory on the stack it
 the probe's four runs agree only because the program's own earlier steps leave the same bytes there:
 FS-300 in `vsample` and `vresamp` (the cubic frame sampler's window points outside the volume), FS-322 in
 `vderiv` (a gradient's sample never written) and FS-325 in `vlinear` (a linear transform's samples before
-the first that succeeds), and in both modes on the
+the first that succeeds), and FS-469 in `vpvlab` (a label's mean read outside the table, from the stack
+beside it, which every run fills the same way), and in both modes on the
 `bvr` line without a cache that FreeSurfer ends at its licence check (`EXIT 255`, `FREESURFER_HOME is
 not defined`: LARMORX performs no licence check). Under `reproduce` a line where FreeSurfer aborted
 with the C++ runtime's lines (`CRASH 6`, standard error starting `terminate called after throwing`:

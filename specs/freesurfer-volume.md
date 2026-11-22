@@ -2605,7 +2605,7 @@ source itself, peak limits that find two peaks and none, and `DIAG_SHOW`. Expect
 FreeSurfer crashes, hangs or touches memory it does not own (FS-498, FS-499, FS-501, FS-502 and the shared FS-53, FS-58,
 FS-290), counted and not compared; the default differs only with a notice.
 
-## 54. Operations on a transform array (3.1-40: transform.cpp's LTA operations)
+## 54. Operations on a transform array (3.1-40)
 A transform array (LTA) holds `n` transforms and as many inverse transforms; each has a centre, a spread, a type, a
 label, a 4 x 4 `float` matrix and two geometries (source, destination). Products are the matrix product of section 6
 (`float` sums), inverses the matrix inverse of fs.maths. A transform's assignment copies its numbers and matrices and
@@ -3254,7 +3254,7 @@ both or none, into a new array, another array of 0 to 2 transforms or the source
 `reproduce` but where the original reads memory it does not own or crashes (FS-504, FS-957, the shared voxel defects),
 counted and not compared; the default differs only with a notice (FS-954, FS-956, FS-957 and the shared ones).
 
-## 69. Validation plan (black box), parts 1 to 8
+## 69. Validation plan (black box), parts 1 to 8 and §54
 
 ### 69.1 The probe
 
@@ -3336,7 +3336,9 @@ for `vresamp` after its sources were given a good RAS in most cases, `fs-volume-
 | `vmri2` | 39 | 390 | 9 | 0 | 0 | `2895f2e6da5e2f714760e18bc0bfffd5aae0f235e549f02931478d7fb2086c90` |
 | `vrules12` | 37-39 | 112 | 10 | 3 | 0 | `06edcc6932caee09486d04babbd672a2231ecde14c3230bb95b09c27fd3e4cf4` |
 | `vrules13` | 37 | 13 | 7 | 0 | 0 | `3d913f7f127b91cea2886f580ad1dae9dff0629702c9e4285f8d1426f256832e` |
-| all | | 14,953 | 1,505 | 729 | 13 | |
+| `vlta54` | 54 | 225 | 10 | 32 | 0 | `51df0bf468be3f8ce169633906d35aa06d2cd8828fd31bf8b2ebee06c473d99d` |
+| `vrules14` | 54 | 94 | 9 | 17 | 0 | `020ac531151bfc93131a683148dd7685db7c798ee22711ef01cb0012d2f82c30` |
+| all | | 15,272 | 1,524 | 778 | 13 | |
 
 The probe's groups `vbspline` and `vbsrules` are fs.bspline's (`specs/freesurfer-bspline.md` §9).
 
@@ -3559,6 +3561,28 @@ a line of its own: a 3 x 2 x 2 volume and a one-voxel volume of that label only 
 them with limits -1, -2 and -3, 12 and 1 voxels, and crashes with -4, -5 and -17), a 3 x 1 x 1 volume of that label
 beside a 0 (border voxels: a crash with -1, -2 and -4) and a volume without the label (0).
 
+§54's groups (relay 14, 2026-11-22: the prebuilt probe rebuilt from commit 84fda65e, §54's commands and the line
+prefixes `+gdiagno=` and `+env=`; the same bytes twice; every earlier group's hash unchanged; the new groups the same
+cold, warm and twice without the cache; the probe as its own candidate: no unexplained line in either mode; every
+model as before, none different; log `oracles/logs/fs-volume-probe-r14-final-2026-11-22.log`): `vlta54` (90 type
+changes of arrays of 1 to 3 transforms between a pool of six geometries, chained or random, from RAS, voxel,
+physical-voxel, REGISTER_DAT, FSL and coronal RAS to each, with `FSLOUTPUTTYPE` unset, `NIFTI_GZ`, `NIFTI` and
+`ANALYZE` and a few at `Gdiag_no` 1; 30 inversions, no array, a given one of the same or another size, in place; 40
+concatenations of 1 to 3 arrays, chained, inverted to match, mismatched, of other types, with and without the
+reduction, some through `LTAconcat2`; 25 reductions of chains, reversed and random transforms; 20 source and target
+tests of volumes of the first source's, the last destination's or another geometry; 20 prints of every type and
+others; the transforms' `m_dL` and `m_last_dL` 4 x 4 zeros, none in 2 % of them) and `vrules14` (§54's fixed cases:
+REGISTER_DAT to RAS, voxels and FSL of one and two transforms (FS-507); every type to REGISTER_DAT and FSL; FSL to
+REGISTER_DAT, RAS and voxels; coronal RAS to RAS; `FSLOUTPUTTYPE` unset, `NIFTI`, `NIFTI_PAIR`, `ANALYZE` and empty both
+ways; FS-508 and the singular registrations; the unsupported targets from 14, 15 and 21, with and without transforms;
+the diagnostic print at levels 1 and 0 and of an array of no transforms (FS-504); inversions of three transforms in
+place, new and into arrays of another size; the concatenations of one array, a chain, an inverted array, a mismatch,
+other types, arrays of no transforms and no array (FS-504); the reductions of one transform, a chain, an inverted one,
+a mismatch, no transforms and transforms without `m_dL` (FS-198); the source and target tests; the prints of every
+type, subjects, scales, NaN elements, no transforms, a 3 x 4 and a 5 x 5 matrix (FS-504)). Their memory and crash lines:
+FS-504's reads, FS-508's freed matrix, FS-198's copies, the reductions' heap checks; their exits: the fills' and
+products' ends, the unsupported targets, `FSLOUTPUTTYPE` unset (status 1).
+
 `vrules` (relay 7, 2026-11-17: the prebuilt probe unchanged; log
 `oracles/logs/fs-volume-probe-r7-refs-2026-11-17.log`, the same hash from the cache and without it,
 the other groups' hashes unchanged) holds fixed cases of single statements: FS-291 with tensor
@@ -3640,7 +3664,10 @@ line of `vrules7` and `vbsvol` identical in both modes, `vstat7` and `vrules8` a
 and `vrules9` identical in both modes, `vnbhd` all but one memory line; no unexplained difference in either
 mode; relay 13 (the prebuilt probes from 0b5c7bb6 and 1536bbbb): the same for every earlier group, and every
 line of `vrules10`, `vrules11` and `vrules12` identical in both modes, `vpvlab`, `vfr8` and `vmri2` all but 1 to
-3 memory lines each; no unexplained difference in either mode.
+3 memory lines each; no unexplained difference in either mode; relay 14 (the prebuilt probes from 1536bbbb and
+84fda65e): the same for every earlier group, every line of `vrules13` identical in both modes, `vlta54` all but 1
+memory line and 2 where FreeSurfer crashed in one process and not in another, `vrules14` all but 1 memory line; no
+unexplained difference in either mode.
 
 ### 69.4 The defects of parts 1 to 8 (index)
 
@@ -3669,13 +3696,14 @@ line of `vrules10`, `vrules11` and `vrules12` identical in both modes, `vpvlab`,
 | FS-471 | 37 | FS-472 | 38 | FS-473 | 38 |
 | FS-474 | 38 | FS-475 | 38 | FS-476 | 38 |
 | FS-477 | 38 | FS-478 | 38 | FS-479 | 38 |
-| FS-480 | 39 | FS-481 | 39 | | |
+| FS-480 | 39 | FS-481 | 39 | FS-504 | 54 |
+| FS-507 | 54 | FS-508 | 54 | | |
 
 Others' defects these parts meet: FS-12 (`nint`, `specs/freesurfer-core.md`), FS-52 (§35's second volumes), FS-53 and FS-58
 (`specs/freesurfer-mri.md`; FS-252, its header copy without cached matrices, in part 4), FS-47 and
 ITK-112 (`specs/freesurfer-maths.md` §17); FS-252 again in part 5 (segmentations copied without their
 cached matrices) and in part 8 (`vrules12`: a volume without its cached matrices sorted); GLIBC-07 (`powf`,
-`cos`) in part 8.
+`cos`) in part 8; FS-195, FS-196 and FS-198 (`specs/freesurfer-mri.md` §21's copies) in §54.
 
 ### 69.5 Beyond the probe, and the sections after §40
 

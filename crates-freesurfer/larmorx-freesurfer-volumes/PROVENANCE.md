@@ -48,7 +48,7 @@ ported file is audited for third-party code first).
 | `mri_add_xform_to_header/mri_add_xform_to_header.help.xml` (3.2-10) | the help text, copied unchanged (`print_usage` renders it) | `src/mri_add_xform_to_header/mri_add_xform_to_header.help.xml` |
 | `utils/mriio.cpp` 11852-11905 (3.2-10; decided for the program's crate: no other program on the default paths calls it) | `MRIwriteInfo` (FS-1156, FS-1157, FS-1158) | `src/mri_add_xform_to_header/write_info.rs` |
 | `mri_convert/mri_make_uchar.cpp` 52-285 (queue item 3.2-22, track D relay 51) | `main` (FS-1127, FS-1129), `get_option` (FS-1128), `usage_exit` (its `printf` literals, copied), `MRIconvertToUchar` (FS-1130, FS-1131; the operand order and NaNs of the official build's object code: `255 * FIRST_PERCENTILE`, `x2 * m`, `val * m + b`, `(-b) / m`); `include/mrinorm.h` `DEFAULT_DESIRED_WHITE_MATTER_VALUE`; `utils/transform.cpp` `LTAtransformPoint` (1496-1503, inline: its static matrix kept by the caller); the program `mri_make_uchar` of `larmorx-freesurfer` | `src/mri_make_uchar/main.rs` |
-| `mri_mask/mri_mask.cpp` 89-655 (queue item 3.2-26, track D relay 51: part 1) | `main`, `usage`, `print_version`, `get_option` (FS-1132; its option names in the order it compares them: the transform's `-invert` never reached); `include/cma.h`'s labels `-samseg` clears; the program `mri_mask` of `larmorx-freesurfer` | `src/mri_mask/main.rs` |
+| `mri_mask/mri_mask.cpp` 89-655 (queue item 3.2-26, track D relays 51 and 52) | `main` (FS-1133, FS-1134, FS-1135), `usage`, `print_version`, `get_option` (FS-1132; its option names in the order it compares them: the transform's `-invert` never reached); `include/cma.h`'s labels `-samseg` clears; the program `mri_mask` of `larmorx-freesurfer` | `src/mri_mask/main.rs` |
 | `mri_mask/mri_mask.help.xml` (3.2-26) | the help text `usage` renders (FreeSurfer's file, copied unchanged) | `src/mri_mask/mri_mask.help.xml` |
 | `lta_convert/lta_convert.cpp` 116-1441 (queue item 3.2-09, track A relay 51) | `main` (FS-1164, FS-1168, FS-1169), `parseNextCommand` (FS-1159, FS-1160), `parseCommandLine` (FS-1170), `printUsage`; the program `lta_convert` of `larmorx-freesurfer` | `src/lta_convert/main.rs` |
 | `lta_convert/lta_convert.cpp` 196-921 (3.2-09) | `shallowCopyLTA`, `readLTA`, `readFSL`, `readMNI`, `readREG`, `readNIFTYREG`, `readITK`, `readVOX`, `writeFSL`, `writeMNI`, `writeREG`, `writeNIFTYREG`, `writeITK`, `writeVOX` (FS-1161 to FS-1165) | `src/lta_convert/formats.rs` |
@@ -149,11 +149,15 @@ version, help and error messages).
   while the geometry's matrices are not cached yet (its only other effect; an input that is not
   coronal calls it at every voxel in `reproduce` for its error); `docs/findings/
   freesurfer-mri-make-uchar.md`.
-- `mri_mask` (relay 51): standard output held until the end, as `mri_make_uchar`'s (FS-1132's crashes in
-  `reproduce`); `-no-allow-diff-geom`'s `setenv` changes the run's own copy of the environment, which `MRImask`
-  reads; the C's `(int)` of a voxel or of `-transfer`'s value is fs.core's `float_to_int` (FS-17 for NaN and out of
-  range); a crop whose region is `NULL` (`REGIONprint(stdout, NULL)`) and a transform that gives no volume end with
-  status 139 in both modes until the probe of relay 52 checks the official's behaviour.
+- `mri_mask` (relays 51 and 52): standard output held until the end (`Cout`), what a crash in `reproduce`
+  keeps being the part before the last flush (an explicit one, or a message of the C++ error stream: `std::cerr`
+  is tied to `std::cout`, fs.core's `StderrState::cxx_messages`) and the full 4,096-byte buffers after it;
+  `-no-allow-diff-geom`'s `setenv` changes the run's own copy of the environment, which `MRImask` reads; the C's
+  `(int)` of a voxel or of `-transfer`'s value is fs.core's `float_to_int` (FS-17 for NaN and out of range).
+  FS-1133 (a `-BBEQ` region `NULL`, `REGIONprint(stdout, NULL)`), FS-1134 (`LTAreduce` `NULL`, then
+  `lta->xforms[0]`), FS-1135 (`TransformApplyType` `NULL`: the rest of `main` without a mask modelled in
+  `null_mask`, each later step's crash or message as the official's) by default an error with status 1;
+  `docs/findings/freesurfer-mri-mask.md`.
 - `mri_add_xform_to_header` (relay 50): the transform file is read with
   `input_transform_file_ex` (what C's `transform` argument holds after a failure, and `errno`),
   the volume keeping a partial transform as C's does; a transform never read gives no matrices

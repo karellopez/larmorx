@@ -1,14 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
-"""mri_mask with a recorded head's morph: FreeSurfer 8.2.0's official program against the port.
+"""mri_mask on recorded heads beyond recon-all's steps: FreeSurfer 8.2.0's official program against the port.
 
 CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (it runs the replica).
 
 recon-all's own ``mri_mask`` steps are replayed by the replay tool (``record.py`` reads them). This
-adds the path no recorded step takes, ``-xform`` with a GCA morph: on recorded heads
-(``oracles/freesurfer-8.2.0/runs/<run>/subjects/<subject>/mri``), the run's ``brainmask.mgz``
-moved into the atlas by its ``transforms/talairach.m3z`` onto the run's ``norm.mgz`` moved there
-by the official ``mri_convert -at`` (``oracles/inputs/fs-mask-real/<run>/natlas.mgz``), with and
-without ``-T 5`` and ``-dilate 1``. The official program by name through the oracle-output cache at
+adds, on recorded heads (``oracles/freesurfer-8.2.0/runs/<run>/subjects/<subject>/mri``): in the
+classic runs the path no recorded step takes, ``-xform`` with a GCA morph (the run's
+``brainmask.mgz`` moved into the atlas by its ``transforms/talairach.m3z`` onto the run's
+``norm.mgz`` moved there by the official ``mri_convert -at``,
+``oracles/inputs/fs-mask-real/<run>/natlas.mgz``; with and without ``-T 5`` and ``-dilate 1``);
+in the v8 runs the two calls of recon-all's scripts whose inputs the runs keep (``T1.mgz`` masked
+by ``synthstrip.mgz``, the call that makes the v8 stream's ``brainmask.mgz``; ``-bb 3`` on
+``orig.mgz`` into a NIfTI file, synthmorph's crop). The official program by name through the oracle-output cache at
 one thread and the port (``larmorx-freesurfer --upstream-defects reproduce|fix freesurfer
 mri_mask``, built here), each in a folder of its own; compared: exit status, messages and every
 file written (FreeSurfer's provenance aside). The other way (the mask in the atlas, the input in
@@ -53,7 +56,18 @@ compare = _load(
     REPO / "validation" / "investigations" / "freesurfer-mri-mask-probe" / "compare.py",
 )
 
-RUNS = ("ds000005-sub-01-classic", "ds000228-sub-pixar008-classic", "ds004173-sub-603309-classic")
+RUNS = (
+    "ds000005-sub-01-classic",
+    "ds000228-sub-pixar008-classic",
+    "ds004173-sub-603309-classic",
+    "ds000005-sub-01-v8",
+    "ds000228-sub-pixar008-v8",
+    "ds004173-sub-603309-v8",
+)
+V8_CALLS = {
+    "synthstrip": ["{mri}/T1.mgz", "{mri}/synthstrip.mgz", "o.mgz"],
+    "bb3": ["-bb", "3", "{mri}/orig.mgz", "{mri}/orig.mgz", "o.nii.gz"],
+}
 CALLS = {
     "morph": ["-xform", "{m3z}", "{natlas}", "{mri}/brainmask.mgz", "o.mgz"],
     "morph-T5-dilate": [
@@ -107,18 +121,23 @@ def main(argv: list[str] | None = None) -> int:
         base.mkdir(parents=True, exist_ok=True)
         m3z = mri / "transforms" / "talairach.m3z"
         natlas = base / "natlas.mgz"
-        made = oracle_cache.run(
-            ["mri_convert", "-at", str(m3z), str(mri / "norm.mgz"), "natlas.mgz"],
-            env=env,
-            cwd=base,
-            outputs=[natlas],
-            policy=compare.POLICY,
-            timeout=900,
-            runner="fs-mask-real",
+        calls = V8_CALLS if run.endswith("-v8") else CALLS
+        made = (
+            None
+            if run.endswith("-v8")
+            else oracle_cache.run(
+                ["mri_convert", "-at", str(m3z), str(mri / "norm.mgz"), "natlas.mgz"],
+                env=env,
+                cwd=base,
+                outputs=[natlas],
+                policy=compare.POLICY,
+                timeout=900,
+                runner="fs-mask-real",
+            )
         )
-        if made.returncode != 0:
+        if made is not None and made.returncode != 0:
             raise SystemExit(f"{run}: mri_convert -at failed: {made.stderr[-500:]}")
-        for kind, words in CALLS.items():
+        for kind, words in calls.items():
             args = [w.format(m3z=m3z, natlas=natlas, mri=mri) for w in words]
             sides = {}
             for side in ("official", "reproduce", "fix"):

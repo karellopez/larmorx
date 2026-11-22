@@ -8,6 +8,8 @@ CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (the cases are written for FreeSurf
     python3 -P hand_cases.py bvr > bvr_hand_cases.txt
     python3 -P hand_cases.py nan > nan_hand_cases.txt
     python3 -P hand_cases.py pv471 > pv471_hand_cases.txt
+    python3 -P hand_cases.py fs508 > fs508_hand_cases.txt
+    python3 -P hand_cases.py fs517 > fs517_hand_cases.txt
 
 
 ``lta``: ``.xfm`` files whose comment loop after the second ``%`` line meets the end of the file
@@ -37,6 +39,17 @@ first operand.
 open group ``vrules13``): a label (-200) below it on volumes whose counted voxels all lie off the
 border (FreeSurfer finishes for -1 to -3, crashes from -4), on a volume whose counted voxels lie on
 the border (a crash for every negative limit) and on a volume without the label.
+``fs508``: ``LTAchangeType`` where FSL's conversion gives no matrix (FS-508, relay 44; track E's
+open group ``vrules14``): one and two transforms of singular and regular tkregister, FSL, RAS and
+voxel matrices, the first or the second failing, the second's source a geometry of voxel size 0,
+the diagnostic level 0 and 1, every route to and from ``FSLREG_TYPE``. FreeSurfer frees the
+matrix and goes on: ``hand_cases.py prefix <dump>`` checks that the port's lines (both modes) are
+FreeSurfer's up to its first read of the freed matrix (``MatrixInverse: matrix (`` or
+``MatrixPrint: unknown type``), then the port's FS-508 error.
+
+``fs517``: ``MRIcropAroundCRS`` whose last voxel lies beyond ``int`` (FS-517; ``vrules15``): centres
+of 2147483647, 1e12, -2147483648 and NaN with fields of view 0, 3 and 4; FreeSurfer crashes;
+``prefix`` checks the port's lines up to the crash.
 """
 
 from __future__ import annotations
@@ -257,7 +270,159 @@ def compare(path: str) -> list[str]:
     return out
 
 
-GROUPS = {"lta": lta, "dns": dns, "bvr": bvr, "nan": nan, "pv471": pv471, "compare": compare}
+ZERO, ONE_F = "00000000", "3f800000"
+
+
+def geom(w: int = 4, h: int = 4, d: int = 4, sizes=(ONE_F, ONE_F, ONE_F), c=(ZERO, ZERO, ZERO)):
+    """``set_geom``'s 24 tokens: valid, identity direction cosines."""
+    cos = [ONE_F if i in (0, 4, 8) else ZERO for i in range(9)]
+    return ["1", str(w), str(h), str(d), *sizes, "1", *cos, *c, ZERO, ZERO, ZERO, "-"]
+
+
+#: 4 x 4 matrices (row by row, float bits): the identity, a shift, a singular one (rank 3), zeros
+M_I = [ONE_F if r == c else ZERO for r in range(4) for c in range(4)]
+M_T = [
+    *(ONE_F, ZERO, ZERO, "40000000"),
+    *(ZERO, ONE_F, ZERO, "bf800000"),
+    *(ZERO, ZERO, ONE_F, "3f000000"),
+    *(ZERO, ZERO, ZERO, ONE_F),
+]
+M_S = [ONE_F if r == c and r != 2 else ZERO for r in range(4) for c in range(4)]
+M_Z = [ZERO] * 16
+
+
+def lta_toks(ty: int, xfs: list[tuple[list[str], list[str], list[str]]]) -> str:
+    """``get_lta_full``'s tokens: ``(matrix, source, destination)`` per transform, no inverses."""
+    t = [str(len(xfs)), str(ty), ZERO, "-"]
+    for m, src, dst in xfs:
+        t += [ZERO, ZERO, ZERO, ONE_F, "0", "0", *m, *src, *dst, "0"]
+    return " ".join(t)
+
+
+def fs508() -> list[str]:
+    g1, g2 = geom(), geom(3, 5, 2, (ONE_F, ONE_F, "40000000"), (ONE_F, "40000000", "40400000"))
+    g0 = geom(4, 4, 4, (ZERO, ONE_F, ONE_F))
+    plans = [
+        (14, 15, [(M_S, g1, g2)]),
+        (14, 15, [(M_Z, g1, g2)]),
+        (14, 15, [(M_S, g1, g2), (M_T, g2, g1)]),
+        (14, 15, [(M_T, g1, g2), (M_S, g2, g1)]),
+        (14, 15, [(M_S, g1, g2), (M_T, g0, g1)]),
+        (14, 15, [(M_S, g1, g2), (M_S, g2, g1)]),
+        (14, 15, [(M_T, g1, g2), (M_I, g2, g1), (M_S, g1, g1)]),
+        (15, 14, [(M_S, g1, g2)]),
+        (15, 14, [(M_T, g1, g2), (M_S, g2, g1)]),
+        (15, 14, [(M_S, g1, g2), (M_T, g2, g1)]),
+        (15, 1, [(M_S, g1, g2), (M_T, g2, g1)]),
+        (15, 0, [(M_S, g1, g2)]),
+        (0, 15, [(M_S, g1, g2)]),
+        (1, 15, [(M_T, g1, g2), (M_S, g2, g1)]),
+        (2, 15, [(M_S, g1, g2)]),
+        (21, 15, [(M_S, g1, g2)]),
+        (14, 0, [(M_S, g1, g2)]),
+    ]
+    out = []
+    for frm, to, xfs in plans:
+        for gd in (0, 1):
+            out.append(f"ltachg 1 {gd} {lta_toks(frm, xfs)} {to}")
+    return out
+
+
+def fs517() -> list[str]:
+    v = vol(4, 4, 1) + " " + fill_paint([ONE_F], [(1, 1, 0, "40000000")])
+    d = {
+        "big": "41dfffffffc00000",
+        "e12": "426d1a94a2000000",
+        "min": "c1e0000000000000",
+        "nan": "7ff8000000000000",
+        "one": "3ff0000000000000",
+        "zero": "0000000000000000",
+    }
+    out = []
+    plans = []
+    # each axis beyond int: inside the volume on the other axes (the slice centre 0) or not
+    for ax in range(3):
+        for k, f in (("big", 3), ("nan", 0), ("e12", 4), ("min", 3), ("nan", 3), ("big", 1)):
+            for other in ("zero", "one"):
+                ctr = [other] * 3
+                ctr[ax] = k
+                fov = [1, 1, 1]
+                fov[ax] = f
+                plans.append((tuple(ctr), tuple(fov)))
+    plans.append((("nan", "nan", "nan"), (3, 3, 3)))
+    plans.append((("nan", "nan", "nan"), (0, 0, 0)))
+    for ctr, fov in plans:
+        c = " ".join(d[k] for k in ctr)
+        out.append(f"ccrs {v} {c} {fov[0]} {fov[1]} {fov[2]} 0")
+        out.append(f"ccrs {v} {c} {fov[0]} {fov[1]} {fov[2]} 2 1 2")
+    return out
+
+
+#: what FreeSurfer prints at its first read of a freed matrix (FS-508; memory contents: the
+#: allocator has reused it): the fill's inverse of a matrix whose sizes are not square, or of a
+#: square one it finds singular (the fill's own end), or the diagnostic print of one (an unknown
+#: type, or rows of no numbers). The port reproduces every earlier transform's fill, so an end
+#: there is the read's.
+READS = (
+    "error: MatrixInverse: matrix (",
+    "error: TransformInvert: xform noninvertible",
+    "error: MatrixPrint: unknown type",
+    "error: MatrixPrint: mat = ",
+    ";\\x0a",
+)
+
+
+def prefix(path: str) -> list[str]:
+    """The dumped lines of an FS-508 or FS-517 hand-case run. Where the port notes FS-508, its text
+    must be FreeSurfer's up to FreeSurfer's first read of the freed matrix (``READS``), followed by
+    the port's error; FS-517, FreeSurfer's text must begin with the port's before its error.
+    Elsewhere ``reproduce`` must be FreeSurfer's line, and ``fix`` too unless it notes a defect."""
+    import json
+
+    out, same, held, noted = [], 0, 0, 0
+    with open(path, encoding="utf-8") as fh:
+        rows = [json.loads(x) for x in fh]
+    for r in rows:
+        a = r["official"].partition(" | ")[2]
+        for mode, ids in (("reproduce", r["ids"]), ("fix", r["fids"])):
+            res, _, b = r[mode].partition(" | ")
+            if not ({"FS-508", "FS-517"} & set(ids)):
+                if r[mode] == r["official"]:
+                    same += 1
+                elif mode == "fix" and ids:
+                    noted += 1
+                else:
+                    out.append(
+                        f"DIFFER {mode} {r['case'][:60]}: {r['official'][:300]} / {r[mode][:300]}"
+                    )
+                continue
+            pre = b.rpartition("error: ")[0]
+            if "FS-508" in ids:
+                ok = a.startswith(pre) and a[len(pre) :].startswith(READS)
+            else:
+                ok = a.startswith(pre)
+            ok = ok and res == "EXIT 252"
+            held += ok
+            if not ok:
+                out.append(f"ORDER {mode} {r['case'][:60]}: {a[:400]} / {b[:400]}")
+    out.append(
+        f"{same} identical, {noted} fix lines with a notice, {held} held to FreeSurfer's first read"
+        f" or crash (of {2 * len(rows)} lines, both modes)"
+    )
+    return out
+
+
+GROUPS = {
+    "lta": lta,
+    "dns": dns,
+    "bvr": bvr,
+    "nan": nan,
+    "pv471": pv471,
+    "fs508": fs508,
+    "fs517": fs517,
+    "compare": compare,
+    "prefix": prefix,
+}
 
 if __name__ == "__main__":
     for line in GROUPS[sys.argv[1]](*sys.argv[2:]):

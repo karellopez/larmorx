@@ -349,3 +349,51 @@ fn hand_cases_give_the_official_outputs() {
         assert_eq!(hex, want);
     }
 }
+
+/// FS-508 and FS-517 (relay 44; track E's R15.5): the hand cases `hand_cases.py fs508` and `fs517`.
+/// FreeSurfer reads a matrix it freed, or overflows `int` in a crop, so the probe's loop lets
+/// those lines differ; `hand_cases.py prefix <dump>` showed on Linux x64 (2026-11-22) that the
+/// port's lines in both modes are FreeSurfer's up to its first read of the freed matrix (FS-508:
+/// 12 lines, every later transform's conversion first; the diagnostic print or the fill of the
+/// earlier transforms), or up to its crash or crop (FS-517: 38 lines, after the limits and, at a
+/// last voxel of exactly `int`'s maximum, the new volume's centre), followed by the port's error,
+/// and that every other line is FreeSurfer's. The SHA-256 of the port's own lines (both modes)
+/// holds that order.
+#[test]
+fn freed_and_overflowing_hand_cases_hold_freesurfer_order() {
+    let sets = [
+        (
+            include_str!("../../../validation/probes/fs-volume/fs508_hand_cases.txt"),
+            "FS-508",
+            "42c56419cb014fbed1ccce651a51ea32bfeea63f4644b8d12599a026f93cb603",
+            12,
+        ),
+        (
+            include_str!("../../../validation/probes/fs-volume/fs517_hand_cases.txt"),
+            "FS-517",
+            "21667a9ad6bc3c01bc44eea8bb935dfcaf54501c28600112b81454d324ba5289",
+            38,
+        ),
+    ];
+    for (text, id, want, want_noted) in sets {
+        let mut h = Sha256::new();
+        let mut noted = 0;
+        for line in text.lines() {
+            let (out, ids) = cases::run_line(line, UpstreamDefects::Reproduce);
+            let (f, fids) = cases::run_line(line, UpstreamDefects::Fix);
+            if ids.contains(&id) {
+                noted += 1;
+                assert!(out.starts_with("EXIT 252 | "), "{line}");
+                assert!(fids.contains(&id) && f.starts_with("EXIT 252 | "), "{line}");
+            }
+            for o in [&out, &f] {
+                h.update(o.as_bytes());
+                h.update(b"\n");
+            }
+        }
+        assert_eq!(noted, want_noted, "{id}");
+        let hex: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
+        println!("{id} {hex}");
+        assert_eq!(hex, want, "{id}");
+    }
+}

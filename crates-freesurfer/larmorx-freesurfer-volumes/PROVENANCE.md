@@ -55,6 +55,9 @@ ported file is audited for third-party code first).
 | `lta_convert/lta_convert.cpp` 116-193, `utils/transform.cpp` 5665-5794 (3.2-09; `conformGeom` decided for the program's crate: no other program on the default paths calls it) | `upsampleGeom`, `downsampleGeom` (FS-1166), `conformGeom` (FS-1167) | `src/lta_convert/geom.rs` |
 | libstdc++'s `std::ifstream` `>>` (`float`, words), `peek`, `getline` and `std::ofstream` `<<` with `precision` in the "C" locale (behaviour as C++ defines it and as measured on the official program; no library code) | the program's NiftyReg, ITK and voxel-space text | `src/lta_convert/cxx.rs` |
 | `lta_convert/lta_convert.help.xml` (3.2-09) | the help text, copied unchanged (`printUsage` renders it) | `src/lta_convert/lta_convert.help.xml` |
+| `mri_robust_register/mri_robust_register.cpp` 71-142, 592-1360, 1424-1827, 1838-2370 (queue item 3.2-13, track C relay 44) | `Parameters`, `main` (FS-1071), `printUsage`, `initRegistration` (FS-1072), `parseNextCommand` (FS-1070), `parseCommandLine`; the robust cost's path (the Powell costs, `entropyImage`, `--test`, `--debug`: "not ported yet"); the program `mri_robust_register` of `larmorx-freesurfer` | `src/mri_robust_register/main.rs`, `options.rs` |
+| `mri_robust_register/MyMRI.cpp` 580-612 (3.2-13) | `MyMRI::setTypeUCHAR`, `MyMRI::setMaxOutsideVal` | `src/mri_robust_register/main.rs` |
+| `mri_robust_register/mri_robust_register.help.xml` (3.2-13) | the help text, copied unchanged (`printUsage` renders it) | `src/mri_robust_register/mri_robust_register.help.xml` |
 
 Third-party code: none in `mri_normalize.cpp` (FreeSurfer's own file, MGH's notice). Its library
 calls are the other crates' (`larmorx-freesurfer-filter`'s normalisation, `-volume`, `-surf`,
@@ -158,3 +161,20 @@ version, help and error messages).
   `reproduce` print the C library's `*** buffer overflow detected ***: terminated` and end with
   status 134 (the official build's fortified copy aborts); standard output as written (C's buffer,
   lost at the abort when it is not a terminal, is not modelled).
+
+Third-party code: none in `mri_robust_register.cpp` and its `MyMRI` pieces (Martin Reuter's,
+MGH's notice). Their library calls are `larmorx-freesurfer-robust`'s (`RegRobust`, `MyMatrix`'s
+conversions and polar decomposition, `MyMRI::MRIvalscale`), the other crates' (`-io`'s `MRIread`
+and `MRIwrite`, `-gca`'s `TransformRead`, `-volume`'s LTA conversions, writer and resampling,
+`MRImask`, change of type, `MRIlinearScale`, C++'s `>> double`; `-filter`'s `MRIsobel`; `-core`'s
+version, help and errors) and `larmorx-core`'s VNL ports (`vnl_matlab_print` of a diagonal matrix
+added for `Scale`, BSD-3-Clause (VXL)).
+
+- `mri_robust_register` (relay 44): `Parameters` is `Options` (owned strings; the images are the
+  values `initRegistration` returns); `RegPowell` is not built (the robust cost only), so the
+  program ends with "not ported yet" where FreeSurfer would make one; the `--iscalein` file is read
+  whole and C++'s `>> double` applied (a folder: nothing read, as libstdc++'s stream opens it), the
+  `--iscaleout` file written whole (both as their streams write them; `errno` set from a failed
+  open); FS-1070 and FS-1071 with `reproduce` print the C++ runtime's and the C library's lines and
+  end with status 134 (standard output as flushed: each option's line is). The time taken comes
+  from the clock (masked by the probe).

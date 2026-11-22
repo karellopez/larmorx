@@ -368,7 +368,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FS-514 | FreeSurfer 8.2.0 `LabelAmygalaCortalJunction` | with several threads, a cortex voxel next to a left and a right amygdala voxel takes whichever label is written last | b | none known (the two amygdalae are far apart) | voxel order (one thread's) in both modes, named | – |
 | FS-515 | FreeSurfer 8.2.0 `MRIcropAroundRAS` | a volume whose orientation names an axis twice, or is unknown, crops to a field of view never set | a (memory) | none known | an error in both modes, named | – |
 | FS-516 | FreeSurfer 8.2.0 `MRIcropAroundRAS` (with an LTA) | the LTA's direction is decided backwards: inverted when the volume is its destination, used as it is when the volume is neither end, refused only when it is both; the comparison reads the volume's validity flag, which no volume sets | c | none known (`mri_vol2vol`-like crops around a point) | inverted when the volume is the source only, refused when it is neither end, the volume compared as valid (rule A, 2026-11-14), named; `reproduce` FreeSurfer's decision | – |
-| FS-517 | FreeSurfer 8.2.0 `MRIcropAroundCRS` (`MRIcropAroundRAS`) | a centre that is not a number or too far away, with a field of view whose last voxel lies beyond the int range, never ends | a (hang) | none known | an error in both modes, named | – |
+| FS-517 | FreeSurfer 8.2.0 `MRIcropAroundCRS` (`MRIcropAroundRAS`) | a centre that is not a number or too far away, with a field of view whose last voxel lies beyond the int range or at its maximum: the crop's limits or its loop counter overflow `int`; as the official build compiles it, the crop crashes or returns a volume holding none of the volume's voxels, by axis | a (crash) | none known | an error in both modes after the lines FreeSurfer prints first, named | – |
 | FS-518 | NrrdIO r3991 (Teem 1.9.0) `enumsNrrd.c` (`nrrdSpace`'s spellings) | a missing comma joins two space names: `3D-left-handed` and `3Drighthanded` are not recognised (the read fails), `3D-right-handed-time` reads as `3D-left-handed`, `3D-left-handed-time` as `3D-right-handed-time` | c | none (fMRIPrep and recon-all read no NRRD) | the names as intended (rule A, 2026-11-14), named; `reproduce` NrrdIO's table | – |
 | FS-519 | NrrdIO r3991 `_nrrdReadNrrdParse_kinds` | `kinds: none` resets the axis's centering instead of its kind | c | none | the kind reset (rule A, 2026-11-14), named; `reproduce` NrrdIO's | – |
 | FS-520 | NrrdIO r3991 `nrrdKindSize` (the check after reading) | an axis of kind `3-gradient` ends the program after its data are read: `nrrdKindSize: PANIC: nrrdKind 20 not implemented!`, exit status 1 | a (exit) | none | 3 samples, as the other 3-component kinds (rule A, 2026-11-14), named; `reproduce` the exit (`LoadError::Exit`) | – |
@@ -495,6 +495,10 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FS-1067 | FreeSurfer 8.2.0 `Regression<T>` (the robust registration's solvers) | fewer rows (usable voxels) than parameters: the robust solve gives memory contents; the least squares VNL's minimum-norm solution | a (out of bounds) and c | none | an error and status 1 by default (rule B, 2026-11-22), named; `reproduce` ends too (memory contents), the least squares "not ported yet" | the least squares of `rows < cols` under `reproduce` (LINPACK's `dsvdc` of a wide matrix) |
 | FS-1068 | FreeSurfer 8.2.0 `Registration::getHalfWayMaps` (`mri_robust_register`'s half-way outputs) | a registration that ran no iteration (`--highit 0` with images too small for a coarser level) reads its half-way maps from empty matrices | a (crash) | none | an error and status 1 in both modes, noted | – |
 | FS-1069 | FreeSurfer 8.2.0 `RegistrationStep::constructAb` (`--iscaleonly --nosym`) | a step of two images of different extents (intensity scaling only, without symmetry, of images of different sizes) reads past the smaller one (its size checks are compiled out) | a (out of bounds) | none | an error and status 1 in both modes, noted | – |
+| FS-1070 | FreeSurfer 8.2.0 `mri_robust_register` (its command line) | an option that takes an argument given as the last argument: the program aborts (an uncaught `std::logic_error`, status 134) for a name, and dies of a segmentation fault for a number | a (crash) | none | an error naming the option and status 1 by default; `reproduce` aborts as FreeSurfer does where it aborts (the same error where it crashes), noted | – |
+| FS-1071 | FreeSurfer 8.2.0 `mri_robust_register` (`--lta`) | an `--lta` name of 1,024 bytes or more: the program aborts (`*** buffer overflow detected ***`, status 134) after printing its results, without writing the transform | a (crash) | none | the name used by default; `reproduce` aborts the same way, noted | – |
+| FS-1072 | FreeSurfer 8.2.0 `mri_robust_register` (`--ixform`) | a non-linear initial transform (a morph) is read as a linear transform array: memory it does not own | a (memory) | none | an error in both modes, noted | – |
+| FS-1073 | FreeSurfer 8.2.0 `Transformation::setParameters(vnl_vector<double>)` (`--doubleprec --iscale`) | FS-1063's case where glibc's allocator hands the freed block straight back (rigid 3-D, affine 2-D and 3-D, isotropic scale 2-D, translation 2-D): each step's transformation has its first two parameters replaced by the allocator's words (a tiny positive number and 0: the step's x and y translations lost) | a (memory: the allocator's words) | none (`--doubleprec` is not the default) | the step's solution by default; `reproduce` FreeSurfer's values (any tiny positive number: it vanishes in every sum), noted | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -4727,6 +4731,27 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
 - **larmorx:** both an error and status 1 in both modes, noted. Found 2026-11-22 (queue 3.2-03, its
   second part).
 - **D13 / gap:** none (a crash and memory contents are not reproduced).
+
+### FS-1070 to FS-1073 FreeSurfer 8.2.0's `mri_robust_register` — (a, crash; a, crash; a, memory; a, memory)
+- **What:** (FS-1070) an option that takes an argument given last makes the program abort (a name) or
+  crash (a number). (FS-1071) an `--lta` name of 1,024 bytes or more makes it abort after its results are
+  printed, before the transform is written. (FS-1072) `--ixform` of a morph reads the morph as a linear
+  transform array. (FS-1073) in double precision with an intensity scale (`--doubleprec --iscale`),
+  FS-1063's memory contents are, for five of the models, the solution with its first two parameters
+  replaced by the memory allocator's words (glibc 2.35: a tiny positive number and 0): the step's x and y
+  translations are lost and the registration goes elsewhere. The details:
+  `docs/findings/freesurfer-robust-register.md` §2 (closed to FreeSurfer's clean-room implementers).
+- **Evidence:** verified (the probe `validation/probes/fs-robust-register`, `check.py`: the official
+  program on 900 seeded and hand-made cases of seeds 1, 7 and 13; FS-1070 and FS-1071 measured, FS-1071
+  with a 1,211-byte name; FS-1073: every double-precision intensity-scaled case of the five models
+  reproduced, 33 cases); FS-1072 from the source.
+- **fMRIPrep:** none (its call, `--satit --iscale`, reaches none). **FreeSurfer:** none on recon-all's
+  default paths (it runs the program only for `-all-info`).
+- **larmorx:** FS-1070 an error naming the option, status 1 (`reproduce` aborts as FreeSurfer where it
+  aborts); FS-1071 the name used (`reproduce` aborts); FS-1072 an error in both modes; FS-1073 the step's
+  solution (`reproduce` FreeSurfer's values). Found 2026-11-22 (queue 3.2-13).
+- **D13 / gap:** FS-1070's segmentation faults and FS-1072 are not reproduced (a crash, memory); FS-1063's
+  other models stay as decided (the solution in both modes).
 
 ### FS-809 to FS-812 zlib 1.2.11 (Ubuntu 22.04's build): deflatePrime with bytes waiting, the stored window's hash count, the dictionary past the window — (a, memory and out of bounds; rules A and B)
 - **What:** `deflatePrime` called while compressed bytes wait behind some already handed out writes its bits at the

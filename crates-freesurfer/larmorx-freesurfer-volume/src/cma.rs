@@ -1524,6 +1524,28 @@ fn is_c_space(b: u8) -> bool {
 /// digit, an optional sign, digits), as far as they go; then `strtod` of that text, which must take
 /// all of it and must not overflow (an infinity fails). `None` when it fails.
 fn stream_double(word: &[u8]) -> Option<f64> {
+    let v: f64 = float_text(word).parse().ok()?;
+    v.is_finite().then_some(v)
+}
+
+/// `stream >> v` for a `double` `v` (libstdc++'s `num_get`, "C" locale) on a stream holding
+/// `text`: nothing but white space leaves `v` (the sentry fails at the end); otherwise the text
+/// [`stream_double`] collects, as `strtod` reads it: a number sets `v`, one too large `+-DBL_MAX`,
+/// a text that is no number 0 (C++11's rules for a failed extraction).
+pub fn istream_double(text: &[u8], v: &mut f64) {
+    if text.iter().all(|&c| is_c_space(c)) {
+        return;
+    }
+    *v = match float_text(text).parse::<f64>() {
+        Ok(x) if x.is_finite() => x,
+        Ok(x) => f64::MAX.copysign(x),
+        Err(_) => 0.0,
+    };
+}
+
+/// The characters `num_get::_M_extract_float` collects for a `double` from `word` (after white
+/// space).
+fn float_text(word: &[u8]) -> String {
     let mut i = 0;
     while i < word.len() && is_c_space(word[i]) {
         i += 1;
@@ -1570,8 +1592,7 @@ fn stream_double(word: &[u8]) -> Option<f64> {
     }
     // what strtod takes whole: the text above is a number when it has a digit before any
     // exponent and, after an `e`, at least one digit
-    let v: f64 = x.parse().ok()?;
-    v.is_finite().then_some(v)
+    x
 }
 
 /// `ComputeBrainVolumeStats(subject, subjdir)`, the caller's (it reads the subject's volumes and

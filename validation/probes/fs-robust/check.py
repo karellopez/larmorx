@@ -153,6 +153,9 @@ SKIP = (
     # least-squares location without a design matrix, fewer rows than parameters (memory
     # contents or a crash in FreeSurfer)
     "FS-1063",
+    # FS-1063's allocator reuse (relay 44): the parameter there is the allocator's mangled
+    # pointer, an address (the unit probe prints its bits); mri_robust_register's probe compares it
+    "FS-1073",
     "FS-1064",
     "FS-1065",
     "FS-1066",

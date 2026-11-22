@@ -2952,7 +2952,7 @@ defects! {
     FS_516 = "FS-516", "FreeSurfer", true,
         "cropping around an RAS point through an LTA (MRIcropAroundRAS) decides the LTA's direction backwards (it inverts the LTA when the volume is its destination, goes on when the volume is neither end, refuses when it is both) and compares the volume's validity flag, which no volume constructor sets";
     FS_517 = "FS-517", "FreeSurfer", true,
-        "cropping around a voxel (MRIcropAroundCRS) whose last voxel lies beyond the int range (a centre too far away, or one that is not a number with a field of view of 0) loops through the whole int range and then writes outside the cropped volume, which crashes the program";
+        "cropping around a voxel (MRIcropAroundCRS) whose last voxel lies beyond the int range or at its maximum (a centre too far away, or one that is not a number) overflows the crop's limits or its loop counter: as the official build compiles it, the crop crashes the program or returns a volume holding none of the volume's voxels, depending on the axis";
     FS_518 = "FS-518", "NrrdIO", true,
         "a NRRD space named 3D-left-handed or 3Drighthanded is not recognised (the read fails), 3D-right-handed-time is read as 3D-left-handed and 3D-left-handed-time as 3D-right-handed-time (two names of its table run together)";
     FS_519 = "FS-519", "NrrdIO", true,
@@ -3205,6 +3205,14 @@ defects! {
         "the half-way maps of a robust registration that ran no iteration (the finest level skipped with no coarser one) are read from empty matrices: a crash or memory contents; an error in both modes";
     FS_1069 = "FS-1069", "FreeSurfer", true,
         "a robust registration step of two images of different sizes (intensity scaling only, without symmetry, of images of different extents) reads past the smaller one: a crash or memory contents; an error in both modes";
+    FS_1070 = "FS-1070", "FreeSurfer", true,
+        "mri_robust_register given an option that takes an argument as its last argument crashes: it aborts (an uncaught std::logic_error, status 134) for a name and dies of a segmentation fault for a number; by default an error naming the option, status 1";
+    FS_1071 = "FS-1071", "FreeSurfer", true,
+        "mri_robust_register given an --lta name of 1,024 bytes or more aborts (*** buffer overflow detected ***, status 134) after printing its results, without writing the transform; by default the name is used";
+    FS_1073 = "FS-1073", "FreeSurfer", true,
+        "the robust registration in double precision with an intensity scale (`--doubleprec --iscale`) of a rigid 3-D, affine 2-D or 3-D, isotropic-scale 2-D or translation 2-D model builds each step's transformation with its first two parameters replaced by memory contents (with glibc's allocator: a tiny positive number and 0: the step's translation along x and y lost); by default the step's solution";
+    FS_1072 = "FS-1072", "FreeSurfer", true,
+        "mri_robust_register given a non-linear initial transform (--ixform of a morph) reads the morph as a linear transform array: memory it does not own; an error in both modes";
 }
 
 /// The register entry with ID `id`.

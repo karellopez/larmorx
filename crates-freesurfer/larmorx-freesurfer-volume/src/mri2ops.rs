@@ -26,9 +26,11 @@
 //!   it is both), comparing the volume's `valid` flag, which no volume constructor sets. By default
 //!   the LTA is inverted when the volume is its source only, refused when it is neither end, and
 //!   the volume's geometry is compared as valid; `reproduce` FreeSurfer's decision on the flag.
-//! - **FS-517** (hang): `MRIcropAroundCRS` whose last voxel lies beyond `int` (a centre that is not
-//!   a number, or too far, with a FoV that overflows): FreeSurfer's loop never ends; an error in
-//!   both modes.
+//! - **FS-517** (crash): `MRIcropAroundCRS` whose last voxel lies beyond `int` or at its maximum
+//!   (a centre that is not a number, or too far): FreeSurfer's limits or its loop counter
+//!   overflow `int`; as the official build compiles it, the crop crashes or holds none of the
+//!   volume's voxels, by axis. An error in both modes, after the lines FreeSurfer prints first
+//!   (the limits; for a last voxel of exactly `int`'s maximum also the new volume's centre).
 //! - **FS-802** (rule A): `MRIfindBrightNonWM` takes each T1 value as the low byte of its
 //!   truncation to an `int` (300 is 44, not bright). By default the value clamped to 0..255 (NaN
 //!   0); `reproduce` the low byte.
@@ -628,6 +630,28 @@ pub fn mri_crop_to_fov(
     Ok(region)
 }
 
+/// FS-517: `MRIcropAroundCRS`'s end where a limit lies beyond `int`, in both modes.
+fn crs_beyond_int(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    beyond: Option<(i32, i64)>,
+) -> Result<Option<Mri>, Fatal> {
+    let (a, last) = beyond.unwrap_or_default();
+    g.notices.add(
+        &FS_517,
+        "MRIcropAroundCRS: a limit beyond int (FreeSurfer's crop overflows int: as its build compiles it, the crop crashes or holds none of the volume's voxels)",
+    );
+    log::error_exit(
+        g,
+        err,
+        ERROR_BADPARM,
+        &format!(
+            "MRIcropAroundCRS: the limits {a} to {last} lie beyond int (FreeSurfer crashes here or returns a crop without the volume's voxels)\n"
+        ),
+    )?;
+    Ok(None)
+}
+
 /// `MRIcropAroundCRS(vol, crsCenter, crsFoV, iKeep)`: a volume of `crsFoV` voxels around
 /// `crsCenter` (its first voxel `round(centre - floor((FoV - 1) / 2))`): `MRIextractRegion` when the
 /// whole box lies in the volume, else a new volume of the volume's type, frames, header, pulse
@@ -650,24 +674,15 @@ pub fn mri_crop_around_crs(
     };
     let ((c0, c1), (r0, r1), (s0, s1)) = (lim(0), lim(1), lim(2));
     let (w, h, d) = (vol.vg.width, vol.vg.height, vol.vg.depth);
-    for (k, a) in [c0, r0, s0].into_iter().enumerate() {
-        let last = i64::from(a) + i64::from(fov[k]) - 1;
-        if last < i64::from(i32::MIN) || last > i64::from(i32::MAX) {
-            g.notices.add(
-                &FS_517,
-                "MRIcropAroundCRS: a limit beyond int (FreeSurfer's loop over the crop never ends)",
-            );
-            log::error_exit(
-                g,
-                err,
-                ERROR_BADPARM,
-                &format!(
-                    "MRIcropAroundCRS: the limits {a} to {last} lie beyond int (FreeSurfer never ends here)\n"
-                ),
-            )?;
-            return Ok(None);
-        }
-    }
+    // FS-517: a last voxel past int's range overflows FreeSurfer's limit (`int`); one of exactly
+    // int's maximum overflows its loop counter after the last voxel
+    let lasts = [c0, r0, s0]
+        .into_iter()
+        .enumerate()
+        .map(|(k, a)| (a, i64::from(a) + i64::from(fov[k]) - 1));
+    let over = |&(_, last): &(i32, i64)| last < i64::from(i32::MIN) || last > i64::from(i32::MAX);
+    let overflow = lasts.clone().find(over);
+    let beyond = overflow.or_else(|| lasts.clone().find(|&(_, last)| last == i64::from(i32::MAX)));
     let _ = out.write_all(b"MRIcropAroundCRS()\n");
     let _ = writeln!(out, "vol size {w} {h} {d}");
     let _ = writeln!(
@@ -685,6 +700,9 @@ pub fn mri_crop_around_crs(
             let _ = write!(out, "{k} ");
         }
         let _ = out.write_all(b"\n");
+    }
+    if overflow.is_some() {
+        return crs_beyond_int(g, err, beyond);
     }
     let mut crop = if c0 >= 0 && c1 < w && r0 >= 0 && r1 < h && s0 >= 0 && s1 < d {
         let _ = out.write_all(b"  using MRIextractRegion()\n");
@@ -726,6 +744,9 @@ pub fn mri_crop_around_crs(
             pg(f64::from(m.vg.c_a)),
             pg(f64::from(m.vg.c_s))
         );
+        if beyond.is_some() {
+            return crs_beyond_int(g, err, beyond);
+        }
         let mut cc = -1i32;
         let mut c = c0;
         while c <= c1 {

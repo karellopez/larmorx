@@ -23,7 +23,10 @@
 //! - **FS-507** (rule A): `LTAchangeType` from `REGISTER_DAT` to `LINEAR_RAS_TO_RAS` converts the
 //!   first transform once per transform; by default each transform once.
 //! - **FS-508** (memory): a change to or from `FSLREG_TYPE` whose FSL conversion gives no matrix:
-//!   FreeSurfer frees the transform's matrix and goes on using it; an error in both modes.
+//!   FreeSurfer frees the transform's matrix and goes on using it: the later transforms are
+//!   converted and the type set, and the program ends at FreeSurfer's first read of the freed
+//!   matrix (the diagnostic print of the first transform's, or the inverses' fill at that
+//!   transform, after the earlier transforms' fills), in both modes.
 
 use std::io::Write;
 
@@ -130,7 +133,22 @@ pub fn lta_fill_inverse(
     err: &mut dyn Write,
     lta: &mut Lta,
 ) -> Result<(), Fatal> {
+    fill_inverse(g, out, err, lta, &[])
+}
+
+/// [`lta_fill_inverse`] where the transforms marked in `freed` hold a matrix FreeSurfer freed
+/// (FS-508): the program ends at the first of them, after the earlier transforms' fills.
+fn fill_inverse(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    lta: &mut Lta,
+    freed: &[bool],
+) -> Result<(), Fatal> {
     for i in 0..lta.num_xforms.max(0) as usize {
+        if freed.get(i) == Some(&true) {
+            return freed_read(g, err);
+        }
         let xf = &lta.xforms[i];
         let inv = &mut lta.inv_xforms[i];
         let failed = match inv.m_l.as_mut() {
@@ -490,29 +508,36 @@ fn header_of(
 }
 
 /// `MatrixCopy(new, m_L)` of a computed matrix into a transform's. FS-508: no computed matrix
-/// (FreeSurfer's `MatrixCopy(NULL, m_L)` frees the transform's matrix, which it goes on using): an
-/// error in both modes.
+/// (FreeSurfer's `MatrixCopy(NULL, m_L)` frees the transform's matrix, which the transform keeps):
+/// `true`, the transform marked freed; nothing changes until FreeSurfer's first read of it
+/// ([`freed_read`]).
 fn copy_into(
     g: &mut Globals,
     out: &mut dyn Write,
     err: &mut dyn Write,
     new: Option<&Matrix>,
     m: &mut Option<Matrix>,
-) -> Result<(), Fatal> {
+) -> Result<bool, Fatal> {
     if new.is_none() && m.is_some() {
-        g.notices.add(
-            &FS_508,
-            "LTAchangeType: FSL's conversion gave no matrix (FreeSurfer frees the transform's matrix and goes on using it)",
-        );
-        log::error_exit(
-            g,
-            err,
-            ERROR_BADPARM,
-            "LTAchangeType: the FSL conversion gave no matrix (FreeSurfer frees the transform's matrix and goes on using it here)\n",
-        )?;
+        return Ok(true);
     }
     matrix_copy(g, out, err, new, m.as_mut())?;
-    Ok(())
+    Ok(false)
+}
+
+/// FS-508: FreeSurfer's first read of a matrix its FSL conversion freed (the diagnostic print or
+/// the inverses' fill): the program ends there, in both modes.
+fn freed_read(g: &mut Globals, err: &mut dyn Write) -> Result<(), Fatal> {
+    g.notices.add(
+        &FS_508,
+        "LTAchangeType: FSL's conversion gave no matrix (FreeSurfer frees the transform's matrix and goes on using it)",
+    );
+    log::error_exit(
+        g,
+        err,
+        ERROR_BADPARM,
+        "LTAchangeType: the FSL conversion gave no matrix (FreeSurfer frees the transform's matrix and goes on using it here)\n",
+    )
 }
 
 /// With `Gdiag_no > 0`: `transformed matrix:` and the first transform's matrix on standard output
@@ -522,6 +547,7 @@ fn diag_print(
     out: &mut dyn Write,
     err: &mut dyn Write,
     lta: &Lta,
+    freed: &[bool],
 ) -> Result<(), Fatal> {
     if g.gdiag_no > 0 {
         let _ = out.write_all(b"transformed matrix:\n");
@@ -533,6 +559,9 @@ fn diag_print(
                 "a transform array without transforms",
             );
         };
+        if freed.first() == Some(&true) {
+            return freed_read(g, err);
+        }
         let mut buf: Vec<u8> = Vec::new();
         matrix_print(g, Some(&mut buf), out, err, lt.m_l.as_ref(), 5);
         let _ = out.write_all(&buf);
@@ -562,6 +591,8 @@ pub fn lta_change_type(
         return Ok(());
     }
     let n = lta.num_xforms.max(0) as usize;
+    // FS-508: the transforms whose matrix an FSL conversion freed (FreeSurfer keeps using it)
+    let mut freed = vec![false; n];
     for lt in &lta.xforms[..n] {
         if lt.src.valid == 0 {
             log::error_exit(
@@ -613,10 +644,10 @@ pub fn lta_change_type(
                 lta.ltype = REGISTER_DAT;
             }
             FSLREG_TYPE => {
-                for lt in &mut lta.xforms[..n] {
+                for (i, lt) in lta.xforms[..n].iter_mut().enumerate() {
                     let mreg = tkreg_mtx(g, out, err, &lt.dst, &lt.src, lt.m_l.as_ref())?;
                     let mfsl = tkreg2fsl(g, out, err, env, &lt.dst, &lt.src, Some(&mreg))?;
-                    copy_into(g, out, err, mfsl.as_ref(), &mut lt.m_l)?;
+                    freed[i] = copy_into(g, out, err, mfsl.as_ref(), &mut lt.m_l)?;
                 }
                 lta.ltype = FSLREG_TYPE;
             }
@@ -706,15 +737,15 @@ pub fn lta_change_type(
                     lta_change_type(g, out, err, env, lta, LINEAR_VOX_TO_VOX)?;
                 }
                 FSLREG_TYPE => {
-                    for lt in &mut lta.xforms[..n] {
+                    for (i, lt) in lta.xforms[..n].iter_mut().enumerate() {
                         let mfsl = tkreg2fsl(g, out, err, env, &lt.dst, &lt.src, lt.m_l.as_ref())?;
-                        copy_into(g, out, err, mfsl.as_ref(), &mut lt.m_l)?;
+                        freed[i] = copy_into(g, out, err, mfsl.as_ref(), &mut lt.m_l)?;
                     }
                     lta.ltype = FSLREG_TYPE;
                 }
                 _ => unsupported(g, err, " unsupported: you are requesting REGISTER_DAT")?,
             }
-            diag_print(g, out, err, lta)?;
+            diag_print(g, out, err, lta, &freed)?;
         }
         LINEAR_CORONAL_RAS_TO_CORONAL_RAS => {
             match ltatype {
@@ -745,7 +776,7 @@ pub fn lta_change_type(
                     " unsupported: you are requesting COR_RAS_TO_COR_RAS",
                 )?,
             }
-            diag_print(g, out, err, lta)?;
+            diag_print(g, out, err, lta, &freed)?;
         }
         FSLREG_TYPE => {
             match ltatype {
@@ -754,19 +785,19 @@ pub fn lta_change_type(
                     lta_change_type(g, out, err, env, lta, ltatype)?;
                 }
                 REGISTER_DAT => {
-                    for lt in &mut lta.xforms[..n] {
+                    for (i, lt) in lta.xforms[..n].iter_mut().enumerate() {
                         let mreg = fsl2tkreg(g, out, err, env, &lt.dst, &lt.src, lt.m_l.as_ref())?;
-                        copy_into(g, out, err, mreg.as_ref(), &mut lt.m_l)?;
+                        freed[i] = copy_into(g, out, err, mreg.as_ref(), &mut lt.m_l)?;
                     }
                     lta.ltype = REGISTER_DAT;
                 }
                 _ => unsupported(g, err, " unsupported: you are requesting FSLREG_TYPE")?,
             }
-            diag_print(g, out, err, lta)?;
+            diag_print(g, out, err, lta, &freed)?;
         }
         _ => {}
     }
-    lta_fill_inverse(g, out, err, lta)
+    fill_inverse(g, out, err, lta, &freed)
 }
 
 /// `LTAmriIsSource(lta, mri)`: 1 when the volume's geometry (`getVolGeom`: marked valid) equals

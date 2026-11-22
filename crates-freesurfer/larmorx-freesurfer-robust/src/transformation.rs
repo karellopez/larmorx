@@ -181,8 +181,8 @@ impl Transformation {
                     v.len()
                 ),
             );
-            for i in 0..dof {
-                self.parameters[i] = v[i].wide();
+            for (p, x) in self.parameters.iter_mut().zip(v) {
+                *p = x.wide();
             }
             if g.notices.reproduce() {
                 // tcache's mangled next pointer (an address shifted right by 12, below 2^47: a

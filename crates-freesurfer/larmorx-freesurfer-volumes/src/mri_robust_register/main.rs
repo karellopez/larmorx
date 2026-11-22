@@ -180,9 +180,9 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     if p.affine || p.isoscale {
         let _ = write!(r.out, " Decompose into Rot * Shear * Scale : \n\n");
         let mut a = VnlMatrix::zeros(3, 3);
-        for i in 0..3 {
-            for j in 0..3 {
-                *a.at_mut(i, j) = fmv2v[i][j];
+        for (i, row) in fmv2v.iter().take(3).enumerate() {
+            for (j, &v) in row.iter().take(3).enumerate() {
+                *a.at_mut(i, j) = v;
             }
         }
         let (rot, shear, scale) = polar2_decomposition(g, r.err, &a)?;

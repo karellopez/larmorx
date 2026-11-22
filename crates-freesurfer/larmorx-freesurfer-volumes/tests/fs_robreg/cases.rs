@@ -273,7 +273,7 @@ fn pair(g: &mut Gen, n: i32, ty: i32) -> (Img, Img) {
 /// checks, unknown options and costs, the options' missing arguments, the files that do not
 /// read) and one registration per output option.
 pub fn prelude() -> Vec<String> {
-    let mut g = Gen::new(0x7065_6b);
+    let mut g = Gen::new(0x0070_656b);
     let (a, b) = pair(&mut g, 16, MRI_UCHAR);
     let mov = write_as(&mut image(&mut g, &a), "mov.mgz");
     let dst = write_as(&mut image(&mut g, &b), "dst.mgz");

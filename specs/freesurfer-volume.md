@@ -2879,14 +2879,23 @@ with `USF` -1 only.)
   or neither, arrays of types 0 and 1); other values take `MRImaskAndUpsample` (§41, part 9) and are not yet ready.
 - **`MRIapplySpmWarp(vol, srclta, warp, LRRev, interp, out)`**: `interp` other than 0 (nearest) and 1 (trilinear):
   `ERROR: MRIapplySpmWarp():  sample type = <n>, must be 0 or 1` and `NULL`. `out`: given, or new (`float`, the warp's
-  grid and header, the volume's frames and pulse parameters). The 1-based vox2ras of SPM's input space: with `srclta`
-  (made `LINEAR_VOX_TO_VOX` first, `MRIapplySpmWarp(): changing Source LTA type to vox2vox`) the geometry at its other end
-  from the volume (`VGgetVoxelToRasXform(.., 1)`: direction cosines times sizes, translation `c - M (n/2 + 1)` in
-  `float`) and its matrix (inverted when the volume is its source: `MRIapplySpmWarp(): inverting Source LTA`), else the
-  volume's own (section 13, base 1). For each warp voxel 1 to extent - 2 (columns outermost): its frames 0 to 2 are an
-  RAS point; its voxel there (`MatrixMultiplyD` by the inverse vox2ras), minus 1 in `float`, reversed left to right with
-  `LRRev` (`ncols - 1 - c`), through the LTA's matrix (`MatrixMultiplyD`); outside the volume (a coordinate below 0 or
-  not below the extent) skipped; else every frame sampled (`MRIsampleVolumeFrameType`) into `out`. A sample that fails
+  grid and header, the volume's frames and pulse parameters). SPM's input space (the space of the warp's RAS points),
+  its 1-based vox2ras, its width `ncols` and the map from its voxels to the volume's: with `srclta` (made
+  `LINEAR_VOX_TO_VOX` first by §54's change, `MRIapplySpmWarp(): changing Source LTA type to vox2vox`, which the
+  caller's array keeps; beyond that change nothing of it is changed, its inverse transforms neither read nor filled),
+  SPM's input space is the
+  array's first transform's end that is not the volume: when the volume is its source (`LTAmriIsSource`, §54), its
+  destination, and the map is the inverse of its matrix (`MatrixInverse` of the forward matrix,
+  `MRIapplySpmWarp(): inverting Source LTA`); otherwise (the volume its destination, or neither end) its source, and the
+  map is its matrix as it is. That geometry's vox2ras is `VGgetVoxelToRasXform(.., 1)` (direction cosines times sizes,
+  translation `c - M (n/2 + 1)` in `float`) and `ncols` its width. Without `srclta`: the volume's own vox2ras (section
+  13, base 1), the volume's width and no map. For each warp voxel 1 to extent - 2 (columns outermost): its frames 0 to 2
+  are an RAS point; its voxel there (`MatrixMultiplyD` by the inverse vox2ras), minus 1 in `float`, reversed left to
+  right with `LRRev` (`ncols - 1 - c`), through the map (`MatrixMultiplyD`); outside the volume (a coordinate below 0 or
+  not below the extent) skipped; else every frame sampled (`MRIsampleVolumeFrameType`) into `out` (**(observed)**:
+  `vrules16`, warp points placed through the array's other end land at their voxels of the volume, for the volume the
+  array's source and its destination, arrays of types 0 and 1, both reversals and both sample types; the same points
+  read in the volume's own space, without an array, land outside). A sample that fails
   before any succeeded: FS-511. A warp of fewer than three frames is read past its frames, and a given `out` of another
   extent or of fewer frames written outside, as the voxel functions read and write outside a volume (fs.mri §5, FS-52,
   FS-53); a warp of an extent below 3 in any direction has no voxel to take, and `out` keeps its voxels

@@ -54,6 +54,18 @@ def summary_rows(path: Path | None) -> list[dict]:
     ]
 
 
+def with_times(rows: list[dict], path: Path | None) -> list[dict]:
+    """``rows`` with the official seconds of ``path``'s rows whose official run was not served."""
+    if path is None:
+        return rows
+    d = json.loads(path.read_text(encoding="utf-8"))
+    t = {r["head"]: r["seconds"]["official"] for r in d["rows"] if not r.get("served")}
+    for r in rows:
+        if r["head"] in t:
+            r["seconds"] = r["seconds"] | {"official": t[r["head"]]}
+    return rows
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--probe", type=Path, nargs="+", required=True)
@@ -76,6 +88,11 @@ def main(argv: list[str] | None = None) -> int:
         "--robent",
         type=Path,
         help="real.py --extra '--cost ROBENT ...''s summary (relay 45: the entropy images)",
+    )
+    ap.add_argument(
+        "--robent-times",
+        type=Path,
+        help="an earlier --robent summary whose official runs were not served (their times)",
     )
     ap.add_argument("--golden", required=True)
     ap.add_argument("--golden-fix", required=True)
@@ -147,7 +164,7 @@ def main(argv: list[str] | None = None) -> int:
         ],
         "golden_sha256": {"official_and_reproduce": a.golden, "fix": a.golden_fix},
         "decided_complex": summary_rows(a.preload),
-        "entropy_images": summary_rows(a.robent),
+        "entropy_images": with_times(summary_rows(a.robent), a.robent_times),
         "memory": memory,
     }
     a.out.mkdir(parents=True, exist_ok=True)

@@ -115,6 +115,8 @@ for _ in range(5000):
     x, y, z = (r.randrange(0, 64) for _ in range(3))
     pts.append(f"1 7 {x} {y} {z} 0 {zero}")
 p7.append(f"@60 nbhd {W(64, 0, 9)} 0 {len(pts)} {' '.join(pts)}")
+
+
 # part 8 (relay 14): the partial-volume count, the frame normalisation, the sort, the vote, the root
 # mean square, the non-maximum suppression, the square root, the frame powers and the half cosine
 def Wf(n: int, t: int, fill: object, frames: int) -> str:

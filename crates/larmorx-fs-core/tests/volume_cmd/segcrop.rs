@@ -38,16 +38,19 @@ fn getkeep(l: &mut Line) -> Vec<i32> {
 pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
     match c {
         // -- §55
-        "a2v" => {
-            let a = getwp(p, l)?;
-            let m = l.getm(p)?;
-            let t = getw(p, l)?;
-            let ft = l.getd();
-            let ct = l.getct(false);
-            let r = p.mri_aseg2vol(&a, m.as_ref(), &t, ft, ct.as_ref())?;
-            p.flush();
-            putv(l, r.as_ref().map(|x| &x.0));
-            putv(l, r.as_ref().map(|x| &x.1));
+        // `a2vtwice` (not the probe's: the defect tests' FS-267): two `a2v` calls in one process
+        "a2v" | "a2vtwice" => {
+            for _ in 0..if c == "a2v" { 1 } else { 2 } {
+                let a = getwp(p, l)?;
+                let m = l.getm(p)?;
+                let t = getw(p, l)?;
+                let ft = l.getd();
+                let ct = l.getct(false);
+                let r = p.mri_aseg2vol(&a, m.as_ref(), &t, ft, ct.as_ref())?;
+                p.flush();
+                putv(l, r.as_ref().map(|x| &x.0));
+                putv(l, r.as_ref().map(|x| &x.1));
+            }
         }
         "a2vmu" => {
             let a = getwp(p, l)?;

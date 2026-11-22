@@ -14,8 +14,9 @@
   by `synthstrip.mgz` and `-bb 3` on `orig.mgz` into NIfTI; both programs, every file compared.
 - `record.py`: `docs/validation/freesurfer-mri-mask.{json,md}` from the replays of the 24 recorded
   steps (`python -m larmorx_validation freesurfer-replay run <run> mri_mask mri_mask:2 mri_mask:3
-  --command '<port> --upstream-defects <mode> freesurfer'`, one JSON per run and mode), `prog.py`'s,
-  `real.py`'s and the memory test's results (from a clean commit).
+  --command '<port> --upstream-defects <mode> freesurfer'` for the v8 runs, `... <run> mri_mask ...`
+  for the classic runs, which record one step; one JSON per run and mode), `prog.py`'s, `real.py`'s
+  and the memory test's results (from a clean commit).
 
     source scripts/orchestration/env.sh
     scripts/orchestration/boxed.sh 20 python -P validation/probes/fs-mask/prog.py --seed 1 --json p1.json
@@ -24,4 +25,8 @@
 
 ## Results (relay 52 of track D, 2026-11-22)
 
-See `docs/validation/freesurfer-mri-mask.md` (made from a clean commit).
+From the clean cdd2cada (`docs/validation/freesurfer-mri-mask.md`): the 24 recorded steps (12 runs)
+reproduced in both modes; the open probe's seeds 1 and 2 (193 cases each): 192 identical in
+`reproduce`, 1 counted (FS-309), 0 different, `fix` identical or explained by a notice; `real.py` 12
+calls identical in both modes; golden `f3af007d...` (the official value) and `5606171d...` (the
+default); memory 70 vs 72 MiB and 166 vs 168 MiB.

@@ -2825,7 +2825,8 @@ with `USF` -1 only.)
   MRIaeg2vol: if passing a ct it must have tissue type info` on standard output and `NULL` (**(observed)**: `vrules15`).
   The map from segmentation voxels to the template's: `Va2v = (inv(Kv) tkR) Ka` (`K` the tkregister vox2ras of each,
   `float` products; `tkR` from the template to the segmentation, as tkregister2 with the segmentation as target); its
-  inverse `Vv2a` (none when `Va2v` is singular). No `tkR` ends the program in the first product (`m2 is null`,
+  inverse `Vv2a` (none when `Va2v` is singular); all of them before the diagnostic line `ASeg2Vol: Building LUT` below,
+  so a product that ends the program prints none of those lines first. No `tkR` ends the program in the first product (`m2 is null`,
   `specs/freesurfer-maths.md` §8.1), a template whose `K` has no inverse (a voxel size of 0) in the same product (`m1 is
   null`), and a singular `Va2v` in the reverse map's first product below (`m1 is null`), reached when an output voxel's
   hit count is 0 (**(observed)**: `vrules15`). Every segmentation voxel (slices outermost, then rows, then columns; its
@@ -2937,12 +2938,13 @@ read and written as the voxel functions do outside a volume (fs.mri §5, FS-52, 
 - **`MRIsegFrameAvg(seg, segid, mri, favg)`**: each frame's mean over the segment (columns outermost, then rows, then
   slices; `sum + v` in `double`, the running sum the first operand, then divided by the count); all 0 for an empty
   segment; returns the count (**(observed)**: `vsegs`, `vrules15`).
-- **`MRIindexNo(in, out)`**: frame 0 holds each voxel's index `s h w + r w + c` (`out` new: `float`, the input's header)
-  (**(observed)**: `vsegs`).
+- **`MRIindexNo(in, out)`**: frame 0 holds each voxel's index `s h w + r w + c` (`out` new: `float`, one frame, the
+  input's header) (**(observed)**: `vsegs`).
 - **`MRIzconcat(mri1, mri2, nskip, out)`**: `mri1`'s slices then `mri2`'s from `nskip`; `out` new (`mri1`'s width, height,
   type, frames, header, `d1 + d2 - nskip` slices) or given. Messages and `NULL` (standard output): `ERROR: MRIzconcat():
   nskip=<n> >= nslices in mri2 <d>` (before anything), then `mri1 and mri2 mismatch width <a> <b>`, `... height`, `out
-  nframes mismatch`, `out width mismatch`, `out height mismatch`, `out depth mismatch`. `out` takes `mri1`'s pulse
+  nframes mismatch`, `out width mismatch`, `out height mismatch`, `out depth mismatch`, each followed by two numbers
+  (`%d %d`): `mri1`'s value (for the depth the slice count `d1 + d2 - nskip`) and then `mri2`'s or `out`'s. `out` takes `mri1`'s pulse
   parameters and vox2ras (`MRIsetVox2RASFromMatrix` of `mri1`'s scanner vox2ras, its messages included). FreeSurfer
   copies as many rows as there are columns (FS-512; by default every row): rows past the width keep their voxels (0 in
   a new `out`), and a width above the height reads and writes rows the volumes do not have. A negative `nskip` reads
@@ -2963,14 +2965,16 @@ read and written as the voxel functions do outside a volume (fs.mri §5, FS-52, 
   `invol` set to `lhVal` where `entowm` is 3006 (`Level` 1 or 3) or 3201 (7030 with `ACJ`; `Level` 2 or 3), to `rhVal`
   for 4006 and 4201 (7031); `MRIfixEntoWM(): nchanged = <n>`; returns the count (a NaN label is the `int` minimum and
   changes nothing; **(observed)**: `vsegs`, `vrules15`).
-- **`LabelAmygalaCortalJunction(seg, topo, out)`**: cortex voxels (3, 42) within `topo` steps of an inner amygdala voxel
+- **`LabelAmygalaCortalJunction(seg, topo, out)`**: cortex voxels (3, 42) among the 26 around an inner amygdala voxel
+  (offsets -1 to 1 on each axis) within `topo` steps (`|dc| + |dr| + |ds|`) of it
   (18 left, 54 right) get 7030 (left) or 7031 (right) in frame 0 of `out` (new: `int`, the segmentation's header and
   pulse parameters, and a colour table of 7,032 places from `CTABalloc` (its random colours, `specs/freesurfer-io.md`;
   the probe seeds 1 first) with all but 7030 and 7031 emptied; those two named `Left-Amygdala-Cortical-Junction` and
   `Right-Amygdala-Cortical-Junction`, red 255 and 254, green 85, blue 255, their `float` colours left as drawn).
   `LabelAmygalaCortalJunction((): nhits = <n>` (every write counted, a voxel written again counted again). A given
   `out` keeps its other voxels and its colour table. FS-514: with one thread the later write stays, in the order of the
-  amygdala voxels (columns outermost) and of their offsets (**(observed)**: `vsegs`; `vrules15`, a cortex voxel between
+  amygdala voxels (columns outermost, then rows, slices innermost) and of their offsets (the column offset outermost,
+  then the row's, the slice's innermost, each from -1) (**(observed)**: `vsegs`; `vrules15`, a cortex voxel between
   a left and a right amygdala voxel ends as 7031).
 
 ## 57. Crops (3.1-37)

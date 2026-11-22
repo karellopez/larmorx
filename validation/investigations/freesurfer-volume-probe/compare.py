@@ -4022,6 +4022,168 @@ class Gen13(Gen12):
         return [Batch("vcrops", "vcrops", L)]
 
 
+# ---- 4 x 4 arithmetic for the fixed cases that place points (plain Python, double) --------------
+
+
+def mm4(a: list[list[float]], b: list[list[float]]) -> list[list[float]]:
+    return [[sum(a[i][k] * b[k][j] for k in range(4)) for j in range(4)] for i in range(4)]
+
+
+def mv4(a: list[list[float]], v: list[float]) -> list[float]:
+    return [sum(a[i][k] * v[k] for k in range(4)) for i in range(4)]
+
+
+def inv4(a: list[list[float]]) -> list[list[float]]:
+    """Gauss-Jordan with partial pivoting (the fixed cases' matrices are well conditioned)."""
+    m = [list(a[i]) + [1.0 if i == j else 0.0 for j in range(4)] for i in range(4)]
+    for c in range(4):
+        p = max(range(c, 4), key=lambda i: abs(m[i][c]))
+        m[c], m[p] = m[p], m[c]
+        d = m[c][c]
+        m[c] = [x / d for x in m[c]]
+        for i in range(4):
+            if i != c and m[i][c] != 0.0:
+                f = m[i][c]
+                m[i] = [x - f * y for x, y in zip(m[i], m[c], strict=True)]
+    return [row[4:] for row in m]
+
+
+def mtext(a: list[list[float]]) -> str:
+    """M (README.md) of a 4 x 4 matrix, each entry as a float."""
+    return "4 4 " + " ".join(f32(a[i][j]) for i in range(4) for j in range(4))
+
+
+class Gen14(Gen13):
+    """Relay 16: the fixed cases of the fs.volume clean room's items 83 to 88 (§55, §57)."""
+
+    @staticmethod
+    def pv2r(dims, sizes, perm, signs, c, base: int) -> list[list[float]]:
+        """The vox2ras of an axis-aligned geometry (``plain``): direction cosines times sizes,
+        the translation the centre less the matrix times the extent's half plus the base."""
+        m = [[0.0] * 4 for _ in range(4)]
+        for j in range(3):
+            m[perm[j]][j] = signs[j] * sizes[j]
+        m[3][3] = 1.0
+        half = [dims[k] / 2.0 + base for k in range(3)]
+        for i in range(3):
+            m[i][3] = c[i] - sum(m[i][k] * half[k] for k in range(3))
+        return m
+
+    def vrules16(self) -> list[Batch]:
+        """§55 and §57's fixed cases (relay 16): MRIaseg2volMU's template geometry with the
+        segmentation the array's source, its destination, neither end, and a source not marked
+        valid (item 84); MRIapplySpmWarp with the volume the array's source and its destination,
+        arrays of types 0 and 1, both reversals and both sample types, warp points placed to land
+        inside the volume through the array's other end (item 85); MRIcropAroundRAS's fields of
+        view for orientations that are the identity, a transposition or a 3-cycle of the axes,
+        with and without an array (item 86, FS-268); MRIapplySpmWarp's trilinear samples of tensor
+        and RGB volumes, the first sample failing (item 88, FS-511)."""
+        L = []
+        r = random.Random(1616)
+        ident = [[1.0 if i == j else 0.0 for j in range(4)] for i in range(4)]
+        # item 84: the template's geometry: the array's destination when the segmentation equals
+        # its source, else its source
+        ga = self.plain((2, 2, 2), c=(0.5, 0.5, 0.0))
+        gb = self.plain((4, 3, 1), c=(-0.5, 0.0, 0.5))
+        g0 = self.plain((3, 3, 2))
+        for gs in (ga, gb, g0):
+            n = gs[0][0] * gs[0][1] * gs[0][2]
+            seg = self.lab(gs, ([1, 2, 1, 2, 1, 2, 1, 2, 1] * 4)[:n])
+            arr = self.arr1(r, 0, ga, gb, m=mtext(ident))
+            L.append(f"a2vmu {seg} 0 {arr} {f64(0.0)} -1 null")
+        seg = self.lab(ga, [1, 2, 1, 2, 1, 2, 1, 2])
+        fw = self.lt(r, mtext(ident), self.g_of(ga, valid=0), self.g_of(gb))
+        inv = self.lt(r, mtext(ident), self.g_of(gb), self.g_of(ga, valid=0))
+        L.append(f"a2vmu {seg} 0 1 0 {f32(1.0)} {xs('')} {fw} {inv} {f64(0.0)} -1 null")
+        # item 85: SPM's input space is the array's other end: points placed through it land at
+        # chosen voxels of the volume (the volume's own space would put them elsewhere)
+        vd, vs, vp, vsg, vc = (4, 3, 3), (1.5, 1.0, 2.0), (1, 0, 2), (1, -1, 1), (2.0, -1.0, 0.5)
+        od, os_, op, osg, oc = (5, 4, 3), (1.0, 2.0, 1.0), (0, 1, 2), (1, 1, -1), (-1.0, 3.0, 1.0)
+        gv = self.plain(vd, vs, vp, vsg, vc)
+        go = self.plain(od, os_, op, osg, oc)
+        v2r0 = {"v": self.pv2r(vd, vs, vp, vsg, vc, 0), "o": self.pv2r(od, os_, op, osg, oc, 0)}
+        o2r1 = self.pv2r(od, os_, op, osg, oc, 1)
+        nf = 2
+        vol = self.lab(gv, [1.25 * i + 100.0 * (i // 36) for i in range(36 * nf)], t=3, nf=nf)
+        # a vox2vox from the other end to the volume: a swap of the first two axes and a shift
+        o2v = [[0.0, 1.0, 0.0, 0.5], [1.0, 0.0, 0.0, -0.25], [0.0, 0.0, 1.0, 0.5], [0, 0, 0, 1.0]]
+        wd = (5, 4, 3)
+        inner = [(c, rr, 1) for c in range(1, 4) for rr in range(1, 3)]
+        for vol_end in ("src", "dst"):
+            for ty in (0, 1):
+                for lr in (0, 1):
+                    for interp in (0, 1):
+                        # the forward transform's vox2vox, from its source to its destination
+                        vox = inv4(o2v) if vol_end == "src" else o2v
+                        src, dst = ("v", "o") if vol_end == "src" else ("o", "v")
+                        m = vox if ty == 0 else mm4(mm4(v2r0[dst], vox), inv4(v2r0[src]))
+                        ends = (gv, go) if vol_end == "src" else (go, gv)
+                        arr = self.arr1(r, ty, ends[0], ends[1], m=mtext(m))
+                        wv = [0.0] * (wd[0] * wd[1] * wd[2] * 3)
+                        for k, (c, rr, s) in enumerate(inner):
+                            if k == 5:
+                                q = [-0.6, 1.0, 1.0, 1.0]  # outside the volume: skipped
+                            else:
+                                q = [r.uniform(0.2, d - 1.2) for d in vd] + [1.0]
+                            p = mv4(inv4(o2v), q)
+                            if lr:
+                                p[0] = od[0] - 1 - p[0]
+                            ras = mv4(o2r1, [p[0] + 1, p[1] + 1, p[2] + 1, 1.0])
+                            for f in range(3):
+                                wv[f * 60 + s * 20 + rr * 5 + c] = ras[f]
+                        warp = self.lab(self.plain(wd), wv, t=3, nf=3)
+                        d = "new"
+                        if vol_end == "dst" and lr == 1 and interp == 1:
+                            d = self.lab(self.plain(wd), [7.0] * (60 * nf), t=3, nf=nf)
+                        L.append(f"spmw {vol} 0 {arr} {warp} 0 {lr} {interp} {d}")
+        # without an array the volume's own space; the same warp (its points through the other
+        # end land elsewhere or outside)
+        L.append(f"spmw {vol} 0 null {warp} 0 0 1 new")
+        L.append(f"spmw {vol} 0 null {warp} 0 1 0 new")
+        # item 86 (FS-268): the fields of view of MRIcropAroundRAS: (left-right, front-back,
+        # up-down) to the voxel axes along them; identity, transpositions and 3-cycles
+        orients = (
+            ((0, 1, 2), (1, 1, 1)),  # RAS
+            ((0, 2, 1), (-1, -1, 1)),  # LIA
+            ((2, 1, 0), (1, 1, 1)),  # SAR
+            ((1, 0, 2), (1, 1, 1)),  # ARS
+            ((2, 0, 1), (1, 1, 1)),  # SRA
+            ((1, 2, 0), (1, 1, 1)),  # ASR
+            ((1, 2, 0), (-1, -1, -1)),  # PIL
+            ((1, 2, 0), (1, 1, -1)),  # ASL
+            ((2, 0, 1), (-1, 1, -1)),  # IRP
+        )
+        cd = (6, 5, 4)
+        cvals = list(range(cd[0] * cd[1] * cd[2]))
+        ctr = " ".join(f64(x) for x in (0.3, -0.2, 0.1))
+        for perm, signs in orients:
+            gc = self.plain(cd, perm=perm, signs=signs)
+            v = self.lab(gc, cvals)
+            for fov in ((4, 1, 3), (2, 3, 1)):
+                L.append(f"crras {v} 0 1 {ctr} {' '.join(map(str, fov))} 0 null")
+        # a 3-cycle through an array (the volume its destination, the array taken as it is)
+        gc = self.plain(cd, perm=(2, 0, 1))
+        other = self.plain((3, 3, 3), c=(1.0, -2.0, 0.0))
+        arr = self.arr1(r, 1, other, gc, m=self.near(r, t=1.0))
+        L.append(f"crras {self.lab(gc, cvals)} 0 1 {ctr} 4 1 3 0 {arr}")
+        # item 88 (FS-511): trilinear samples of a tensor and an RGB volume (the sampler cannot
+        # read them): the first sample at a point not on a voxel fails before any wrote a value;
+        # then a point on a voxel (the nearest sampler: 0); and the reverse order
+        gp = self.plain((4, 4, 4))
+        fd = (4, 3, 3)
+        for first, second in (((1.5, 2.25, 2.0), (2.0, 2.0, 2.0)), ((2.0, 2.0, 2.0), (1.5, 2.25, 2.0))):
+            wv = [0.0] * (fd[0] * fd[1] * fd[2] * 3)
+            for (c, rr, s), q in (((1, 1, 1), first), ((2, 1, 1), second)):
+                for k in range(3):
+                    wv[k * 36 + s * 12 + rr * 4 + c] = q[k] + 1 - 3
+            warp = self.lab(self.plain(fd), wv, t=3, nf=3)
+            for t in (6, 9):
+                for nfr in (1, 2):
+                    v = self.lab(gp, [17 + i for i in range(64 * nfr)], t=t, nf=nfr)
+                    L.append(f"spmw {v} 0 null {warp} 0 0 1 new")
+        return [Batch("vrules16", "vrules16", L)]
+
+
 GROUPS = [
     "vgblock",
     "vgcopy",
@@ -4070,6 +4232,7 @@ GROUPS = [
     "vsegs",
     "vcrops",
     "vrules15",
+    "vrules16",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -4177,7 +4340,7 @@ def mask(b: Batch, line: bytes) -> bytes:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen13) else Gen13(gen.seed)
+    gen = gen if isinstance(gen, Gen14) else Gen14(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

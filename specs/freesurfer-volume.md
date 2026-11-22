@@ -2867,10 +2867,16 @@ with `USF` -1 only.)
   (its inverse when the segmentation is not its source); otherwise the segmentation cut to its bounding box padded by 2
   and upsampled (`MRImaskAndUpsample`) with the LTA concatenated after the inverse of the cut's and reduced (the
   caller's LTA has its inverses filled and may change type). The result is inverted when the segmentation is its
-  source, made `REGISTER_DAT`, and `MRIaseg2vol` maps onto a header of the LTA's other geometry (`int`, the
-  segmentation's pulse parameters). `USF` -1 is ready for the clean room (**(observed)**: `vaseg`, the segmentation the
-  array's source, its destination or neither, arrays of types 0 and 1); other values take `MRImaskAndUpsample` (§41,
-  part 9) and are not yet ready.
+  source, made `REGISTER_DAT`, and `MRIaseg2vol` maps onto a header (`int`, one frame, the segmentation's pulse
+  parameters) of a geometry of the caller's LTA: its first transform's destination when the segmentation equals that
+  transform's source (`LTAmriIsSource`, §54: the segmentation's geometry, marked valid, against the source's), else its
+  first transform's source: so the source both when the segmentation is the destination and when it is neither end
+  (**(observed)**: `vrules16`, a segmentation of 2 x 2 x 2 voxels and an array from it to a 4 x 3 x 1 grid: the result
+  4 x 3 x 1; the segmentation the destination, or a third grid: 2 x 2 x 2). A source geometry not marked valid never
+  equals the segmentation: the array is inverted, its destination is then that geometry, and the change to
+  `REGISTER_DAT` ends the program (`LTAchangeType: dst geometry must be valid`, §54) (**(observed)**: `vrules16`).
+  `USF` -1 is ready for the clean room (**(observed)**: `vaseg`, the segmentation the array's source, its destination
+  or neither, arrays of types 0 and 1); other values take `MRImaskAndUpsample` (§41, part 9) and are not yet ready.
 - **`MRIapplySpmWarp(vol, srclta, warp, LRRev, interp, out)`**: `interp` other than 0 (nearest) and 1 (trilinear):
   `ERROR: MRIapplySpmWarp():  sample type = <n>, must be 0 or 1` and `NULL`. `out`: given, or new (`float`, the warp's
   grid and header, the volume's frames and pulse parameters). The 1-based vox2ras of SPM's input space: with `srclta`

@@ -110,9 +110,7 @@ def official_line(exe: Path, line: str, root: Path, k: int) -> str:
         inputs.append(name)
         i += 2
     nargs = int(t[i])
-    args = [
-        ("" if h == "@" else bytes.fromhex(h).decode()) for h in t[i + 1 : i + 1 + nargs]
-    ]
+    args = [("" if h == "@" else bytes.fromhex(h).decode()) for h in t[i + 1 : i + 1 + nargs]]
     # never a run whose licence check (any volume read) prints the licence file: DIAG_NO above 1
     # with an input that has an extension
     if "DIAG_NO" in env and any("." in x for x in args if not x.startswith("-")):
@@ -213,7 +211,9 @@ def main(argv: list[str] | None = None) -> int:
         else:
             differ += 1
             if len(first) < a.show:
-                first.append({"case": k, "args": case[-300:], "official": c[:1500], "port": r[:1500]})
+                first.append(
+                    {"case": k, "args": case[-300:], "official": c[:1500], "port": r[:1500]}
+                )
         if f != c:
             fix_differ += 1
             for x in fids:

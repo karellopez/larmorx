@@ -67,11 +67,15 @@ def main(argv: list[str] | None = None) -> int:
             )  # fmt: skip
     by_call = {}
     for r in rows:
-        c = by_call.setdefault(r["call"], {"calls": 0, "official": 0, "fix": 0, "log": 0})
+        c = by_call.setdefault(
+            r["call"], {"calls": 0, "official": 0, "fix": 0, "logged": 0, "log": 0}
+        )
         c["calls"] += 1
         c["official"] += r["reproduce_identical"]
         c["fix"] += r["fix_identical"]
-        c["log"] += r.get("log_identical", True)
+        if "log_identical" in r:
+            c["logged"] += 1
+            c["log"] += r["log_identical"]
     payload = {
         "name": NAME,
         "tool": "mri_info (FreeSurfer 8.2.0)",
@@ -123,7 +127,12 @@ def main(argv: list[str] | None = None) -> int:
     for k, c in by_call.items():
         lines.append(
             f"- {CALLS.get(k, k)}: {c['calls']} calls; `reproduce` {c['official']} identical to "
-            f"the official program, `fix` {c['fix']}; {c['log']} identical to the log."
+            f"the official program, `fix` {c['fix']}"
+            + (
+                f"; {c['log']} of {c['logged']} identical to the log."
+                if c["logged"]
+                else " (not logged)."
+            )
         )
     lines += [
         "",

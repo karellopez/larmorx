@@ -723,6 +723,114 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
     out
 }
 
+// ------------------------------------------------------------------ the golden cases
+
+/// The golden cases (`tests/mri_info_golden.rs`): a 32^3 float volume (a head-like pattern made
+/// with integer arithmetic; every header tag) and a 32^3 uchar segmentation with a colour table,
+/// each with the full report and the options that read every voxel or print a matrix.
+pub fn golden_cases() -> Vec<String> {
+    const N: i32 = 32;
+    let value = |x: i32, y: i32, z: i32| {
+        let c = N / 2;
+        let d2 = (x - c) * (x - c) + (y - c) * (y - c) + (z - c) * (z - c);
+        let base = if d2 < 52 {
+            110
+        } else if d2 < 92 {
+            75
+        } else if d2 < 144 {
+            35
+        } else {
+            4
+        };
+        let noise = (x * 7 + y * 13 + z * 29) % 7 + (x * 11 + y * 5 + z * 3) % 5 - 5;
+        (base + noise) as f32 + 0.25 * ((x + y + z) % 4) as f32
+    };
+    let mut g = Gen::new(32);
+    let spec = Spec {
+        dims: [1, 1, 1, 1],
+        ty: MRI_FLOAT,
+        size: [1.0, 1.0, 1.5],
+        mdc: [-1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0],
+        c: [2.0, -3.0, 1.5],
+        good: 1,
+        tr: 2300.0,
+        flip: 0.157_079_632_679_489_66,
+        te: 2.98,
+        ti: 900.0,
+        fov: 48.0,
+        dof: 1,
+        xform: Some("transforms/talairach.xfm".to_owned()),
+        pedir: Some("COL".to_owned()),
+        cmds: s(&["mri_convert rawavg.mgz orig.mgz --conform"]),
+        auto_align: Some(rand_matrix(&mut g)),
+        orig: None,
+        field: 3.0,
+        frames: Vec::new(),
+        ctab: false,
+        seg: false,
+    };
+    let mut fs = Globals::new(UpstreamDefects::Fix);
+    let (mut o, mut e) = (Vec::new(), Vec::new());
+    let mut out = Vec::new();
+    for (name, seg) in [("in.mgz", false), ("seg.mgz", true)] {
+        let mut sp = spec.clone();
+        sp.ty = if seg { MRI_UCHAR } else { MRI_FLOAT };
+        sp.ctab = seg;
+        let mut m = build(&mut g, &sp);
+        let mut v = mri_alloc_sequence(&mut fs, &mut o, &mut e, N, N, N, sp.ty, 1).expect("a volume");
+        for z in 0..N {
+            for y in 0..N {
+                for x in 0..N {
+                    let val = if seg {
+                        [0.0, 2.0, 3.0, 17.0, 41.0][((x / 8 + y / 8 + z / 8) % 5) as usize]
+                    } else {
+                        value(x, y, z)
+                    };
+                    mri_set_vox_val(&mut fs, &mut e, &mut v, x, y, z, 0, val, 0).expect("a voxel");
+                }
+            }
+        }
+        v.vg = m.vg.clone();
+        (v.vg.width, v.vg.height, v.vg.depth) = (N, N, N);
+        std::mem::swap(&mut m.chunk, &mut v.chunk);
+        let mut m2 = v;
+        m2.tr = m.tr;
+        m2.flip_angle = m.flip_angle;
+        m2.te = m.te;
+        m2.ti = m.ti;
+        m2.fov = m.fov;
+        m2.dof = m.dof;
+        m2.transform_fname = m.transform_fname.clone();
+        m2.pedir = m.pedir.clone();
+        m2.cmdlines = m.cmdlines.clone();
+        m2.auto_align = m.auto_align.clone();
+        m2.field_strength = m.field_strength;
+        m2.ct = m.ct.take();
+        let files = write_volume(&mut m2, name);
+        for args in [
+            s(&[name]),
+            s(&["--dump", name]),
+            s(&["--stats", name]),
+            s(&["--voxvolsum", name]),
+            s(&["--entropy", name]),
+            s(&["--voxel", "5", "17", "30", name]),
+            s(&["--vox2ras", name]),
+            s(&["--ras2vox", name]),
+            s(&["--ras2vox-tkr", name]),
+            s(&["--tkr2scanner", name]),
+            s(&["--scanner2tkr", name]),
+            s(&["--center", name]),
+            s(&["--otags", "tags.bin", name]),
+            s(&["--otags", "tags.mgz", name]),
+            s(&["--ctab", name]),
+            s(&["--o", "out.txt", "--res", name]),
+        ] {
+            out.push(info_line(None, &files, &args));
+        }
+    }
+    out
+}
+
 // ------------------------------------------------------------------ the port's answer
 
 /// The probe's environment (the official side adds `FREESURFER_HOME`, `FS_LICENSE` and

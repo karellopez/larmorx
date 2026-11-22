@@ -4,6 +4,7 @@
 //! The port's side of the fs-info probe (`validation/probes/fs-info/`):
 //!
 //!     fs_info_probe cases <seed> <n>            the case file, on standard output
+//!     fs_info_probe golden-cases                the golden cases (`tests/mri_info_golden.rs`)
 //!     fs_info_probe run <cases> fix|reproduce   one line per case: the output, a tab, the
 //!                                         defects the port noted (comma-separated)
 
@@ -22,6 +23,11 @@ fn main() {
                 println!("{line}");
             }
         }
+        Some("golden-cases") => {
+            for line in cases::golden_cases() {
+                println!("{line}");
+            }
+        }
         Some("run") if args.len() == 4 => {
             let mode = match args[3].as_str() {
                 "fix" => UpstreamDefects::Fix,
@@ -35,7 +41,7 @@ fn main() {
             }
         }
         _ => {
-            eprintln!("usage: fs_info_probe cases <seed> <n> | run <cases> fix|reproduce");
+            eprintln!("usage: fs_info_probe cases <seed> <n> | golden-cases | run <cases> fix|reproduce");
             std::process::exit(2);
         }
     }

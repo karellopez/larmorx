@@ -146,6 +146,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--json", type=Path)
     ap.add_argument("--show", type=int, default=5, help="differing cases to print")
+    ap.add_argument(
+        "--golden", action="store_true", help="the golden cases: their official SHA-256 only"
+    )
     a = ap.parse_args(argv)
     ws = workspace()
     if ws is None:
@@ -162,15 +165,20 @@ def main(argv: list[str] | None = None) -> int:
     )  # fmt: skip
     inputs = ws / "oracles" / "inputs" / "fs-info"
     inputs.mkdir(parents=True, exist_ok=True)
-    cases_path = inputs / f"cases-{a.seed}-{a.n}.txt"
-    text = subprocess.run(
-        [EXAMPLE, "cases", str(a.seed), str(a.n)], check=True, capture_output=True, text=True
-    ).stdout
+    tag = "golden" if a.golden else f"{a.seed}-{a.n}"
+    cases_path = inputs / f"cases-{tag}.txt"
+    gen = ["golden-cases"] if a.golden else ["cases", str(a.seed), str(a.n)]
+    text = subprocess.run([EXAMPLE, *gen], check=True, capture_output=True, text=True).stdout
     cases_path.write_text(text, encoding="utf-8")
     cases = text.splitlines()
-    root = inputs / f"cases-{a.seed}-{a.n}.d"
+    root = inputs / f"cases-{tag}.d"
     official = [official_line(exe, c, root, k) for k, c in enumerate(cases)]
     shutil.rmtree(root)
+    if a.golden:
+        h = hashlib.sha256()
+        for c in official:
+            h.update(c.encode() + b"\n")
+        print(f"golden OFFICIAL_SHA256 {h.hexdigest()} ({len(official)} cases)")
 
     def port_lines(mode: str) -> list[tuple[str, list[str]]]:
         out = subprocess.run(

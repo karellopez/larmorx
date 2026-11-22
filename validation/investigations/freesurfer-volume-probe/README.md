@@ -44,7 +44,11 @@ fs.mri probe runs its lines ([`../freesurfer-mri-probe/README.md`](../freesurfer
 "Running it": a child process each, an alarm of 2 seconds unless `@` sets another, the line
 `<result> | <standard output> <standard error>`, `EXIT <status>`, `CRASH <signal>`, `TIMEOUT`). From the
 build of relay 8 (commit `9319981f`) each child orients its standard error before the call, as a program
-that has written to it (the C library's `perror` then leaves `errno` alone: the spec's §21). The
+that has written to it (the C library's `perror` then leaves `errno` alone: the spec's §21). From the build of
+relay 14, two more prefixes before the command: `+gdiagno=<n>` sets `Gdiag_no` to n and points the diagnostic
+stream `Gstdout` at standard output (as a program's diagnostic set-up does), `+env=<NAME>=<value>` sets an
+environment variable for that call (`+env=FSLOUTPUTTYPE=NIFTI_GZ`; `+env=NAME=` sets it empty; the comparison
+loop's runs start from an environment of `PATH`, `LC_ALL=C` and `OMP_NUM_THREADS=1` only). The
 commands that write or read a file use `vg.out` and `vg.in` in the working directory (`ltaread` and
 `ltareads` their own names, `bvc` and `bvr` the folder `subj`).
 
@@ -185,6 +189,11 @@ The spec's sections in brackets.
 | `mskz W W P D` | `MRImaskZero` (the source, the painted mask, the destination) | the result |
 | `clipwm W W P` | `MRIclipBrightWM` (the T1 volume, the painted white-matter volume) | its value, the T1 volume |
 | `ltachg LTA i` | `LTAchangeType` (the type) [§54] | `self` when it returns the array, then the array (LTA) |
+| `ltainv k LTA [LTA]` | `LTAinvert` of the array into k 0 none, 1 the second array, 2 the array itself [§54] | `null`, `self`, `given` or `new`, then the result (LTA or `null`), the given array when it is not the result (k 1), the first array when it is not the result (k 0, 1) |
+| `ltacat n LTA×n i`, `ltacat2 LTA LTA i` | `LTAconcat` of the n arrays, resp. `LTAconcat2` of the two, with the reduction (1) or not (0) | the result (LTA or `null`), then each given array as the call left it |
+| `ltared LTA` | `LTAreduce` | the result (LTA or `null`), then the array |
+| `ltasrc LTA W` | `LTAmriIsSource`, then `LTAmriIsTarget` of the volume | the two integers |
+| `ltaprt LTA` | `LTAprint` to standard output | its value |
 | `pvlab W P W\|null P i i W\|null W\|null W\|null P` | the label volume painted, the values (painted) or none, label, maxlabels, the mixing and neighbour-label volumes or none, the border volume (painted) or none: `MRIvoxelsInLabelWithPartialVolumeEffects` [§37] | the float, then the mixing and the neighbour volumes (`null` when none) |
 | `randn i i i i f f i W\|null` | `srand48` of the seed, then `MRIrandn` (columns, rows, slices, frames, avg, stddev) into the given volume or none [§38] | the result (`given` when it is the given one) |
 | `const i i i i f W\|null` | `MRIconst` (columns, rows, slices, frames, the value) | the result |
@@ -249,8 +258,9 @@ the candidate noted a defect whose value in FreeSurfer is memory on the stack it
 the probe's four runs agree only because the program's own earlier steps leave the same bytes there:
 FS-300 in `vsample` and `vresamp` (the cubic frame sampler's window points outside the volume), FS-322 in
 `vderiv` (a gradient's sample never written) and FS-325 in `vlinear` (a linear transform's samples before
-the first that succeeds), and FS-469 in `vpvlab` (a label's mean read outside the table, from the stack
-beside it, which every run fills the same way), and in both modes on the
+the first that succeeds), FS-469 in `vpvlab` (a label's mean read outside the table, from the stack
+beside it, which every run fills the same way) and FS-198, FS-504 and FS-508 in `vlta54` and `vrules14` (a freed
+matrix, or a transform the array does not hold, read: the same bytes in every run), and in both modes on the
 `bvr` line without a cache that FreeSurfer ends at its licence check (`EXIT 255`, `FREESURFER_HOME is
 not defined`: LARMORX performs no licence check). Under `reproduce` a line where FreeSurfer aborted
 with the C++ runtime's lines (`CRASH 6`, standard error starting `terminate called after throwing`:

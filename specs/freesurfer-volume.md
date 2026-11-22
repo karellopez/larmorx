@@ -2643,7 +2643,7 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
   (`LINEAR_RAS_TO_RAS`, 1) and physical-voxel (`LINEAR_PHYSVOX_TO_PHYSVOX`, 2) types, the validity checks, the targets
   these three types do not support and the arrays of another type: made ready for the clean room by the spec
   finisher's relays 12 and 13, §69.2's groups `vltapv` and `vrules10`, `models.py physvox` and `ltatypes`; the changes to
-  and from REGISTER_DAT, FSL and coronal RAS, at the end of this bullet, are not ready yet): nothing at all
+  and from REGISTER_DAT, FSL and coronal RAS, at the end of this bullet, by its relay 14): nothing at all
   when the array has the type (no check; its inverses not filled either: **(observed)** with invalid geometries).
   Otherwise, whatever the array's type and the target, first for each transform in order its source then its
   destination must be valid: the first that is not ends the program (status 252) with the error `LTAchangeType: src
@@ -2704,27 +2704,89 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
   FS-505 where an inverse has no matrix). An array of no transforms takes the target and nothing else (**(observed)**:
   `vltapv`, `vrules10`, every one of the six changes).
 
-  **Not yet ready for the clean room** (the spec finisher's next relay): the changes to and from REGISTER_DAT, FSL and
-  coronal RAS, as track A wrote them:
-  - RAS to REGISTER_DAT: tkregister's registration of section 15b with the destination as reference and the source as
-    moving (`MRItkRegMtx(dst, src, M)`); REGISTER_DAT to RAS: its inverse conversion (`MRItkReg2Native` of headers of the
-    two geometries); FreeSurfer converts the first transform once per transform (FS-507; by default each once).
-  - to FSL (`FSLREG_TYPE`): from RAS through REGISTER_DAT and FSL's conversion (`MRItkreg2FSL`, which reads
-    `FSLOUTPUTTYPE`); from REGISTER_DAT directly; FSL to REGISTER_DAT `MRIfsl2TkReg`; FSL to RAS or vox through
-    REGISTER_DAT; vox and physvox to REGISTER_DAT or FSL through RAS; REGISTER_DAT to vox through RAS. An FSL conversion
-    that gives no matrix: FS-508.
-  - coronal RAS to RAS: `RASFromSurfaceRAS_(dst header) * M`; to REGISTER_DAT or FSL through RAS.
-  - from REGISTER_DAT, coronal RAS and FSL, another target ends the program: `LTAchangeType unsupported: you are
-    requesting REGISTER_DAT to <n> ` (`COR_RAS_TO_COR_RAS`, `FSLREG_TYPE`), status 252.
-  These take the new type and fill the inverses as above. From REGISTER_DAT, coronal RAS and FSL, with `Gdiag_no > 0`:
-  `transformed matrix:` and the first matrix (`MatrixPrint`) on standard output.
+  The changes to and from REGISTER_DAT (14), FSL (`FSLREG_TYPE`, 15) and coronal RAS (21) (made ready for the clean
+  room by the spec finisher's relay 14: §69.2's groups `vlta54` and `vrules14`). `MRItkRegMtx`, `MRItkReg2Native`,
+  `MRItkreg2FSL`, `MRIfsl2TkReg` and `RASFromSurfaceRAS_` are `specs/freesurfer-mri.md` §9's (their messages, their
+  reading of `FSLOUTPUTTYPE` and their ends of the program included), each called with the transform's destination
+  as the reference and its source as the moving volume; "copied into `M`" is `MatrixCopy(new, M)`
+  (`specs/freesurfer-maths.md` §2.4). For each transform in order:
+  - RAS to REGISTER_DAT (1 to 14): `MRItkRegMtx(dst, src, M)` copied into `M`.
+  - RAS to FSL (1 to 15): `R = MRItkRegMtx(dst, src, M)`, then `MRItkreg2FSL(dst, src, R)` copied into `M`
+    (**(observed)**: `FSLOUTPUTTYPE` unset ends the program with §9's two lines, status 1; set empty, `ANALYZE` or
+    another name: its `FSLOUTPUTTYPE <value> ` line and no flip; `NIFTI`, `NIFTI_PAIR` and `NIFTI_GZ`: the determinants'
+    line and a flip for each positive one).
+  - REGISTER_DAT to RAS (14 to 1): headers of the source's and of the destination's extent and geometry are made (a
+    `MRI_UCHAR` header each, `specs/freesurfer-mri.md` §4: its shape messages for an extent that is not positive),
+    then `MRItkReg2Native(destination header, source header, M)` copied into `M`. FS-507: FreeSurfer makes this change
+    as many times as the array has transforms, each time on the FIRST transform (from its previous result; the others
+    are not changed); with `reproduce` so; by default (rule A) each transform once; noted when the array holds more
+    than one transform.
+  - REGISTER_DAT to FSL (14 to 15): `MRItkreg2FSL(dst, src, M)` copied into `M`.
+  - FSL to REGISTER_DAT (15 to 14): `MRIfsl2TkReg(dst, src, M)` copied into `M` (a singular `M` ends the program in
+    §9's second product, `m2 is null`, **(observed)**).
+  - coronal RAS to RAS (21 to 1): a header of the destination's extent and geometry (as above), `C =
+    RASFromSurfaceRAS_(header)` (a new matrix), then `M = C · M` (the outer product into `M` itself, as above).
+  - Through RAS or REGISTER_DAT: vox (0) and physvox (2) to 14 or 15, and coronal RAS to 14 or 15, are the change to RAS
+    and then the change from RAS to the target; REGISTER_DAT to vox, the change to RAS and then to vox; FSL to RAS or to
+    vox, the change to REGISTER_DAT and then from REGISTER_DAT to the target. Each of the two is a whole call of
+    `LTAchangeType` (its validity checks, its type set, its inverses filled and, from REGISTER_DAT, coronal RAS and FSL,
+    its diagnostic print below), then the outer call's own print and fill. Physvox to RAS here is FS-506's change.
+  - FS-508: a conversion copied into `M` that gives no matrix (`MRItkreg2FSL`'s last inverse fails: a registration
+    that cannot be inverted): FreeSurfer's copy frees `M` and the inverses' fill then reads the freed matrix
+    (**(observed)**: `vrules14`, `MatrixInverse: matrix (<memory> x <memory>) is not square` and the fill's end). In both
+    modes the program ends there (status 252) with the error `LTAchangeType: the FSL conversion gave no matrix
+    (FreeSurfer frees the transform's matrix and goes on using it here)` + `\n`, noted.
+  - Another target, after the validity checks and before any change (also for an array of no transforms), ends the
+    program (status 252) with the error `LTAchangeType unsupported: you are requesting REGISTER_DAT to <n> ` from
+    REGISTER_DAT (`COR_RAS_TO_COR_RAS` from coronal RAS, `FSLREG_TYPE` from FSL; the text without a final newline)
+    (**(observed)**: `vrules14`, targets 2, 21, 5 and an array of no transforms from 14; 2, 21, -1 from 15; 0, 2, 100
+    from 21).
+  - The diagnostic print: from REGISTER_DAT, coronal RAS and FSL, after the change and before the inverses' fill, with
+    `Gdiag_no` above 0: `transformed matrix:` + `\n` on standard output, then the first transform's matrix
+    (`MatrixPrint`, `specs/freesurfer-maths.md` §8.6) to the diagnostic stream (`Gstdout`: standard output once a
+    program's diagnostic set-up has run) (**(observed)**: `vrules14`: one print from 14 to 1; three from 15 to 1 (the
+    inner change to 14, the inner change to 1, the outer call), two from 21 to 14; none from 1 to 14; none at level 0).
+    An array of no transforms with `Gdiag_no` above 0: FS-504 (FreeSurfer prints `transformed matrix:` and reads a
+    transform it does not hold, **(observed)**: `MatrixPrint: mat = NULL!`); in both modes the program ends there (status
+    252) with the error `LTAchangeType: a transform array without transforms (FreeSurfer reads memory it does not own
+    here)` + `\n`, after the `transformed matrix:` line, noted.
+  These changes then set the target type and fill the inverses as the six changes above (**(observed)**: `vlta54`,
+  `vrules14`).
+- **FS-504's errors** (the functions below and `LTAchangeType`'s print): where FreeSurfer reads a transform an array
+  does not hold, in both modes the program ends (status 252) with the error `<function>: <why> (FreeSurfer reads memory
+  it does not own here)` + `\n`, noted, `<why>` one of `no transform arrays`, `a transform array without transforms`,
+  `a transform without a 4 x 4 matrix`.
+- **`LTAinvert`** beyond the bullet above (**(observed)**: `vlta54`, `vrules14`): an array of no transforms gives a new
+  array of no transforms (nothing read); into an array of another size: `LTAcopy(): ERROR: number of xforms does not
+  match (<n>,<m>)` (fs.mri §21) and none returned, the given array unchanged; a transform that cannot be inverted ends
+  the program in the fill (`TransformInvert: xform noninvertible`). With an odd count the middle transform stays where
+  it is. The copy is fs.mri §21's (FS-195, FS-196, FS-198 with its matrices).
+- **`LTAconcat`** beyond the bullet above: its copies are `LTcopy` into the new array's transforms (fs.mri §21: FS-195,
+  FS-196, FS-198); FS-504 (**(observed)**: `vrules14`, no array: a crash; an array of no transforms first or later: the
+  mismatch's lines or a crash, memory): no array, or an array without transforms where a transform is read (the
+  first array when a later one follows, any later one), ends the program as above (`LTAconcat: no transform arrays`,
+  `LTAconcat: a transform array without transforms`), after the inverses' fills and the type changes made before it.
+  With `Reduce`, the new array is reduced (`LTAreduce` below) and freed, the reduced array returned (**(observed)**:
+  `vrules14`, chains, an inverted array, other types changed first).
+- **`LTAreduce`** beyond the bullet above: the product is `MatrixMultiply(M, reduced, reduced)` (into the reduced matrix
+  itself; it keeps its old numbers when the product gives nothing, `m1 is null` when the transform has no matrix);
+  with one transform the result is its copy (**(observed)**: `vrules14`); FS-504: an array of no transforms ends the
+  program as above (`LTAreduce: a transform array without transforms`), after the copy and its fill.
 - **`LTAmriIsSource(lta, mri)`**, **`LTAmriIsTarget(lta, mri)`**: 1 when the volume's geometry (marked valid) equals the
-  first transform's source (the last transform's destination), else 0 (`vg_isEqual`). FS-504 without transforms.
+  first transform's source (the last transform's destination), else 0 (`vg_isEqual`, §4) (**(observed)**: `vrules14`, a
+  volume of the source's geometry 1 and 0, of the target's 0 and 1, of a middle geometry or one slice more 0 and 0;
+  `vlta54`). FS-504 without transforms: the program ends as above (`LTAmriIsSource: a transform array without
+  transforms`; `LTAmriIsTarget` the same).
 - **`LTAprint(fp, lta)`**: `type      = <n> ` and `# LINEAR_VOX_TO_VOX`, `# LINEAR_RAS_TO_RAS` or `# REGISTER_DAT` for
   those types, a newline; `nxforms   = <n>`; per transform `mean      = <x0> <y0> <z0>` (`%6.4f`), `sigma     = <s>`
   (`%6.4f`), `1 4 4` and four rows of `%18.15le ` (the elements as `double`); then per transform `src volume info` and
-  `dst volume info` with the geometry blocks of section 1; then `subject <s>` when the subject is not empty and `fscale
-  <f>` (`%f`) when it is above 0. Returns `NO_ERROR`.
+  `dst volume info` with the geometry blocks of section 2; then `subject <s>` when the subject is not empty and `fscale
+  <f>` (`%f`) when it is above 0. Returns `NO_ERROR` (0) (**(observed)**: `vrules14`, every type, subjects with a blank,
+  scales 0.5, 0 and -1, a NaN element as the C library's `%18.15le` prints it (`nan` padded to 18 characters); an
+  array of no transforms: its two lines and the subject and scale lines). A matrix larger than 4 x 4 prints its first four rows' first four elements; FS-504: a transform whose matrix is
+  smaller than 4 x 4 in either direction, or absent: FreeSurfer reads outside it (**(observed)**: a 3 x 4 matrix
+  crashes); in both modes the lines up to that transform's `1 4 4` are written, then the program ends as above
+  (`LTAprint: a transform without a 4 x 4 matrix`).
 
 ## 55. Segmentations onto another grid; SPM warps (3.1-37: resample.cpp's volume functions)
 - **`MRIaseg2vol(aseg, tkR, voltemp, fthresh, &volhit, ct)`**: a colour table without a tissue-type table: `ERROR:
@@ -2828,16 +2890,16 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
   FreeSurfer decides it backwards (FS-516). An orientation that names an axis twice or is unknown: FS-515.
 
 ## 58. Validation plan (sections 54 to 57)
-§54's `LTAfillInverse` and `LTAchangeType`'s changes between the voxel, RAS-to-RAS and physical-voxel types, its
-validity checks, unsupported targets and arrays of another type (made ready by the spec finisher's relays 12 and
-13): §69's groups `vltapv` and `vrules10` (the open probe's `ltachg`; and `bslta`, `specs/freesurfer-bspline.md`
-§5.3), identical with `reproduce` but where FreeSurfer crashes; the default differs only with a notice (FS-505,
-FS-506); `models.py physvox` and `ltatypes` check the products bit for bit. The rest of §54 to §57 (`LTAchangeType`'s
-changes to and from REGISTER_DAT, FSL and coronal RAS among them) is not yet read through for the clean room; until
-it is, the plan below names the replica's closed probe, which the implementer does not open.
+§54 whole (made ready by the spec finisher's relays 12 to 14): §69's groups `vltapv`, `vrules10`, `vlta54` and
+`vrules14` (the open probe's `ltachg`, `ltainv`, `ltacat`, `ltacat2`, `ltared`, `ltasrc`, `ltaprt`, with the line
+prefixes `+env=FSLOUTPUTTYPE=...` and `+gdiagno=1`; and `bslta`, `specs/freesurfer-bspline.md` §5.3), identical with
+`reproduce` but where FreeSurfer crashes or reads memory it does not own (FS-504, FS-508, FS-198's copies), lines the
+loop allows; the default differs only with a notice (FS-505, FS-506, FS-507); `models.py physvox` and `ltatypes` check
+the six changes' products bit for bit. FS-504's and FS-508's errors are larmorx's own (the loop lets those lines
+differ): the implementations' own tests, against §54's text. §55 to §57 are not yet read through for the clean room;
+until they are, the plan below names the replica's closed probe, which the implementer does not open.
 
-The probe's `ltafill`, `ltainv`, `ltachg`, `ltacat`, `ltared`, `ltasrc`, `ltaprt` (arrays of 0 to 3 transforms along a
-pool of scanner-like geometries, chained, inverted and mismatched; all types, FSL output types, `Gdiag_no`), `a2v`,
+The replica's closed probe's `a2v`,
 `a2vmu`, `spmw`, `icode`, `vvtk`, `sbound`, `sborder`, `idxno`, `ssrob`, `sfavg`, `zcat`, `aedit`, `shdim`, `fento`,
 `lacj`, `lacjn`, `cfov`, `ccrs`, `crras` (small volumes of labels and values, NaN and infinite voxels, colour tables of 50
 and 1,001 places with empty places and odd tissue types, given and new outputs, out-of-range options). Expected:
@@ -3197,7 +3259,7 @@ counted and not compared; the default differs only with a notice (FS-954, FS-956
 ### 69.1 The probe
 
 The open probe folder `validation/investigations/freesurfer-volume-probe/` holds the probe's source
-(calls of the functions of §2 to §35, §37 to §39 and of §54's `LTAchangeType` by name, and of fs.bspline's) and the
+(calls of the functions of §2 to §35, §37 to §39 and of §54 by name, and of fs.bspline's) and the
 comparison loop; its README lists every
 command, its arguments and what it prints, and the encodings (every float and double as its bits;
 the volumes, geometries, matrices, colour tables and MINC transforms as the fs.mri probe encodes
@@ -3544,7 +3606,8 @@ standard error) are taken out and their IDs kept. Every line must be identical, 
   cubic frame sampler's window points FreeSurfer never reads), FS-322 in `vderiv` (§28: a gradient's
   sample never written) and FS-325 in `vlinear` (§29: a linear transform's samples before the first
   that succeeds); likewise FS-469 in `vpvlab` (§37: a label's mean read outside the table, from the
-  stack beside it);
+  stack beside it), and FS-198, FS-504 and FS-508 in `vlta54` and `vrules14` (§54: a freed matrix, or a
+  transform the array does not hold, read);
 - in both modes, the `bvr` line without a cache that FreeSurfer ends at its licence check (§23:
   `EXIT 255` with the licence message; LARMORX performs none).
 
@@ -3620,7 +3683,7 @@ cached matrices) and in part 8 (`vrules12`: a volume without its cached matrices
   when they are ported.
 - **Every platform:** the clean room's own golden checks (its results on the other five platforms
   are its Linux results; a NaN's bits as x86-64 gives them).
-- **§41 to §68** (but §54's `LTAfillInverse` and `LTAchangeType`'s changes between the voxel, RAS-to-RAS
-  and physical-voxel types, in `vltapv` and `vrules10`) are not yet in the open probe: until they are, their clean room checks them against the
+- **§41 to §68** (but §54, in `vltapv`, `vrules10`, `vlta54` and `vrules14`) are not yet in the open probe: until they
+  are, their clean room checks them against the
   official programs as black boxes and against the replays; their validation plans name the replica's
   probe, which the implementer does not open.

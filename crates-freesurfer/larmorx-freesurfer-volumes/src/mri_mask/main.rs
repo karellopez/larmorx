@@ -27,13 +27,25 @@
 //! - **FS-1132** (crash): an option given last (or before too few arguments) whose number or file
 //!   FreeSurfer reads past the arguments (`atoi`, `atof`, `sscanf` or `MRIreadHeader` of a
 //!   missing argument: status 139). By default `<option> needs <n> values` and the help, status 1.
+//! - **FS-1133** (crash): `-BBEQ` whose box cannot be made square with an odd number of slices
+//!   (`REGIONgetBoundingBoxEqOdd`'s `ERROR` lines): FreeSurfer prints the region it does not have
+//!   and crashes (status 139). By default an error, status 1.
+//! - **FS-1134** (crash): `-xform` with a transform array whose transforms do not chain
+//!   (`LTAreduce`'s `ERROR` line): FreeSurfer crashes (status 139). By default an error, status 1.
+//! - **FS-1135** (crash or a late error): `-xform` whose voxel-to-voxel transform for the two
+//!   volumes does not invert in single precision (`MRIlinearTransform: xform is singular`):
+//!   FreeSurfer goes on without a mask, crashing (status 139) where a later step reads it (`-T`,
+//!   `-invert`, `-samseg`, `-lh`, `-rh`, the crops, `-dilate`), else ending in `MRImask` (`must
+//!   have a valid MRI (src)`, status 252; `-erode`'s messages before it). By default an error at
+//!   once, status 1.
 
 use std::io::Write;
 
 use larmorx_core::cfmt;
 use larmorx_core::cscan::{sscanf_f64, sscanf_i32};
-use larmorx_core::defects::FS_1132;
+use larmorx_core::defects::{FS_1132, FS_1133, FS_1134, FS_1135};
 use larmorx_freesurfer_core::affine::float_to_int;
+use larmorx_freesurfer_core::cscan;
 use larmorx_freesurfer_core::cstd::{atof, atoi};
 use larmorx_freesurfer_core::diag::diag_init;
 use larmorx_freesurfer_core::globals::Globals;
@@ -52,7 +64,7 @@ use larmorx_freesurfer_io::mriio::{mri_read_header, mri_read_volume, mri_write};
 use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::ctab::ctab_deep_copy;
 use larmorx_freesurfer_mri::lta::{LINEAR_VOX_TO_VOX, MORPH_3D_TYPE};
-use larmorx_freesurfer_mri::mri::{MGZ_INTENT_UNKNOWN, Mri, MriRegion};
+use larmorx_freesurfer_mri::mri::{MGZ_INTENT_UNKNOWN, Mri, MriRegion, mri_free};
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use larmorx_freesurfer_volume::arith::{Pair, mri_clone, mri_extract_region};
@@ -122,10 +134,63 @@ impl Options {
     }
 }
 
+/// Standard output as the C library buffers it: kept until the end, with what a crash would keep.
+/// The buffer is written out when it fills and at each flush: an explicit one (`fflush(stdout)`:
+/// [`Write::flush`]) and each message of the C++ error stream (`std::cerr` is tied to
+/// `std::cout`, which writes through the C library's buffer: `ErrorPrintf`, `ErrorExit`).
+pub struct Cout {
+    pub buf: Vec<u8>,
+    /// What was flushed (written out) at the last flush.
+    flushed: usize,
+    /// The C++ error stream's message count at the last look.
+    seen: usize,
+    cxx: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl Cout {
+    /// An empty standard output for `g`'s streams.
+    pub fn new(g: &Globals) -> Cout {
+        Cout {
+            buf: Vec::new(),
+            flushed: 0,
+            seen: g.stderr.cxx_messages(),
+            cxx: g.stderr.cxx_messages.clone(),
+        }
+    }
+
+    /// A message on the C++ error stream since the last look flushed what was written before it.
+    fn sync(&mut self) {
+        let n = self.cxx.load(std::sync::atomic::Ordering::Relaxed);
+        if n != self.seen {
+            self.seen = n;
+            self.flushed = self.buf.len();
+        }
+    }
+
+    /// What a crash now keeps: the flushed part and the full buffers written after it.
+    pub fn kept_by_crash(&mut self) -> usize {
+        self.sync();
+        self.flushed + (self.buf.len() - self.flushed) / STDOUT_BUFFER * STDOUT_BUFFER
+    }
+}
+
+impl Write for Cout {
+    fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+        self.sync();
+        self.buf.extend_from_slice(b);
+        Ok(b.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.flushed = self.buf.len();
+        Ok(())
+    }
+}
+
 /// The program's streams, environment and working directory. Standard output is kept in `out`
 /// until the end (FreeSurfer's buffer: a crash in `reproduce` loses what it would).
 pub struct Run<'a, 'b> {
-    pub out: &'a mut Vec<u8>,
+    pub out: &'a mut Cout,
     pub err: &'a mut dyn Write,
     /// The environment, changed by `-no-allow-diff-geom` (`setenv`).
     pub env: Environment,
@@ -137,11 +202,11 @@ pub struct Run<'a, 'b> {
 pub fn run(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
     let mut g = Globals::new(settings.mode);
     g.stderr.read_write = system::stderr_read_write();
-    let mut buf: Vec<u8> = Vec::new();
+    let mut cout = Cout::new(&g);
     let status = {
         let mut terr = log::TrackedErr::new(&g, &mut *err);
         let mut r = Run {
-            out: &mut buf,
+            out: &mut cout,
             err: &mut terr,
             env: settings.env.clone(),
             dir: settings.dir.as_deref(),
@@ -152,11 +217,11 @@ pub fn run(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut 
         }
     };
     let keep = if i32::from(status) == SEGFAULT && g.notices.reproduce() {
-        buf.len() / STDOUT_BUFFER * STDOUT_BUFFER
+        cout.kept_by_crash()
     } else {
-        buf.len()
+        cout.buf.len()
     };
-    let _ = out.write_all(&buf[..keep]);
+    let _ = out.write_all(&cout.buf[..keep]);
     let _ = out.flush();
     g.notices.print(err);
     status
@@ -540,7 +605,10 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     if let Some(xform_fname) = o.xform_fname.clone()
         && xform_fname != "identity.nofile"
     {
-        mask = apply_xform(g, r, &o, &xform_fname, &mri_in, mask)?;
+        match apply_xform(g, r, &o, &xform_fname, &mri_in, mask)? {
+            Some(m) => mask = m,
+            None => return null_mask(g, r, &mut o, &xform_fname),
+        }
     }
     o.lta_src = None;
     o.lta_dst = None;
@@ -618,7 +686,18 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
         let region = crop_region(g, r, &o, &mask)?;
         let Some(region) = region else {
             // `REGIONprint(stdout, NULL)`: FreeSurfer reads address 0
-            return Err(Fatal::Exit(SEGFAULT));
+            g.notices.add(
+                &FS_1133,
+                "mri_mask -BBEQ: no square bounding box with an odd number of slices: FreeSurfer prints the region it does not have and crashes".to_owned(),
+            );
+            if g.notices.reproduce() {
+                return Err(Fatal::Exit(SEGFAULT));
+            }
+            let _ = writeln!(
+                r.err,
+                "{progname}: ERROR: -BBEQ found no bounding box with as many columns as rows and an odd number of slices"
+            );
+            return Err(Fatal::Exit(1));
         };
         region_print(r.out, &region);
         let Some(m) =
@@ -834,7 +913,7 @@ fn crop_region(
 }
 
 /// `-xform`: the transform read and applied to the mask (nearest neighbour), as the module's
-/// text says; the moved mask.
+/// text says; the moved mask, `None` where `TransformApplyType` gives none (FS-1135).
 fn apply_xform(
     g: &mut Globals,
     r: &mut Run,
@@ -842,7 +921,7 @@ fn apply_xform(
     xform_fname: &str,
     mri_in: &Mri,
     mask: Mri,
-) -> Result<Mri, Fatal> {
+) -> Result<Option<Mri>, Fatal> {
     let progname = g.progname.clone();
     let env = r.env.clone();
     let _ = writeln!(r.out, "Applying transform to the mask volume");
@@ -857,7 +936,21 @@ fn apply_xform(
     };
     if transform.ttype != MORPH_3D_TYPE {
         let Some(mut lta) = lta_reduce(g, r.out, r.err, transform.lta())? else {
-            return Err(Fatal::Exit(SEGFAULT));
+            // the reduced array's first transform read through NULL
+            g.notices.add(
+                &FS_1134,
+                format!(
+                    "mri_mask -xform {xform_fname}: the transforms do not chain: FreeSurfer crashes"
+                ),
+            );
+            if g.notices.reproduce() {
+                return Err(Fatal::Exit(SEGFAULT));
+            }
+            let _ = writeln!(
+                r.err,
+                "{progname}: ERROR: the transforms of {xform_fname} do not chain into one"
+            );
+            return Err(Fatal::Exit(1));
         };
         if lta.xforms[0].src.valid == 0 {
             let Some(src) = o.lta_src.as_ref() else {
@@ -930,9 +1023,88 @@ fn apply_xform(
         None,
         SAMPLE_NEAREST,
     )?;
-    match moved.into_new() {
-        Some(m) => Ok(m),
-        // `TransformApplyType` gave NULL: the program's next use of the mask reads address 0
-        None => Err(Fatal::Exit(SEGFAULT)),
+    Ok(moved.into_new())
+}
+
+/// FS-1135: `TransformApplyType` gave no mask. By default an error (status 1); with `reproduce`
+/// the rest of FreeSurfer's program without a mask: `MRIcopy(NULL, NULL)` gives none; the
+/// threshold (`-T`, `-invert`), `-samseg`, `-lh` and `-rh`, the crops (`-BB` and its forms,
+/// `-BBEQ`, `-crop-to-fov`, `-crop-to-fov-mm`: their first line printed) and `-dilate` (`Dilating
+/// <n>`) read it (status 139); `-erode` prints `Eroding <n>`, `MRIerodeNN`'s in-place error once a
+/// pass and `MRIfree: null pointer`; then `maskval=...` and `MRImask`'s `must have a valid MRI
+/// (src)` (status 252).
+fn null_mask(
+    g: &mut Globals,
+    r: &mut Run,
+    o: &mut Options,
+    xform_fname: &str,
+) -> Result<(), Fatal> {
+    g.notices.add(
+        &FS_1135,
+        format!(
+            "mri_mask -xform {xform_fname}: the voxel-to-voxel transform is singular in single precision: FreeSurfer goes on without a mask (a crash or 'must have a valid MRI (src)')"
+        ),
+    );
+    if !g.notices.reproduce() {
+        let _ = writeln!(
+            r.err,
+            "{}: ERROR: the transform {xform_fname} could not be applied to the mask volume",
+            g.progname
+        );
+        return Err(Fatal::Exit(1));
     }
+    if o.threshold_set || o.samseg || o.do_lh || o.do_rh {
+        return Err(Fatal::Exit(SEGFAULT));
+    }
+    if o.do_bb || o.do_bb_eq || o.do_crop_to_fov || o.do_crop_to_fov_mm {
+        if o.do_bb {
+            let p = o.npad_bb;
+            let _ = writeln!(
+                r.out,
+                "Computing bounding box, npad = {}, {}, {}, {}, {}, {}",
+                p[0], p[1], p[2], p[3], p[4], p[5]
+            );
+        } else if o.do_bb_eq {
+            let _ = writeln!(
+                r.out,
+                "Computing bounding box with ncols=nrows, npad = {}",
+                o.npad_bb[0]
+            );
+        }
+        return Err(Fatal::Exit(SEGFAULT));
+    }
+    let mut maskval = 0i32;
+    if o.do_transfer {
+        maskval = float_to_int(g, f64::from(o.transfer_val), "mri_mask -transfer");
+        o.out_val = o.transfer_val;
+    }
+    if o.dilate > 0 {
+        let _ = writeln!(r.out, "Dilating {}", o.dilate);
+        return Err(Fatal::Exit(SEGFAULT));
+    }
+    if o.erode > 0 {
+        let _ = writeln!(r.out, "Eroding {}", o.erode);
+        for _ in 0..o.erode {
+            let _ = writeln!(r.out, "ERROR: MRIerodeNN(): cannot be done in-place");
+        }
+        mri_free(g, r.err, &mut None);
+    }
+    let _ = writeln!(
+        r.out,
+        "maskval={maskval}, outval={}",
+        cfmt::g(f64::from(o.out_val), 6)
+    );
+    // `MRImask`'s start: its environment variable, then the mask's geometry from NULL
+    let mut allow = 1;
+    if let Some(a) = r.env.get("FS_MRIMASK_ALLOW_DIFF_GEOM") {
+        let mut st = cscan::Bytes::new(a.as_encoded_bytes());
+        if let Some(n) = cscan::Call::new().i32(&mut st, &mut g.errno) {
+            allow = n;
+        }
+    }
+    if g.gdiag > 0 {
+        let _ = writeln!(r.out, "MRImask(): AllowDiffGeom = {allow}");
+    }
+    error_exit(g, r.err, ERROR_BADPARM, "must have a valid MRI (src)")?;
+    unreachable!("ErrorExit returns only for code 0");
 }

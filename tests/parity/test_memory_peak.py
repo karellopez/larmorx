@@ -17,8 +17,9 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 ``mri_convert`` (``MRI_CONVERT_CASES``, 2026-11-21), ``mri_segstats`` (``MRI_SEGSTATS_CASES``,
 2026-11-22), ``mri_info`` (``MRI_INFO_CASES``, 2026-11-22), ``mris_calc`` (``MRIS_CALC_CASES``,
 2026-11-22), ``mri_add_xform_to_header`` (``MRI_ADD_XFORM_CASES``, 2026-11-22), ``mri_make_uchar``
-(``MRI_MAKE_UCHAR_CASES``, 2026-11-22), ``lta_convert`` (``LTA_CONVERT_CASES``, 2026-11-22) and
-``mri_robust_register`` (``MRI_ROBUST_REGISTER_CASES``, 2026-11-22).
+(``MRI_MAKE_UCHAR_CASES``, 2026-11-22), ``lta_convert`` (``LTA_CONVERT_CASES``, 2026-11-22),
+``mri_robust_register`` (``MRI_ROBUST_REGISTER_CASES``, 2026-11-22) and ``mri_mask``
+(``MRI_MASK_CASES``, 2026-11-22).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -2641,6 +2642,89 @@ def test_mri_make_uchar_replica_needs_no_more_memory_than_freesurfer(tmp_path, n
         )
         c = fsfiles.compare(o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out)
         assert c.same, f"mri_make_uchar {name} ({mode}): {c.verdict} {c.detail}"
+
+
+#: FreeSurfer's ``mri_mask`` against the ``larmorx-freesurfer`` replica (queue item 3.2-26,
+#: 2026-11-22), on recorded heads, one thread, both D13 modes: recon-all's ``-T 5`` call
+#: (ds000005 sub-01's classic run: ``brain.mgz`` masked by ``brainmask.mgz``) and the v8 stream's
+#: ``-oval 1 -invert`` call with its venous-sinus mask (on the v8 run's ``brain.mgz``, into another
+#: file); the output identical to FreeSurfer's.
+MRI_MASK_CASES = [
+    (
+        "T5",
+        "ds000005-sub-01-classic",
+        ["-T", "5", "{mri}/brain.mgz", "{mri}/brainmask.mgz", "out.mgz"],
+    ),
+    (
+        "invert",
+        "ds000005-sub-01-v8",
+        ["-oval", "1", "-invert", "{mri}/brain.mgz", "{mri}/vsinus.mgz", "out.mgz"],
+    ),
+]
+
+
+@pytest.mark.parametrize(("name", "run", "args"), MRI_MASK_CASES)
+def test_mri_mask_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, run, args):
+    from larmorx_validation.freesurfer import files as fsfiles
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / "mri_mask" if ws else None
+    mri = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / run / "subjects" / "sub-01" / "mri"
+        if ws
+        else None
+    )
+    if exe is None or not exe.is_file() or not (mri / "brain.mgz").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    words = [a.format(mri=mri) for a in args]
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        "FS_DISABLE_LANG": "1",
+        **freesurfer_env(),
+    }
+
+    def fresh(d: Path):
+        def reset() -> None:
+            if d.exists():
+                shutil.rmtree(d)
+            d.mkdir()
+
+        reset()
+        return reset
+
+    o_dir = tmp_path / "freesurfer"
+    code, fs_mib = _original_peak(
+        ["mri_mask", *words], env, "freesurfer", fresh(o_dir), o_dir, (), "freesurfer"
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        fresh(r_dir)
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_mask", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(f"mri_mask {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"mri_mask {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        c = fsfiles.compare(
+            o_dir / "out.mgz",
+            r_dir / "out.mgz",
+            fsfiles.Context(any_directory=True),
+            name="out.mgz",
+        )
+        assert c.same, f"mri_mask {name} ({mode}): {c.verdict} {c.detail}"
 
 
 #: lta_convert's calls: recon-all's step 4 and talairach_avi's (the volumes read in place, so

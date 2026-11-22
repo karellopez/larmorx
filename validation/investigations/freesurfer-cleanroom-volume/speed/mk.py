@@ -5,7 +5,8 @@ and limits (relay 10), and parts 6b and 6c's frame-range sampler, splatting, der
 resampling onto a template (relay 11); fs.bspline's coefficients, sampling, transform and pyramids and
 fs.volume's cubic B-spline paths (relay 12: `python -P mk.py bspline` writes only those), and part 7b's
 smoothing, window counts, label means and borders, mask, clipping and image view (relay 13: `python -P mk.py
-part7b`). Run with
+part7b`), and part 8's partial-volume count, normalisation, sort, vote, root mean square, non-maximum
+suppression, square root, frame powers and half cosine (relay 14: `python -P mk.py part8`). Run with
 `python -P mk.py` in a scratch folder, then `run.sh`."""
 
 import random
@@ -114,12 +115,31 @@ for _ in range(5000):
     x, y, z = (r.randrange(0, 64) for _ in range(3))
     pts.append(f"1 7 {x} {y} {z} 0 {zero}")
 p7.append(f"@60 nbhd {W(64, 0, 9)} 0 {len(pts)} {' '.join(pts)}")
+# part 8 (relay 14): the partial-volume count, the frame normalisation, the sort, the vote, the root
+# mean square, the non-maximum suppression, the square root, the frame powers and the half cosine
+def Wf(n: int, t: int, fill: object, frames: int) -> str:
+    return W(n, t, fill).replace(f"{n} {n} {n} {t} 1 0", f"{n} {n} {n} {t} {frames} 0", 1)
+
+
+p8 = [
+    f"@60 pvlab {W(24, 0, 9)} 0 {W(24, 3, 't3')} 0 5 256 null null null",
+    f"@60 nseq {Wf(48, 3, 't3', 8)} 0 0 3f800000",
+    f"@60 sort {Wf(48, 3, 't3', 8)} 0 null new",
+    f"@60 vote {Wf(48, 0, 9, 9)} 0 null new 1",
+    f"@60 rms {Wf(48, 3, 't3', 8)} 0 {W(48, 3, 0)}",
+    f"@60 nonmax {W(48, 3, 't3')} 0 new 3f000000 1",
+    f"@60 msq 1 {W(64, 3, 't3')} 0 null new",
+    f"@60 fpow {W(64, 3, 't3')} 0 1 40000000",
+    f"@60 hcos {W(64, 3, 't3')} 0 {f64(0.5)} new",
+]
 if sys.argv[1:] == ["bspline"]:
     lines = bs
 elif sys.argv[1:] == ["part7b"]:
     lines = p7
+elif sys.argv[1:] == ["part8"]:
+    lines = p8
 else:
-    lines += bs + p7
+    lines += bs + p7 + p8
 for i, line in enumerate(lines):
     with open(f"b{i}.txt", "w", encoding="utf-8") as f:
         f.write(line + "\n")

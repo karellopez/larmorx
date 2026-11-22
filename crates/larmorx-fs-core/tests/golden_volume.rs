@@ -235,11 +235,11 @@ const GOLDEN: &[(&str, &str)] = &[
     ),
     (
         "fr8.fix",
-        "284ff0d3d39048391cba86ab3584371800c3e960260fab58cda95c05a756abdc",
+        "bec60a69764b3de153b8bd6bf670f902466d7a54752d2a25de372f744cdff9c8",
     ),
     (
         "fr8.reproduce",
-        "11ffadaecf65888b4c4b2fbe3f57e7d2b98b08866e04dc3b8d5b717fa3360533",
+        "e810e59a1851774a844cd7a1648f78aa4881799c42471df73660d59aeeb5aa5d",
     ),
     (
         "vox8.fix",
@@ -2531,8 +2531,9 @@ const FR8: &[(&str, Make)] = &[
         format!("{} {}", w0(g, &s), g.int(0, 9))
     }),
     ("vperm", |g| {
+        // seed 0 is "no seed yet", which FS-04's `reproduce` takes from the clock
         let s = g.shape(NUMERIC);
-        format!("{} {}", w0(g, &s), g.int(0, 9))
+        format!("{} {}", w0(g, &s), g.int(1, 99))
     }),
     ("nonmax", |g| {
         let s = g.shape(&[0, 3, 3, 4]);

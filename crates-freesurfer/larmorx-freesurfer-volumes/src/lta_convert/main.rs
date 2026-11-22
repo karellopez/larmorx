@@ -10,8 +10,8 @@
 //! options while the next argument starts with `-`: the name after one or two dashes, upper-cased
 //! in place (so messages show it upper-cased), each printing what it set (`--inlta: <x> input LTA
 //! transform.` and so on); `--help` the help (`lta_convert.help.xml`), status 1; an unknown one
-//! `ERROR: Option: <arg> unknown (see --help) !! ` between empty lines on standard error, status
-//! 1. No argument at all: the help, status 1. The input: `--inlta` (`--regheader`:
+//! `ERROR: Option: <arg> unknown (see --help) !! ` between empty lines on standard error,
+//! status 1. No argument at all: the help, status 1. The input: `--inlta` (`--regheader`:
 //! `identity.nofile`), `--infsl`, `--inmni`/`--inxfm`, `--inreg`, `--inniftyreg`/`--inras`,
 //! `--inniftyreg2d`, `--initk`/`--inlps`, `--invox` (none: `<progname>: can't read input file `,
 //! `ERROR_BADFILE`); then ` LTA read, type : 1` and the matrix (`MatrixPrint`); the source's and
@@ -645,7 +645,7 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
             }
             lta_change_type(g, r.out, r.err, env, &mut lta, p.ltaouttype)?;
         }
-        let _ = write!(r.out, "Writing  LTA to file {}...\n", p.ltaout);
+        let _ = writeln!(r.out, "Writing  LTA to file {}...", p.ltaout);
         let mut fo = match CFile::open(r.dir, &p.ltaout, "w") {
             Ok(f) => f,
             Err(e) => {

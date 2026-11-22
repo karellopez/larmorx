@@ -84,7 +84,9 @@ const IDENT: [f32; 9] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
 const CORONAL: [f32; 9] = [-1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0];
 /// 30 degrees about the superior axis.
 const OBLIQUE: [f32; 9] = [0.866_025_4, 0.5, 0.0, -0.5, 0.866_025_4, 0.0, 0.0, 0.0, 1.0];
-/// 45 degrees: two axes share their main direction (FS-1167).
+/// 45 degrees: two axes share their main direction (FS-1167). The number as written (its `float`,
+/// which the recorded cases' volumes hold), not `FRAC_1_SQRT_2`'s.
+#[allow(clippy::approx_constant)]
 const DIAG: [f32; 9] = [
     0.707_106_8,
     0.707_106_8,

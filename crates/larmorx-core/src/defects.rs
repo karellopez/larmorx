@@ -2029,6 +2029,8 @@ defects! {
         "mri_make_uchar given a volume whose slices are not coronal prints the error 'MRIvoxelToTalairachVoxel: unsupported slice direction' (after the last system error's message) once for every voxel, although the point it fails to compute is never used and the result is right: larmorx prints none";
     FS_1131 = "FS-1131", "FreeSurfer", true,
         "mri_make_uchar whose ball around the Talairach origin gives both percentiles in histogram bins of one value (no voxel in the ball, one intensity in it) or whose percentile is not a number divides by zero: its intensity line is not finite and it writes a volume of zeros with status 0: larmorx ends with an error (status 1) and writes no output";
+    FS_1132 = "FS-1132", "FreeSurfer", true,
+        "mri_mask given an option that takes numbers or a file (-dilate, -erode, -T, -threshold, -crop-to-fov, -crop-to-fov-mm, -BB, -crop-crs, -BBM, -BBMM, -BBEQ, -transfer, -oval, -lta_src, -lta_dst, -DEBUG_VOXEL, -bgnoise) as its last arguments, without all its values, reads past its arguments and crashes (signal 11): larmorx prints that the option needs its values and the help, status 1";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

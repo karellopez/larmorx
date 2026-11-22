@@ -347,25 +347,67 @@ def path_text(program: str, args: Sequence[str]) -> tuple[str, ...]:
     if Path(program).name == "bet2" and len(args) < 2:
         texts += ["-h", "--help"]
     if Path(program).name in EXTENSION_FROM_WHOLE_PATH:
-        # the text after an argument's last dot, folders included: the program's extension
-        # (``a.b/c`` has ``b/c``, ``trail.`` none), which a file's suffix does not give
-        texts += [a[a.rfind(".") :] for a in args if "." in a]
+        texts += whole_path_texts(args)
     return tuple(texts)
+
+
+#: What FreeSurfer's readers look for anywhere in a gzipped name: ``mri_identify`` takes a name
+#: whose extension is ``gz`` as MGH when it holds ``.mgh.gz`` and as NIfTI when it holds
+#: ``.nii.gz``; ``TransformFileNameType`` takes a name ending in ``nii.gz`` as a morph.
+GZ_MARKERS = (".mgh.gz", ".nii.gz", "nii.gz")
+
+
+def whole_path_texts(args: Sequence[str]) -> list[str]:
+    """For the programs of :data:`EXTENSION_FROM_WHOLE_PATH`: the texts of the arguments' paths
+    that decide a file's format and that the key's suffix of the file's own name does not hold
+    (``key.suffix``): the text after a path's last dot when that suffix does not end with it (a dot
+    in a folder's name, ``a.b/c``: extension ``b/c``; a dot last, ``trail.``; a name that is only an
+    extension, ``.mgz``), and each of :data:`GZ_MARKERS` a path holds that its suffix does not
+    (``x.mgh.gz``: suffix ``.gz``). A name the suffix already decides (``in.mgz``, ``x.nii.gz``,
+    ``noext``) adds nothing: its run keeps its key."""
+    from pathlib import PurePosixPath
+
+    from larmorx_validation.oracle_cache.key import _SPLIT, suffix
+
+    texts = []
+    for a in args:
+        for i, piece in enumerate(_SPLIT.split(str(a))):
+            if i % 2 or not piece:
+                continue
+            held = suffix(PurePosixPath(piece).name)
+            if "." in piece and not held.endswith(tail := piece[piece.rfind(".") :]):
+                texts.append(tail)
+            texts += [m for m in GZ_MARKERS if m in piece and m not in held]
+    return texts
 
 
 #: Programs that read a file's format from the text after the last dot of its whole path
 #: (FreeSurfer's ``fio_extension``: ``a.b/c`` has the extension ``b/c``): the key keeps that
-#: text (relay 50 of FreeSurfer's track A: two inputs of the same content named ``a.b/c`` and
-#: ``trail.`` had one key, and the cache served the one's run for the other). ``mri_make_uchar``
-#: (relay 51 of track D): ``MRIread``'s ``mri_identify`` and ``LTAread``'s file type both take
-#: the text after the whole name's last dot.
-EXTENSION_FROM_WHOLE_PATH = ("mri_add_xform_to_header", "mri_make_uchar")
+#: text where the file's own suffix does not give it (:func:`whole_path_texts`; relay 50 of
+#: FreeSurfer's track A: two inputs of the same content named ``a.b/c`` and ``trail.`` had one
+#: key, and the cache served the one's run for the other). Every program of larmorx-freesurfer
+#: that reads its volumes through ``MRIread`` (``mri_identify``'s extension of the whole name) or
+#: its transforms through ``LTAread`` (``TransformFileNameType``'s): ``mri_make_uchar`` (relay 51
+#: of track D), the others and the unit oracle's harness ``fsunit`` (relay 51 of track A).
+EXTENSION_FROM_WHOLE_PATH = (
+    "fsunit",
+    "lta_convert",
+    "mri_add_xform_to_header",
+    "mri_binarize",
+    "mri_convert",
+    "mri_info",
+    "mri_make_uchar",
+    "mri_normalize",
+    "mri_segstats",
+    "mris_calc",
+)
 
 
 __all__ = [
     "CLOCK_SAMPLED_STAGES",
     "CONFIRMATIONS",
     "EXTENSION_FROM_WHOLE_PATH",
+    "GZ_MARKERS",
     "IMAGE_MATH_VOXELWISE",
     "VARIES_ABOVE_ONE_THREAD",
     "VARYING_DEFECTS",
@@ -381,4 +423,5 @@ __all__ = [
     "path_text",
     "read_past_end",
     "threads_from_env",
+    "whole_path_texts",
 ]

@@ -90,3 +90,23 @@ keeps, for the programs of `EXTENSION_FROM_WHOLE_PATH` (`mri_add_xform_to_header
 each argument's last dot; seeds 1 and 3 were run again with the new keys (seed 1's hash unchanged,
 seed 3 0 different). Other programs that read a format from a whole path (`mri_info`'s
 `fio_extension` of its inputs) may want the same.
+
+Relay 51 widened it: every program of larmorx-freesurfer reads its volumes through `MRIread`
+(`mri_identify`: `strrchr(name, '.')` of the whole name, and for the extension `gz` a `strstr` of
+`.mgh.gz` and `.nii.gz` anywhere in it) or its transforms through `LTAread`
+(`TransformFileNameType`: the last `@` or `.`, the name cut at `#`, a name ending in `nii.gz`), so
+`EXTENSION_FROM_WHOLE_PATH` lists them all (with track D's `mri_make_uchar` and the unit oracle's
+`fsunit`), and `policy.whole_path_texts` keeps only what the key's suffix of the file's own name
+does not already hold (the text after the last dot where that suffix does not end with it; a gzip
+name the suffix does not hold): a run whose names the suffix decides keeps its old key. A name
+without a dot (`noext`) keeps its key too, and its entry may have been stored by a run of another
+name: relay 51's re-check ran every run with such an input fresh (`refresh`) and compared each
+run's exit status, streams and files with the run served before
+(`validation/investigations/oracle-cache/whole_path_recheck.py`; logs
+`<scratch>/A/rl51/recheck/`): fs-add-xform seeds 1, 3 and the extra cases (27, 39 and 3 confusable
+runs: `noext`, `a.b/c`, `trail.`) and fs-calc seeds 1 and 2 (one each: an input `2`) give the
+same summaries and official hashes (`127e7633...`, `98de724e...`, `b5eebbd1...`; 223 of 228
+identical); the only raw differences, 24 runs' standard error, are FS-167 cases (FreeSurfer
+prints memory never written: `SKIP`). The other probes (fs-info seeds 1, 3, golden and its
+replay; fs-binarize, fs-segstats, fs-normalize seeds 1, 2 and golden; fs-convert's golden; the
+golden cases of fs-calc and fs-add-xform) have no confusable run: their keys do not change.

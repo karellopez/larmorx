@@ -16,8 +16,8 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 (``MRI_NORMALIZE_CASES``, 2026-11-19), ``mri_binarize`` (``MRI_BINARIZE_CASES``, 2026-11-21),
 ``mri_convert`` (``MRI_CONVERT_CASES``, 2026-11-21), ``mri_segstats`` (``MRI_SEGSTATS_CASES``,
 2026-11-22), ``mri_info`` (``MRI_INFO_CASES``, 2026-11-22), ``mris_calc`` (``MRIS_CALC_CASES``,
-2026-11-22), ``mri_add_xform_to_header`` (``MRI_ADD_XFORM_CASES``, 2026-11-22) and
-``mri_make_uchar`` (``MRI_MAKE_UCHAR_CASES``, 2026-11-22).
+2026-11-22), ``mri_add_xform_to_header`` (``MRI_ADD_XFORM_CASES``, 2026-11-22), ``mri_make_uchar``
+(``MRI_MAKE_UCHAR_CASES``, 2026-11-22) and ``lta_convert`` (``LTA_CONVERT_CASES``, 2026-11-22).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -2640,3 +2640,99 @@ def test_mri_make_uchar_replica_needs_no_more_memory_than_freesurfer(tmp_path, n
         )
         c = fsfiles.compare(o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out)
         assert c.same, f"mri_make_uchar {name} ({mode}): {c.verdict} {c.detail}"
+
+
+#: lta_convert's calls: recon-all's step 4 and talairach_avi's (the volumes read in place, so
+#: that both sides' outputs name the same files).
+LTA_CONVERT_CASES = [
+    (
+        "recon-all",
+        [
+            "--inlta",
+            "identity.nofile",
+            "--src",
+            "{mri}/rawavg.mgz",
+            "--trg",
+            "{mri}/orig.mgz",
+            "--outlta",
+            "out.lta",
+            "--subject",
+            "sub-01",
+        ],
+    ),
+    (
+        "talairach",
+        [
+            "--src",
+            "{mri}/orig.mgz",
+            "--trg",
+            "{home}/average/mni305.cor.mgz",
+            "--inxfm",
+            "{mri}/transforms/talairach.xfm",
+            "--outlta",
+            "out.lta",
+            "--subject",
+            "fsaverage",
+            "--ltavox2vox",
+        ],
+    ),
+]
+
+
+@pytest.mark.parametrize(("name", "args"), LTA_CONVERT_CASES)
+def test_lta_convert_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, args):
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    home = ws / FS_HOME if ws else None
+    exe = home / "bin" / "lta_convert" if home else None
+    mri = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / "ds000005-sub-01-classic" / "subjects"
+        / "sub-01" / "mri"
+        if ws
+        else None
+    )  # fmt: skip
+    if exe is None or not exe.is_file() or not (mri / "orig.mgz").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    words = [a.format(mri=mri, home=home) for a in args]
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        "FS_DISABLE_LANG": "1",
+        **freesurfer_env(),
+    }
+
+    def fresh(d: Path):
+        def reset() -> None:
+            if d.exists():
+                shutil.rmtree(d)
+            d.mkdir()
+
+        reset()
+        return reset
+
+    o_dir = tmp_path / "freesurfer"
+    code, fs_mib = _original_peak(
+        ["lta_convert", *words], env, "freesurfer", fresh(o_dir), o_dir, (), "freesurfer"
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        fresh(r_dir)
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "lta_convert", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(f"lta_convert {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"lta_convert {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        assert (r_dir / "out.lta").read_bytes() == (o_dir / "out.lta").read_bytes(), name

@@ -269,6 +269,7 @@ pub fn run(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut 
             err: &mut terr,
             env: settings.env.clone(),
             dir: settings.dir.as_deref(),
+            threads: settings.threads,
         };
         match main(&mut g, &mut r, args) {
             Ok(()) => 0,
@@ -342,6 +343,26 @@ pub fn mri_seg_count(
         }
     }
     Ok(nhits)
+}
+
+/// [`mri_seg_count`] of every id of frame 0 in one pass: each `(int)` value's count.
+pub fn seg_counts(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    seg: &Mri,
+) -> Result<std::collections::HashMap<i32, i32>, Fatal> {
+    let mut counts = std::collections::HashMap::new();
+    for c in 0..seg.vg.width {
+        for r in 0..seg.vg.height {
+            for s in 0..seg.vg.depth {
+                let v = mri_get_vox_val(g, err, seg, c, r, s, 0, 0)?;
+                let id = float_to_int(g, f64::from(v), "MRIsegCount");
+                let k = counts.entry(id).or_insert(0i32);
+                *k = k.wrapping_add(1);
+            }
+        }
+    }
+    Ok(counts)
 }
 
 /// The excluded ids' test (`DoExclSegId` and the list).
@@ -957,87 +978,47 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
         maxlabel = m;
     }
 
-    for (n, e) in table.iter_mut().enumerate() {
-        if excluded(&o, e.id) {
-            continue;
+    // MRIsegCount of every id at once: one pass over the voxels gives each id's count, the same
+    // numbers as a pass per id
+    let counts = if !o.dontrun && mris.is_none() {
+        seg_counts(g, r.err, &seg)?
+    } else {
+        std::collections::HashMap::new()
+    };
+    let ctx = IdCtx {
+        o: &o,
+        counts: &counts,
+        seg: &seg,
+        pvvol: pvvol.as_ref(),
+        segborder: segborder.as_ref(),
+        invol: invol.as_ref(),
+        mris: mris.as_ref(),
+        voxelvolume,
+        maxlabel,
+    };
+    let todo: Vec<usize> = (0..table.len())
+        .filter(|&n| !excluded(&o, table[n].id) && segidlist0.contains(&table[n].id))
+        .collect();
+    let ids: Vec<i32> = table.iter().map(|e| e.id).collect();
+    let results = per_id(g, &ctx, &ids, &todo, r.threads);
+    for (n, res) in todo.iter().zip(results) {
+        let res = res?;
+        let _ = r.out.write_all(&res.out);
+        let _ = r.err.write_all(&res.err);
+        g.notices.extend(res.notices);
+        let e = &mut table[*n];
+        e.nhits = res.nhits;
+        e.vol = res.vol;
+        if let Some(st) = res.stats {
+            e.min = st[0];
+            e.max = st[1];
+            e.range = st[2];
+            e.mean = st[3];
+            e.std = st[4];
+            e.snr = st[5];
         }
-        if !segidlist0.contains(&e.id) {
-            continue;
-        }
-        let (nhits, vol): (i32, f32);
-        if !o.dontrun {
-            match &mris {
-                None => match &pvvol {
-                    None => {
-                        nhits = mri_seg_count(g, r.err, &seg, e.id, 0)?;
-                        vol = mul(nhits as f32, voxelvolume);
-                    }
-                    Some(pv) => {
-                        vol = mri_voxels_in_label_with_partial_volume_effects(
-                            g,
-                            r.out,
-                            r.err,
-                            &seg,
-                            Some(pv),
-                            e.id,
-                            None,
-                            None,
-                            maxlabel + 1,
-                            segborder.as_ref(),
-                        )?;
-                        nhits = mri_seg_count(g, r.err, &seg, e.id, 0)?;
-                    }
-                },
-                Some(m) => {
-                    let (mut nh, mut v) = (0i32, 0.0f32);
-                    let verts = m.vertices.as_deref().unwrap_or(&[]);
-                    for c in 0..m.nvertices {
-                        let sv = mri_get_vox_val(g, r.err, &seg, c, 0, 0, 0, 0)?;
-                        if sv == e.id as f32 {
-                            nh += 1;
-                            let vx = &verts[c as usize];
-                            let a = if m.group_avg_vtxarea_loaded != 0 {
-                                vx.group_avg_area
-                            } else {
-                                vx.area
-                            };
-                            v = larmorx_freesurfer_core::sse::add(v, a);
-                        }
-                    }
-                    nhits = nh;
-                    vol = v;
-                }
-            }
-        } else {
-            nhits = n as i32;
-            vol = 0.0;
-        }
-        e.nhits = nhits;
-        e.vol = vol;
-        if let Some(iv) = invol.as_ref()
-            && !o.dontrun
-        {
-            let (min, max, range, mean, std, snr) = if nhits > 0 {
-                let (_, st) = if !o.use_robust {
-                    mri_seg_stats(g, r.err, &seg, e.id, iv, o.frame)?
-                } else {
-                    mri_seg_stats_robust(g, r.err, &seg, e.id, iv, o.frame, o.robust_pct)?
-                };
-                let snr = larmorx_freesurfer_core::sse::div(st.mean, st.std);
-                (st.min, st.max, st.range, st.mean, st.std, snr)
-            } else {
-                (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-            };
-            e.min = min;
-            e.max = max;
-            e.range = range;
-            e.mean = if o.do_accumulate {
-                mul(mean, nhits as f32)
-            } else {
-                mean
-            };
-            e.std = std;
-            e.snr = snr;
+        if let Some(f) = res.fatal {
+            return Err(f);
         }
     }
 
@@ -1140,6 +1121,193 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
 
     let _ = writeln!(r.out, "mri_segstats done");
     Ok(())
+}
+
+/// What each id's statistics read (shared by the threads).
+struct IdCtx<'a> {
+    o: &'a Options,
+    /// Each id's `MRIsegCount(seg, id, 0)` ([`seg_counts`]).
+    counts: &'a std::collections::HashMap<i32, i32>,
+    seg: &'a Mri,
+    pvvol: Option<&'a Mri>,
+    segborder: Option<&'a Mri>,
+    invol: Option<&'a Mri>,
+    mris: Option<&'a Mris>,
+    voxelvolume: f32,
+    maxlabel: i32,
+}
+
+/// One id's results: count, volume, the input's statistics (minimum, maximum, range, mean,
+/// standard deviation, signal-to-noise ratio), what its functions printed and noted, and the end
+/// of the program when one of them ended it.
+#[derive(Default)]
+struct IdResult {
+    nhits: i32,
+    vol: f32,
+    stats: Option<[f32; 6]>,
+    out: Vec<u8>,
+    err: Vec<u8>,
+    notices: Vec<larmorx_core::defects::Notice>,
+    fatal: Option<Fatal>,
+}
+
+/// The loop body of `main`'s OpenMP loop over the ids (`mri_segstats.cpp` 865-939) for the
+/// `n`-th id: its count and volume (`MRIsegCount` and the voxel volume; with `--pv`
+/// `MRIvoxelsInLabelWithPartialVolumeEffects`; on a surface the vertices' areas), and with an
+/// input its statistics (`MRIsegStats`, or `MRIsegStatsRobust` with `--robust`; 0 for an empty
+/// id). `--dontrun`: the count is `n`.
+fn id_stats(g: &mut Globals, c: &IdCtx, id: i32, n: usize) -> IdResult {
+    let mut res = IdResult::default();
+    let mut out = Vec::new();
+    let mut err = Vec::new();
+    let r = id_stats_wkr(g, c, id, n, &mut out, &mut err, &mut res);
+    if let Err(f) = r {
+        res.fatal = Some(f);
+    }
+    res.out = out;
+    res.err = err;
+    res.notices = g.notices.as_slice().to_vec();
+    res
+}
+
+fn id_stats_wkr(
+    g: &mut Globals,
+    c: &IdCtx,
+    id: i32,
+    n: usize,
+    out: &mut Vec<u8>,
+    err: &mut Vec<u8>,
+    res: &mut IdResult,
+) -> Result<(), Fatal> {
+    let o = c.o;
+    let (nhits, vol): (i32, f32);
+    if !o.dontrun {
+        match c.mris {
+            None => match c.pvvol {
+                None => {
+                    nhits = c.counts.get(&id).copied().unwrap_or(0);
+                    vol = mul(nhits as f32, c.voxelvolume);
+                }
+                Some(pv) => {
+                    vol = mri_voxels_in_label_with_partial_volume_effects(
+                        g,
+                        out,
+                        err,
+                        c.seg,
+                        Some(pv),
+                        id,
+                        None,
+                        None,
+                        c.maxlabel + 1,
+                        c.segborder,
+                    )?;
+                    nhits = c.counts.get(&id).copied().unwrap_or(0);
+                }
+            },
+            Some(m) => {
+                let (mut nh, mut v) = (0i32, 0.0f32);
+                let verts = m.vertices.as_deref().unwrap_or(&[]);
+                for k in 0..m.nvertices {
+                    let sv = mri_get_vox_val(g, err, c.seg, k, 0, 0, 0, 0)?;
+                    if sv == id as f32 {
+                        nh += 1;
+                        let vx = &verts[k as usize];
+                        let a = if m.group_avg_vtxarea_loaded != 0 {
+                            vx.group_avg_area
+                        } else {
+                            vx.area
+                        };
+                        v = larmorx_freesurfer_core::sse::add(v, a);
+                    }
+                }
+                nhits = nh;
+                vol = v;
+            }
+        }
+    } else {
+        nhits = n as i32;
+        vol = 0.0;
+    }
+    res.nhits = nhits;
+    res.vol = vol;
+    if let Some(iv) = c.invol
+        && !o.dontrun
+    {
+        let st = if nhits > 0 {
+            let (_, st) = if !o.use_robust {
+                mri_seg_stats(g, err, c.seg, id, iv, o.frame)?
+            } else {
+                mri_seg_stats_robust(g, err, c.seg, id, iv, o.frame, o.robust_pct)?
+            };
+            let snr = larmorx_freesurfer_core::sse::div(st.mean, st.std);
+            let mean = if o.do_accumulate {
+                mul(st.mean, nhits as f32)
+            } else {
+                st.mean
+            };
+            [st.min, st.max, st.range, mean, st.std, snr]
+        } else {
+            [0.0; 6]
+        };
+        res.stats = Some(st);
+    }
+    Ok(())
+}
+
+/// [`id_stats`] of each id in `todo` (indices into `ids`), on `threads` threads (0: every
+/// logical CPU), each id with its own copy of the globals; the results in `todo`'s order, so that
+/// what they print and note is FreeSurfer's one-thread order. `Err` only for a thread that
+/// panicked.
+fn per_id(
+    g: &Globals,
+    c: &IdCtx,
+    ids: &[i32],
+    todo: &[usize],
+    threads: usize,
+) -> Vec<Result<IdResult, Fatal>> {
+    let procs = std::thread::available_parallelism().map_or(1, |p| p.get());
+    let nt = if threads == 0 { procs } else { threads }.clamp(1, todo.len().max(1));
+    if nt == 1 {
+        return todo
+            .iter()
+            .map(|&n| Ok(id_stats(&mut g.clone(), c, ids[n], n)))
+            .collect();
+    }
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let mut slots: Vec<Option<IdResult>> = (0..todo.len()).map(|_| None).collect();
+    // each thread its own copy of the globals (they are not shared), each id a copy of that
+    let bases: Vec<Globals> = (0..nt).map(|_| g.clone()).collect();
+    let next = &next;
+    let done: Vec<Vec<(usize, IdResult)>> = std::thread::scope(|s| {
+        let handles: Vec<_> = bases
+            .into_iter()
+            .map(|base| {
+                s.spawn(move || {
+                    let mut mine = Vec::new();
+                    loop {
+                        let k = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        if k >= todo.len() {
+                            break;
+                        }
+                        let n = todo[k];
+                        mine.push((k, id_stats(&mut base.clone(), c, ids[n], n)));
+                    }
+                    mine
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|h| h.join().unwrap_or_default())
+            .collect()
+    });
+    for (k, res) in done.into_iter().flatten() {
+        slots[k] = Some(res);
+    }
+    slots
+        .into_iter()
+        .map(|x| x.ok_or(Fatal::Exit(134)))
+        .collect()
 }
 
 /// A colour table's entry as a row: its id, name (at most 999 bytes) and colour.

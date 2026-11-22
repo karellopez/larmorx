@@ -66,6 +66,8 @@ pub struct Run<'a, 'b> {
     pub err: &'a mut dyn Write,
     pub env: Environment,
     pub dir: Option<&'b Path>,
+    /// The threads of the ids' statistics (`Settings::threads`; 0: every logical CPU).
+    pub threads: usize,
 }
 
 /// `mri_segstats`'s settings (its file-scope variables), FreeSurfer's defaults.

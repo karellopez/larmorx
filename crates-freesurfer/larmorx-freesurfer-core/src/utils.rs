@@ -480,8 +480,14 @@ pub fn unique_int_list(g: &mut Globals, idlist: &mut [i32]) -> Vec<i32> {
         };
     }
     idlist.sort_unstable();
-    let mut u = idlist.to_vec();
-    u.dedup();
+    // the distinct values only: a copy of the whole list kept its room (a volume's worth for
+    // MRIsegIdList: mri_segstats's memory, relay 49 of track D)
+    let mut u: Vec<i32> = Vec::new();
+    for &x in idlist.iter() {
+        if u.last() != Some(&x) {
+            u.push(x);
+        }
+    }
     u
 }
 

@@ -2989,18 +2989,28 @@ read and written as the voxel functions do outside a volume (fs.mri §5, FS-52, 
   minimum and `WARNING: clip cmax ` when the extent is below `max - min`, in the order cmin, cmax, rmin, rmax, smin, smax
   (**(observed)**: `vcrops`; `vrules15`, no voxel at or above the threshold: the centroid's NaNs, the bounds 1000000 and
   0, the corner 0).
-- **`MRIcropAroundCRS(vol, center, FoV, iKeep)`**: first voxel `round(center - floor((FoV - 1) / 2))` per axis (as `int`;
-  a NaN centre the `int` minimum), last `first + FoV - 1`. Inside the volume: `MRIextractRegion` (`  using
+- **`MRIcropAroundCRS(vol, center, FoV, iKeep)`**: first voxel `round(center - floor((FoV - 1) / 2))` per axis (as `int`
+  as x86 converts, in both modes: a NaN or a value outside `int`'s range the `int` minimum), last `first + FoV - 1`
+  (in `int`, see FS-517 below). Inside the volume: `MRIextractRegion` (`  using
   MRIextractRegion()`); otherwise a new volume of `FoV` (the volume's type, frames, header, pulse parameters, colour
   table), its centre set from the RAS of the first voxel (`MRIp0ToCRAS`, printed as `P0 <g> <g> <g>` and `c_ras of new
   volume ...`), the voxels inside the volume copied. With `iKeep`, voxels whose value is in none of its labels become 0.
   Printed first: `MRIcropAroundCRS()`, `vol size`, `center` (`%g`), `fov`, `limits <c0> <c1>   <r0> <r1>   <s0> <s1>` and
   `iKeep ...`. A FoV of 0 inside the volume takes `MRIextractRegion`, whose volume prints `MRI::Shape::Shape(): volume
   size must be greater than 0 in every dimension` (fs.mri §4) and is returned; a negative FoV outside it ends the
-  program in the allocation (status 1) (**(observed)**: `vcrops`, `vrules15`). A last voxel beyond `int`: FS-517
-  (FreeSurfer's loop runs through `int`'s range and, as the official build compiles it, then writes outside the new
-  volume and crashes; **(observed)**: `vrules15`, a centre of 2147483647 with a FoV of 3, and a NaN centre with a FoV of
-  0).
+  program in the allocation (status 1) (**(observed)**: `vcrops`, `vrules15`). FS-517, in both modes: on an axis whose
+  last voxel (`first + FoV - 1`, computed exactly) lies past `int`'s range (above its maximum or below its minimum),
+  the lines above are printed (through `iKeep ...`; `limits` shows FreeSurfer's `int` values, the last wrapped) and the
+  program ends (larmorx's own error), noted; otherwise, on an axis whose last voxel is exactly `int`'s maximum, the
+  path outside the volume is taken up to its `P0` and `c_ras of new volume` lines (the allocation's own messages
+  included) and then the program ends the same way. FreeSurfer's own outcome in these cases, as its build compiles the
+  `int` overflow, is a crash or a returned volume of `FoV` holding none of the volume's voxels, by the axis and the path
+  (**(observed)**: `vrules16`, each axis with the others inside the volume or outside it: a last voxel past the maximum
+  crashes on the columns with the others inside (after `error: MRIextractInto: bad src location (2147483646, 1, 1)`)
+  and returns zeros otherwise, the rows and slices with that error printed first when the others are inside; exactly
+  the maximum returns zeros but on the slices with the others inside, a crash before any line is written; a NaN centre
+  with a FoV of 0 crashes with the others inside and returns a volume of no voxels otherwise; `vrules15`, a centre of
+  2147483647 with a FoV of 3, and a NaN centre with a FoV of 0: crashes).
 - **`MRIcropAroundRAS(vol, rasCenter, voxFoVRAS, lta, iKeep)`**: the RAS centre's voxel by the inverse vox2ras (with an
   LTA: a copy, oriented and made RAS to RAS, `Chaning Source LTA type to ras2ras`, applied first: `ras2vox * M`; the
   matrices printed: `Input RAS2VOX`, `LTA RAS2RAS`, then `final ras2vox matrix`, the matrix and a line of dashes). The

@@ -4076,8 +4076,11 @@ class Gen14(Gen13):
         arrays of types 0 and 1, both reversals and both sample types, warp points placed to land
         inside the volume through the array's other end (item 85); MRIcropAroundRAS's fields of
         view for orientations that are the identity, a transposition or a 3-cycle of the axes,
-        with and without an array (item 86, FS-268); MRIapplySpmWarp's trilinear samples of tensor
-        and RGB volumes, the first sample failing (item 88, FS-511)."""
+        with and without an array (item 86, FS-268), and of an orientation naming x twice with
+        three different fields of view (item 87, FS-515); MRIcropAroundCRS's FS-517 on each axis,
+        the other axes inside the volume or outside it (a last voxel past int's maximum, at it,
+        and below its minimum); MRIapplySpmWarp's trilinear samples of tensor and RGB volumes, the
+        first sample failing (item 88, FS-511)."""
         L = []
         r = random.Random(1616)
         ident = [[1.0 if i == j else 0.0 for j in range(4)] for i in range(4)]
@@ -4172,6 +4175,19 @@ class Gen14(Gen13):
         ob = ((4, 4, 2), [*(f32(1.0) for _ in range(3)), "1", *(f32(x) for x in cs), *[f32(0.0)] * 6])
         c1 = " ".join(f64(x) for x in (1.0, 1.0, 0.0))
         L.append(f"crras {self.lab(ob, list(range(32)))} 0 1 {c1} 4 1 3 0 null")
+        # FS-517's outcomes in FreeSurfer, by axis: a last voxel past int's maximum (a centre of
+        # 2147483647, a field of view of 3), exactly at it (a field of view of 1) and below int's
+        # minimum (a NaN centre, a field of view of 0), the other axes inside the volume or not
+        cv = self.lab(self.plain((4, 4, 2)), list(range(32)))
+        for ax in range(3):
+            for kind in ((2147483647.0, 3), (2147483647.0, 1), (float("nan"), 0)):
+                for others in (1.0, -5.0):
+                    ctr = [others] * 3
+                    fov = [1, 1, 1]
+                    ctr[ax], fov[ax] = kind
+                    L.append(
+                        f"ccrs {cv} 0 {' '.join(f64(x) for x in ctr)} {' '.join(map(str, fov))} 0"
+                    )
         # item 88 (FS-511): trilinear samples of a tensor and an RGB volume (the sampler cannot
         # read them): the first sample at a point not on a voxel fails before any wrote a value;
         # then a point on a voxel (the nearest sampler: 0); and the reverse order
@@ -4187,7 +4203,9 @@ class Gen14(Gen13):
                 for nfr in (1, 2):
                     v = self.lab(gp, [17 + i for i in range(64 * nfr)], t=t, nf=nfr)
                     L.append(f"spmw {v} 0 null {warp} 0 0 1 new")
-        return [Batch("vrules16", "vrules16", L)]
+        # FS-517: larmorx ends in both modes where FreeSurfer returns a volume of zeros: a line
+        # noting it may differ in both modes
+        return [Batch("vrules16", "vrules16", L, both="FS-517")]
 
 
 GROUPS = [

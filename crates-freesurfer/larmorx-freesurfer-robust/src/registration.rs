@@ -32,6 +32,9 @@
 //! (`--test`) and the `--debug` writes (the intermediate images, the keypress waits) come with
 //! `mri_robust_register` (queue 3.2-13): a debug level above 0 ends here with "not ported yet".
 
+// the 4 x 4 and 3 x 3 matrices are indexed as FreeSurfer's code indexes them
+#![allow(clippy::needless_range_loop)]
+
 use std::io::Write;
 
 use larmorx_core::cfmt::{self, ostream};

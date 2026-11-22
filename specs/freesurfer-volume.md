@@ -2733,10 +2733,21 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
     `LTAchangeType` (its validity checks, its type set, its inverses filled and, from REGISTER_DAT, coronal RAS and FSL,
     its diagnostic print below), then the outer call's own print and fill. Physvox to RAS here is FS-506's change.
   - FS-508: a conversion copied into `M` that gives no matrix (`MRItkreg2FSL`'s last inverse fails: a registration
-    that cannot be inverted): FreeSurfer's copy frees `M` and the inverses' fill then reads the freed matrix
-    (**(observed)**: `vrules14`, `MatrixInverse: matrix (<memory> x <memory>) is not square` and the fill's end). In both
-    modes the program ends there (status 252) with the error `LTAchangeType: the FSL conversion gave no matrix
-    (FreeSurfer frees the transform's matrix and goes on using it here)` + `\n`, noted.
+    that cannot be inverted; reached from REGISTER_DAT: from RAS, a singular `M` ends the program first in
+    `MRItkRegMtx`'s product, `m2 is null`): FreeSurfer's copy frees `M`, which the transform keeps, and goes on: the
+    later transforms are converted (their messages, and their own ends of the program, come first), the type is set,
+    and the freed matrix is first read by the diagnostic print (from REGISTER_DAT with `Gdiag_no` above 0, when it is
+    the first transform's: after the `transformed matrix:` line) or else by the inverses' fill at that transform (the
+    earlier transforms filled first, their own ends first) (**(observed)**: `vrules14`: `MatrixInverse: matrix
+    (<memory> x <memory>) is not square` and the fill's end, or the print's `MatrixPrint: unknown type <memory>`;
+    relay 15's cases of two transforms: the first failing, the second's conversion lines come before the read; the
+    first failing and the second's source a geometry whose `K` has no inverse, the second's own end, `m2 is null`,
+    with no read at all; the second failing, both transforms' lines and, at the diagnostic level 1, the first
+    transform's matrix printed before the fill reads the second's). In both modes the program ends at that first read
+    (status 252) with the error `LTAchangeType: the FSL conversion gave no matrix (FreeSurfer frees the transform's
+    matrix and goes on using it here)` + `\n`, noted; where the program ends before it (a later conversion's or an
+    earlier fill's own end), that end is FreeSurfer's and nothing is noted. (Until relay 15 this text said "there",
+    which read as the copy itself: the later transforms' lines and ends come first.)
   - Another target, after the validity checks and before any change (also for an array of no transforms), ends the
     program (status 252) with the error `LTAchangeType unsupported: you are requesting REGISTER_DAT to <n> ` from
     REGISTER_DAT (`COR_RAS_TO_COR_RAS` from coronal RAS, `FSLREG_TYPE` from FSL; the text without a final newline)

@@ -3453,6 +3453,15 @@ class Gen12(Gen11):
         # other way
         L.append(f"ltared {arr(1, [(m1, g1, g2), (m2, g3, g2), (m3, g3, g1)])}")
         L.append(f"ltared {arr(1, [(m1, g1, g2), (m2, g3, g2), (m3, g2, g4)])}")
+        # FS-508's place: FreeSurfer converts the later transforms (their lines, their own ends)
+        # and reads the freed matrix first in the diagnostic print or in the inverses' fill; each
+        # on a line of its own
+        gz = geo((3, 5, 2), (0.0, 3.0, 1.0), c=(-1.0, 2.0, 7.0))
+        L.append(f"{nz}ltachg {arr(14, [(sing, g1, g2), (m2, g2, g3)])} 15")
+        L.append(f"{nz}ltachg {arr(14, [(m1, g1, g2), (sing, g2, g3)])} 15")
+        L.append(f"{nz}ltachg {arr(14, [(sing, g1, g2), (m2, gz, g3)])} 15")
+        L.append(f"+gdiagno=1 {nz}ltachg {arr(14, [(sing, g1, g2)])} 15")
+        L.append(f"+gdiagno=1 {nz}ltachg {arr(14, [(m1, g1, g2), (sing, g2, g3)])} 15")
         # FS-198, FS-504, FS-508: FreeSurfer reads a freed matrix or a transform the array does not
         # hold, the same bytes in every run of the probe: a line noting one may differ in both modes
         return [Batch("vrules14", "vrules14", L, both="FS-198,FS-504,FS-508")]

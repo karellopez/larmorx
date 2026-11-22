@@ -241,6 +241,20 @@ The spec's sections in brackets.
 | `cfov W P c r s d` | `MRIcropToFoV` (the fields of view, the threshold) [§57] | the region's x y z dx dy dz |
 | `ccrs W P c r s fc fr fs n k×n` | `MRIcropAroundCRS` (the centre, doubles; the fields of view; the labels kept) [§57] | the volume |
 | `crras W P valid c r s fc fr fs n k×n LTA` | `MRIcropAroundRAS` (the volume's `valid` flag set first; the RAS centre; the array or `null`) [§57] | the volume, then the array when one was given |
+| `vv W P od W2 P2 M interp param` | `MRIvol2Vol` (the source, its outside value (a double) set first; the target; the target-to-source voxel matrix or `null`; the sample type; the parameter, a float) [§41] | the status, then the target |
+| `vvsm W P od W2 P2 M interp param VSM LTA pedir` | `MRIvol2VolVSM` (as `vv`; VSM `null` or `W P od`, the voxel-shift map and its outside value; the map's array or `null`; the direction) [§41] | the status, the target, then the array (`null` without one) |
+| `vvtk W P od W2 P2 M interp param VSM LTA pedir` | `MRIvol2VolTkRegVSM` (as `vvsm`, M the tkregister registration or `null`) [§56] | as `vvsm` |
+| `vvk W P W2 P2 M` | `MRIvol2VolTLKernel` [§41] | 1 when it returned none, then the target |
+| `vvd W P W2 P2 M` | `MRIvol2VolDelta` (the moving volume, the target, the registration or `null`) [§41] | the volume |
+| `rd2lta W W2 M` | `TransformRegDat2LTA` (the target, the moving volume, the registration or `null`) [§41] | the array |
+| `maskup W P MASK up npad cons` | `MRImaskAndUpsample` (MASK `null` or `W P`; the factor, the pad, conserving) [§41] | the volume, then the array (`null` without a volume) |
+| `cov W P MASK` | `MRIcovarianceMatrix` (MASK `null` or `W P`) [§42] | the matrix |
+| `mpca W P MASK` | `MRIpca` [§42] | the status, `U`, `S`, then `V` |
+| `pcast n f×n mode` | the singular values (a row vector); mode 0 `PrintPCAStats` to standard output, 1 `WritePCAStats` into `pca.dat` (in the working folder), 2 into `no-such-folder/pca.dat` [§42] | the status, then `pca.dat`'s bytes after the program flushed it (empty without one) |
+| `fdr n (W P f MASK OUT)×n d sign lg dbg pm po` | `MRIfdr2vwth` (each input with its frame, a mask `null` or `W P`, an output `new` (none), `self` (the input) or a W; the rate (a double), the sign, log10, debug, whether masks and outputs are passed) [§42] | the status, the threshold (a double, 7 before), then each output passed |
+| `rgbb W P kind pads` | kind 0 `REGIONgetBoundingBox` (one pad), 1 `REGIONgetBoundingBoxM` (six pads), 2 `REGIONgetBoundingBoxEqOdd` (one pad) [§43] | the region's x y z dx dy dz, or `null` |
+| `rgprt x y z dx dy dz` | `REGIONprint` to standard output, then `REGIONcopy` into a new region and `REGIONclear` of the copy [§43] | the copy's six fields, then the cleared copy's |
+| `vxn W P n (x y z w f)×n` | for each point `MRIvoxelDx`, `MRIvoxelDy`, `MRIvoxelDz`, `MRIvoxelMean` (the window, the frame), `MRIvoxelDirection` and `MRIvoxelGradientDir2ndDerivative` (the window) [§44] | six floats per point |
 
 ## The models
 
@@ -507,3 +521,15 @@ cached matrices as allocated, recomputed or dropped.
   warm and twice without the cache; the probe as its own candidate: no unexplained difference in either mode; every
   model as before, none different (logs `oracles/logs/fs-volume-probe-r15-final-2026-11-22.log`,
   `-r15-vrules15-2026-11-22.log`: `vrules15` gained its FS-515 case after the first cold run).
+- Relay 16 (2026-11-22): the prebuilt probe from `2c4d9f97` first: the new fixed group `vrules16` (68 calls: the fs.volume
+  clean room's items 84 to 88 and FS-517 on each axis; FS-517 allowed in both modes) the same cold, warm and twice
+  without the cache, the probe as its own candidate identical in both modes (log
+  `oracles/logs/fs-volume-probe-r16-vrules16b-2026-11-22.log`). Then part 9: the prebuilt probe rebuilt from commit
+  `39264dfc` (the commands `vv`, `vvsm`, `vvtk`, `vvk`, `vvd`, `rd2lta`, `maskup`, `cov`, `mpca`, `pcast`, `fdr`, `rgbb`,
+  `rgprt`, `vxn`; its build in `BUILD_INFO.txt`, the same bytes twice; the 2c4d9f97 build kept in
+  `<workspace>/archive/2026-11-22-fs-volume-probe-2c4d9f97/`): every earlier group's hash unchanged; the new groups
+  `vv2v` (415 calls), `vregion` (160) and `vrules17` (45) and `vrules16` the same cold, warm and twice without the
+  cache (log `oracles/logs/fs-volume-probe-r16-final-2026-11-22.log`). `cov`, `mpca`, `pcast`, `fdr` and `vxn` (§42,
+  §44) have no group yet. The probe as its own candidate: no unexplained difference in either mode; every model as
+  before, none different. The arrays of Gen15's groups carry every matrix (`arr1z`): a transform without `m_dL`
+  makes the concatenation's copies crash (FS-198), which would hide `MRIaseg2volMU`'s own paths.

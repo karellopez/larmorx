@@ -1124,19 +1124,27 @@ fn fs470_fs471_the_errors_and_the_limits_off_the_border() {
     }
 }
 
-/// §39: fewer powers than frames (`mri_framepower`) end the program before any frame changes
-/// (rule B, status 252), both modes.
+/// FS-266 (§39): fewer powers than frames (`mri_framepower`) end the program before any frame
+/// changes (rule B, status 252), both modes, noted.
 #[test]
-fn framepower_with_fewer_powers_than_frames() {
+fn fs266_framepower_with_fewer_powers_than_frames() {
     let line = format!("fpow {} 1 40000000", wp("1 1 1 3 2 0", "i1073741824", "0"));
     for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
-        let (r, _) = run(&line, mode);
+        let (r, ids) = run(&line, mode);
         assert!(r.starts_with("EXIT 252 |"), "{r}");
         assert!(
             r.contains("mri_framepower(): fewer powers than frames (FreeSurfer reads past them)\n"),
             "{r}"
         );
+        assert!(ids.iter().any(|i| i == "FS-266"), "{ids:?}");
     }
+    // as many powers as frames: not noted
+    let line = format!(
+        "fpow {} 2 40000000 3f800000",
+        wp("1 1 1 3 2 0", "i1073741824", "0")
+    );
+    let (_, ids) = run(&line, UpstreamDefects::Fix);
+    assert!(!ids.iter().any(|i| i == "FS-266"), "{ids:?}");
 }
 
 /// FS-480: frames -1, 0, 0 with zeros excluded (`MRIvote`): the last run of zeros taken with
@@ -1229,6 +1237,58 @@ fn fs508_an_fsl_conversion_without_a_matrix() {
         assert!(r.starts_with("EXIT 252 |"), "{r}");
         assert!(r.contains("LTAchangeType: the FSL conversion gave no matrix (FreeSurfer frees the transform's matrix and goes on using it here)\n"), "{r}");
         assert!(ids.iter().any(|i| i == "FS-508"), "{ids:?}");
+    }
+}
+
+/// FS-508's place (§54, relay 15's answer): the program ends at the first read of the freed
+/// matrix, after the later transforms' conversions: the diagnostic print of the first transform
+/// (after `transformed matrix:`), else the inverses' fill at that transform (the earlier
+/// transforms filled and, at the diagnostic level 1, the first one's matrix printed first).
+#[test]
+fn fs508_ends_at_the_first_read_of_the_freed_matrix() {
+    let fsl = "+env=FSLOUTPUTTYPE=NIFTI_GZ";
+    let first = arr54(14, &[(SING, G1, G2), (M1, G2, G3)]);
+    let second = arr54(14, &[(M1, G1, G2), (SING, G2, G3)]);
+    let ends = |line: &str, mode| {
+        let (r, ids) = run(line, mode);
+        assert!(r.starts_with("EXIT 252 |"), "{line}: {r}");
+        assert!(r.contains("LTAchangeType: the FSL conversion gave no matrix (FreeSurfer frees the transform's matrix and goes on using it here)\n"), "{r}");
+        assert!(ids.iter().any(|i| i == "FS-508"), "{ids:?}");
+        out_of(&r)
+    };
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        // the first transform's freed matrix read by the print, after both conversions' lines:
+        // nothing after the print's first line
+        let out = ends(&format!("{fsl} +gdiagno=1 ltachg {first} 15"), mode);
+        assert_eq!(out.matches("tkreg2FSL: mov det").count(), 2, "{out}");
+        assert!(
+            out.ends_with("registration matrix.\ntransformed matrix:\n"),
+            "{out}"
+        );
+        // the second's read by the fill, the first one's matrix printed before it
+        let out = ends(&format!("{fsl} +gdiagno=1 ltachg {second} 15"), mode);
+        let (_, after) = out.split_once("transformed matrix:\n").expect("the print");
+        assert_eq!(after.lines().count(), 4, "{out}");
+        // at level 0 both end in the fill, nothing printed by the change itself
+        for a in [&first, &second] {
+            ends(&format!("{fsl} ltachg {a} 15"), mode);
+        }
+    }
+    // the second transform's own end comes first: a geometry whose K has no inverse (a voxel size
+    // of 0) as its source ends the program in its own conversion, nothing noted
+    let g0 = G3.replacen(
+        "3f800000 3f800000 3f800000 1",
+        "00000000 3f800000 3f800000 1",
+        1,
+    );
+    let line = format!(
+        "{fsl} ltachg {} 15",
+        arr54(14, &[(SING, G1, G2), (M1, &g0, G3)])
+    );
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let (r, ids) = run(&line, mode);
+        assert!(!r.contains("the FSL conversion gave no matrix"), "{r}");
+        assert!(!ids.iter().any(|i| i == "FS-508"), "{ids:?}");
     }
 }
 

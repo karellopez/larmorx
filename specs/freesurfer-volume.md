@@ -3367,8 +3367,8 @@ for `vresamp` after its sources were given a good RAS in most cases, `fs-volume-
 | `vrules12` | 37-39 | 112 | 10 | 3 | 0 | `06edcc6932caee09486d04babbd672a2231ecde14c3230bb95b09c27fd3e4cf4` |
 | `vrules13` | 37 | 13 | 7 | 0 | 0 | `3d913f7f127b91cea2886f580ad1dae9dff0629702c9e4285f8d1426f256832e` |
 | `vlta54` | 54 | 225 | 10 | 32 | 0 | `51df0bf468be3f8ce169633906d35aa06d2cd8828fd31bf8b2ebee06c473d99d` |
-| `vrules14` | 54 | 94 | 9 | 17 | 0 | `020ac531151bfc93131a683148dd7685db7c798ee22711ef01cb0012d2f82c30` |
-| all | | 15,272 | 1,524 | 778 | 13 | |
+| `vrules14` | 54 | 109 | 13 | 30 | 0 | `d307c05f700a98a5e18e2c7f6cf2a5528951005cb7516519f09fa1f5981c011a` |
+| all | | 15,287 | 1,528 | 791 | 13 | |
 
 The probe's groups `vbspline` and `vbsrules` are fs.bspline's (`specs/freesurfer-bspline.md` §9).
 
@@ -3609,7 +3609,11 @@ the diagnostic print at levels 1 and 0 and of an array of no transforms (FS-504)
 place, new and into arrays of another size; the concatenations of one array, a chain, an inverted array, a mismatch,
 other types, arrays of no transforms and no array (FS-504); the reductions of one transform, a chain, an inverted one,
 a mismatch, no transforms and transforms without `m_dL` (FS-198); the source and target tests; the prints of every
-type, subjects, scales, NaN elements, no transforms, a 3 x 4 and a 5 x 5 matrix (FS-504)). Their memory and crash lines:
+type, subjects, scales, NaN elements, no transforms, a 3 x 4 and a 5 x 5 matrix (FS-504); relay 15's: two
+reductions after a transform taken inverted, a mismatch and a match, that tell the previous transform's
+destination from the chain's end; five FS-508 places of two transforms and the diagnostic level 1, one of them
+ended by the second transform's own conversion before any read; eight changes of transforms without a matrix).
+Their memory and crash lines:
 FS-504's reads, FS-508's freed matrix, FS-198's copies, the reductions' heap checks; their exits: the fills' and
 products' ends, the unsupported targets, `FSLOUTPUTTYPE` unset (status 1).
 
@@ -3697,7 +3701,8 @@ line of `vrules10`, `vrules11` and `vrules12` identical in both modes, `vpvlab`,
 3 memory lines each; no unexplained difference in either mode; relay 14 (the prebuilt probes from 1536bbbb and
 84fda65e): the same for every earlier group, every line of `vrules13` identical in both modes, `vlta54` all but 1
 memory line and 2 where FreeSurfer crashed in one process and not in another, `vrules14` all but 1 memory line; no
-unexplained difference in either mode.
+unexplained difference in either mode; relay 15 (the prebuilt probe from 84fda65e, compare.py's `vrules14` grown by
+15 fixed calls): `vrules14` all but 3 memory lines, no unexplained difference in either mode.
 
 ### 69.4 The defects of parts 1 to 8 (index)
 

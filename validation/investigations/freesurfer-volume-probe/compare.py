@@ -3300,8 +3300,10 @@ class Gen12(Gen11):
         and into an array of another size; LTAconcat of one array, of arrays that do not match, of
         an inverted one, of other types, with an array without transforms; LTAreduce of one
         transform, of a mismatch and of an inverted one; LTAmriIsSource and LTAmriIsTarget;
-        LTAprint of every type, subjects, scales, NaN elements, a 3 x 4 matrix (FS-504). Lines that
-        read memory FreeSurfer does not own are on lines of their own."""
+        LTAprint of every type, subjects, scales, NaN elements, a 3 x 4 matrix (FS-504); relay 15's:
+        LTAreduce after a transform taken inverted, FS-508's place with two transforms and the
+        diagnostic level, transforms without a matrix. Lines that read memory FreeSurfer does not
+        own are on lines of their own."""
         L = []
         zero = f32(0.0)
 

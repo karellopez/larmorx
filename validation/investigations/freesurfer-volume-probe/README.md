@@ -23,7 +23,7 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 |---|---|
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 30 groups of seeded cases and thirteen of fixed cases (`vrules`, `vrules4` to `vrules14`, `vbsrules`; 15,753 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 30 groups of seeded cases and thirteen of fixed cases (`vrules`, `vrules4` to `vrules14`, `vbsrules`; 15,768 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 | `models.py` | statements of the spec checked as models of the probe's printed results: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
@@ -357,8 +357,9 @@ random draw's sums, the zero test, the integer stores past their range, the vote
 lines of their own) and of `vrules13` (§37: FS-471's negative label limits off and on the border), §54's `vlta54`
 (arrays of 0 to 3 transforms between a pool of six geometries: type changes to and from REGISTER_DAT, FSL and coronal
 RAS with each `FSLOUTPUTTYPE` and a diagnostic level, inversions, concatenations, reductions, source and target tests,
-prints) and the fixed cases of `vrules14` (§54: FS-504, FS-507, FS-508, FS-198's copies, the unsupported targets, the
-diagnostic print, the edges of every operation), and fs.bspline's `vbspline` (the coefficients of volumes of the six numeric types, degrees 2
+prints) and the fixed cases of `vrules14` (§54: FS-504, FS-507, FS-508 and its place, FS-198's copies, the unsupported
+targets, the diagnostic print, the edges of every operation, the reductions' comparison after an inverted
+transform, transforms without a matrix), and fs.bspline's `vbspline` (the coefficients of volumes of the six numeric types, degrees 2
 to 9 and 0, 1, 10, -1, given B-splines with fitting, other or no coefficients; sampling at points inside,
 at and past the edges, NaN and infinite, frames -1 to one past; the frame-range sampler; coefficients
 sampled as given with degrees -2 to 12; the linear, RAS and transform-array transforms; the pyramids into
@@ -473,3 +474,7 @@ cached matrices as allocated, recomputed or dropped.
   different (log `oracles/logs/fs-volume-probe-r14-final-2026-11-22.log`). The arrays' transforms carry `m_dL` and
   `m_last_dL` as 4 x 4 zeros, as a new array holds them: without them the fs.mri copy frees the destination's
   (FS-198), and every reduction then fails glibc's heap checks; FS-198 has a line of its own.
+- Relay 15 (2026-11-22): the prebuilt probe from `84fda65e` unchanged; `vrules14` gains 15 fixed calls at its end
+  (109: two reductions after a transform taken inverted, five places of FS-508, eight changes of transforms
+  without a matrix); its new hash the same cold, warm and twice without the cache, the probe as its own candidate:
+  no unexplained difference in either mode (log `oracles/logs/fs-volume-probe-r15-vrules14-2026-11-22.log`).

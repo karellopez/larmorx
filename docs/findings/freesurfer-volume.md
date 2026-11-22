@@ -1172,3 +1172,55 @@ object code read: the unit oracle's `libutils.a` member `mriBSpline.cpp.o` (`obj
   of <n> bins (the values' range, <min> to <max>) is refused (FreeSurfer allocates <bytes> bytes here)` and
   `ERROR_NO_MEMORY` in both modes (FreeSurfer's result there depends on the machine's memory); the probe does not compare
   those cases.
+
+## 32. Crops around an RAS point, bounding boxes, a segmentation at neither end (relay 45 of track C): FS-268 to FS-270
+Track E's R16.5 (its spec relay 16, `specs/freesurfer-volume.md` §43, §55, §57) applied to the replica.
+- **FS-268** (c, rule A): `MRIcropAroundRAS` (`utils/mri2.cpp` 7763) fills `crsFoV[dim(ostr[k])] = voxFoVRAS[k]` for
+  `k = 0..2`, where its own documentation gives `voxFoVRAS` in RAS order (`voxFoVRAS[0]` the left-right field, ...)
+  and `crsFoV` goes to `MRIcropAroundCRS` per voxel axis: the right assignment is `crsFoV[k] = voxFoVRAS[dim(ostr[k])]`.
+  The two agree when the axis permutation is its own inverse (the identity or one swap: `RAS`, `LIA`, `SAR`, `ARS`) and
+  differ for a 3-cycle (`SRA`, `ASR`, `PIL`, `ASL`, `IRP`). By default the right one, noted where they differ
+  (`MRIcropAroundRAS: the fields of view given to the voxel axes the other way round (<ostr>: (FreeSurfer's) for (the
+  documented))`); `reproduce` FreeSurfer's; the `ostr` line prints the mode's. Reached by `mri_binarize
+  --crop-around-ras` only; `mri_vsinus_seg`'s call gives the same field (96) on every axis, so it never changes there.
+- **FS-515 under `reproduce`** (D13's rule for memory contents): an orientation that names a direction twice or is
+  `???` leaves a `crsFoV` entry unset: `reproduce` now gives FreeSurfer's assignment with the unset entry 0, noted (the
+  open probe saw 0 in four runs; this probe's `fsvolume` children see other stack contents, 1693078050 among them, and
+  allocation failures: those lines stay `SKIP`); the default ends (status 252) as before.
+- **FS-269** (c; rules A and C, measured 2026-11-23): `REGIONgetBoundingBox` (`utils/region.cpp` 344) sizes its box
+  `max - min + 2 npad` (`REGIONgetBoundingBoxM`: `max - min + npad[lo] + npad[hi]`), one voxel short of `min - npad ..
+  max + npad`: the box ends at `max + npad - 1` (when the start is not clamped at 0). Measured on the recorded heads
+  (`validation/investigations/freesurfer-fs269-bbox/`):
+  - `mri_binarize --bb 0` (`binarize.py`: the official program and the port, 3 heads x 2 streams, five calls each):
+    FreeSurfer's output leaves out the mask's last voxels on each axis: 1,287 of 11,238,727 mask voxels over 18 masks
+    (white matter `--match 2 41`: 10 to 51; `brainmask --min 1`: 36 to 284; hippocampus `--match 17`: 24 to 69); the
+    numpy model (`boxes.py`) gives the same counts, and over the 36 masks of the six heads 3,005 of 25,531,217 (7 to 390
+    each). Rule A: by default the box is one voxel longer on an axis whose box would end before the mask's last voxel
+    (a pad after it of 0 or less), noted; `reproduce` FreeSurfer's. The default's outputs hold every mask voxel (the
+    counts above); `reproduce` 30 of 30 calls identical with the official program, `fix` identical where the pad is 1 or
+    2 (12 calls) and different with FS-269 noted where it is 0 (18).
+  - With a pad of 1 or more FreeSurfer's box holds every mask voxel and only the last padding layer (outside the mask)
+    is missing: in every caller ported so far that layer holds zeros of the cropped volume (`mri_binarize --bb`,
+    `mri_mask -bb`, `MRImaskAndUpsample` of the segmentation itself, `MRISfillInterior`'s shell). Correcting it there
+    would change recon-all's results: the v8 stream's SynthMorph step (`fs-synthmorph-reg`) runs `mri_mask -bb 3
+    orig.mgz orig.mgz invol.crop.nii.gz`, and the full box differs from FreeSurfer's on all six recorded heads (one more
+    column, row and slice wherever `orig.mgz`'s far edge is not reached: `boxes.py`), so the network's input grid
+    would change. `MRISfillInterior` (pad 2, its box only for speed) gives the same interior with the full box: track
+    D's `mriflood.rs` patched to it (`fill_interior_full_box.patch`, applied and reverted) on `real.py`'s 24 recorded
+    calls (the white and pial interiors in `aseg.mgz`'s grid, the ribbon, the white interior at 0.5 mm, 3 heads x 2
+    hemispheres): 24 of 24 identical with FreeSurfer in both modes, as the flood fill implies (a fully outside layer
+    adds no connection). Rule C (no gain, a pipeline relies on it): FreeSurfer's box in both modes there, nothing
+    noted; `mriflood.rs`'s own box is unchanged.
+- **FS-270** (a, crash; rule B): `MRIaseg2volMU` (`utils/resample.cpp` 2699) with `USF != -1` passes `LTAconcat`'s
+  `NULL` (the segmentation at neither end of the caller's array: `ERROR: LTAconcat(): LTAs 0 and 1 do not match`) to
+  `LTAmriIsSource`, which crashes. Both modes end after the refusal's lines (`MRIaseg2volMU: the segmentation is at
+  neither end of the registration (FreeSurfer crashes here)`, status 252), noted; it was FS-504 before. `check.py`'s
+  `SKIP` gains FS-270 (the line was already `SKIP` as FS-504: the seed-1 hash `a2c71444...` is unchanged).
+- **FS-511's text** (no code change): the value never written arises only where a trilinear sample of a type the
+  sampler cannot read fails before any sample gave a value; the nearest sampler of such a type writes 0 (and
+  returns its error), which later failing samples repeat. The port notes FS-511 at every failing sample before a
+  successful one (also those where the nearest sampler wrote 0): its value is FreeSurfer's (0) either way.
+- **The probe** (`check.py --only crras,ccrs,rgbb,maskup,a2vmu`, seeds 7 and 13 of 28,600: 500 cases each; logs
+  `oracles/logs/fs-found-c-r45-volume-crops.log`): `reproduce` 0 different (seed 7: 457 identical, 43 not comparable;
+  seed 13: 470 and 30); `fix` different only with notices (FS-268 15 and 9 times, FS-269 105 and 112). Seed 1's
+  5,720 cases: the hash and its counts unchanged.

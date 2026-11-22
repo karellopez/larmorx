@@ -19,8 +19,14 @@
 //! - **FS-514** (b): `LabelAmygalaCortalJunction`'s threads write the left and the right label
 //!   into a voxel next to both amygdalae in an order that depends on the threads; here in voxel
 //!   order (one thread's), noted.
+//! - **FS-268** (rule A): `MRIcropAroundRAS` gives the fields of view, documented in RAS order
+//!   (left-right, front-back, up-down), to the voxel axes the other way round (entry `k` to the
+//!   axis whose place is the direction axis `k`'s letter names): wrong for orientations that move
+//!   all three axes (`SRA`, `PIL`, `ASL`, ...). By default each voxel axis takes the entry its
+//!   letter names; `reproduce` FreeSurfer's; noted where the two differ.
 //! - **FS-515** (memory): `MRIcropAroundRAS` with an orientation that names an axis twice (or
-//!   `???`) crops to an extent never set: an error in both modes.
+//!   `???`) crops to an extent never set: an error by default; `reproduce` FreeSurfer's
+//!   assignment with the unset field of view taken as 0 (0 in every official run), noted.
 //! - **FS-516** (rule A): `MRIcropAroundRAS` decides the LTA's direction backwards (it inverts it
 //!   when the volume is its destination, goes on when the volume is neither end, and refuses when
 //!   it is both), comparing the volume's `valid` flag, which no volume constructor sets. By default
@@ -38,7 +44,7 @@
 use std::io::Write;
 
 use larmorx_core::cfmt;
-use larmorx_core::defects::{FS_512, FS_513, FS_514, FS_515, FS_516, FS_517, FS_802};
+use larmorx_core::defects::{FS_268, FS_512, FS_513, FS_514, FS_515, FS_516, FS_517, FS_802};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
 use larmorx_freesurfer_core::matrix::{Matrix, matrix_multiply};
@@ -825,10 +831,11 @@ fn vol_as_geom(g: &Globals, vol: &Mri) -> VolGeom {
 /// `MRIcropAroundRAS(vol, rasCenter, voxFoVRAS, lta0, iKeep)`: [`mri_crop_around_crs`] around the
 /// voxel of `rasCenter` (`inv(vox2ras)`, through a copy of `lta0` made RAS-to-RAS when given,
 /// `Chaning Source LTA type to ras2ras`), with the FoV of each voxel axis taken from the entry of
-/// `voxFoVRAS` (left-right, front-back, up-down) its orientation letter names. The matrices and
-/// numbers on standard output. An LTA neither end of which is the volume: `ERROR:
+/// `voxFoVRAS` (left-right, front-back, up-down) its orientation letter names (`reproduce`:
+/// FreeSurfer's assignment, FS-268). The matrices and numbers on standard output (the `ostr` line
+/// with the fields of view the mode takes). An LTA neither end of which is the volume: `ERROR:
 /// MRIcropAroundRAS(): vol is not src or dst of LTA (<a>, <b>)`, the LTA, `vg_isEqual_Threshold =
-/// <t>` and `None`. FS-515, FS-516.
+/// <t>` and `None`. FS-268, FS-515, FS-516.
 #[allow(clippy::too_many_arguments)]
 pub fn mri_crop_around_ras(
     g: &mut Globals,
@@ -931,32 +938,70 @@ pub fn mri_crop_around_ras(
         f64::from(crs.relt(3, 1)),
     ];
     let (_, ostr) = dircos_to_orientation_string(&vol.vg);
-    let mut fov: [Option<i32>; 3] = [None; 3];
+    // the RAS direction (0 left-right, 1 front-back, 2 up-down) each voxel axis's letter names
+    let dir = |o: u8| match o {
+        b'R' | b'L' => Some(0usize),
+        b'A' | b'P' => Some(1),
+        b'S' | b'I' => Some(2),
+        _ => None,
+    };
+    // FreeSurfer's assignment (FS-268): entry k of voxFoVRAS to the voxel axis whose place is the
+    // direction axis k's letter names, a later axis's write replacing an earlier one's
+    let mut fs_fov: [Option<i32>; 3] = [None; 3];
     for (k, &o) in ostr.iter().enumerate() {
-        match o {
-            b'R' | b'L' => fov[0] = Some(vox_fov_ras[k]),
-            b'A' | b'P' => fov[1] = Some(vox_fov_ras[k]),
-            b'S' | b'I' => fov[2] = Some(vox_fov_ras[k]),
-            _ => {}
+        if let Some(d) = dir(o) {
+            fs_fov[d] = Some(vox_fov_ras[k]);
         }
     }
-    let Some(fov) = fov.iter().copied().collect::<Option<Vec<i32>>>() else {
-        g.notices.add(
-            &FS_515,
-            "MRIcropAroundRAS: an orientation that names an axis twice: a FoV never set",
-        );
-        log::error_exit(
-            g,
-            err,
-            ERROR_BADPARM,
-            &format!(
-                "MRIcropAroundRAS: the orientation {} leaves a field of view unset (FreeSurfer reads memory it does not own here)\n",
-                String::from_utf8_lossy(&ostr)
-            ),
-        )?;
-        return Ok(None);
+    let fov = if fs_fov.iter().any(Option::is_none) {
+        // an orientation that names a direction twice, or `???`: a voxel axis no write reaches
+        if g.notices.reproduce() {
+            g.notices.add(
+                &FS_515,
+                "MRIcropAroundRAS: an orientation that names an axis twice: a FoV never set, taken as 0",
+            );
+            fs_fov.map(|f| f.unwrap_or(0))
+        } else {
+            g.notices.add(
+                &FS_515,
+                "MRIcropAroundRAS: an orientation that names an axis twice: a FoV never set",
+            );
+            log::error_exit(
+                g,
+                err,
+                ERROR_BADPARM,
+                &format!(
+                    "MRIcropAroundRAS: the orientation {} does not name each of the three directions once (FreeSurfer reads memory it does not own here)\n",
+                    String::from_utf8_lossy(&ostr)
+                ),
+            )?;
+            return Ok(None);
+        }
+    } else {
+        let fs_fov = fs_fov.map(|f| f.unwrap_or(0));
+        // the documented assignment: each voxel axis takes the entry its letter names
+        let ras_fov = ostr.map(|o| dir(o).map_or(0, |d| vox_fov_ras[d]));
+        if ras_fov != fs_fov {
+            g.notices.add(
+                &FS_268,
+                format!(
+                    "MRIcropAroundRAS: the fields of view given to the voxel axes the other way round ({}: ({} {} {}) for ({} {} {}))",
+                    String::from_utf8_lossy(&ostr),
+                    fs_fov[0],
+                    fs_fov[1],
+                    fs_fov[2],
+                    ras_fov[0],
+                    ras_fov[1],
+                    ras_fov[2]
+                ),
+            );
+        }
+        if g.notices.reproduce() {
+            fs_fov
+        } else {
+            ras_fov
+        }
     };
-    let fov = [fov[0], fov[1], fov[2]];
     let _ = writeln!(
         out,
         "ostr {} ({} {} {}) ({} {} {})",

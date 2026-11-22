@@ -16,12 +16,17 @@
 //! - **FS-267** (memory: the previous call's): a vote by tissue type with a tissue-type table of
 //!   no places compares no type: FreeSurfer takes the type its previous vote in the same process
 //!   chose (0 in its first); the port takes 0 at every call (FreeSurfer's first), noted.
-//! - **FS-511** (memory): `MRIapplySpmWarp`'s value where a sample fails before any succeeded:
-//!   never written; 0 in both modes.
+//! - **FS-511** (memory): `MRIapplySpmWarp`'s value where a trilinear sample of a volume type it
+//!   cannot read fails before any sample of the call gave a value: never written; 0 in both modes
+//!   (the nearest sampler of such a type gives 0, which later failing samples repeat: the same 0;
+//!   the port notes FS-511 at every failing sample before a successful one).
+//! - **FS-270** (crash): `MRIaseg2volMU` with upsampling (`USF` other than -1) and a segmentation
+//!   at neither end of the registration: the concatenation refuses (its lines printed) and
+//!   FreeSurfer then crashes on the missing array; both modes end the program there, noted.
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_267, FS_504, FS_509, FS_510, FS_511};
+use larmorx_core::defects::{FS_267, FS_270, FS_504, FS_509, FS_510, FS_511};
 use larmorx_core::glibc_qsort::qsort;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal, NO_ERROR};
@@ -401,7 +406,7 @@ pub fn mri_aseg2vol(
 /// concatenated with the inverse of the cut's, reduced; the caller's array has its inverses filled
 /// and may change type), made tkregister's (`REGISTER_DAT`, pointing from the volume), onto a
 /// header of `aseg2vol`'s other geometry (`int`, the segmentation's pulse parameters). `None` where
-/// [`mri_aseg2vol`] gives none. FS-504.
+/// [`mri_aseg2vol`] gives none. FS-270 (a segmentation at neither end with upsampling), FS-504.
 #[allow(clippy::too_many_arguments)]
 pub fn mri_aseg2vol_mu(
     g: &mut Globals,
@@ -428,7 +433,22 @@ pub fn mri_aseg2vol_mu(
         let Some(mut mu2a) = lta_invert(g, out, err, InvertInto::New(&a2mu))?.into_new() else {
             return no_array(g, err, "MRIaseg2volMU");
         };
-        lta_concat(g, out, err, env, &mut [&mut mu2a, aseg2vol], true)?
+        let c = lta_concat(g, out, err, env, &mut [&mut mu2a, aseg2vol], true)?;
+        if c.is_none() {
+            // FS-270: the concatenation refused (its lines printed); FreeSurfer then crashes
+            g.notices.add(
+                &FS_270,
+                "MRIaseg2volMU: the segmentation is at neither end of the registration (FreeSurfer crashes after the concatenation's refusal)",
+            );
+            log::error_exit(
+                g,
+                err,
+                ERROR_BADPARM,
+                "MRIaseg2volMU: the segmentation is at neither end of the registration (FreeSurfer crashes here)\n",
+            )?;
+            return Ok(None);
+        }
+        c
     } else if lta_mri_is_source(g, err, aseg2vol, aseg)? == 1 {
         lta_copy(g, out, err, aseg2vol, None)?.into_new()
     } else {

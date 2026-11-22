@@ -34,7 +34,8 @@ const SKIP: &[&str] = &[
     "FS-550", "FS-551", "FS-552", "FS-555", "FS-559", "FS-560", "FS-561", "FS-562", "FS-564",
     "FS-567", "FS-568", "FS-569", "FS-570", "FS-571", "FS-573", "FS-575", "FS-579", "FS-581",
     "FS-582", "FS-583", "FS-586", "FS-588", "FS-589", "FS-591", "FS-593", "FS-597", "FS-598",
-    "FS-600", "FS-601", "FS-615", "FS-618", "FS-966", "FS-967",
+    "FS-600", "FS-601", "FS-615", "FS-618", "FS-966", "FS-967", "FS-1063", "FS-1064", "FS-1065",
+    "FS-1066", "FS-1067", "ITK-113",
 ];
 
 #[test]
@@ -104,6 +105,53 @@ fn reproduce_gives_the_official_square_roots() {
 #[test]
 fn square_roots_fix_differs_only_with_a_notice() {
     for line in cases::generate_sqrtm(1, N_SQRTM) {
+        let (r, _) = cases::run_line(&line, UpstreamDefects::Reproduce);
+        let (f, ids) = cases::run_line(&line, UpstreamDefects::Fix);
+        assert!(r == f || !ids.is_empty(), "{line}");
+    }
+}
+
+/// The registration step's stream (`check.py --family regstep`: `rgauss`, `regress`, `trans`,
+/// `quat`, `rstep`), recorded 2026-11-22 (3.2-03 part 1: `RobustGaussian`, `Regression`,
+/// `Quaternion`, the fifteen transformation models and `RegistrationStep` in float and double):
+/// 1,000 cases, 914 lines identical, 80 hashed as `SKIP` (FS-1063..FS-1067, ITK-113, ITK-116,
+/// FS-163), 6 as `NOTPORTED` (the least-squares solve of fewer rows than columns under
+/// `reproduce`, FS-1067's other path).
+const N_REGSTEP: usize = 1000;
+const OFFICIAL_REGSTEP_SHA256: &str =
+    "401667eb618dc40ebb57e6110aa4f7b25c2a1af0d4d679e840562e11b37f6bb2";
+const SKIPPED_REGSTEP: usize = 80;
+const NOTPORTED_REGSTEP: usize = 6;
+
+#[test]
+fn reproduce_gives_the_official_registration_steps() {
+    let mut h = Sha256::new();
+    let (mut skipped, mut notported) = (0, 0);
+    for line in cases::generate_regstep(1, N_REGSTEP) {
+        let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
+        if out.contains("is not ported yet") {
+            notported += 1;
+            h.update(b"NOTPORTED\n");
+        } else if ids.iter().any(|x| *x == "FS-968" || *x == "SVDNAN") {
+            h.update(b"NANBITS\n");
+        } else if ids.iter().any(|x| SKIP.contains(x)) {
+            skipped += 1;
+            h.update(b"SKIP\n");
+        } else {
+            h.update(out.as_bytes());
+            h.update(b"\n");
+        }
+    }
+    assert_eq!((skipped, notported), (SKIPPED_REGSTEP, NOTPORTED_REGSTEP));
+    let hex: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    assert_eq!(hex, OFFICIAL_REGSTEP_SHA256);
+}
+
+/// The registration step's default differs from `reproduce` only where a defect it corrects is
+/// noted.
+#[test]
+fn registration_steps_fix_differs_only_with_a_notice() {
+    for line in cases::generate_regstep(1, N_REGSTEP) {
         let (r, _) = cases::run_line(&line, UpstreamDefects::Reproduce);
         let (f, ids) = cases::run_line(&line, UpstreamDefects::Fix);
         assert!(r == f || !ids.is_empty(), "{line}");

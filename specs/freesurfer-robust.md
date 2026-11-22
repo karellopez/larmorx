@@ -22,7 +22,11 @@ as black boxes the official FreeSurfer 8.2.0 programs (§8).
 Status: **part 1**, the helpers both `mri_robust_register` and `mri_robust_template` reach (the image
 helpers of §2, the moments of §3, the matrix helpers of §4), with **part 2's first piece**, the complex
 Schur form and the matrix square root (§4.5, §4.6; relay 41, 2026-11-20). The rest of part 2 (the
-registration itself, its transformations, steps and robust regression) follows with queue item 3.2-03. What black-box runs confirmed is marked **(observed)**.
+registration itself, its transformations, steps and robust regression) follows with queue item 3.2-03:
+its **first part** (relay 42, 2026-11-22) is §9 to §15, the robust statistics, the robust and
+least-squares solvers, the quaternions, the fifteen transformation models and the registration step;
+the registration's loop (`RegRobust`, `Registration`) follows. What black-box runs confirmed is marked
+**(observed)**.
 
 ## 1. Conventions
 
@@ -377,3 +381,292 @@ Jordan blocks with a zero eigenvalue end in step 4.
   official code reads memory it does not own, crashes or hangs (363), and four FS-968 lines are identical
   but for the NaNs' bits. At one thread on the main machine, on a 256^3 float volume: `getPartials` 0.8 s
   (FreeSurfer's peak 402 MB), `getBlur` 0.4 s, `MRIvalscale` 0.08 s, `subSample` 0.03 s.
+
+## 9. Robust statistics (`RobustGaussian<T>`, `T` float or double; part 3)
+
+Every comparison is C's (`a > b` and `a < b` are false when either is a NaN), so a list with NaNs is
+reordered in a definite way; arithmetic is in `T` unless said.
+
+- **`quick_select(a, n, k)`** (the `k`-th smallest, `k` from 1; Numerical Recipes' selection): `low = 0`,
+  `high = n - 1`, `median = k - 1`; repeat: if `high <= low` return `a[median]`; if `high == low + 1`,
+  swap the two when `a[low] > a[high]`, return `a[median]`; else `middle = (low + high) / 2` (integer);
+  swap `a[middle], a[high]` if `a[middle] > a[high]`; swap `a[low], a[high]` if `a[low] > a[high]`;
+  swap `a[middle], a[low]` if `a[middle] > a[low]`; swap `a[middle], a[low + 1]`; `ll = low + 1`, `hh =
+  high`; loop: `ll` increases by one, then again while `a[low] > a[ll]`; `hh` decreases by one, then
+  again while `a[hh] > a[low]`; stop when `hh < ll`, else swap `a[ll], a[hh]`; then swap `a[low],
+  a[hh]`; if `hh <= median` then `low = ll`; if `hh >= median` then `high = hh - 1`. `quick_selectI`
+  does the same and swaps a list of original positions (0 to `n - 1`) alongside, returning the
+  position of the result too.
+- **`kth_smallest(a, n, k)`** (Wirth's selection): `l = 0`, `m = n - 1`, `kk = k - 1`; while `l < m`:
+  `x = a[kk]`, `i = l`, `j = m`; do { while `a[i] < x`: `i++`; while `x < a[j]`: `j--`; if `i <= j`:
+  swap `a[i], a[j]`, `i++`, `j--` } while `i <= j`; if `j < kk` then `l = i`; if `kk < i` then `m = j`.
+  Return `a[kk]`. `kth_smallestI` likewise with positions.
+- **`median(a, n)`** (reorders `a`): odd `n`: `kth_smallest(a, n, (n + 1) / 2)`; even `n`: `q =
+  quick_select(a, n, n / 2)`, then `q2 = quick_select(a, n, n / 2 + 1)` on the array as the first left
+  it, and `0.5 * (q + q2)` (the sum in `T`, `q` its first operand; the half in `double`, rounded to
+  `T`). **`medianI`**: the same with the positions; for an even count the position is `0.5 * (i + i2)`
+  of the two positions' integer sum, as `T`.
+- **`mad(a, n, d)`** (reorders `a`): `m = median(a, n)`; a new list `t[i] = |a[i] - m|` (in `T`, over
+  `a` as the median left it); `d * median(t, n)` (in `T`, `d` first). FreeSurfer's default `d` is
+  1.4826 (as `T`).
+- An empty list: see FS-1064 (§14).
+
+## 10. The solvers (`Regression<T>`; part 3)
+
+A system `A p = b`: `A` is `rows x cols` (row by row), `b` has `rows` numbers; or `b` alone (one location
+parameter). Its state: the last error, the last weight and zero percentages (all -1 at the start), a
+verbosity (`setVerbose(v)` clamps to 0..2; 1 at the start) and whether the weighted solves run in
+`float` (`setFloatSvd`, off at the start).
+
+- **`getSigmaMAD(v, d)`**: `mad` (§9) of a copy of `v`.
+- **`getSqrtTukeyDiaWeights(r, w, sat)`** (the square roots of Tukey's biweights): for each `i`, `w[i] =
+  0` when `|r[i]| >= sat` (the magnitude in `T`, compared in `double`), else `t = r[i] / sat` (in
+  `double`) and `w[i] = (T)(1 - t * t)`.
+- **Weighted least squares `getWeightedLSEst(w)`** (`w` the square roots of the weights): `M = diag(w)
+  A` (`M[i][j]` the product of `A[i][j]` and `w[i]` in `T`) and `v[i] = b[i] * w[i]` (in `T`); the
+  least-squares solution of `M p = v` by VNL's QR decomposition (LINPACK's Householder QR without
+  pivoting, `larmorx_core::vnl_qr`'s `Qr<T>`, its `solve`). Of two NaN operands in `M`'s products the
+  official build passes on `A`'s where a row has four or more columns in `float` (three or more in
+  `double`), `w`'s otherwise. When the back-substitution meets a zero diagonal entry of `R`, VNL prints
+  `/home/rd521/4.13.2_ubuntu20/itk/4.13.2/src/ITK/Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_qr.hxx:
+  vnl_qr<T>::solve() : matrix is rank-deficient by <j>` and a newline on standard error (the
+  official build's path; `<j>` the 1-based column) and the solution keeps the entries the
+  back-substitution had not reached (LINPACK's), except for a single row (ITK-113, §14).
+- **`getWeightedLSEstFloat(w)`**: the same in `float` whatever `T`: `M` and `v` the products in `T`
+  rounded to `float`, `vnl_qr<float>`, the solution converted back to `T`. Two NaN operands: in `float`
+  as above; in `double` `A`'s, except for the third of the columns after the last multiple of four
+  (the third column of a row of three or fewer), where `w`'s.
+- **Least squares `getLSEst()`**: the weight percentages become -1. With `A`: VNL's SVD of `A` (`vnl_svd<T>`,
+  LINPACK's `xsvdc` with `job = 21`: `U` of `rows x cols`, `W` the singular values' magnitudes, `V` of `cols
+  x cols`); when LINPACK does not converge, VNL's two lines and the matrix (`specs/freesurfer-maths.md`'s
+  `suspicious return value` lines; `float` and `double` print alike), then `    Regression<T>::getLSEst
+  could not compute pseudo inverse!` on standard error and the end of the program (status 1). Else the
+  pseudo-inverse `V W^+ U^T` (`W^+` the reciprocals `1 / w_k` in `T` of the first `rank` magnitudes,
+  `rank` the count of magnitudes not `<= 0`, the others 0; VNL's products, `V W^+` first), `p = pinv(A)
+  b` (§10's matrix-vector product below), the residual `A p - b` and the last error its sum of squares
+  (each square in `T`, summed in `double` from 0). Without `A`: FS-1066 (§14).
+- **The matrix-vector product** (`A p`, `pinv(A) b`; ITK 4.13.2's VNL as built): each row `s = +0` and
+  `s = s + m * v` for each column, in order, with the official build's operand orders: in `float`, for
+  rows of four or more numbers, blocks of four products `v[j] * m[j]` (the vector's number first) summed
+  as `s = p0 + s`, `s = p1 + s`, `s = s + p2`, `s = s + p3`; in `double`, for rows of two or more, pairs
+  `v[j] * m[j]` summed `s = s + p`; the remaining numbers (all of them in shorter rows) `s = s + m[j] *
+  v[j]`. A matrix product is `specs/freesurfer-robust.md` §1's.
+- **The robust solution with `A` (`getRobustEstW(w, sat, sig)`, Tukey's biweight by iteratively
+  reweighted least squares)**: with verbosity 2 first `  Regression<T>::getRobustEstWAB( <sat> ,
+  <sig> )   FLOAT version ` (or `  DOUBLE version ` without `setFloatSvd`) and a newline on standard
+  output (`<sat>`, `<sig>` as C++ streams print a `double`: `%g` with six digits). `err[0] = +inf`,
+  `err[1] = 1e20` (in `T`); the residuals `r = b`; `count = 0`, `incr = 0`; repeat:
+  1. `count` increases; from the second step the solution and weights of the step before are kept;
+  2. `sigma = getSigmaMAD(r, 1.4826)` (as `double`); below `2e-12`: `  Sigma too small: <sigma>
+     (identical images?)` and a newline on standard output, all weights 1; else `r[i] = r[i] * s` with
+     `s = (T)(1 / sigma)`, then `getSqrtTukeyDiaWeights(r, w, sat)`;
+  3. `p` = the weighted least squares of `w` (`getWeightedLSEstFloat` with `setFloatSvd`, else
+     `getWeightedLSEst`);
+  4. `r = b - A p` (element by element, `b` first);
+  5. `err[count] = swr / sw` in `T`, with `sw = sum w_i^2` and `swr = sum (r_i^2 * w_i^2)` (each square in
+     `T`; the product `r_i^2 * w_i^2` with the residual's square first; sums from 0 in order, the sum
+     first); if `err[count - 1] <= err[count]` then `incr` increases;
+  until `incr >= 1`, or `count` reaches 20, or `err[count]` is not above `2e-12` (in `double`).
+  If `err[count] > err[count - 1]` the step before is taken (its solution and weights; the last error
+  `err[count - 1]`, and with verbosity 2 `     Step: <count - 2> ERR: <err[count - 1]>` and a newline);
+  else this step's (`     Step: <count - 1> ERR: <err[count]>`). Then over the entries with `|b[i]| >
+  0.00001` (the magnitude in `T`): `dd` the sum of their weights (the square roots, from 0, in
+  `double`), `n` their count, `z` the count of those weights below 0.1; the last weight percentage `dd /
+  n` and the zero percentage `z / n` (in `double`; 0 / 0 is the default NaN); with verbosity 2 `
+  weights average: <dd/n>  zero: <z/n>` on standard output **without** a newline (ten spaces first).
+  The weights returned are the square roots `w`.
+- **The robust location without `A`** (`getRobustEstW(w, sat, sig)` of `b` alone): `mu = median(b)`,
+  which **reorders `b` in place** (the caller's list); `muold = mu + 100` (in `T`); all weights 1; while
+  `|muold - mu| > 2e-6` (in `T`, compared in `double`) and fewer than 20 steps: `muold = mu`; `r_i =
+  (-b_i) + muold`; `sigma = getSigmaMAD(r)`; below `2e-6`: `mu = muold`, all weights 1, stop; else `t_i =
+  r_i * (T)(1 / sigma)`, the weights `getSqrtTukeyDiaWeights(t, w, sat)`; `d1 = sum b_i * w_i^2`, `d2 =
+  sum w_i^2` (in `double` from 0: `w_i^2` in `T`, then widened; `b_i` first in the product); `mu = (T)(muold
+  - (T)(d1) / d2)` (`d1` rounded to `T`, divided in `double`). The result is the one number `mu`; the
+  weights vector must have `b`'s length (FS-1065, §14).
+
+## 11. Quaternions (part 3)
+
+A quaternion `a + b i + c j + d k` and whether it is known to be of norm 1. `sin`, `cos` in `double`
+(glibc 2.35's with `reproduce`: `larmorx_core::math::Libm`; correctly rounded by default, GLIBC-07
+noted where they differ), `sqrt` IEEE.
+
+- **From a rotation vector `(v1, v2, v3)`**: `l = sqrt((v1 v1 + v2 v2) + v3 v3)`; when `l < 0.000001`
+  the quaternion is `1 + 0i + 0j + 0k`; else `a = cos(l / 2)`, and `b, c, d = (sin(l / 2) * v) / l`
+  (the product first). Of norm 1.
+- **From an angle `alpha` about an axis `(v1, v2, v3)`**: the same with `alpha / 2` in the sine and
+  cosine (the axis's length still `l`, the test on `l`).
+- **From the angles `z, y, x` (`importZYXAngles`)**: `qx * qy * qz` (left to right), `qz` the rotation by
+  `z` about `(0, 0, 1)`, `qy` by `y` about `(0, 1, 0)`, `qx` by `x` about `(1, 0, 0)`. Of norm 1.
+- **The product** `q * r` (Hamilton's, `q` on the left): `a = ((qa ra - qb rb) - qc rc) - qd rd`, `b =
+  ((qa rb + qb ra) + qc rd) - qd rc`, `c = ((qa rc - qb rd) + qc ra) + qd rb`, `d = ((qa rd + qb rc) - qc
+  rb) + qd ra`; of norm 1 when both are.
+- **The rotation matrix** (row by row): of the quaternion divided by its norm `sqrt(((a a + b b) + c c) +
+  d d)` unless it is of norm 1; with `qij` the products (`q11 = a a`, `q12 = a b`, `q13 = a c`, `q14 = a
+  d`, `q22 = b b`, `q23 = b c`, `q24 = b d`, `q33 = c c`, `q34 = c d`, `q44 = d d`): `((q11 + q22) - q33)
+  - q44`, `2 (q23 - q14)`, `2 (q24 + q13)`; `2 (q23 + q14)`, `((q11 - q22) + q33) - q44`, `2 (q34 - q12)`;
+  `2 (q24 - q13)`, `2 (q34 + q12)`, `((q11 - q22) - q33) + q44`.
+
+## 12. The transformation models (part 3)
+
+Fifteen models, each with `DOF` parameters (in `double`), a 4 x 4 matrix of them, Powell's initial steps
+and, for the robust step, the row of the linearised system at a voxel `(x, y, z)` (unsigned integers)
+with the image's derivatives `(fx, fy, fz)` (`float`). A new model's parameters are its identity. The
+registration uses the first kind (`Translate`, `Rigid`, `Isoscale`, `Affine`, `Identity`), Powell's the
+second (the models marked 2).
+
+| Model | DOF | identity | matrix | row of the system | steps |
+|---|---|---|---|---|---|
+| 2-D affine | 6 | 0 | `I` with `m00 = 1 + p0`, `m01 = p1`, `m03 = p2`, `m10 = p3`, `m11 = 1 + p4`, `m13 = p5` | `x fx`, `y fx`, `fx`, `x fy`, `y fy`, `fy` (products in `double`) | 0.001, `p2`, `p5` 0.02 |
+| 2-D affine 2 | 6 | `p3 = p4 = 1` | `(Z S) R` with `R` the rotation of `importZYXAngles(-p2, 0, 0)`, `S = diag(p3, p4, 1)`, `Z` the identity with `z01 = p5`; translation `(p0, p1, 0)`; last row `(0, 0, 0, 1)` | ends the program: `Gradient for affine 2d (second type) not implemented!` | 0.001, `p0`, `p1` 0.02, `p3`, `p4` 0.01 |
+| 2-D isotropic scale | 4 | 0 | `I` with `m00 = 1 + p2`, `m01 = -p3`, `m03 = p0`, `m10 = p3`, `m11 = 1 + p2`, `m13 = p1` | `fx`, `fy`, `fx x + fy y`, `fy x - fx y` (in `float`) | 0.001, `p0`, `p1` 0.02 |
+| 2-D isotropic scale 2 | 4 | `p3 = 1` | `I` with the upper 2 x 2 `p3 R` (`p3` first; `R` of `importZYXAngles(-p2, 0, 0)`), `m03 = p0`, `m13 = p1` | ends: `Gradient for isoscale 2d (second type) not implemented!` | 0.001, `p0`, `p1` 0.02, `p3` 0.01 |
+| 2-D rigid | 3 | 0 | the rotation of the rotation vector `(0, 0, p2)` with translation `(p0, p1, 0)` | `fx`, `fy`, `fy x - fx y` (in `float`) | 0.001, `p0`, `p1` 0.02 |
+| 2-D rigid 2 | 3 | 0 | the rotation of `importZYXAngles(-p2, 0, 0)`, translation `(p0, p1, 0)` | ends: `Gradient for rigid 2d (second type) not implemented!` | 0.001, `p0`, `p1` 0.02 |
+| 2-D translation | 2 | 0 | `I` with `m03 = p0`, `m13 = p1` | `fx`, `fy` | 0.02 |
+| 3-D affine | 12 | 0 | `I` plus `p` added to its first three rows, row by row (`m[r][c] = I[r][c] + p[4r + c]`, the identity's number first) | `fx x`, `fx y`, `fx z`, `fx`, `fy x`, `fy y`, `fy z`, `fy`, `fz x`, `fz y`, `fz z`, `fz` (in `float`) | 0.001, `p3`, `p7`, `p11` 0.02 |
+| 3-D affine 2 | 12 | `p6 = p7 = p8 = 1` | `(Z S) R`: `R` of `importZYXAngles(-p5, p4, -p3)`, `S = diag(p6, p7, p8)`, `Z` the identity with `z01 = p9`, `z02 = p10`, `z12 = p11`; translation `(p0, p1, p2)` | ends: ` Affine in 3D (type 2): gradient not implemented!` | 0.001, `p0..p2` 0.02, `p6..p8` 0.01 |
+| 3-D isotropic scale | 7 | `p6 = 1` | ends the program: ` Isoscale in 3D not implemented yet, use ridig or affine` | ends with the same message | 0.001, `p0..p2` 0.02, `p6` 0.01 |
+| 3-D isotropic scale 2 | 7 | `p6 = 1` | `I` with the upper 3 x 3 `R p6` (each of `R`'s numbers times `p6`, `R`'s first; `R` of `importZYXAngles(-p5, p4, -p3)`), translation `(p0, p1, p2)` | ends: ` Isoscale in 3D (type 2): gradient not implemented!` | as the isotropic scale |
+| 3-D rigid | 6 | 0 | the rotation of the rotation vector `(p3, p4, p5)`, translation `(p0, p1, p2)` | `fx`, `fy`, `fz`, `fz y - fy z`, `fx z - fz x`, `fy x - fx y` (in `float`) | 0.001, `p0..p2` 0.02 |
+| 3-D rigid 2 | 6 | 0 | the rotation of `importZYXAngles(-p5, p4, -p3)`, translation `(p0, p1, p2)` | ends: `ERROR rigid in 3D (type 2): gradient not implemented !` | 0.001, `p0..p2` 0.02 |
+| 3-D translation | 3 | 0 | `I` with the translation `(p0, p1, p2)` | `fx`, `fy`, `fz` | 0.02 |
+| 3-D identity | 0 | — | `I` | none | none |
+
+In the rows of the system the voxel positions are converted to `float` (`fx x` is a single-precision
+product) but for the 2-D affine model, whose six products are in `double`; each number is then stored as
+`double`. "Ends" means the message and a newline on standard error and status 1. `-p` flips the sign
+(a NaN keeps its payload). **Setting the parameters** from a list of at least `DOF` numbers takes the
+first `DOF` (from `float`s widened to `double`); FS-1063 (§14) for other lengths.
+
+## 13. The registration step (`RegistrationStep<T>`; part 3)
+
+The step reads from its registration: the saturation `sat` (a negative one: 4.685), whether the
+intensity is scaled (`iscale`: one more parameter, the last), the cost (the robust biweight `ROB`, or any
+other: least squares), the subsampling size (`subsample`, -1 none) and the verbosity; the weighted
+solves always run in `float` (`setFloatSVD(true)`, the registration sets it). It keeps the weights image
+of its last robust step and the index image of its last system between calls.
+
+**The system `constructAb(S, T)`** of two images in the same space (same size, frames and type):
+
+1. Verbosity 2: `   - constructAb: ` and a newline. A frame count 0 becomes 1. If either is one
+   slice deep and the other not: `ERROR: both source and target need to be 2D or 3D` on **standard
+   output** and status 1. Two images one slice deep are 2-D.
+2. The index image: of the source's size and frames, `int` voxels (`long` above 2,147,483,647 voxels and
+   frames: FS-1061), its outside value -10, every voxel -10. Verbosity 2: `     -- using INT for indexing
+   ... ` and a newline, `     -- allocating <MB>Mb mem for indexing ... `, then ` done!` and a newline
+   (`<MB>` = voxels x 4 / 2^20, as C++ prints a `double`).
+3. Subsampling happens when `subsample > 0` and the width and height are above it and the depth is above
+   it or is 1.
+4. Verbosity 2: `     -- compute derivatives ... `. The mean image `(S + T) * 0.5` (`MRIadd` into a new
+   `float` image, then `MRIscalarMul` by the `float` 0.5 in place) gives the derivatives `fx`, `fy`,
+   `fz` (none in 2-D) and its smoothed image `ft` (`getPartials`, §2.6); the difference `S - T`
+   (`MRIsubtract` into a new `float` image) smoothed in place (`getBlur`, §2.5) is `b`'s image.
+   Verbosity 2: ` done!` and a newline. When subsampling: `     -- subsample ... `, then `fx`, `fy`,
+   `fz`, `ft` and the difference each `subSample(image, none, false, 0)` (§2.4: every second voxel at
+   the fixed offsets), then ` done! ` and a newline.
+5. Verbosity 2: `     -- size <w> x <h> x <d> x <f> = <n>` (the derivatives' size) without a newline.
+6. The voxels are visited `z` outermost, then `x`, then `y` innermost (the derivatives' grid). The
+   image position of a grid voxel is itself, or when subsampling `(2x + dx, 2y + dy, 2z + dz)` with
+   `dx`, `dy` and (in 3-D; `z` itself in 2-D) `dz` each `(int)(2 * getRand(k))` for a counter `k` from 0
+   that advances after each draw (§2.3). A voxel is **outside** when `|S(p) - S's outside value| <=
+   0.00001 + S's outside value / 255` or the same for `T` (frame 0 of each image, `MRIgetVoxVal` as
+   `float`, the difference and the bound in `double`); then all its frames are skipped. Otherwise for
+   each frame: a NaN in `fx`, `fy`, `fz` (0.000005 as `float` in 2-D) or `ft` skips it; `|fx|`, `|fy|`
+   and `|fz|` all below 0.00001 (in `double`) skip it (a zero gradient); else it is a row. A first pass
+   counts the rows (and the NaN, zero and outside counts: `outside` adds the frame count).
+7. Verbosity 2: `  need only: <rows>` and a newline when there are fewer rows than grid voxels and frames.
+   No row: on standard error an empty line, ` ERROR: All entries are zero! Images do not overlap
+   (anymore?).`, `    This can have several reasons (i.e. different modalities, different `, `
+   intensity scales, large non-linearities, too diff. voxel sizes ...)`, `    Try calling with
+   --noinit (if the original images are well aligned)`, `    Maybe use --ixform <init.lta> with an
+   approx. alignment`, `    obtained from tkregister or another registration program.`, `    Or do some
+   prior intensity correction? `, `    You can also try to switch off symmetric reg. via --nosym `, `
+   or manually play around with the --sat parameter. `, an empty line (each line ending in a
+   newline, the trailing blanks kept), status 1. Verbosity 2: `     -- nans: <n> zeros: <z> outside:
+   <o>` and a newline.
+8. `A` has one column per parameter (the model's `DOF`, plus one with `iscale`). With `amu = rows *
+   (columns + 1) * size / 2^20` and `bmu = rows * size / 2^20` (`size` 4 in `float`, 8 in `double`; in
+   `double`), verbosity 2 prints `     -- allocating <amu + bmu>Mb mem for A and b ... `, then ` done! `
+   and a newline, then `         (MAX usage in SVD-float will be > <maxmu>Mb mem + 6 MRI) ` and a newline
+   (`maxmu = (amu + 3 bmu) + 2 (amu + bmu)`; without the float setting `SVD` and `5 amu + 7 bmu`). Above
+   3,800 (whatever the verbosity): `     -- WARNING: mem usage large: <maxmu>Mb mem + 6 MRI` and `
+   Maybe use --subsample <int> ` (ten spaces first), each with a newline.
+9. A second pass in the same order (the counter `k` again from 0) fills the index image at the image
+   position: -4 (all frames) for a voxel outside one image, -5 outside both, -2 for a frame skipped for a
+   NaN, -1 for a zero gradient, else the row number (from 0, as a 32-bit integer); the row is the model's
+   row of the system (§12) at the **grid** position `(x, y, z)` (FS-1062) with that frame's `fx`, `fy`,
+   `fz`, then with `iscale` `ft` as the last column; `b`'s number is the smoothed difference there (each
+   converted to `T`).
+
+**`computeRegistrationStep(S, T)`**: without a model: `ERROR in RegistrationStep: no transform specified
+...` on standard error, status 1. The system (above); verbosity 2: `   - checking A and b for nan ...`; an
+infinite or NaN number in `A` or `b`: ` A or b constain NAN or infinity values!!` on standard error,
+status 1; verbosity 2: `  DONE` and a newline. The solver (§10) with the step's verbosity and the float
+setting. **Robust**: verbosity 2: `   - compute robust estimate ( sat <sat> )...`; the robust solution
+with `sat` (4.685 for a negative one) and 1.4826; verbosity 2 `  DONE` and a newline. The weights image:
+kept from the last step when it has the source's width, height and depth, else a new `float` image of the
+source's size and frames with the source's header (`MRIcopyHeader`), its type float, its resolution set
+to the source's voxel sizes (`MRIsetResolution`) and its outside value 1. With `sigma = max(width,
+height, depth) / 6`, `s22 = (2 sigma) sigma` and `factor = 1 / sqrt(pi s22)`, every voxel `(x, y, z)` of
+every frame (frames outermost, then `z`, then `x`, then `y`) gets: its index's weight `w^2` (in `T`,
+stored as `float`) for a row, 0 for -4, 1 for every other negative index; for each row with `xx = x -
+0.5 width`, `yy`, `zz` likewise (in `double`), `g = factor * exp(-((xx xx + yy yy) + zz zz) / s22)`
+(glibc's `exp` with `reproduce`), and the sums from 0 in that order `dsum = dsum + g`, `wcheck = wcheck +
+g (1 - w^2)` and `wsqrt = wsqrt + g (1 - w)`; the checks are `wcheck / dsum` and `wsqrt / dsum`.
+Verbosity 2: `   - Weight Check: <wcheck>  wsqrt: <wsqrt>` and a newline. **Least squares**: verbosity 2
+`   - compute least squares estimate ...`, the least squares, `  DONE` and a newline, no weights image.
+The step's zero-weight number is the solver's last weight percentage (-1 for least squares). The
+intensity parameter is the last parameter with `iscale` (0 without); the model's parameters are set to
+the solution (in `float` the first `DOF` numbers; in `double` see FS-1063) and the step's matrix is the
+model's (§12).
+
+## 14. Defects of part 3 (`larmorx_core::defects`)
+
+- **FS-1061** (memory; unreachable): more than 2,147,483,647 voxels and frames: the index image becomes
+  `long` but is still written and read as 32-bit integers and the row numbers wrap; computed as
+  FreeSurfer computes it, noted (the system alone would need more than 60 GB).
+- **FS-1062** (rule D, kept): subsampled, the rows of the system take the subsampled grid's positions
+  (half the image's), so the rotation, scale and shear columns are half what the image positions would
+  give; both modes as FreeSurfer, noted, until measured with the registrations that reach it.
+- **FS-1063** (memory): a model set from a `double` list of another length than its `DOF` (the step in
+  `double` with `iscale` passes `DOF + 1`) is left with memory contents (**(observed)**: the first
+  parameter a pointer's bits, the others 0 or earlier values); from a shorter list of the other kinds
+  FreeSurfer reads past it. Both modes take the list's first `DOF` numbers (0 for missing ones), noted.
+- **FS-1064** (memory): §9's median, `medianI` and `mad` of an empty list read memory that is not theirs;
+  NaN in both modes, noted.
+- **FS-1065** (crash): the robust location (§10) writes its weights past a shorter vector (its only
+  caller passes an empty one: a crash unless the first sigma is below `2e-6`); both modes size it to
+  `b`, noted.
+- **FS-1066** (memory): the least squares without `A` writes the mean past its one-number result and
+  returns memory contents; both modes return the mean (the sum in `T` divided by the count as `T`),
+  noted.
+- **FS-1067** (rule B): fewer rows than columns: the QR solve reads past its arrays (memory contents)
+  and the SVD's minimum-norm solution is arbitrary. By default `Regression: <rows> equations for
+  <cols> parameters: too few usable voxels for the transformation (FS-1067)` on standard error and
+  status 1; `reproduce` ends so for the robust and weighted solves and with `Regression<T>::getLSEst of
+  fewer rows than columns is not ported yet` (status 1) for the least squares. Noted in both modes.
+- **ITK-113** (memory): VNL's QR solve of a single row whose number is 0 leaves the solution unwritten;
+  0 in both modes, noted. **ITK-116** (VNL's SVD never returning on a non-finite matrix): an error in
+  both modes (`Regression<T>::getLSEst: VNL's singular value decomposition never returns on this matrix
+  (an infinite or NaN entry)`, status 1).
+- The `double` SVD's NaN results' bits (an open item of the main package's `vnl_svd`, as FS-968's): the
+  least squares of a `double` matrix with an infinite or NaN number is reproduced but for its NaNs' bits.
+
+## 15. Validation plan of part 3 (black box)
+
+- **The official programs**: `mri_robust_register` and `mri_robust_template` run the step at every
+  iteration of every resolution (float unless `--doubleprec`; `--leastsquares` the least squares;
+  `--iscale`, `--affine`, `--transonly`, `--isoscale`, `--subsample <n>` and `--sat <s>` the step's
+  settings; `--verbose 2` its lines), and the robust location with `mri_robust_template --average 2`.
+- **The open probe** (to come from the spec finisher): the functions of §9 to §13 by name on lists,
+  systems, parameter vectors and pairs of small images (the fs-volume probe's line protocol), compared
+  bit for bit, the cases of §14 counted apart.
+- **Reference numbers (observed)**: 4,000 seeded cases (lists of up to 14 numbers with ties and special
+  values; systems of up to 48 x 7 in `float` and `double` with special numbers, zero columns, outliers
+  and identical rows; the fifteen models with special parameters; registration steps of pairs of images
+  up to 10 x 10 x 7, 1 or 2 frames, `float` or `uchar`, every model, `ROB` and least squares,
+  subsampled or not, with `iscale`, verbosities 0 to 2, two calls in a row): FreeSurfer's lines are
+  reproduced but where the official code reads memory it does not own or crashes (the cases of §14 and
+  FS-163's 2-frame images), the `double` least squares of non-finite matrices identical but for the
+  NaNs' bits. One step of the robust rigid (affine with `iscale`) registration of a 128^3 float image
+  pair at one thread: FreeSurfer 0.45 s (0.76 s), peak 101 MB (145 MB).

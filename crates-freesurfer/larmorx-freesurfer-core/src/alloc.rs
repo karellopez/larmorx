@@ -27,28 +27,24 @@ pub const ENOMEM: i32 = 12;
 /// what is written into it. For a type whose default value is not all zero bits each value is
 /// written (as the port's own `Vec` of such values always was).
 ///
-/// The first request asks for at least [`PROBE_BYTES`]: glibc's `malloc` raises the size from
-/// which it maps fresh pages to that of any mapped block freed below 32 MiB (its dynamic mmap
-/// threshold), so a freed probe of the buffer's own size would put the buffer itself, and every
-/// later one up to that size, on the heap, where freed memory is not given back (the conformed
-/// conversion of `mri_convert` kept its 11 MiB input after freeing it: 39 MiB against
-/// FreeSurfer's 29, relay 48). A probe above 32 MiB leaves the threshold as it was.
+/// The system is asked first only for more than 32 MiB (glibc's largest dynamic mmap threshold,
+/// `DEFAULT_MMAP_THRESHOLD_MAX`): freeing a smaller probe of more than 128 KiB would raise glibc's
+/// threshold to its size, so the buffer itself and every later one of that size would come from
+/// the heap, whose freed buffers stay resident; FreeSurfer's own `calloc` leaves the threshold
+/// alone (measured: a robust registration step at 128^3 held 25 % more memory than FreeSurfer's
+/// with the probe, 3 % less without it, `docs/findings/freesurfer-robust.md` §6; the conformed
+/// conversion of `mri_convert` kept its 11 MiB input after freeing it, 39 MiB against
+/// FreeSurfer's 29, track A's relay 48). Below 32 MiB the system never refuses (the address
+/// space).
 pub fn zeroed<T: Clone + Default>(n: usize) -> Option<Vec<T>> {
-    let mut probe: Vec<T> = Vec::new();
-    let size = std::mem::size_of::<T>().max(1);
-    let at_least = if n == 0 {
-        0
-    } else {
-        n.max(PROBE_BYTES.div_ceil(size))
-    };
-    probe.try_reserve_exact(at_least).ok()?;
-    drop(probe);
+    const PROBE_ABOVE: u128 = 32 << 20;
+    if (n as u128).saturating_mul(std::mem::size_of::<T>() as u128) > PROBE_ABOVE {
+        let mut probe: Vec<T> = Vec::new();
+        probe.try_reserve_exact(n).ok()?;
+        drop(probe);
+    }
     Some(vec![T::default(); n])
 }
-
-/// The smallest probe [`zeroed`] asks for: above glibc's largest dynamic mmap threshold (32 MiB on
-/// 64-bit systems), whose freeing leaves the threshold as it was.
-pub const PROBE_BYTES: usize = (32 << 20) + 4096;
 
 /// `calloc(n, 1)` of bytes: `None` (and `errno` [`ENOMEM`]) past [`CALLOC_LIMIT`] or where the
 /// machine refuses them; otherwise `n` zero bytes not touched until written ([`zeroed`]).

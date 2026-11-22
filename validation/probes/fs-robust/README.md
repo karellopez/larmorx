@@ -57,3 +57,34 @@ Measured 2026-11-20 (track C, relay 41), `--family sqrtm`: seed 1, 1,200 cases: 
 test's `reproduce_gives_the_official_square_roots`); seed 7, 3,000: 2,961 identical, 39 `NOTPORTED`, 0
 different; seed 13, 6,000: 5,913 identical, 87 `NOTPORTED`, 0 different. `fix` differs only with
 notices (FS-969, FS-970).
+
+Commands of 3.2-03's first part (relay 42), in a seeded stream of their own (`check.py --family
+regstep`; the example's `cases-regstep <seed> <n>`): `rgauss` (`RobustGaussian<T>`'s `median`,
+`medianI`, `mad`, `kth_smallest(I)`, `quick_select(I)`; the result, then the list as the call left
+it), `regress` (`Regression<T>`: `rob` the robust solution with or without `A`, `ls` the least
+squares, `wls` and `wlsf` the weighted least squares, `sigma` `getSigmaMAD`, `tukey` the weights; then
+the last error, weight and zero percentages and `b` as the call left it), `trans` (the fifteen
+transformation models: DOF, parameters from each kind of vector, steps, matrix, gradient), `quat`
+(`importRotVec`, both forms, `importZYXAngles`; the quaternion and its rotation matrix) and `rstep`
+(`RegistrationStep<T>(R).computeRegistrationStep(S, T)`, one or two calls, with a `RegRobust` whose
+fields the step reads set from the case: the matrix, the intensity parameter, the weight checks, the
+parameters, the weights image and the index image). `fsrobust.cpp` opens these classes' members with
+`#define private public` and `protected public` around their headers (included after every header
+they include, so only they are affected); `build.sh` compiles `Registration.cpp`, `RegRobust.cpp` and
+`RegPowell.cpp` with the rest. `check.py` hashes as `NANBITS` the port's `SVDNAN` lines (a `double`
+least squares of a matrix with an infinite or NaN number: the double SVD's NaN bits, an open item),
+and as `SKIP` FS-1063..FS-1067 and ITK-113 (memory contents or crashes in FreeSurfer).
+
+```bash
+scripts/orchestration/boxed.sh 16 python -P validation/probes/fs-robust/check.py --family regstep --seed 1 --n 1000 --jobs 10
+```
+
+Measured 2026-11-22 (track C, relay 42), `--family regstep`: seed 1, 1,000 cases: 914 identical, 80
+`SKIP`, 6 `NOTPORTED` (FS-1067's least squares under `reproduce`), 0 different, hash
+`401667eb618dc40ebb57e6110aa4f7b25c2a1af0d4d679e840562e11b37f6bb2` (the test's
+`reproduce_gives_the_official_registration_steps`); seed 7, 1,000: 922 identical, 71 `SKIP`, 7
+`NOTPORTED`, 0 different; seed 13, 2,000: 1,840 identical, 154 `SKIP`, 6 `NOTPORTED`, 0 different. `fix`
+differs only with notices (GLIBC-07 for the correctly rounded `sin`, `cos` and `exp`). `bench rstep|rstepa
+<n>` (one robust rigid step; affine with the intensity scale) at 128^3: FreeSurfer 0.45 s / 101 MB and
+0.76 s / 145 MB, the port 0.66 s / 98 MB and 1.06 s / 140 MB, identical hashes
+(`docs/findings/freesurfer-robust.md` §6).

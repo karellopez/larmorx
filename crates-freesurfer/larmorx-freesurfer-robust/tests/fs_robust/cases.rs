@@ -22,6 +22,14 @@ use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_mri::mri::{self as mm, Mri};
 use larmorx_freesurfer_mri::vol_geom::{VolGeom, reinit_cache};
 use larmorx_freesurfer_mri::voxel::mri_set_vox_val;
+use larmorx_freesurfer_robust::quaternion::Quaternion;
+use larmorx_freesurfer_robust::real::{Mat, Real};
+use larmorx_freesurfer_robust::regression::{
+    Regression, get_sigma_mad, get_sqrt_tukey_dia_weights,
+};
+use larmorx_freesurfer_robust::regstep::{Cost, RegistrationStep, StepParams};
+use larmorx_freesurfer_robust::robust_gauss as rg;
+use larmorx_freesurfer_robust::transformation::{Kind, Transformation};
 use larmorx_freesurfer_robust::{costs, mymatrix as mx, mymri};
 use larmorx_freesurfer_volume::arith::Pair;
 
@@ -715,6 +723,375 @@ pub fn generate_sqrtm(seed: u64, n: usize) -> Vec<String> {
 }
 
 // ------------------------------------------------------------------------------------------
+// The registration step's cases (3.2-03 part 1: `rgauss`, `regress`, `trans`, `quat`, `rstep`),
+// a stream of their own
+
+/// The registration step's commands, cycled.
+pub const REGSTEP: [&str; 5] = ["rgauss", "regress", "trans", "quat", "rstep"];
+
+/// A number of the registration's lists: values with ties, zeros, outliers, sometimes special.
+fn rnum(g: &mut Gen) -> f64 {
+    if g.chance(45) {
+        return f64::from_bits(g.pick(&SPECIAL64));
+    }
+    match g.below(6) {
+        0 => g.int(-4, 4) as f64,
+        1 => 0.0,
+        2 => (g.unit() - 0.5) * 200.0,
+        3 => g.int(-1000, 1000) as f64 / 16.0,
+        4 => (g.unit() - 0.5) * 1e-4,
+        _ => (g.unit() - 0.5) * 8.0,
+    }
+}
+
+/// A number token of the case's precision (`dbl`: 16 hex digits, else 8 of a float).
+fn tok(dbl: bool, v: f64) -> String {
+    if dbl { dx(v) } else { fx(v as f32) }
+}
+
+/// A float token whose special value keeps its own bits (a signalling NaN is not quieted).
+fn tokf_special(g: &mut Gen) -> String {
+    fx(g.pick(&SPECIAL))
+}
+
+fn gen_rgauss(g: &mut Gen, t: &mut Vec<String>) {
+    let dbl = g.chance(2);
+    t.push(i64::from(dbl).to_string());
+    let op = g.pick(&[
+        "median", "median", "medianI", "mad", "mad", "kth", "qsel", "kthI", "qselI",
+    ]);
+    t.push(op.to_owned());
+    let sel = op.starts_with('k') || op.starts_with('q');
+    let n = if sel {
+        g.int(1, 13)
+    } else if g.chance(25) {
+        0
+    } else {
+        g.int(1, 14)
+    };
+    t.push(n.to_string());
+    let pool: Vec<f64> = (0..4).map(|_| rnum(g)).collect();
+    for _ in 0..n {
+        if !dbl && g.chance(60) {
+            t.push(tokf_special(g));
+            continue;
+        }
+        let v = if g.chance(3) { g.pick(&pool) } else { rnum(g) };
+        t.push(tok(dbl, v));
+    }
+    if op == "mad" {
+        let d = if g.chance(3) { rnum(g) } else { 1.4826 };
+        t.push(tok(dbl, d));
+    } else if sel {
+        t.push(g.int(1, n).to_string());
+    }
+}
+
+fn gen_regress(g: &mut Gen, t: &mut Vec<String>) {
+    let dbl = g.chance(2);
+    t.push(i64::from(dbl).to_string());
+    let method = g.pick(&[
+        "rob", "rob", "rob", "rob", "ls", "ls", "wls", "wlsf", "sigma", "tukey",
+    ]);
+    t.push(method.to_owned());
+    t.push(g.pick(&[0, 1, 1]).to_string());
+    t.push(g.pick(&[0, 1, 2, 2]).to_string());
+    let sat = if g.chance(4) {
+        g.pick(&[2.0, 6.0, 0.5, -1.0, 1e-3, 100.0, f64::INFINITY])
+    } else {
+        4.685
+    };
+    t.push(dx(sat));
+    t.push(dx(g.pick(&[1.4826, 1.4826, 2.0])));
+    let has_a = !(matches!(method, "rob" | "ls") && g.chance(5));
+    t.push(i64::from(has_a).to_string());
+    let cols = if has_a { g.int(1, 7) } else { 1 };
+    let rows = if g.chance(12) {
+        g.int(1, cols.max(2))
+    } else {
+        g.int(cols, 48)
+    };
+    t.push(rows.to_string());
+    t.push(cols.to_string());
+    // a system: A's columns gradient-like, b = A p + noise, some outliers
+    let ptrue: Vec<f64> = (0..cols).map(|_| (g.unit() - 0.5) * 4.0).collect();
+    let zero_col = if g.chance(8) { g.int(0, cols - 1) } else { -1 };
+    let mut a = vec![0.0f64; (rows * cols) as usize];
+    for r in 0..rows {
+        for c in 0..cols {
+            let v = if c == zero_col {
+                0.0
+            } else if g.chance(120) {
+                f64::from_bits(g.pick(&SPECIAL64))
+            } else {
+                match g.below(4) {
+                    0 => g.int(-50, 50) as f64 / 4.0,
+                    1 => (g.unit() - 0.5) * 100.0,
+                    2 => (r as f64) * (g.unit() - 0.5),
+                    _ => (g.unit() - 0.5) * 2.0,
+                }
+            };
+            a[(r * cols + c) as usize] = v;
+        }
+    }
+    if has_a {
+        for &v in &a {
+            t.push(tok(dbl, v));
+        }
+    }
+    let identical = g.chance(12);
+    for r in 0..rows {
+        let mut v = if has_a {
+            (0..cols)
+                .map(|c| a[(r * cols + c) as usize] * ptrue[c as usize])
+                .sum::<f64>()
+        } else {
+            ptrue[0] * 10.0
+        };
+        if !identical {
+            v += (g.unit() - 0.5) * 0.5;
+            if g.chance(6) {
+                v += (g.unit() - 0.5) * 400.0;
+            }
+            if g.chance(150) {
+                v = f64::from_bits(g.pick(&SPECIAL64));
+            }
+        }
+        t.push(tok(dbl, v));
+    }
+    match method {
+        "rob" => {
+            let wsize = if has_a {
+                g.pick(&[0, rows, rows])
+            } else {
+                g.pick(&[rows, rows, rows + 2, 0])
+            };
+            t.push(wsize.to_string());
+            for _ in 0..wsize {
+                t.push(tok(dbl, g.unit()));
+            }
+        }
+        "wls" | "wlsf" | "tukey" => {
+            if method != "tukey" {
+                for _ in 0..rows {
+                    let w = if g.chance(5) { 0.0 } else { g.unit() };
+                    t.push(tok(dbl, w));
+                }
+            }
+        }
+        "sigma" => {
+            let d = if g.chance(3) { rnum(g) } else { 1.4826 };
+            t.push(tok(dbl, d));
+        }
+        _ => {}
+    }
+}
+
+/// A transformation parameter: an angle, a translation, a scale or a shear, sometimes special.
+fn tparam(g: &mut Gen) -> f64 {
+    if g.chance(40) {
+        return f64::from_bits(g.pick(&SPECIAL64));
+    }
+    match g.below(5) {
+        0 => (g.unit() - 0.5) * 0.4,
+        1 => (g.unit() - 0.5) * 40.0,
+        2 => 1.0 + (g.unit() - 0.5) * 0.2,
+        3 => g.pick(&[0.0, -0.0, 1.0, std::f64::consts::PI, 1e-8, 1e-7]),
+        _ => (g.unit() - 0.5) * 8.0,
+    }
+}
+
+fn gen_trans(g: &mut Gen, t: &mut Vec<String>) {
+    let code = g.int(0, 14);
+    let dof = [6i64, 6, 4, 4, 3, 3, 2, 12, 12, 7, 7, 6, 6, 3, 0][code as usize];
+    let ptype = g.int(0, 2);
+    let np = match g.below(10) {
+        0 => dof + 1,
+        1 if dof > 0 => dof - 1,
+        _ => dof,
+    };
+    for v in [code, ptype, np] {
+        t.push(v.to_string());
+    }
+    for _ in 0..np {
+        let v = tparam(g);
+        t.push(if ptype == 1 { fx(v as f32) } else { dx(v) });
+    }
+    t.push(i64::from(g.chance(8)).to_string());
+    for _ in 0..3 {
+        t.push(g.pick(&[0i64, 1, 2, 7, 31, 128, 255, 300]).to_string());
+        let f = if g.chance(25) {
+            g.pick(&SPECIAL)
+        } else {
+            ((g.unit() - 0.5) * 60.0) as f32
+        };
+        t.push(fx(f));
+    }
+}
+
+fn gen_quat(g: &mut Gen, t: &mut Vec<String>) {
+    let op = g.pick(&["rv", "rva", "zyx"]);
+    t.push(op.to_owned());
+    let k = if op == "rva" { 4 } else { 3 };
+    for _ in 0..k {
+        let v = if g.chance(6) {
+            g.pick(&[0.0, 1e-7, 1e-6, -1e-6, std::f64::consts::PI])
+        } else {
+            tparam(g)
+        };
+        t.push(dx(v));
+    }
+}
+
+/// `get_vol`'s tokens for an image of the registration step: a smooth blob (`centre` and
+/// `scale`), a background of `bg` outside a radius, noise, a few outliers, sometimes a NaN.
+#[allow(clippy::too_many_arguments)]
+fn reg_vol(
+    g: &mut Gen,
+    t: &mut Vec<String>,
+    s: Shape,
+    centre: [f64; 3],
+    scale: f64,
+    bg: f64,
+    nan: bool,
+) {
+    for v in [s.w, s.h, s.d, s.ty, s.nf, 0, g.int(0, 255)] {
+        t.push(v.to_string());
+    }
+    geom(g, t);
+    t.push("0".to_owned());
+    t.push((s.d - 1).to_string());
+    for _ in 0..6 {
+        t.push(fx(0.0));
+    }
+    t.push(fx(1.0));
+    t.push(fx(1.0));
+    for _ in 0..3 {
+        t.push(fx(0.0));
+    }
+    t.push(dx(0.0));
+    t.push("0".to_owned());
+    t.push("0".to_owned());
+    t.push((s.w * s.h * s.d * s.nf).to_string());
+    let r2 = (s.w * s.w + s.h * s.h + s.d * s.d) as f64 / 6.0;
+    for f in 0..s.nf {
+        for z in 0..s.d {
+            for y in 0..s.h {
+                for x in 0..s.w {
+                    for v in [x, y, z, f] {
+                        t.push(v.to_string());
+                    }
+                    let (dx_, dy_, dz_) = (
+                        x as f64 - centre[0],
+                        y as f64 - centre[1],
+                        z as f64 - centre[2],
+                    );
+                    let d2 = dx_ * dx_ + dy_ * dy_ + dz_ * dz_;
+                    let mut v = if d2 > r2 * 1.6 {
+                        bg
+                    } else {
+                        scale * (200.0 - 150.0 * d2 / r2) + 20.0 * f as f64 + (g.unit() - 0.5) * 2.0
+                    };
+                    if g.chance(30) {
+                        v = g.int(0, 255) as f64;
+                    }
+                    if nan && g.chance(25) {
+                        v = f64::NAN;
+                    }
+                    let v = if s.ty == 0 {
+                        v.clamp(0.0, 255.0).round()
+                    } else {
+                        (v * 4.0).round() / 4.0
+                    };
+                    t.push(fx(v as f32));
+                }
+            }
+        }
+    }
+}
+
+fn gen_rstep(g: &mut Gen, t: &mut Vec<String>) {
+    let dbl = g.chance(4);
+    let d = if g.chance(4) { 1 } else { g.int(3, 7) };
+    let codes: &[i64] = if d == 1 {
+        &[6, 4, 4, 2, 0, 0, 14, 1, 3, 5]
+    } else {
+        &[13, 11, 11, 11, 7, 7, 14, 9, 8, 10, 12]
+    };
+    let code = g.pick(codes);
+    let costfun = g.pick(&[1, 1, 1, 1, 0, 2]);
+    let iscale = code == 14 || g.chance(3);
+    let ss = if g.chance(4) { g.int(1, 4) } else { -1 };
+    let calls = if g.chance(5) { 2 } else { 1 };
+    t.push(i64::from(dbl).to_string());
+    t.push(g.pick(&[1, 1, 1, 0]).to_string());
+    t.push(costfun.to_string());
+    t.push(code.to_string());
+    let sat = if g.chance(3) {
+        g.pick(&[-1.0, 2.5, 6.0, 9.0])
+    } else {
+        4.685
+    };
+    t.push(dx(sat));
+    t.push(i64::from(iscale).to_string());
+    t.push(ss.to_string());
+    t.push(g.pick(&[0, 1, 2, 2]).to_string());
+    t.push(calls.to_string());
+    let s = Shape {
+        w: g.int(3, 10),
+        h: g.int(3, 10),
+        d,
+        ty: g.pick(&[3, 3, 0]),
+        nf: if g.chance(8) { 2 } else { 1 },
+    };
+    for _ in 0..calls {
+        let c = [
+            s.w as f64 / 2.0 + (g.unit() - 0.5) * 2.0,
+            s.h as f64 / 2.0 + (g.unit() - 0.5) * 2.0,
+            s.d as f64 / 2.0 + (g.unit() - 0.5) * 2.0,
+        ];
+        let shift = [
+            (g.unit() - 0.5) * 1.5,
+            (g.unit() - 0.5) * 1.5,
+            if s.d == 1 {
+                0.0
+            } else {
+                (g.unit() - 0.5) * 1.5
+            },
+        ];
+        let bg = g.pick(&[0.0, 0.0, 0.0, 10.0]);
+        let nan = s.ty == 3 && g.chance(10);
+        let scale_t = if iscale {
+            1.0 + (g.unit() - 0.5) * 0.3
+        } else {
+            1.0
+        };
+        reg_vol(g, t, s, c, 1.0, bg, nan);
+        let ct = [c[0] + shift[0], c[1] + shift[1], c[2] + shift[2]];
+        reg_vol(g, t, s, ct, scale_t, bg, nan);
+    }
+}
+
+/// The registration step's cases of `seed`.
+pub fn generate_regstep(seed: u64, n: usize) -> Vec<String> {
+    let mut g = Gen::new(seed ^ 0x5245_4753);
+    (0..n)
+        .map(|k| {
+            let cmd = REGSTEP[k % REGSTEP.len()];
+            let mut t = vec![cmd.to_owned()];
+            match cmd {
+                "rgauss" => gen_rgauss(&mut g, &mut t),
+                "regress" => gen_regress(&mut g, &mut t),
+                "trans" => gen_trans(&mut g, &mut t),
+                "quat" => gen_quat(&mut g, &mut t),
+                _ => gen_rstep(&mut g, &mut t),
+            }
+            t.join(" ")
+        })
+        .collect()
+}
+
+// ------------------------------------------------------------------------------------------
 // The answers
 
 /// One buffer both streams write into, in order.
@@ -876,6 +1253,9 @@ struct Ctx {
     g: Globals,
     a: Shared,
     b: Shared,
+    /// A double least-squares solve of a matrix with an infinite or NaN entry (its NaN bits
+    /// are compared as one NaN: `SVDNAN`).
+    svdnan: bool,
 }
 
 fn set_geom(t: &mut Toks, v: &mut VolGeom) {
@@ -1014,6 +1394,7 @@ fn run_line_here(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str
         g: Globals::new(mode),
         a: shared.clone(),
         b: shared.clone(),
+        svdnan: false,
     };
     cx.g.progname = "fsrobust".to_owned();
     let mut t = Toks {
@@ -1033,6 +1414,9 @@ fn run_line_here(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str
             .iter()
             .map(|n| n.defect.id)
             .collect();
+    if cx.svdnan {
+        ids.push("SVDNAN");
+    }
     ids.sort_unstable();
     ids.dedup();
     (format!("{result} | {text}"), ids)
@@ -1244,7 +1628,277 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let r = mx::matrix_sqrt(&mut cx.g, &mut cx.a, &mut cx.b, &m)?;
             o.vm(&r);
         }
+        "rgauss" => {
+            if t.i() != 0 {
+                rgauss::<f64>(cx, t, o);
+            } else {
+                rgauss::<f32>(cx, t, o);
+            }
+        }
+        "regress" => {
+            let mut svdnan = false;
+            let r = if t.i() != 0 {
+                regress::<f64>(cx, t, o, &mut svdnan)
+            } else {
+                regress::<f32>(cx, t, o, &mut svdnan)
+            };
+            if svdnan {
+                cx.svdnan = true;
+            }
+            r?;
+        }
+        "trans" => trans_case(cx, t, o)?,
+        "quat" => {
+            let g = &mut cx.g;
+            let op = t.next();
+            let q = match op {
+                "rv" => {
+                    let (a, b, c) = (t.d(), t.d(), t.d());
+                    Quaternion::import_rot_vec(g, a, b, c)
+                }
+                "rva" => {
+                    let (al, a, b, c) = (t.d(), t.d(), t.d(), t.d());
+                    Quaternion::import_rot_vec_angle(g, al, a, b, c)
+                }
+                _ => {
+                    let (a, b, c) = (t.d(), t.d(), t.d());
+                    Quaternion::import_zyx_angles(g, a, b, c)
+                }
+            };
+            for v in [q.a, q.b, q.c, q.d] {
+                o.d(v);
+            }
+            for v in q.rot_matrix3d() {
+                o.d(v);
+            }
+        }
+        "rstep" => {
+            if t.i() != 0 {
+                rstep::<f64>(cx, t, o)?;
+            } else {
+                rstep::<f32>(cx, t, o)?;
+            }
+        }
         _ => panic!("unknown command {cmd}"),
+    }
+    Ok(())
+}
+
+// ---- the registration step's answers (3.2-03 part 1)
+
+/// A number of the case's type.
+fn tv<T: Real>(t: &mut Toks) -> T {
+    if T::SINGLE {
+        T::of_f32(t.f())
+    } else {
+        T::narrow(t.d())
+    }
+}
+
+impl Out {
+    fn r<T: Real>(&mut self, v: T) {
+        self.0 += &v.hex();
+        self.0 += " ";
+    }
+    fn rv<T: Real>(&mut self, v: &[T]) {
+        self.i(v.len() as i64);
+        for &x in v {
+            self.r(x);
+        }
+    }
+    fn m4(&mut self, m: &[[f64; 4]; 4]) {
+        for row in m {
+            for &v in row {
+                self.d(v);
+            }
+        }
+    }
+}
+
+fn rgauss<T: Real>(cx: &mut Ctx, t: &mut Toks, o: &mut Out) {
+    let op = t.next();
+    let n = t.i() as usize;
+    let mut a: Vec<T> = (0..n).map(|_| tv::<T>(t)).collect();
+    let g = &mut cx.g;
+    match op {
+        "median" => o.r(rg::median(g, &mut a)),
+        "medianI" => {
+            let (v, p) = rg::median_i(g, &mut a);
+            o.r(v);
+            o.r(p);
+        }
+        "mad" => {
+            let d = tv::<T>(t);
+            o.r(rg::mad(g, &mut a, d));
+        }
+        _ => {
+            let k = t.i() as usize;
+            match op {
+                "kth" => o.r(rg::kth_smallest(&mut a, k)),
+                "qsel" => o.r(rg::quick_select(&mut a, k)),
+                "kthI" => {
+                    let (v, p) = rg::kth_smallest_i(&mut a, k);
+                    o.r(v);
+                    o.i(i64::from(p));
+                }
+                _ => {
+                    let (v, p) = rg::quick_select_i(&mut a, k);
+                    o.r(v);
+                    o.i(i64::from(p));
+                }
+            }
+        }
+    }
+    for &x in &a {
+        o.r(x);
+    }
+}
+
+fn regress<T: Real>(
+    cx: &mut Ctx,
+    t: &mut Toks,
+    o: &mut Out,
+    svdnan: &mut bool,
+) -> Result<(), Fatal> {
+    let method = t.next();
+    let (fsvd, verbose) = (t.i() != 0, t.i());
+    let (sat, sig) = (t.d(), t.d());
+    let (has_a, rows, cols) = (t.i() != 0, t.i() as usize, t.i() as usize);
+    let mut a = Mat::<T>::zeros(0, 0);
+    if has_a {
+        a = Mat::zeros(rows, cols);
+        for v in a.data.iter_mut() {
+            *v = tv::<T>(t);
+        }
+    }
+    let mut b: Vec<T> = (0..rows).map(|_| tv::<T>(t)).collect();
+    let (g, out, err) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let (last, bout) = {
+        let mut r = if has_a {
+            Regression::new(&a, &mut b)
+        } else {
+            Regression::new_b(&mut b)
+        };
+        r.set_verbose(verbose);
+        r.set_float_svd(fsvd);
+        match method {
+            "rob" => {
+                let wsize = t.i() as usize;
+                let mut w: Vec<T> = (0..wsize).map(|_| tv::<T>(t)).collect();
+                let p = r.get_robust_est_w(g, out, err, &mut w, sat, sig)?;
+                o.rv(&p);
+                o.rv(&w);
+            }
+            "ls" => {
+                let p = r.get_ls_est(g, err)?;
+                o.rv(&p);
+                if !T::SINGLE && has_a && !a.is_finite() {
+                    // the double SVD's NaN bits are an open item (FS-968's): compared with every
+                    // NaN read as one (check.py's NANBITS)
+                    *svdnan = true;
+                }
+            }
+            "wls" | "wlsf" => {
+                let w: Vec<T> = (0..rows).map(|_| tv::<T>(t)).collect();
+                let p = if method == "wls" {
+                    r.get_weighted_ls_est(g, err, &w)?
+                } else {
+                    r.get_weighted_ls_est_float(g, err, &w)?
+                };
+                o.rv(&p);
+            }
+            "sigma" => {
+                let d = tv::<T>(t);
+                let bb = r.b().to_vec();
+                o.r(get_sigma_mad(g, &bb, d));
+            }
+            _ => {
+                let mut w = vec![T::ZERO; rows];
+                let bb = r.b().to_vec();
+                get_sqrt_tukey_dia_weights(&bb, &mut w, sat);
+                o.rv(&w);
+            }
+        }
+        ((r.lasterror, r.lastweight, r.lastzero), r.b().to_vec())
+    };
+    o.d(last.0);
+    o.d(last.1);
+    o.d(last.2);
+    o.rv(&bout);
+    Ok(())
+}
+
+fn trans_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
+    let code = t.i() as usize;
+    let ptype = t.i();
+    let np = t.i() as usize;
+    let mut tr = Transformation::new(Kind::ALL[code]);
+    if ptype == 1 {
+        let v: Vec<f32> = (0..np).map(|_| t.f()).collect();
+        tr.set_parameters(&mut cx.g, &v, true);
+    } else {
+        let v: Vec<f64> = (0..np).map(|_| t.d()).collect();
+        tr.set_parameters(&mut cx.g, &v, ptype == 0);
+    }
+    if t.i() != 0 {
+        tr.set_identity();
+    }
+    let x = t.i() as u32;
+    let fxv = t.f();
+    let y = t.i() as u32;
+    let fyv = t.f();
+    let z = t.i() as u32;
+    let fzv = t.f();
+    o.i(tr.dof() as i64);
+    o.rv(&tr.parameters);
+    o.rv(&tr.steps());
+    let m = tr.matrix(&mut cx.g, &mut cx.b)?;
+    o.m4(&m);
+    let gr = tr.gradient(&mut cx.b, x, fxv, y, fyv, z, fzv)?;
+    o.rv(&gr);
+    Ok(())
+}
+
+fn rstep<T: Real>(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
+    let fsvd = t.i() != 0;
+    let costfun = Cost::of(t.i()).expect("a cost function");
+    let code = t.i() as usize;
+    let sat = t.d();
+    let iscale = t.i() != 0;
+    let ss = t.i();
+    let verbose = t.i();
+    let calls = t.i();
+    let params = StepParams {
+        sat,
+        iscale,
+        transonly: false,
+        rigid: true,
+        isoscale: false,
+        costfun,
+        subsamplesize: ss,
+        debug: 0,
+        verbose,
+        iscalefinal: 1.0,
+    };
+    let mut trans = Transformation::new(Kind::ALL[code]);
+    let mut step = RegistrationStep::<T>::new(params);
+    step.set_float_svd(fsvd);
+    for _ in 0..calls {
+        let mut ms = get_vol(cx, t)?;
+        let mut mt = get_vol(cx, t)?;
+        let (g, out, err) = (&mut cx.g, &mut cx.a, &mut cx.b);
+        let (m, second) =
+            step.compute_registration_step(g, out, err, Some(&mut trans), &mut ms, &mut mt)?;
+        o.m4(&m);
+        o.d(second);
+        if costfun == Cost::Rob {
+            o.d(step.wcheck);
+            o.d(step.wchecksqrt);
+        }
+        o.d(step.zeroweights);
+        o.rv(&step.pvec);
+        o.vol(step.mri_weights.as_ref());
+        o.vol(step.mri_indexing.as_ref());
     }
     Ok(())
 }

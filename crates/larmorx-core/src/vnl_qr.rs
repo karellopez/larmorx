@@ -436,6 +436,18 @@ impl<T: ItkReal> Qr<T> {
                 x[i + n * j] = m[i * p + j];
             }
         }
+        Qr::from_column_major(x, rows, cols)
+    }
+
+    /// [`Qr::new`] of the matrix given column by column (`x[i + rows * j]` its element `(i, j)`):
+    /// the same factorization without the row-major copy (for a caller that builds the matrix only
+    /// to factor it).
+    pub fn from_column_major(mut x: Vec<T>, rows: usize, cols: usize) -> Qr<T> {
+        assert!(
+            rows > 0 && cols > 0 && x.len() == rows * cols,
+            "not a rows × cols matrix"
+        );
+        let (n, p) = (rows, cols);
         let mut qraux = vec![T::ZERO; p];
         let at = |i: usize, j: usize| (i - 1) + (j - 1) * n;
         // job == 0: pl = 1 > pu = 0, so the norms are not computed and no column pivots.
@@ -803,4 +815,26 @@ mod tests {
     }
 
     const QR_NAN_BITS: u64 = 0x0151_9e2f_7355_76b0;
+
+    /// The column-major constructor is the same factorization as the row-major one.
+    #[test]
+    fn from_column_major_is_new() {
+        let (rows, cols) = (7, 3);
+        let m: Vec<f32> = (0..rows * cols)
+            .map(|k| ((k * 37 % 11) as f32) - 5.0)
+            .collect();
+        let mut x = vec![0.0f32; rows * cols];
+        for i in 0..rows {
+            for j in 0..cols {
+                x[i + rows * j] = m[i * cols + j];
+            }
+        }
+        let (a, b) = (
+            Qr::new(&m, rows, cols),
+            Qr::from_column_major(x, rows, cols),
+        );
+        assert_eq!(a, b);
+        let rhs: Vec<f32> = (0..rows).map(|k| k as f32 * 0.5).collect();
+        assert_eq!(a.solve(&rhs), b.solve(&rhs));
+    }
 }

@@ -148,14 +148,26 @@ SKIP = (
     "FS-618",
     "FS-966",
     "FS-967",
+    # the registration step's (3.2-03 part 1): a transformation set from a vector of another
+    # length, the median of an empty list, the robust location's empty weights, the
+    # least-squares location without a design matrix, fewer rows than parameters (memory
+    # contents or a crash in FreeSurfer)
+    "FS-1063",
+    "FS-1064",
+    "FS-1065",
+    "FS-1066",
+    "FS-1067",
+    # VNL's QR solve of one row whose entry is 0 leaves the solution unwritten
+    "ITK-113",
 )
 
 
 # FS-968's lines (a transform distance from an SVD that did not converge): FreeSurfer's arbitrary
 # number, which reproduce gives but for the NaNs' bits (the double SVD's NaN operand order is not
 # ported yet: an open item in the crate's PROVENANCE.md). Compared with every NaN read as one NaN,
-# hashed as NANBITS.
-NANBITS = ("FS-968",)
+# hashed as NANBITS. SVDNAN (the port's marker, no defect): a double least-squares solve of a
+# matrix with an infinite or NaN entry, the same open item (the double SVD's NaN operand orders).
+NANBITS = ("FS-968", "SVDNAN")
 
 
 def nan_canonical(line: str) -> str:
@@ -227,9 +239,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument(
         "--family",
-        choices=("helpers", "sqrtm"),
+        choices=("helpers", "sqrtm", "regstep"),
         default="helpers",
-        help="the seeded stream: the helpers (part 1) or the matrix square root's (schur, sqrtm)",
+        help="the seeded stream: the helpers (part 1), the matrix square root's (schur, sqrtm) or "
+        "the registration step's (3.2-03: rgauss, regress, trans, quat, rstep)",
     )
     ap.add_argument(
         "--cases",

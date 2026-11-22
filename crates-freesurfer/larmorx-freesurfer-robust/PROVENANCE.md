@@ -17,9 +17,7 @@ included: `docs/findings/freesurfer-robust.md` §1). Files of `mri_robust_regist
 the v8.2.0 tag's files): `MyMRI.cpp` (`f8e956398418`), `MyMRI.h` (`f1125a5d1338`), `MyMatrix.cpp`
 (`efbe9fc64c5e`), `MyMatrix.h` (`b06f981dc03d`), `CostFunctions.cpp` (`2cd72bb84df8`),
 `CostFunctions.h` (`092656c7682f`); all by Martin Reuter, MGH, under FreeSurfer's licence. Audited
-for third-party code: none in the functions translated (`RobustGaussian.cpp`'s quick select, after
-Numerical Recipes and N. Devillard's public-domain code, is not translated here: its only callers have
-no live caller).
+for third-party code: none in the functions translated (`RobustGaussian.cpp` came with 3.2-03, below).
 
 - `src/mymri.rs`: `MyMRI::MRIvalscale`, `getPrefilter`, `getDerfilter`, `getRand` (its table),
   `subSample`, `getBlur`, `getPartials`, `findRightSize`, `getBackground`, `MRIlinearTransform`.
@@ -38,9 +36,31 @@ package's `larmorx_core::lapack_zgees`, C++'s complex arithmetic `larmorx_core::
 `__muldc3`, `cabs` and `csqrt` on the correctly rounded `hypot`, the project's decision D4), VNL's complex
 matrices and `vnl_matlab_print` `larmorx_core::vnl_matrix` (the findings' §4).
 
-Not yet: `RegRobust.cpp`/`.h` and `Registration.cpp` 77-678 (`clear`, `computeIterativeRegistration`,
-`computeMultiresRegistration`), which call item 3.2-03's templates and are ported with them; the
-functions only one program reaches (its item).
+Queue item 3.2-03's first part (track C, relay 42, 2026-11-22): the registration step's classes, files
+of `mri_robust_register/` (SHA-256 prefixes of the v8.2.0 tag's files) `RobustGaussian.cpp` (`40b70bef94f1`), `RobustGaussian.h` (`09e453f76464`), `Regression.cpp` (`cb9a4c74f372`), `Regression.h` (`e137b64606f6`), `Quaternion.h` (`4183a4ddc13e`), `Quaternion.cpp` (`4c1672e48c0b`), `Transformation.h` (`ae6b10ab59df`), `RegistrationStep.h` (`a8efdc4f97d6`); all by Martin Reuter, MGH, under FreeSurfer's
+licence. Audited for third-party code: `RobustGaussian.cpp`'s selections follow Numerical Recipes in C
+(2nd ed., §8.5) and Wirth (1976) after N. Devillard's public-domain code (credited in its comments);
+the translation is of FreeSurfer's modified versions (the positions kept alongside), no other
+third-party code.
+
+- `src/robust_gauss.rs`: `RobustGaussian<T>::quick_select`, `quick_selectI`, `kth_smallest`,
+  `kth_smallestI`, `median`, `medianI`, `mad`.
+- `src/regression.rs`: `Regression<T>` (its constructors, `setVerbose`, `setFloatSvd`, `getRobustEst`,
+  `getRobustEstW`, `getRobustEstWAB`, `getRobustEstWB`, `getLSEst`, `getWeightedLSEst`,
+  `getWeightedLSEstFloat`, `getSigmaMAD`, `getSqrtTukeyDiaWeights`, `getLast*`); `vnl_svd<T>`'s
+  pseudo-inverse as `getLSEst` uses it.
+- `src/quaternion.rs`: `Quaternion`'s constructors, `importRotVec` (both), `importZYXAngles`,
+  `operator*`, `getNormalized`, `getRotMatrix3d`.
+- `src/transformation.rs`: `Transformation` and its fifteen models (`getDOF`, `setParameters` (the three
+  kinds), `setIdentity`, `getSteps`, `getMatrix`, `getGradient`).
+- `src/regstep.rs`: `RegistrationStep<T>` (its constructor from the registration's settings,
+  `setFloatSVD`, `computeRegistrationStep`, `constructAb`, the getters); `Registration::Cost`.
+- `src/real.rs`: larmorx's own (the two element types, `vnl_matrix<T>`'s product and
+  `matrix_x_vector` as ITK 4.13.2's VNL computes them, BSD).
+
+Not yet: `RegRobust.cpp`/`.h` and `Registration.cpp` 77-678 and 1315-4545 (the registration's loop, its
+pyramid, initialisation and saturation search: relay 43); the functions only one program reaches (its
+item).
 
 ## Changes from the originals
 
@@ -63,6 +83,17 @@ functions only one program reaches (its item).
   3.2-16).
 - **ITK-115**, **ITK-116** (VNL's eigensystem and SVD never returning, where FreeSurfer hangs): an error
   in both modes.
+- **FS-1061** (`regstep`): more than 2,147,483,647 voxels and frames: computed as FreeSurfer (its
+  32-bit row numbers), noted. **FS-1062** (`regstep`, rule D): the subsampled step's gradient positions
+  kept, noted. **FS-1063** (`transformation::set_parameters`): a `double` vector of another length: its
+  first `DOF` numbers in both modes (FreeSurfer's are memory contents). **FS-1064** (`robust_gauss`): the
+  median of an empty list NaN in both modes. **FS-1065** (`regression`, the location): the weights sized
+  to `b` in both modes (FreeSurfer crashes). **FS-1066** (`regression::get_ls_est` without `A`): the mean
+  in both modes. **FS-1067** (`regression`): fewer rows than columns: an error by default; `reproduce`
+  ends too (the robust and weighted solves read memory; the least squares is not ported yet).
+  **ITK-113** (VNL's QR of one zero row): 0, noted.
+- `sin`, `cos` (the quaternions) and `exp` (the weights' Gaussian): correctly rounded by default,
+  glibc's with `reproduce`, GLIBC-07 noted where they differ.
 - `get_rand` with a negative position (FreeSurfer reads before its table; no caller passes one): a panic
   in the port.
 - Speed: `getPartials`, `getBlur` are 3.9x FreeSurfer's time at 256^3 (fs.filter's `MRIconvolve1d`),

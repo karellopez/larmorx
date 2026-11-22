@@ -36,6 +36,28 @@
 #include "MyMRI.h"
 #undef private
 
+// 3.2-03 (relay 42): the registration step's classes. Their own headers and every header they
+// include first (so the access change below touches only these classes; the layout does not
+// change): the protected and private members of Regression, RegistrationStep and RegRobust (its
+// fields the step reads) are opened for the probe.
+#include <fstream>
+#include <limits>
+#include <sstream>
+#include <typeinfo>
+#include <vnl/algo/vnl_qr.h>
+#include <vnl/algo/vnl_svd.h>
+#include "Quaternion.h"
+#include "Transformation.h"
+#include "RobustGaussian.h"
+#define private public
+#define protected public
+#include "Regression.h"
+#include "Registration.h"
+#include "RegRobust.h"
+#include "RegistrationStep.h"
+#undef protected
+#undef private
+
 #include "error.h"
 #include "matrix.h"
 #include "mri.h"
@@ -263,6 +285,236 @@ vnl_matrix_fixed<double, 4, 4> get_m4()
   return m;
 }
 
+// ---- 3.2-03 (relay 42): RobustGaussian, Regression, Quaternion, the transformations and the
+// registration step
+
+template <class T> T getv();
+template <> float getv<float>() { return getf(); }
+template <> double getv<double>() { return getd(); }
+void ov(float v) { of(v); }
+void ov(double v) { od(v); }
+template <class T> void ovec(const vnl_vector<T> &v)
+{
+  oi(v.size());
+  for (unsigned i = 0; i < v.size(); i++) ov(v[i]);
+}
+template <class T> void oarr(const T *a, int n)
+{
+  for (int i = 0; i < n; i++) ov(a[i]);
+}
+
+// RobustGaussian<T>::<op>(a, n[, k | d]): the result, then the array as the call left it
+template <class T> void rgauss()
+{
+  std::string op = next();
+  int n = geti();
+  std::vector<T> a(n > 0 ? n : 1);
+  for (int i = 0; i < n; i++) a[i] = getv<T>();
+  T *p = a.data();
+  if (op == "median") {
+    ov(RobustGaussian<T>::median(p, n));
+  } else if (op == "medianI") {
+    std::pair<T, T> r = RobustGaussian<T>::medianI(p, n);
+    ov(r.first);
+    ov(r.second);
+  } else if (op == "mad") {
+    T d = getv<T>();
+    ov(RobustGaussian<T>::mad(p, n, d));
+  } else if (op == "kth" || op == "qsel" || op == "kthI" || op == "qselI") {
+    int k = geti();
+    if (op == "kth") ov(RobustGaussian<T>::kth_smallest(p, n, k));
+    else if (op == "qsel") ov(RobustGaussian<T>::quick_select(p, n, k));
+    else {
+      std::pair<T, int> r = op == "kthI" ? RobustGaussian<T>::kth_smallestI(p, n, k)
+                                         : RobustGaussian<T>::quick_selectI(p, n, k);
+      ov(r.first);
+      oi(r.second);
+    }
+  } else {
+    fail("unknown rgauss op");
+  }
+  oarr(p, n);
+}
+
+// Regression<T>: regress <T> <method> <floatsvd> <verbose> <sat> <sig> <hasA> <rows> <cols>
+// [A row by row] <b> [<wsize> | <w>]; methods: rob (getRobustEstW), ls (getLSEst), wls
+// (getWeightedLSEst), wlsf (getWeightedLSEstFloat), sigma (getSigmaMAD with d), tukey
+// (getSqrtTukeyDiaWeights). Prints the result, the weights, the last error, weight and zero
+// percentages, and b as the call left it.
+template <class T> void regress()
+{
+  std::string method = next();
+  int fsvd = geti(), verbose = geti();
+  double sat = getd(), sig = getd();
+  int hasA = geti(), rows = geti(), cols = geti();
+  vnl_matrix<T> A(hasA ? rows : 0, hasA ? cols : 0);
+  if (hasA)
+    for (int i = 0; i < rows; i++)
+      for (int j = 0; j < cols; j++) A[i][j] = getv<T>();
+  vnl_vector<T> b(rows);
+  for (int i = 0; i < rows; i++) b[i] = getv<T>();
+  Regression<T> *R = hasA ? new Regression<T>(A, b) : new Regression<T>(b);
+  R->setVerbose(verbose);
+  R->setFloatSvd(fsvd != 0);
+  if (method == "rob") {
+    int wsize = geti();
+    vnl_vector<T> w(wsize);
+    for (int i = 0; i < wsize; i++) w[i] = getv<T>();
+    vnl_vector<T> p = R->getRobustEstW(w, sat, sig);
+    ovec(p);
+    ovec(w);
+  } else if (method == "ls") {
+    ovec(R->getLSEst());
+  } else if (method == "wls" || method == "wlsf") {
+    vnl_vector<T> w(rows);
+    for (int i = 0; i < rows; i++) w[i] = getv<T>();
+    ovec(method == "wls" ? R->getWeightedLSEst(w) : R->getWeightedLSEstFloat(w));
+  } else if (method == "sigma") {
+    T d = getv<T>();
+    ov(R->getSigmaMAD(b, d));
+  } else if (method == "tukey") {
+    vnl_vector<T> w(rows);
+    R->getSqrtTukeyDiaWeights(b, w, sat);
+    ovec(w);
+  } else {
+    fail("unknown regress method");
+  }
+  std::cout << std::flush;
+  od(R->getLastError());
+  od(R->getLastWeightPercent());
+  od(R->getLastZeroWeightPercent());
+  ovec(b);
+  delete R;
+}
+
+// the transformation models by number (Registration::setTransformation's and RegPowell's)
+Transformation *make_trans(int code)
+{
+  switch (code) {
+    case 0: return new Transform2dAffine;
+    case 1: return new Transform2dAffine2;
+    case 2: return new Transform2dIsoscale;
+    case 3: return new Transform2dIsoscale2;
+    case 4: return new Transform2dRigid;
+    case 5: return new Transform2dRigid2;
+    case 6: return new Transform2dTranslate;
+    case 7: return new Transform3dAffine;
+    case 8: return new Transform3dAffine2;
+    case 9: return new Transform3dIsoscale;
+    case 10: return new Transform3dIsoscale2;
+    case 11: return new Transform3dRigid;
+    case 12: return new Transform3dRigid2;
+    case 13: return new Transform3dTranslate;
+    case 14: return new Transform3dIdentity;
+  }
+  fail("unknown transformation");
+}
+
+void put_m4(const vnl_matrix_fixed<double, 4, 4> &m)
+{
+  for (int i = 0; i < 4; i++)
+    for (int j = 0; j < 4; j++) od(m[i][j]);
+}
+
+// trans <code> <ptype> <np> <params> <identity> <x> <fx> <y> <fy> <z> <fz>: the transformation's
+// parameters set from a std::vector<double> (ptype 0), a vnl_vector<float> (1) or a
+// vnl_vector<double> (2), optionally setIdentity() after; its DOF, parameters, steps, matrix and
+// gradient (the last two may end the program)
+void trans_case()
+{
+  int code = geti(), ptype = geti(), np = geti();
+  std::vector<double> pd(np);
+  vnl_vector<float> pf(np);
+  vnl_vector<double> pv(np);
+  for (int i = 0; i < np; i++) {
+    if (ptype == 1) pf[i] = getf();
+    else pd[i] = pv[i] = getd();
+  }
+  int identity = geti();
+  unsigned x = (unsigned)geti();
+  float fx = getf();
+  unsigned y = (unsigned)geti();
+  float fy = getf();
+  unsigned z = (unsigned)geti();
+  float fz = getf();
+  Transformation *t = make_trans(code);
+  if (ptype == 0) t->setParameters(pd);
+  else if (ptype == 1) t->setParameters(pf);
+  else t->setParameters(pv);
+  if (identity) t->setIdentity();
+  oi(t->getDOF());
+  ovec(t->getParameters());
+  ovec(t->getSteps());
+  std::cout << std::flush;
+  put_m4(t->getMatrix());
+  ovec(t->getGradient(x, fx, y, fy, z, fz));
+  delete t;
+}
+
+// quat rv <v1> <v2> <v3> | rva <alpha> <v1> <v2> <v3> | zyx <z> <y> <x>: the quaternion and
+// its rotation matrix
+void quat_case()
+{
+  std::string op = next();
+  Quaternion q;
+  if (op == "rv") {
+    double a = getd(), b = getd(), c = getd();
+    q.importRotVec(a, b, c);
+  } else if (op == "rva") {
+    double al = getd(), a = getd(), b = getd(), c = getd();
+    q.importRotVec(al, a, b, c);
+  } else if (op == "zyx") {
+    double a = getd(), b = getd(), c = getd();
+    q.importZYXAngles(a, b, c);
+  } else {
+    fail("unknown quat op");
+  }
+  od(q.getReal());
+  std::vector<double> im = q.getImg();
+  for (double v : im) od(v);
+  std::vector<double> m = q.getRotMatrix3d();
+  for (double v : m) od(v);
+}
+
+// rstep <T> <floatsvd> <costfun> <trans> <sat> <iscale> <subsamplesize> <verbose> <calls>, then
+// per call the source and target volumes: RegistrationStep<T>(R).computeRegistrationStep(S, T)
+// with a RegRobust R whose fields the step reads set from the case; per call the matrix, the
+// intensity parameter, the weight checks, the parameters, the weights image and the index image
+template <class T> void rstep()
+{
+  int fsvd = geti(), costfun = geti(), code = geti();
+  double sat = getd();
+  int iscale = geti(), ss = geti(), verbose = geti(), calls = geti();
+  RegRobust R;
+  R.sat = sat;
+  R.iscale = iscale != 0;
+  R.costfun = (Registration::Cost)costfun;
+  R.trans = make_trans(code);
+  R.subsamplesize = ss;
+  R.verbose = verbose;
+  R.debug = 0;
+  RegistrationStep<T> S(R);
+  S.setFloatSVD(fsvd != 0);
+  for (int c = 0; c < calls; c++) {
+    MRI *ms = get_vol();
+    MRI *mt = get_vol();
+    std::pair<vnl_matrix_fixed<double, 4, 4>, double> md = S.computeRegistrationStep(ms, mt);
+    std::cout << std::flush;
+    put_m4(md.first);
+    od(md.second);
+    if (costfun == Registration::ROB) {
+      od(S.getwcheck());
+      od(S.getwchecksqrt());
+    }
+    od(S.getzeroweights());
+    ovec(S.pvec);
+    put_vol(S.getWeights());
+    put_vol(S.mri_indexing);
+    MRIfree(&ms);
+    MRIfree(&mt);
+  }
+}
+
 std::string slurp(const std::string &path)
 {
   std::string r;
@@ -410,6 +662,19 @@ void run_case()
   } else if (cmd == "sqrtm") {
     // MyMatrix::MatrixSqrt(A) of a square matrix
     ovm(MyMatrix::MatrixSqrt(get_vm()));
+  } else if (cmd == "rgauss") {
+    if (geti()) rgauss<double>();
+    else rgauss<float>();
+  } else if (cmd == "regress") {
+    if (geti()) regress<double>();
+    else regress<float>();
+  } else if (cmd == "trans") {
+    trans_case();
+  } else if (cmd == "quat") {
+    quat_case();
+  } else if (cmd == "rstep") {
+    if (geti()) rstep<double>();
+    else rstep<float>();
   } else {
     fail("unknown command");
   }

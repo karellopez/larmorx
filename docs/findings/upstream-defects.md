@@ -486,6 +486,13 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FS-968 | FreeSurfer 8.2.0 `MyMatrix::RigidTransDistSq` (the robust registration's convergence distance) | the first transform is inverted with VNL's SVD; on a matrix with an infinite or NaN entry the SVD can stop without converging (its warning on standard error) and the distance is computed from the decomposition reached: an arbitrary number | c (rule B, 2026-11-18) | none (finite transforms) | an error and status 1 by default, named; `reproduce` FreeSurfer's number (its NaNs' bits not yet the official build's) | NaN bits |
 | FS-969 | FreeSurfer 8.2.0 `MyMatrix::SchurComplex`, `MatrixSqrt` (the robust registration's matrix square root, at every step of its symmetric registration) | a matrix with an infinite or NaN element: LAPACK's `zlahqr` never converges (`zhseqr` retries with `zlaqr0`; `info = 2, something went wrong` and `the QR iteration failed` on standard error) or the NaNs pass through; the assertion on `info` is compiled out and the result's two checks never fail on NaNs: a NaN matrix is returned | c (rule B, 2026-11-20) | none (the registration's transforms are finite) | an error and status 1 by default, named; `reproduce` FreeSurfer's result where `zlahqr` converges (`zlaqr0` not ported: an error) | `zlaqr0` |
 | FS-970 | FreeSurfer 8.2.0 `MyMatrix::SchurComplex`, `MatrixSqrt` | an empty (0 x 0) matrix: `zgees_` refuses `LDA = 0`, LAPACK's `XERBLA` prints ` ** On entry to ZGEES parameter number  6 had an illegal value` on standard output and Fortran's `STOP` ends the program with status 0 | c (rule B, 2026-11-20) | none (the matrices are 3 x 3 and 4 x 4) | an error and status 1 by default, named; `reproduce` the line and status 0 | – |
+| FS-1061 | FreeSurfer 8.2.0 `RegistrationStep::constructAb` (the robust registration's step) | an image pair of more than 2,147,483,647 voxels and frames: the system's rows are numbered in 32-bit integers, which wrap, so some voxels would get other voxels' weights | a (overflow; unreachable: the system alone needs more than 60 GB) | none | computed as FreeSurfer, noted | – |
+| FS-1062 | FreeSurfer 8.2.0 `RegistrationStep::constructAb` (`--subsample`) | a subsampled step forms its rows with the subsampled grid's positions (half the image's): the rotation, scale and shear columns are halved relative to the image's positions | c | `mri_robust_template --subsample 200` in recon-all's and sMRIPrep's averaging of several T1w images (to measure) | kept in both modes, noted (rule D pending, 2026-11-22) | to measure (with FS-963, at `mri_robust_register`'s and `mri_robust_template`'s replays) |
+| FS-1063 | FreeSurfer 8.2.0 `Transformation::setParameters(vnl_vector<double>)` | a parameter vector of another length than the model's (every step of `--doubleprec --iscale` passes one more): the model is left with memory contents (the first parameter a pointer's bits, observed) | a (memory: never written) | none (`--doubleprec` is not the default) | the vector's first parameters in both modes, noted | – |
+| FS-1064 | FreeSurfer 8.2.0 `RobustGaussian<T>::median`, `medianI`, `mad` | an empty list: memory contents | a (out of bounds) | none | NaN in both modes, noted | – |
+| FS-1065 | FreeSurfer 8.2.0 `Regression<T>::getRobustEstWB` (the robust location; `mri_robust_template --average 2`) | the weights are written through an empty vector: a crash unless the first robust sigma is below `2e-6` | a (crash) | none (`--average 1`, the median, is the default) | the weights sized to the values in both modes, noted | – |
+| FS-1066 | FreeSurfer 8.2.0 `Regression<T>::getLSEst` without a design matrix | returns memory contents instead of the mean | a (out of bounds) | none (no program reaches it) | the mean in both modes, noted | – |
+| FS-1067 | FreeSurfer 8.2.0 `Regression<T>` (the robust registration's solvers) | fewer rows (usable voxels) than parameters: the robust solve gives memory contents; the least squares VNL's minimum-norm solution | a (out of bounds) and c | none | an error and status 1 by default (rule B, 2026-11-22), named; `reproduce` ends too (memory contents), the least squares "not ported yet" | the least squares of `rows < cols` under `reproduce` (LINPACK's `dsvdc` of a wide matrix) |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -4670,6 +4677,38 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
   1 by default; `reproduce` LAPACK's line and status 0. Found 2026-11-20 (queue 3.2-02, its second part).
 - **D13 / gap:** FS-969's `reproduce` where `zlaqr0` runs (`zlaqr0`, `zlaqr3`, `zlaqr4`, `zlaqr5`,
   `ztrexc`: about 3,000 lines of LAPACK, for non-finite matrices only).
+### FS-1061 to FS-1067 FreeSurfer 8.2.0's fs.robust: the registration step and its solvers — (a, overflow; c, rule D pending; a, memory; a, out of bounds; a, crash; a, out of bounds; a and c, rule B)
+- **What:** (FS-1061) a robust registration step of an image pair of more than 2,147,483,647 voxels
+  and frames numbers its system's rows in 32-bit integers, which wrap: some voxels would get other
+  voxels' weights. (FS-1062) a subsampled step (`--subsample`) forms its system with the subsampled
+  grid's positions while it reads the image at twice them: its rotation, scale and shear columns are
+  half what the image's positions give. (FS-1063) a transformation model set from a `double` parameter
+  vector of another length than its own is left with memory contents: every step of the registration
+  in double precision with an intensity scale (`--doubleprec --iscale`) builds its matrix from them
+  (observed: a three-parameter model's parameters `00000005e2c796d5 0 0`, the first a pointer's bits).
+  (FS-1064) the median and median absolute deviation of an empty list read memory before and past it.
+  (FS-1065) the robust location of a set of values (Tukey's biweight; `mri_robust_template --average
+  2`) writes its weights through an empty vector: a crash unless the first robust sigma is below
+  `2e-6`. (FS-1066) the least-squares location without a design matrix writes the mean past its result
+  and returns memory contents. (FS-1067) a step's system with fewer rows (usable voxels) than
+  parameters: the robust solve reads past its arrays (memory contents) and the least squares gives
+  VNL's minimum-norm solution. The details: `docs/findings/freesurfer-robust.md` §6 (closed to
+  FreeSurfer's clean-room implementers).
+- **Evidence:** verified (the probe `validation/probes/fs-robust`, `check.py --family regstep`:
+  FreeSurfer's `Regression`, `RobustGaussian`, `Transformation`, `Quaternion` and `RegistrationStep`
+  compiled with the official flags; seeds 1, 7, 13, 4,000 cases: FS-1063 49 times in seed 1's 1,000
+  (memory contents in the official output), FS-1065 crashes, FS-1066 and FS-1067 memory contents, every
+  other line reproduced bit for bit); FS-1061 and FS-1062 from the source.
+- **fMRIPrep:** FS-1062 possibly: sMRIPrep averages several T1w images with `mri_robust_template
+  --subsample 200` (to measure); the others none. **FreeSurfer:** recon-all's averaging of several T1w
+  inputs likewise for FS-1062.
+- **larmorx:** FS-1061 computed as FreeSurfer, noted; FS-1062 kept (rule D: measured with FS-963 at the
+  replays of `mri_robust_register` and `mri_robust_template`, queue 3.2-13 to 3.2-16); FS-1063 the vector's
+  first parameters in both modes; FS-1064 NaN; FS-1065 the weights sized to the values; FS-1066 the mean;
+  FS-1067 (rule B) an error and status 1 by default, `reproduce` ends too. Each noted. Found 2026-11-22
+  (queue 3.2-03, its first part).
+- **D13 / gap:** FS-1063 to FS-1066 are memory contents or a crash (not reproduced); FS-1067's least
+  squares of a wide matrix under `reproduce` (not ported).
 
 ### FS-809 to FS-812 zlib 1.2.11 (Ubuntu 22.04's build): deflatePrime with bytes waiting, the stored window's hash count, the dictionary past the window — (a, memory and out of bounds; rules A and B)
 - **What:** `deflatePrime` called while compressed bytes wait behind some already handed out writes its bits at the

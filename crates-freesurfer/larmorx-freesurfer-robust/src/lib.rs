@@ -15,3 +15,9 @@
 pub mod costs;
 pub mod mymatrix;
 pub mod mymri;
+pub mod quaternion;
+pub mod real;
+pub mod regression;
+pub mod regstep;
+pub mod robust_gauss;
+pub mod transformation;

@@ -179,7 +179,7 @@ const SVD_HANGS: &str = "MyMatrix: VNL's singular value decomposition never retu
 /// The lines `vnl_svd<double>` prints on standard error when LINPACK's `dsvdc` does not converge
 /// (ITK 4.13.2's `vnl_svd.hxx`, the official build's path): `info`, the size, and the matrix by
 /// `vnl_matlab_print(std::cerr, M, "M", vnl_matlab_print_format_long)`.
-fn suspicious_svdc(m: &[f64], rows: usize, cols: usize, info: usize) -> String {
+pub(crate) fn suspicious_svdc(m: &[f64], rows: usize, cols: usize, info: usize) -> String {
     let file = vnl_svd_hxx();
     let mut s = format!(
         "{file}: suspicious return value ({info}) from SVDC\n{file}: M is {rows}x{cols}\nM = [ ...\n"

@@ -2992,9 +2992,18 @@ read and written as the voxel functions do outside a volume (fs.mri §5, FS-52, 
   0).
 - **`MRIcropAroundRAS(vol, rasCenter, voxFoVRAS, lta, iKeep)`**: the RAS centre's voxel by the inverse vox2ras (with an
   LTA: a copy, oriented and made RAS to RAS, `Chaning Source LTA type to ras2ras`, applied first: `ras2vox * M`; the
-  matrices printed: `Input RAS2VOX`, `LTA RAS2RAS`, then `final ras2vox matrix`, the matrix and a line of dashes); each
-  voxel axis takes the FoV of `voxFoVRAS` (left-right, front-back, up-down) that its orientation letter names
-  (`ostr ...`, `rasCenter ...`, `crsCenter ...` printed); then `MRIcropAroundCRS`. The LTA's direction: by default
+  matrices printed: `Input RAS2VOX`, `LTA RAS2RAS`, then `final ras2vox matrix`, the matrix and a line of dashes). The
+  fields of view: `voxFoVRAS` holds them in RAS order (left-right, front-back, up-down), and by default each voxel axis
+  takes the entry its orientation letter (§14's orientation string) names: a column axis along `S` or `I` takes the
+  up-down entry. FreeSurfer (FS-268, `reproduce`) assigns them the other way round: for each voxel axis `k` in order,
+  entry `k` of `voxFoVRAS` goes to the voxel axis whose place is the RAS direction its letter names (`R`/`L` the first,
+  `A`/`P` the second, `S`/`I` the third), a later axis's write replacing an earlier one's. The two agree when the
+  orientation keeps every axis in place or swaps two of them (`RAS`, `LIA`, `SAR`, `ARS`) and differ when it moves all
+  three (`SRA`, `ASR`, `PIL`, `ASL`, `IRP`, ...): `SRA` with `(4, 1, 3)` crops `(1, 3, 4)` voxels with `reproduce` and
+  `(3, 4, 1)` by default; the default notes FS-268 where the voxel axes' fields of view differ (**(observed)**:
+  `vrules16`, nine orientations, two fields of view each, with and without an array; `vcrops`). Then `ostr <o> (<v0>
+  <v1> <v2>) (<f0> <f1> <f2>)` (the orientation, `voxFoVRAS`, the voxel axes' fields of view the mode takes),
+  `rasCenter ...`, `crsCenter ...` are printed; then `MRIcropAroundCRS`. The LTA's direction: by default
   inverted (`Inverting LTA`) when the volume is its source only and refused when the volume is neither end (`ERROR:
   MRIcropAroundRAS(): vol is not src or dst of LTA (<a>, <b>)`, the LTA, `vg_isEqual_Threshold = <g>`, `NULL`);
   FreeSurfer decides it backwards (FS-516): with `reproduce`, the volume is compared (`vg_isEqual`, §4) with its own
@@ -3002,8 +3011,13 @@ read and written as the voxel functions do outside a volume (fs.mri §5, FS-52, 
   the array inverted when the volume equals its destination and not its source, refused (`(1, 1)`) when it equals both,
   taken as it is otherwise (the volume its source, or neither end) (**(observed)**: `vcrops`; `vrules15`, the eight
   cases). A volume whose vox2ras has no inverse: `final ras2vox matrix`, `MatrixPrint`'s error and the end of the
-  program in the first product (`m1 is null`) (**(observed)**: `vrules15`). An orientation that names an axis twice or
-  is unknown: FS-515 (**(observed)**: `vrules15`, an invertible matrix whose first two columns are mostly x).
+  program in the first product (`m1 is null`) (**(observed)**: `vrules15`). An orientation that names an RAS direction
+  twice, or is unknown (`???`: `ras_good_flag` 0): FS-515: by default the program ends (larmorx's own error, status
+  252), noted; with `reproduce` the fields of view are assigned as FreeSurfer does (FS-268's way, the later axis's
+  write kept), and a voxel axis no letter reaches keeps a field of view FreeSurfer never set (memory contents),
+  taken as 0 and noted (the D13 rule for memory contents; 0 in all four probe runs) (**(observed)**: `vrules15`, an
+  invertible matrix whose first two columns are mostly x: `ostr RRS (2 2 1) (2 0 1)`; `vrules16`, the same with
+  `(4, 1, 3)`: `(1 0 3)`, the second axis's entry kept).
 
 ## 58. Validation plan (sections 54 to 57)
 §54 whole (made ready by the spec finisher's relays 12 to 14): §69's groups `vltapv`, `vrules10`, `vlta54` and
@@ -3014,17 +3028,18 @@ loop allows; the default differs only with a notice (FS-505, FS-506, FS-507); `m
 the six changes' products bit for bit. FS-504's and FS-508's errors are larmorx's own (the loop lets those lines
 differ): the implementations' own tests, against §54's text.
 
-§55 to §57 (made ready by the spec finisher's relay 15), but `MRIaseg2volMU` with `USF` other than -1 and
-`MRIvol2VolTkRegVSM` (part 9): §69's groups `vaseg` (§55), `vsegs` (§56), `vcrops` (§57) and `vrules15` (their fixed
-cases) (the open probe's `a2v`, `a2vmu`, `spmw`, `icode`, `sbound`, `sborder`, `idxno`, `ssrob`, `sfavg`, `zcat`,
-`aedit`, `shdim`, `fento`, `lacj`, `cfov`, `ccrs`, `crras`; README.md says what each prints), identical with `reproduce`
-but where FreeSurfer crashes or reads or writes memory it does not own (FS-509, FS-515, FS-517, the voxel functions'
-FS-52 and FS-53), lines the loop allows; the default differs only with a notice (FS-510, FS-512, FS-513, FS-514,
-FS-516, FS-267). FS-509's, FS-515's and FS-517's errors are larmorx's own (the loop lets those lines differ; FS-509's
-in both modes: a tissue type of 100 counted past FreeSurfer's array gives a value of its memory, the same in every
-run): the implementations' own tests, against these sections' text. Not in the probe: FS-511 (a sample that fails
-before any succeeded), more than 1,000 labels or 100 tissue types in one voxel (FS-509), FS-267's cross-call state
-(each probe call is a process of its own), FS-514's threads (the loop runs one thread).
+§55 to §57 (made ready by the spec finisher's relays 15 and 16), but `MRIaseg2volMU` with `USF` other than -1 and
+`MRIvol2VolTkRegVSM` (part 9): §69's groups `vaseg` (§55), `vsegs` (§56), `vcrops` (§57), `vrules15` and `vrules16`
+(their fixed cases) (the open probe's `a2v`, `a2vmu`, `spmw`, `icode`, `sbound`, `sborder`, `idxno`, `ssrob`, `sfavg`,
+`zcat`, `aedit`, `shdim`, `fento`, `lacj`, `cfov`, `ccrs`, `crras`; README.md says what each prints), identical with
+`reproduce` but where FreeSurfer crashes or reads or writes memory it does not own (FS-509, FS-515, FS-517, the voxel
+functions' FS-52 and FS-53), lines the loop allows; the default differs only with a notice (FS-510, FS-511, FS-512,
+FS-513, FS-514, FS-516, FS-267, FS-268). FS-509's, FS-515's and FS-517's errors are larmorx's own (the loop lets those
+lines differ; FS-509's in both modes: a tissue type of 100 counted past FreeSurfer's array gives a value of its memory,
+the same in every run): the implementations' own tests, against these sections' text. FS-511's and FS-515's values
+never written are 0 in every probe run (`vrules16`, `vrules15`), so `reproduce` gives 0 there and the loop compares
+those lines. Not in the probe: more than 1,000 labels or 100 tissue types in one voxel (FS-509), FS-267's cross-call
+state (each probe call is a process of its own), FS-514's threads (the loop runs one thread).
 
 ## 59. Filling a coarser grid, bright voxels outside the white matter, voxel topology (3.1-37: mri2.cpp, relay 29)
 - **`MRIvol2VolFill(src, mask, lta, UpsampleFactor, DoConserve, outfill)`**: maps the source onto the LTA's other end by
@@ -3864,7 +3879,7 @@ and `vrules15` identical in both modes; no unexplained difference in either mode
 | FS-509 | 55 | FS-510 | 55 | FS-511 | 55 |
 | FS-512 | 56 | FS-513 | 56 | FS-514 | 56 |
 | FS-515 | 57 | FS-516 | 57 | FS-517 | 57 |
-| FS-267 | 55 | | | | |
+| FS-267 | 55 | FS-268 | 57 | | |
 
 Others' defects these parts meet: FS-12 (`nint`, `specs/freesurfer-core.md`), FS-52 (§35's second volumes), FS-53 and FS-58
 (`specs/freesurfer-mri.md`; FS-252, its header copy without cached matrices, in part 4), FS-47 and

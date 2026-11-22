@@ -4166,6 +4166,12 @@ class Gen14(Gen13):
         other = self.plain((3, 3, 3), c=(1.0, -2.0, 0.0))
         arr = self.arr1(r, 1, other, gc, m=self.near(r, t=1.0))
         L.append(f"crras {self.lab(gc, cvals)} 0 1 {ctr} 4 1 3 0 {arr}")
+        # item 87 (FS-515): an orientation naming x twice (RRS) with three different fields of view:
+        # the later axis's entry kept, the axis no letter reaches never set
+        cs = (0.8, 0.6, 0.0, 0.75, -0.66, 0.0, 0.0, 0.0, 1.0)
+        ob = ((4, 4, 2), [*(f32(1.0) for _ in range(3)), "1", *(f32(x) for x in cs), *[f32(0.0)] * 6])
+        c1 = " ".join(f64(x) for x in (1.0, 1.0, 0.0))
+        L.append(f"crras {self.lab(ob, list(range(32)))} 0 1 {c1} 4 1 3 0 null")
         # item 88 (FS-511): trilinear samples of a tensor and an RGB volume (the sampler cannot
         # read them): the first sample at a point not on a voxel fails before any wrote a value;
         # then a point on a voxel (the nearest sampler: 0); and the reverse order

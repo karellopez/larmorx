@@ -2023,6 +2023,18 @@ defects! {
         "mris_calc --label with a point whose vertex number is outside input 1's values writes outside its mask (memory corruption; such points never count); larmorx refuses the label (status 10)";
     FS_1126 = "FS-1126", "FreeSurfer", true,
         "mris_calc prints the index of the minimum and the negative, zero and positive counts through a float, and keeps a label's indices as floats: beyond 16,777,216 values they are rounded (a label's values then land at a rounded index); larmorx keeps them exact";
+    FS_1127 = "FS-1127", "FreeSurfer", true,
+        "mri_make_uchar given only an input volume and a transform (no output name) converts the whole volume, then crashes writing it (signal 11; what it printed to a file or pipe is lost): larmorx prints the usage and ends with status 1 before reading anything";
+    FS_1128 = "FS-1128", "FreeSurfer", true,
+        "mri_make_uchar's -f, -w or -r given as the last argument, without its value, crashes (signal 11): larmorx prints the usage and ends with status 1, as for -h and -v given last";
+    FS_1129 = "FS-1129", "FreeSurfer", true,
+        "mri_make_uchar ends with status 0 when its output volume, the ball volume of -v or the histogram file of -h cannot be written: larmorx ends with status 1 after the writer's messages";
+    FS_1130 = "FS-1130", "FreeSurfer", true,
+        "mri_make_uchar given a volume whose slices are not coronal prints the error 'MRIvoxelToTalairachVoxel: unsupported slice direction' (after the last system error's message) once for every voxel, although the point it fails to compute is never used and the result is right: larmorx prints none";
+    FS_1131 = "FS-1131", "FreeSurfer", true,
+        "mri_make_uchar whose ball around the Talairach origin gives both percentiles in histogram bins of one value (no voxel in the ball, one intensity in it) or whose percentile is not a number divides by zero: its intensity line is not finite and it writes a volume of zeros with status 0: larmorx ends with an error (status 1) and writes no output";
+    FS_1132 = "FS-1132", "FreeSurfer", true,
+        "mri_mask given an option that takes numbers or a file (-dilate, -erode, -T, -threshold, -crop-to-fov, -crop-to-fov-mm, -BB, -crop-crs, -BBM, -BBMM, -BBEQ, -transfer, -oval, -lta_src, -lta_dst, -DEBUG_VOXEL, -bgnoise) as its last arguments, without all its values, reads past its arguments and crashes (signal 11): larmorx prints that the option needs its values and the help, status 1";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

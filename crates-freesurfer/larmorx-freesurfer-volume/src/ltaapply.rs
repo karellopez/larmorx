@@ -26,6 +26,7 @@ use std::path::Path;
 
 use larmorx_core::defects::{FS_886, FS_887};
 use larmorx_core::math::Libm;
+use larmorx_freesurfer_core::cscan;
 use larmorx_freesurfer_core::cstd::note_glibc07;
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE, diag_heartbeat};
 use larmorx_freesurfer_core::globals::Globals;
@@ -78,8 +79,9 @@ fn exp_nan(libm: &Libm, x: f64) -> f64 {
 /// in `float`, the rest in `double`), normalised by their total; a transform whose share is below
 /// `0.1 / n` is left out, each other one's matrix times its share (as a `float`) added in turn
 /// (`MatrixScalarMul`, `MatrixAdd`, in `float`). A total within 1e-15 of 0 gives the first
-/// transform's matrix. Into `m_l` (cleared first) when given, else a new 4 x 4 matrix. FS-504,
-/// FS-886.
+/// transform's matrix. Into `m_l` (cleared first) when given, else a new 4 x 4 matrix. A weight
+/// whose finite exponent gives 0 (or an infinity) sets `errno` to ERANGE, as the C library's
+/// `exp` does. FS-504, FS-886.
 #[allow(clippy::too_many_arguments)]
 pub fn lta_transform_at_point(
     g: &mut Globals,
@@ -119,9 +121,16 @@ pub fn lta_transform_at_point(
     }
     let libm = Libm::new(g.mode());
     let nx = n.max(0) as usize;
-    let mut w_p = Vec::with_capacity(nx);
+    // the weights on the stack for a few transforms (a call per voxel: no allocation)
+    let (mut w_small, mut w_big) = ([0.0f64; 8], Vec::new());
+    let w_p: &mut [f64] = if nx <= w_small.len() {
+        &mut w_small[..nx]
+    } else {
+        w_big.resize(nx, 0.0);
+        &mut w_big
+    };
     let mut wtotal = 0.0f64;
-    for lt in &lta.xforms[..nx] {
+    for (lt, w_i) in lta.xforms[..nx].iter().zip(w_p.iter_mut()) {
         let dx = f64::from(sse::sub(lt.x0, x));
         let dy = f64::from(sse::sub(lt.y0, y));
         let dz = f64::from(sse::sub(lt.z0, z));
@@ -131,8 +140,14 @@ pub fn lta_transform_at_point(
         );
         let sigma = f64::from(lt.sigma);
         let s2 = sse::mul64(sse::mul64(2.0, sigma), sigma);
-        let w = exp_nan(&libm, sse::div64(-dsq, s2));
-        w_p.push(w);
+        let arg = sse::div64(-dsq, s2);
+        let w = exp_nan(&libm, arg);
+        // the C library's `exp` sets `errno` to ERANGE when a finite argument gives 0 or an
+        // infinity (observed: glibc 2.35); a later error message prints it
+        if arg.is_finite() && (w == 0.0 || w.is_infinite()) {
+            g.errno = cscan::ERANGE;
+        }
+        *w_i = w;
         wtotal = sse::add64(wtotal, w);
     }
     note_glibc07(g, &libm, "exp");
@@ -151,12 +166,11 @@ pub fn lta_transform_at_point(
             )?;
             return Ok(Ret::Null);
         };
-        let m0 = m0.clone();
-        matrix_copy(g, out, err, Some(&m0), Some(m))?;
+        matrix_copy(g, out, err, Some(m0), Some(m))?;
     } else {
         let wmin = 0.1 / f64::from(n);
         let mut m_tmp = Matrix::real(4, 4);
-        for (lt, &w) in lta.xforms[..nx].iter().zip(&w_p) {
+        for (lt, &w) in lta.xforms[..nx].iter().zip(w_p.iter()) {
             let w_k_p = sse::div64(w, wtotal);
             if w_k_p < wmin {
                 continue;

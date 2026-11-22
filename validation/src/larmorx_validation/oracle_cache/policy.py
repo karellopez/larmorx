@@ -356,8 +356,10 @@ def path_text(program: str, args: Sequence[str]) -> tuple[str, ...]:
 #: Programs that read a file's format from the text after the last dot of its whole path
 #: (FreeSurfer's ``fio_extension``: ``a.b/c`` has the extension ``b/c``): the key keeps that
 #: text (relay 50 of FreeSurfer's track A: two inputs of the same content named ``a.b/c`` and
-#: ``trail.`` had one key, and the cache served the one's run for the other).
-EXTENSION_FROM_WHOLE_PATH = ("mri_add_xform_to_header",)
+#: ``trail.`` had one key, and the cache served the one's run for the other). ``mri_make_uchar``
+#: (relay 51 of track D): ``MRIread``'s ``mri_identify`` and ``LTAread``'s file type both take
+#: the text after the whole name's last dot.
+EXTENSION_FROM_WHOLE_PATH = ("mri_add_xform_to_header", "mri_make_uchar")
 
 
 __all__ = [

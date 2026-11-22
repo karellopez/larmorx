@@ -4022,6 +4022,503 @@ class Gen13(Gen12):
         return [Batch("vcrops", "vcrops", L)]
 
 
+# ---- 4 x 4 arithmetic for the fixed cases that place points (plain Python, double) --------------
+
+
+def mm4(a: list[list[float]], b: list[list[float]]) -> list[list[float]]:
+    return [[sum(a[i][k] * b[k][j] for k in range(4)) for j in range(4)] for i in range(4)]
+
+
+def mv4(a: list[list[float]], v: list[float]) -> list[float]:
+    return [sum(a[i][k] * v[k] for k in range(4)) for i in range(4)]
+
+
+def inv4(a: list[list[float]]) -> list[list[float]]:
+    """Gauss-Jordan with partial pivoting (the fixed cases' matrices are well conditioned)."""
+    m = [list(a[i]) + [1.0 if i == j else 0.0 for j in range(4)] for i in range(4)]
+    for c in range(4):
+        p = max(range(c, 4), key=lambda i: abs(m[i][c]))
+        m[c], m[p] = m[p], m[c]
+        d = m[c][c]
+        m[c] = [x / d for x in m[c]]
+        for i in range(4):
+            if i != c and m[i][c] != 0.0:
+                f = m[i][c]
+                m[i] = [x - f * y for x, y in zip(m[i], m[c], strict=True)]
+    return [row[4:] for row in m]
+
+
+def mtext(a: list[list[float]]) -> str:
+    """M (README.md) of a 4 x 4 matrix, each entry as a float."""
+    return "4 4 " + " ".join(f32(a[i][j]) for i in range(4) for j in range(4))
+
+
+class Gen14(Gen13):
+    """Relay 16: the fixed cases of the fs.volume clean room's items 83 to 88 (§55, §57)."""
+
+    @staticmethod
+    def pv2r(dims, sizes, perm, signs, c, base: int) -> list[list[float]]:
+        """The vox2ras of an axis-aligned geometry (``plain``): direction cosines times sizes,
+        the translation the centre less the matrix times the extent's half plus the base."""
+        m = [[0.0] * 4 for _ in range(4)]
+        for j in range(3):
+            m[perm[j]][j] = signs[j] * sizes[j]
+        m[3][3] = 1.0
+        half = [dims[k] / 2.0 + base for k in range(3)]
+        for i in range(3):
+            m[i][3] = c[i] - sum(m[i][k] * half[k] for k in range(3))
+        return m
+
+    def vrules16(self) -> list[Batch]:
+        """§55 and §57's fixed cases (relay 16): MRIaseg2volMU's template geometry with the
+        segmentation the array's source, its destination, neither end, and a source not marked
+        valid (item 84); MRIapplySpmWarp with the volume the array's source and its destination,
+        arrays of types 0 and 1, both reversals and both sample types, warp points placed to land
+        inside the volume through the array's other end (item 85); MRIcropAroundRAS's fields of
+        view for orientations that are the identity, a transposition or a 3-cycle of the axes,
+        with and without an array (item 86, FS-268), and of an orientation naming x twice with
+        three different fields of view (item 87, FS-515); MRIcropAroundCRS's FS-517 on each axis,
+        the other axes inside the volume or outside it (a last voxel past int's maximum, at it,
+        and below its minimum); MRIapplySpmWarp's trilinear samples of tensor and RGB volumes, the
+        first sample failing (item 88, FS-511)."""
+        L = []
+        r = random.Random(1616)
+        ident = [[1.0 if i == j else 0.0 for j in range(4)] for i in range(4)]
+        # item 84: the template's geometry: the array's destination when the segmentation equals
+        # its source, else its source
+        ga = self.plain((2, 2, 2), c=(0.5, 0.5, 0.0))
+        gb = self.plain((4, 3, 1), c=(-0.5, 0.0, 0.5))
+        g0 = self.plain((3, 3, 2))
+        for gs in (ga, gb, g0):
+            n = gs[0][0] * gs[0][1] * gs[0][2]
+            seg = self.lab(gs, ([1, 2, 1, 2, 1, 2, 1, 2, 1] * 4)[:n])
+            arr = self.arr1(r, 0, ga, gb, m=mtext(ident))
+            L.append(f"a2vmu {seg} 0 {arr} {f64(0.0)} -1 null")
+        seg = self.lab(ga, [1, 2, 1, 2, 1, 2, 1, 2])
+        fw = self.lt(r, mtext(ident), self.g_of(ga, valid=0), self.g_of(gb))
+        inv = self.lt(r, mtext(ident), self.g_of(gb), self.g_of(ga, valid=0))
+        L.append(f"a2vmu {seg} 0 1 0 {f32(1.0)} {xs('')} {fw} {inv} {f64(0.0)} -1 null")
+        # item 85: SPM's input space is the array's other end: points placed through it land at
+        # chosen voxels of the volume (the volume's own space would put them elsewhere)
+        vd, vs, vp, vsg, vc = (4, 3, 3), (1.5, 1.0, 2.0), (1, 0, 2), (1, -1, 1), (2.0, -1.0, 0.5)
+        od, os_, op, osg, oc = (5, 4, 3), (1.0, 2.0, 1.0), (0, 1, 2), (1, 1, -1), (-1.0, 3.0, 1.0)
+        gv = self.plain(vd, vs, vp, vsg, vc)
+        go = self.plain(od, os_, op, osg, oc)
+        v2r0 = {"v": self.pv2r(vd, vs, vp, vsg, vc, 0), "o": self.pv2r(od, os_, op, osg, oc, 0)}
+        o2r1 = self.pv2r(od, os_, op, osg, oc, 1)
+        nf = 2
+        vol = self.lab(gv, [1.25 * i + 100.0 * (i // 36) for i in range(36 * nf)], t=3, nf=nf)
+        # a vox2vox from the other end to the volume: a swap of the first two axes and a shift
+        o2v = [[0.0, 1.0, 0.0, 0.5], [1.0, 0.0, 0.0, -0.25], [0.0, 0.0, 1.0, 0.5], [0, 0, 0, 1.0]]
+        wd = (5, 4, 3)
+        inner = [(c, rr, 1) for c in range(1, 4) for rr in range(1, 3)]
+        for vol_end in ("src", "dst"):
+            for ty in (0, 1):
+                for lr in (0, 1):
+                    for interp in (0, 1):
+                        # the forward transform's vox2vox, from its source to its destination
+                        vox = inv4(o2v) if vol_end == "src" else o2v
+                        src, dst = ("v", "o") if vol_end == "src" else ("o", "v")
+                        m = vox if ty == 0 else mm4(mm4(v2r0[dst], vox), inv4(v2r0[src]))
+                        ends = (gv, go) if vol_end == "src" else (go, gv)
+                        arr = self.arr1(r, ty, ends[0], ends[1], m=mtext(m))
+                        wv = [0.0] * (wd[0] * wd[1] * wd[2] * 3)
+                        for k, (c, rr, s) in enumerate(inner):
+                            if k == 5:
+                                q = [-0.6, 1.0, 1.0, 1.0]  # outside the volume: skipped
+                            else:
+                                q = [r.uniform(0.2, d - 1.2) for d in vd] + [1.0]
+                            p = mv4(inv4(o2v), q)
+                            if lr:
+                                p[0] = od[0] - 1 - p[0]
+                            ras = mv4(o2r1, [p[0] + 1, p[1] + 1, p[2] + 1, 1.0])
+                            for f in range(3):
+                                wv[f * 60 + s * 20 + rr * 5 + c] = ras[f]
+                        warp = self.lab(self.plain(wd), wv, t=3, nf=3)
+                        d = "new"
+                        if vol_end == "dst" and lr == 1 and interp == 1:
+                            d = self.lab(self.plain(wd), [7.0] * (60 * nf), t=3, nf=nf)
+                        L.append(f"spmw {vol} 0 {arr} {warp} 0 {lr} {interp} {d}")
+        # without an array the volume's own space; the same warp (its points through the other
+        # end land elsewhere or outside)
+        L.append(f"spmw {vol} 0 null {warp} 0 0 1 new")
+        L.append(f"spmw {vol} 0 null {warp} 0 1 0 new")
+        # item 86 (FS-268): the fields of view of MRIcropAroundRAS: (left-right, front-back,
+        # up-down) to the voxel axes along them; identity, transpositions and 3-cycles
+        orients = (
+            ((0, 1, 2), (1, 1, 1)),  # RAS
+            ((0, 2, 1), (-1, -1, 1)),  # LIA
+            ((2, 1, 0), (1, 1, 1)),  # SAR
+            ((1, 0, 2), (1, 1, 1)),  # ARS
+            ((2, 0, 1), (1, 1, 1)),  # SRA
+            ((1, 2, 0), (1, 1, 1)),  # ASR
+            ((1, 2, 0), (-1, -1, -1)),  # PIL
+            ((1, 2, 0), (1, 1, -1)),  # ASL
+            ((2, 0, 1), (-1, 1, -1)),  # IRP
+        )
+        cd = (6, 5, 4)
+        cvals = list(range(cd[0] * cd[1] * cd[2]))
+        ctr = " ".join(f64(x) for x in (0.3, -0.2, 0.1))
+        for perm, signs in orients:
+            gc = self.plain(cd, perm=perm, signs=signs)
+            v = self.lab(gc, cvals)
+            for fov in ((4, 1, 3), (2, 3, 1)):
+                L.append(f"crras {v} 0 1 {ctr} {' '.join(map(str, fov))} 0 null")
+        # a 3-cycle through an array (the volume its destination, the array taken as it is)
+        gc = self.plain(cd, perm=(2, 0, 1))
+        other = self.plain((3, 3, 3), c=(1.0, -2.0, 0.0))
+        arr = self.arr1(r, 1, other, gc, m=self.near(r, t=1.0))
+        L.append(f"crras {self.lab(gc, cvals)} 0 1 {ctr} 4 1 3 0 {arr}")
+        # item 87 (FS-515): an orientation naming x twice (RRS) with three different fields of view:
+        # the later axis's entry kept, the axis no letter reaches never set
+        cs = (0.8, 0.6, 0.0, 0.75, -0.66, 0.0, 0.0, 0.0, 1.0)
+        ob = (
+            (4, 4, 2),
+            [*(f32(1.0) for _ in range(3)), "1", *(f32(x) for x in cs), *[f32(0.0)] * 6],
+        )
+        c1 = " ".join(f64(x) for x in (1.0, 1.0, 0.0))
+        L.append(f"crras {self.lab(ob, list(range(32)))} 0 1 {c1} 4 1 3 0 null")
+        # FS-517's outcomes in FreeSurfer, by axis: a last voxel past int's maximum (a centre of
+        # 2147483647, a field of view of 3), exactly at it (a field of view of 1) and below int's
+        # minimum (a NaN centre, a field of view of 0), the other axes inside the volume or not
+        cv = self.lab(self.plain((4, 4, 2)), list(range(32)))
+        for ax in range(3):
+            for kind in ((2147483647.0, 3), (2147483647.0, 1), (float("nan"), 0)):
+                for others in (1.0, -5.0):
+                    ctr = [others] * 3
+                    fov = [1, 1, 1]
+                    ctr[ax], fov[ax] = kind
+                    L.append(
+                        f"ccrs {cv} 0 {' '.join(f64(x) for x in ctr)} {' '.join(map(str, fov))} 0"
+                    )
+        # item 88 (FS-511): trilinear samples of a tensor and an RGB volume (the sampler cannot
+        # read them): the first sample at a point not on a voxel fails before any wrote a value;
+        # then a point on a voxel (the nearest sampler: 0); and the reverse order
+        gp = self.plain((4, 4, 4))
+        fd = (4, 3, 3)
+        for first, second in (
+            ((1.5, 2.25, 2.0), (2.0, 2.0, 2.0)),
+            ((2.0, 2.0, 2.0), (1.5, 2.25, 2.0)),
+        ):
+            wv = [0.0] * (fd[0] * fd[1] * fd[2] * 3)
+            for (c, rr, s), q in (((1, 1, 1), first), ((2, 1, 1), second)):
+                for k in range(3):
+                    wv[k * 36 + s * 12 + rr * 4 + c] = q[k] + 1 - 3
+            warp = self.lab(self.plain(fd), wv, t=3, nf=3)
+            for t in (6, 9):
+                for nfr in (1, 2):
+                    v = self.lab(gp, [17 + i for i in range(64 * nfr)], t=t, nf=nfr)
+                    L.append(f"spmw {v} 0 null {warp} 0 0 1 new")
+        # FS-517: larmorx ends in both modes where FreeSurfer returns a volume of zeros: a line
+        # noting it may differ in both modes
+        return [Batch("vrules16", "vrules16", L, both="FS-517")]
+
+
+class Gen15(Gen14):
+    """Part 9 (relay 16): volume-to-volume resampling (§41) with MRIaseg2volMU's upsampling (§55)
+    and MRIvol2VolTkRegVSM (§56); the region boxes (§43)."""
+
+    def p9vol(self, r: random.Random, dims, t: int, nf: int, special: float = 0.05):
+        """(W, its geometry): a volume of the extent, type and frames, an axis-aligned or any
+        geometry, values from the type's range (floats with special ones)."""
+        geo = self.rgeo(r, dims)
+        n = dims[0] * dims[1] * dims[2] * nf
+        if t == 3:
+            vals = self.fvals(r, n, special=special, lo=-50.0, hi=100.0)
+        elif t == 0:
+            vals = [r.randint(0, 255) for _ in range(n)]
+        else:
+            vals = [r.randint(-40, 200) for _ in range(n)]
+        return self.lab(geo, vals, t=t, nf=nf), geo
+
+    def arr1z(self, ty: int, ga, gb, m: str) -> str:
+        """An array of one transform from ga to gb with every matrix present (m_dL and m_last_dL
+        zero: none would be FS-198's freed copy), centre 0, spread 1, its inverse transform the
+        identity (the functions here fill or compute the inverses themselves)."""
+        ident = "4 4 " + " ".join(f32(1.0 if i % 5 == 0 else 0.0) for i in range(16))
+
+        def lt(mm: str, a: str, b: str) -> str:
+            return " ".join([f32(0.0)] * 3 + [f32(1.0), mm, Z44, Z44, "0", "0", a, b])
+
+        fw = lt(m, self.g_of(ga), self.g_of(gb))
+        inv = lt(ident, self.g_of(gb), self.g_of(ga))
+        return f"1 {ty} {f32(1.0)} {xs('')} {fw} {inv}"
+
+    def v2vmat(self, r: random.Random) -> str:
+        k = r.random()
+        if k < 0.5:
+            return self.near(r, scale=r.choice([1.0, 1.0, 0.5, 2.0]), t=1.5)
+        if k < 0.85:
+            m = self.xmat(r)
+            # every caller passes a 4 x 4 matrix (the spec covers no other size)
+            return m if m.startswith("4 4 ") else self.affine(r)
+        return "null"
+
+    @staticmethod
+    def od(r: random.Random) -> str:
+        return r.choice([f64(0.0), f64(0.0), f64(5.0), f"{DSPECIAL[4]:016x}"])
+
+    def shiftmap(self, r: random.Random, dims) -> str:
+        """A voxel-shift map (float, one frame): shifts within 1.5 voxels, zeros, values below
+        FLT_MIN (subnormal), NaN."""
+        n = dims[0] * dims[1] * dims[2]
+        vals = []
+        for _ in range(n):
+            k = r.random()
+            if k < 0.1:
+                vals.append(0.0)
+            elif k < 0.15:
+                vals.append(r.choice(["00000001", "007fffff", "80400000", "00800000"]))
+            elif k < 0.17:
+                vals.append(QNAN)
+            else:
+                vals.append(r.uniform(-1.5, 1.5))
+        return self.lab(self.rgeo(r, dims), vals, t=3)
+
+    def vv2v(self) -> list[Batch]:
+        """§41: MRIvol2Vol (uchar, int, long, float, short and ushort sources of one or two frames,
+        one voxel thick in some cases; targets of the same frames mostly; voxel-to-voxel matrices
+        near a scaling, the linear transforms' kinds, none; the sample types 0, 1, 2 (half-widths
+        0.5 to 3), 5, and unknown ones; outside values 0, 5 and NaN; the diagnostic level 1),
+        MRIvol2VolVSM and MRIvol2VolTkRegVSM (a voxel-shift map or none, directions -4 to 4, an array
+        of types 0 and 1 between the volumes' grids or none, the verbose bit), MRIvol2VolTLKernel
+        (targets of 8 frames, fewer), MRIvol2VolDelta, TransformRegDat2LTA, MRImaskAndUpsample (a
+        mask or none, factors -1 to 3, pads 0 to 2, conserving or not, the diagnostic level 1) and
+        MRIaseg2volMU with upsampling factors 1 to 3."""
+        r = self.rng("vv2v")
+        L = []
+        types = [0, 1, 2, 3, 3, 3, 4, 10]
+
+        def dims(lo: int = 1, hi: int = 4):
+            return (r.randint(lo, hi), r.randint(lo, hi), r.randint(lo, hi))
+
+        for _ in range(130):
+            nf = r.choice([1, 1, 2])
+            s, _ = self.p9vol(r, dims(), r.choice(types), nf)
+            tnf = nf if r.random() < 0.88 else 3 - nf
+            t, _ = self.p9vol(r, dims(), r.choice(types), tnf)
+            interp = r.choice([0, 0, 1, 1, 1, 2, 2, 5, 5, 3, -1])
+            param = f32(r.choice([0.5, 1.0, 2.0, 3.0, 1.4]))
+            pre = "+gdiagno=1 " if r.random() < 0.1 else ""
+            L.append(f"{pre}vv {s} 0 {self.od(r)} {t} 0 {self.v2vmat(r)} {interp} {param}")
+        for _ in range(110):
+            nf = r.choice([1, 1, 2])
+            sd = dims(2, 4)
+            s, sg = self.p9vol(r, sd, r.choice(types), nf)
+            t, tg = self.p9vol(r, dims(), r.choice(types), nf)
+            vsm = "null"
+            if r.random() < 0.75:
+                vsm = f"{self.shiftmap(r, sd if r.random() < 0.9 else dims(2, 4))} 0 {self.od(r)}"
+            lta = "null"
+            if r.random() < 0.4:
+                ends = (sg, tg) if r.random() < 0.6 else (tg, sg)
+                lta = self.arr1z(r.choice([0, 0, 1]), ends[0], ends[1], m=self.near(r, t=0.5))
+            pedir = r.choice([1, -1, 2, -2, 3, -3, 1, 2, -1, 3, 0, 4])
+            interp = r.choice([0, 1, 1, 2, 5, 9])
+            cmd = "vvtk" if r.random() < 0.35 else "vvsm"
+            m = self.near(r, t=1.0) if cmd == "vvtk" and r.random() < 0.8 else self.v2vmat(r)
+            pre = ""
+            q = r.random()
+            if q < 0.12:
+                pre = "+gdiag=10000000 "
+            elif q < 0.2:
+                pre = "+gdiagno=1 "
+            L.append(
+                f"{pre}{cmd} {s} 0 {self.od(r)} {t} 0 {m} {interp} {f32(r.choice([1.0, 2.0]))} "
+                f"{vsm} {lta} {pedir}"
+            )
+        for _ in range(40):
+            s, _ = self.p9vol(r, dims(), r.choice(types), 1)
+            t, _ = self.p9vol(r, dims(), 3, r.choice([8, 8, 8, 8, 8, 8, 9, 2]))
+            L.append(f"vvk {s} 0 {t} 0 {self.v2vmat(r)}")
+        for _ in range(30):
+            mv, _ = self.p9vol(r, dims(), r.choice(types), 1)
+            t, _ = self.p9vol(r, dims(), r.choice(types), r.choice([1, 2]))
+            m = r.choice(["null", self.near(r, t=2.0), self.affine(r)])
+            L.append(f"vvd {mv} 0 {t} 0 {m}")
+        for _ in range(30):
+            t, _ = self.p9vol(r, dims(), 3, 1)
+            mv, _ = self.p9vol(r, dims(), 3, 1)
+            m = r.choice(["null", self.near(r, t=2.0), self.affine(r)])
+            L.append(f"rd2lta {t} {mv} {m}")
+        for _ in range(45):
+            d = dims(2, 5)
+            n = d[0] * d[1] * d[2]
+            t = r.choice([0, 1, 3, 3, 4])
+            vals = [0 if r.random() < 0.5 else r.randint(1, 90) for _ in range(n)]
+            s = self.lab(self.rgeo(r, d), [float(v) for v in vals] if t == 3 else vals, t=t)
+            mk = "null"
+            if r.random() < 0.4:
+                mvals = [r.choice([0.0, 0.0, 1.0, 1e-6, 2e-5, -1.0]) for _ in range(n)]
+                mk = f"{self.lab(self.rgeo(r, d), mvals, t=3)} 0"
+            up = r.choice([1, 2, 2, 3, 0, -1])
+            pre = "+gdiagno=1 " if r.random() < 0.15 else ""
+            L.append(f"{pre}maskup {s} 0 {mk} {up} {r.choice([0, 1, 2])} {r.choice([0, 1])}")
+        pool = [self.rgeo(r, (r.randint(2, 4), r.randint(2, 4), r.randint(1, 3))) for _ in range(5)]
+        for _ in range(30):
+            ia, ib = r.sample(range(len(pool)), 2)
+            arr = self.arr1z(r.choice([1, 1, 0]), pool[ia], pool[ib], m=self.near(r, t=1.0))
+            ig = r.choice([ia, ia, ib, ib, r.randrange(len(pool))])
+            d = pool[ig][0]
+            nlab = r.choice([3, 5])
+            vals = [0 if r.random() < 0.3 else r.randrange(nlab) for _ in range(d[0] * d[1] * d[2])]
+            ct = "null" if r.random() < 0.6 else self.tct(r, nlab, r.choice([2, 3]))
+            ft = r.choice([0.0, 0.5, 1.0])
+            usf = r.choice([1, 2, 2, 3])
+            L.append(f"a2vmu {self.lab(pool[ig], vals)} 0 {arr} {f64(ft)} {usf} {ct}")
+        return [Batch("vv2v", "vv2v", L)]
+
+    def vregion(self) -> list[Batch]:
+        """§43: REGIONgetBoundingBox (pads -1 to 3), REGIONgetBoundingBoxM (six pads),
+        REGIONgetBoundingBoxEqOdd (pads 0 to 2) of masks with clusters, magnitudes about 1e-5,
+        NaN, none; REGIONprint, REGIONcopy and REGIONclear."""
+        r = self.rng("vregion")
+        L = []
+        for _ in range(150):
+            d = (r.randint(1, 7), r.randint(1, 7), r.randint(1, 6))
+            n = d[0] * d[1] * d[2]
+            vals = [0.0] * n
+            k = r.random()
+            if k < 0.85:
+                for _ in range(r.randint(1, 3)):
+                    c = [r.randrange(d[0]), r.randrange(d[1]), r.randrange(d[2])]
+                    e = [r.randint(0, 3) for _ in range(3)]
+                    for z in range(c[2], min(d[2], c[2] + e[2] + 1)):
+                        for y in range(c[1], min(d[1], c[1] + e[1] + 1)):
+                            for x in range(c[0], min(d[0], c[0] + e[0] + 1)):
+                                vals[x + d[0] * (y + d[1] * z)] = r.choice(
+                                    [1.0, 1.0, -2.0, 1e-5, 9.99e-6, -1e-5, 5.0]
+                                )
+            if r.random() < 0.05:
+                vals[r.randrange(n)] = QNAN
+            t = 3 if r.random() < 0.8 else 1
+            if t == 1:
+                vals = [0 if v == QNAN else int(v) for v in vals]
+            m = self.lab(self.rgeo(r, d), vals, t=t)
+            kind = r.choice([0, 0, 1, 2, 2])
+            if kind == 1:
+                pads = " ".join(str(r.randint(-1, 3)) for _ in range(6))
+            else:
+                pads = str(r.randint(-1, 3) if kind == 0 else r.randint(0, 2))
+            L.append(f"rgbb {m} 0 {kind} {pads}")
+        for _ in range(10):
+            L.append(
+                "rgprt "
+                + " ".join(
+                    str(r.randint(-5, 2147483647 if r.random() < 0.1 else 50)) for _ in range(6)
+                )
+            )
+        return [Batch("vregion", "vregion", L)]
+
+    def vrules17(self) -> list[Batch]:
+        """§41's and §43's fixed cases (relay 16): MRIvol2Vol's frame mismatch, an unknown sample
+        type with no target voxel inside and with one, the one-voxel-thick rounding at a half
+        voxel, the value vector kept from voxel to voxel (sinc's frame 0 for every frame), a
+        singular source geometry without a matrix; MRIvol2VolVSM's direction checked only with a
+        map, the map's four corners at FLT_MIN and just below, a shift of 0, an array of type 1
+        converted, a map of a type the sampler refuses (FS-482); MRIvol2VolTLKernel into fewer
+        frames; MRImaskAndUpsample of an empty mask; MRIaseg2volMU with the segmentation the
+        array's destination; REGIONgetBoundingBoxEqOdd's refusals and growths."""
+        L = []
+        r = random.Random(1717)
+        one = self.plain((3, 3, 3))
+        s3 = self.lab(one, [float(i) for i in range(27)], t=3)
+        s3b = self.lab(one, [float(i) for i in range(54)], t=3, nf=2)
+        t3 = self.lab(one, [0.0], t=3)
+        t3b = self.lab(one, [0.0] * 54, t=3, nf=2)
+        ident = "4 4 " + " ".join(f32(1.0 if i % 5 == 0 else 0.0) for i in range(16))
+        far = "4 4 " + " ".join(
+            f32(x) for x in (1, 0, 0, 40, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)
+        )  # every target voxel outside
+        z0 = f64(0.0)
+        L.append(f"vv {s3} 0 {z0} {t3b} 0 {ident} 0 {f32(1.0)}")  # frames differ
+        L.append(f"vv {s3} 0 {z0} {t3} 0 {far} 3 {f32(1.0)}")  # unknown type, nothing inside
+        L.append(f"vv {s3} 0 {z0} {t3} 0 {ident} 3 {f32(1.0)}")  # unknown type, inside: ends
+        L.append(f"vv {s3} 0 {z0} {t3} 0 {ident} -1 {f32(1.0)}")
+        # one voxel thick: a half voxel rounds up (nint2), and the same matrix on a full source
+        thin = self.lab(self.plain((3, 1, 3)), [float(i) for i in range(9)], t=3)
+        half = "4 4 " + " ".join(
+            f32(x) for x in (1, 0, 0, 0.5, 0, 1, 0, -0.5, 0, 0, 1, 0, 0, 0, 0, 1)
+        )
+        L.append(f"vv {thin} 0 {z0} {t3} 0 {half} 0 {f32(1.0)}")
+        L.append(f"vv {s3} 0 {z0} {t3} 0 {half} 0 {f32(1.0)}")
+        # sinc of two frames: frame 0's sample for both
+        L.append(f"vv {s3b} 0 {z0} {t3b} 0 {half} 2 {f32(2.0)}")
+        # the cubic B-spline (degree 3 coefficients made first)
+        L.append(f"vv {s3b} 0 {z0} {t3b} 0 {half} 5 {f32(1.0)}")
+        # no matrix: the scanner vox2ras of a singular source geometry
+        sing = (
+            (3, 3, 3),
+            [
+                *(f32(1.0) for _ in range(3)),
+                "1",
+                *(f32(x) for x in (1, 0, 0, 1, 0, 0, 0, 0, 1)),
+                *[f32(0.0)] * 6,
+            ],
+        )
+        L.append(f"vv {self.lab(sing, [1.0] * 27, t=3)} 0 {z0} {t3} 0 null 0 {f32(1.0)}")
+        # MRIvol2VolVSM: a direction of 0 without a map (no check), with a map (ends)
+        vsm = self.lab(one, [0.5] * 27, t=3)
+        L.append(f"vvsm {s3} 0 {z0} {t3} 0 {half} 1 {f32(1.0)} null null 0")
+        L.append(f"vvsm {s3} 0 {z0} {t3} 0 {half} 1 {f32(1.0)} {vsm} 0 {z0} null 0")
+        L.append(f"vvsm {s3b} 0 {z0} {t3} 0 {half} 1 {f32(1.0)} {vsm} 0 {z0} null 1")  # frames
+        # the four corners: FLT_MIN passes, just below (the largest subnormal) skips; a shift of 0
+        for v in ("00800000", "007fffff", "80800000", "00000000"):
+            m = self.lab(one, [0.5] * 13 + [v] + [0.5] * 13, t=3)
+            for ped in (1, -2, 3):
+                L.append(f"vvsm {s3} 0 {z0} {t3} 0 {half} 1 {f32(1.0)} {m} 0 {z0} null {ped}")
+        # an array of type 1 (RAS to RAS) converted to voxel to voxel; of type 0 as it is
+        for ty in (0, 1):
+            arr = self.arr1z(
+                ty, one, self.plain((3, 3, 3), c=(0.5, 0.0, 0.0)), m=self.near(r, t=0.5)
+            )
+            L.append(f"vvsm {s3} 0 {z0} {t3} 0 {half} 1 {f32(1.0)} {vsm} 0 {z0} {arr} 2")
+        # a map of a type the sampler refuses (tensor): FS-482's first value never written
+        tvsm = self.lab(one, [7] * 27, t=6)
+        L.append(f"vvsm {s3} 0 {z0} {t3} 0 {half} 1 {f32(1.0)} {tvsm} 0 {z0} null 1")
+        # MRIvol2VolTkRegVSM without a registration and with one
+        L.append(f"vvtk {s3} 0 {z0} {t3} 0 null 0 {f32(1.0)} {vsm} 0 {z0} null 1")
+        L.append(f"vvtk {s3} 0 {z0} {t3} 0 {ident} 1 {f32(1.0)} null null 0")
+        # MRIvol2VolTLKernel into a target of two frames (writes past them)
+        L.append(f"vvk {s3} 0 {t3b} 0 {half}")
+        L.append(f"vvk {s3} 0 {self.lab(one, [0.0] * 216, t=3, nf=8)} 0 null")
+        # MRImaskAndUpsample: an empty mask (the box from 1000000 to 0), a mask of one voxel
+        L.append(f"maskup {s3} 0 {t3} 0 2 1 0")
+        L.append(f"maskup {s3} 0 {self.lab(one, [0.0] * 13 + [1.0] + [0.0] * 13, t=3)} 0 2 0 1")
+        # MRIaseg2volMU with upsampling: the segmentation the array's destination, and its source
+        g2 = self.plain((2, 2, 2), c=(0.5, 0.5, 0.0))
+        g4 = self.plain((4, 3, 2), c=(-0.5, 0.0, 0.5))
+        segv = [0, 1, 2, 1, 2, 1, 0, 2]
+        for ends in ((g2, g4), (g4, g2)):
+            arr = self.arr1z(1, ends[0], ends[1], m=ident)
+            L.append(f"a2vmu {self.lab(g2, segv)} 0 {arr} {f64(0.0)} 2 null")
+
+        # REGIONgetBoundingBoxEqOdd: a box wider than the volume is high, one higher than wide; an
+        # even depth at the last slice and at the first; equal sides; asymmetric growths
+        def box(d, lo, hi):
+            vals = [0.0] * (d[0] * d[1] * d[2])
+            for z in range(lo[2], hi[2] + 1):
+                for y in range(lo[1], hi[1] + 1):
+                    for x in range(lo[0], hi[0] + 1):
+                        vals[x + d[0] * (y + d[1] * z)] = 1.0
+            return self.lab(self.plain(d), vals, t=3)
+
+        for d, lo, hi, pad in (
+            ((6, 2, 3), (0, 0, 0), (4, 1, 2), 0),
+            ((2, 6, 3), (0, 0, 0), (1, 4, 2), 0),
+            ((5, 5, 4), (1, 1, 2), (3, 3, 3), 0),
+            ((5, 5, 2), (1, 1, 0), (3, 3, 1), 0),
+            ((5, 5, 4), (1, 1, 0), (3, 3, 1), 0),
+            ((5, 5, 3), (1, 1, 1), (3, 3, 1), 0),
+            ((6, 6, 3), (0, 1, 1), (1, 4, 1), 0),
+            ((6, 6, 3), (1, 0, 1), (4, 1, 1), 0),
+            ((6, 6, 3), (4, 1, 1), (5, 4, 1), 0),
+            ((6, 6, 3), (2, 2, 1), (3, 3, 1), 1),
+        ):
+            L.append(f"rgbb {box(d, lo, hi)} 0 2 {pad}")
+        return [Batch("vrules17", "vrules17", L)]
+
+
 GROUPS = [
     "vgblock",
     "vgcopy",
@@ -4070,6 +4567,10 @@ GROUPS = [
     "vsegs",
     "vcrops",
     "vrules15",
+    "vrules16",
+    "vv2v",
+    "vregion",
+    "vrules17",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -4177,7 +4678,7 @@ def mask(b: Batch, line: bytes) -> bytes:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen13) else Gen13(gen.seed)
+    gen = gen if isinstance(gen, Gen15) else Gen15(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

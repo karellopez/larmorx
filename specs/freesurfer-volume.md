@@ -49,9 +49,11 @@ trilinear kernel and splatting, derivatives, gradients, neighbour counts and lin
 (§31-32) resampling onto a template and replacing a value; part 7a (§33) statistics, orientation strings
 and voxel-to-RAS matrices; part 7b (§34-35) slices as 2-D images, neighbourhoods and labels; part 8
 (§37-40) the partial-volume count of a label, random and constant volumes, frames, orders, fractions,
-difference lists and voxelwise operations. Then the rest of the module (§41-68; of §54,
-`LTAfillInverse` and `LTAchangeType`'s changes between the voxel, RAS-to-RAS and physical-voxel types
-are ready).
+difference lists and voxelwise operations. Then the rest of the module (§41-68), of which these are
+ready too: §41 (volume-to-volume resampling) and §43 (regions), part 9's first half; §54 (operations on a
+transform array) whole; §55 to §57 (segmentations onto another grid, SPM warps, segment statistics,
+crops), `MRIaseg2volMU`'s upsampling and `MRIvol2VolTkRegVSM` included. Not yet: §42, §44 (their probe
+commands exist; their groups to come), §46 to §53, §59 to §68.
 
 ## 1. Conventions
 
@@ -2097,15 +2099,18 @@ past an array (FS-470, FS-471, FS-479, FS-266's fewer powers than frames: the lo
 statuses are not compared): the implementations' own tests, against these sections' text.
 
 ## 41. Volume-to-volume resampling (3.1-37, piece d, part 2)
-- The target voxel `(ct, rt, st)` maps to the source point `M (ct, rt, st, 1)`, `M` the target-to-source
-  voxel matrix (single precision). In `MRIvol2Vol` and `MRIvol2VolTLKernel` each coordinate is
+(Made ready for the clean room by the spec finisher's relay 16: §69.2's groups `vv2v` and `vrules17`.)
+- The target's voxels are taken in order, columns outermost, then rows, slices innermost (one thread), and
+  the target voxel `(ct, rt, st)` maps to the source point `M (ct, rt, st, 1)`, `M` the target-to-source
+  voxel matrix (single precision; every caller passes a 4 x 4 matrix, and no other size is covered here). In
+  `MRIvol2Vol` and `MRIvol2VolTLKernel` each coordinate is
   `((m1 ct + m2 rt) + m3 st) + m4` with every product and sum rounded to `float`; for NaN operands the
   official build's order matters: `MRIvol2Vol` sums rows 1 and 2 as `(p1 + p2) + p3` and row 3 as `p3 + (p2 +
   p1)`; `MRIvol2VolTLKernel` sums rows 1 and 3 as `(p1 + p2) + p3` and row 2 as `p3 + (p1 + p2)` (each `+ m4`
   last, the first operand's NaN kept when both are NaN). `MRIvol2VolVSM` multiplies `M` by the column `(ct,
   rt, st, 1)` (`MatrixMultiply`'s single-precision accumulation). `M` absent: the inverse of the source's scanner
   voxel-to-RAS matrix times the target's (a singular source geometry ends the program: `MatrixMultiply(): m1 is
-  null`).
+  null`, **(observed)**: `vrules17`).
 - A coordinate's nearest voxel is `nint` of it (`MRIvol2Vol` uses `nint2`, which rounds `x + 0.49999999` for `x
   >= 0`, when the source is one voxel thick in some direction); outside the source the target voxel is left as it
   was. `MRIvol2Vol` tests the column first, then computes and tests the row, then the slice; `MRIvol2VolVSM`
@@ -2114,30 +2119,43 @@ statuses are not compared): the implementations' own tests, against these sectio
   different number of frames`, 1). With `Gdiag_no > 0`: `MRIvol2Vol: Vt2s Matrix (<1 if computed>)` and the
   matrix (`% 2.5f`). Methods: `SAMPLE_NEAREST` (0: the nearest voxel's frames, `MRIgetVoxVal`), `SAMPLE_TRILINEAR`
   (1: `MRIsampleSeqVolume` of every frame at once into one value vector), `SAMPLE_SINC` (2: `MRIsincSampleVolume`
-  with half-width `nint(param)`, frame 0's sample for every frame), `SAMPLE_CUBIC_BSPLINE` (5: needs the B-spline
-  module, not yet ported: an error); another prints `ERROR: MRIvol2vol: interpolation method <m> unknown` and ends
-  the program with status 1 at the first target voxel that maps inside. The values go into the target with
-  `MRIsetVoxVal`; the value vector keeps its contents from voxel to voxel (zeros at first), so frames a sampler
-  did not write repeat the previous voxel's. Returns 0.
+  with half-width `nint(param)`, frame 0's sample for every frame), `SAMPLE_CUBIC_BSPLINE` (5: the source's
+  degree-3 coefficients, `MRItoBSpline(src, NULL, 3)` (`specs/freesurfer-bspline.md` §3, its `MRItoBSpline degree
+  3` line on standard output), made once before the first voxel, whether or not any voxel maps inside, and each
+  frame sampled at the point by `MRIsampleBSpline`, §4.1); another prints `ERROR: MRIvol2vol: interpolation method
+  <m> unknown` and ends the program with status 1 at the first target voxel that maps inside (none inside: 0
+  returned, nothing printed). The values go into the target with `MRIsetVoxVal`; the value vector keeps its
+  contents from voxel to voxel (zeros at first), so frames a sampler did not write repeat the previous voxel's.
+  Returns 0 (**(observed)**: `vv2v`; `vrules17`, the frames' mismatch, an unknown type with no voxel inside and with
+  one, a half voxel on a source one voxel thick and on a full one, sinc and the cubic B-spline of two frames).
 - `MRIvol2VolTLKernel(src, targ, M)`: for each target voxel that maps inside, the eight trilinear weights of its
   source point (`MRItrilinKernel`, section 27) go into the target's frames 0 to 7 (as `float`; a target with fewer
-  frames writes past them: memory). Returns `NULL` always (an 8-frame `float` work volume with the target's header
-  is made and discarded).
+  frames writes past them: memory, **(observed)**: `vv2v`, `vrules17`, a crash with two frames). Returns `NULL`
+  always (an 8-frame `float` work volume with the target's header is made and discarded) (**(observed)**: `vv2v`).
 - `MRIvol2VolVSM(src, targ, M, interp, param, vsm, vsmlta, pedir)`: as `MRIvol2Vol` (messages `ERROR:
   MRIvol2volVSM(): source and target have different number of frames`, `ERROR: MRIvol2volVSM: interpolation
   method <m> unknown`; with `DIAG_VERBOSE` first `Using MRIvol2VolVSM` and `MRIvol2VolVSM interp=<i>,
-  param=<%g>, pedir=<p>`), with a voxel-shift map: with `vsm` given, `|pedir|` must be 1, 2 or 3 (`ERROR:
-  MRIvol2volVSM: pedir=<p>, must be +/-1, +/-2, +/-3`, exit 1). At each target voxel that maps inside: `cvsm =
+  param=<%g>, pedir=<p>`), with a voxel-shift map. In order: the frames' check (the status 1); with `vsm` given,
+  `|pedir|` must be 1, 2 or 3 (`ERROR: MRIvol2volVSM: pedir=<p>, must be +/-1, +/-2, +/-3`, exit 1; without a map
+  the direction is never checked); with `vsm` and `vsmlta`, a copy of the array changed to `LINEAR_VOX_TO_VOX` by
+  §54's change (its messages and ends; the caller's array unchanged) gives the map's voxel-to-voxel matrix (its first
+  transform's); then `M` (made as `MRIvol2Vol` makes it when absent), the diagnostic print of `Gdiag_no > 0` (the
+  same `MRIvol2Vol: Vt2s Matrix (<0|1>)` line and matrix), and with `SAMPLE_CUBIC_BSPLINE` the coefficients
+  (`MRIvol2Vol`'s). At each target voxel that maps inside: `cvsm =
   floor(c)`, `rvsm = floor(r)` (single precision) must satisfy `0 <= cvsm`, `cvsm + 1 < width`, the same for rows
   (the source's extent); the shift map's frame-0 values at `(cvsm, rvsm)`, `(cvsm+1, rvsm)`, `(cvsm, rvsm+1)`,
   `(cvsm+1, rvsm+1)` on the voxel's slice must each have magnitude at least `FLT_MIN` (1.17549435e-38), else the
   voxel is skipped; the shift is `MRIsampleSeqVolume` of the map's frame 0 at the point (kept in one `float` across
   voxels: a map type the sampler refuses leaves the previous value, and at the first such voxel a value never
   written: FS-482, both modes 0, noted); a shift of 0 skips the voxel; else `coordinate[|pedir|] += shift * (pedir
-  < 0 ? -1 : 1)` (single precision), then with `vsmlta` the point is mapped by its voxel-to-voxel matrix
-  (`MatrixMultiplyD`; a transform of another type is converted with `LTAchangeType`, section of 3.1-39, not yet
-  ported: an error), and the nearest voxel is tested again (column, row, slice in turn). Then sampled as
-  `MRIvol2Vol`. Returns 0.
+  < 0 ? -1 : 1)` (single precision), then with `vsmlta` the point `(c, r, s, 1)` is mapped by the map's
+  voxel-to-voxel matrix (`MatrixMultiplyD`, the result taken back as `float`s), and the nearest voxel is tested
+  again (column, row, slice in turn). Then sampled as `MRIvol2Vol`, with the error `ERROR: MRIvol2volVSM:
+  interpolation method <m> unknown` (exit 1). The map's corners and sample are read where the source's extent puts
+  them: a map of another extent is read as the voxel functions read outside a volume (fs.mri §5, FS-52). Returns 0
+  (**(observed)**: `vv2v`; `vrules17`, a direction of 0 with and without a map, the frames' check before it, the
+  corners at `FLT_MIN` (kept), `-FLT_MIN` (kept), the largest subnormal and 0 (skipped), arrays of types 0 and 1, a
+  tensor map: every shift 0 in all four probe runs, so every voxel skipped).
 - `MRIvol2VolDelta(mov, targ, R)`: a new 3-frame `float` volume of the target's extent with its header
   (`MRIcopyHeader`); `R` absent: `MRItkRegMtx(targ, mov)`. With `T` the target's tkregister voxel-to-RAS matrix and
   `T2 = R T` (single-precision products), each voxel's frames are `(T x - T2 x)` component by component (`x = (ct,
@@ -2150,7 +2168,12 @@ statuses are not compared): the implementations' own tests, against these sectio
   section 43) of the mask, or of the source when there is none, padded by `npad`; with `Gdiag_no > 0`, `
   mask-and-upsample bounding box <%g of (float) w h d / (dx dy dz)> ` and the box (`REGIONprint`); the box cut out
   of the source (`MRIextractRegion`; its failure gives `NULL`); with a factor above 1 upsampled
-  (`MRIupsampleNConserve` with `conserve`, else `MRIupsampleN`); `lta = TransformRegDat2LTA(src, result, NULL)`.
+  (`MRIupsampleNConserve` with `conserve`, else `MRIupsampleN`; a factor of 1 or below keeps the cut);
+  `lta = TransformRegDat2LTA(src, result, NULL)` (from the source's voxels to the result's). A mask (or source)
+  without a voxel of magnitude 1e-5 or more gives the box from 1000000, of a negative size, and the cut ends the
+  program (`error: MRIextractInto: bad src location (<x>, <y>, <z>)` then the allocation's `could not allocate
+  memory for <n> slices`, status 1; §11); a box of one voxel without a pad has the size 0 (§43, FS-269), and the cut
+  gives a volume of no voxels (**(observed)**: `vv2v`; `vrules17`, an empty mask, a mask of one voxel).
 
 ## 42. Frame covariance, PCA and the false discovery rate (3.1-37, piece d, part 3)
 - `MRIcovarianceMatrix(mri, mask)`: with a mask, its voxel count is the number of frame-0 values above 0.5
@@ -2190,13 +2213,19 @@ statuses are not compared): the implementations' own tests, against these sectio
   with `reproduce`, correctly rounded by default, section 44). Returns 0.
 
 ## 43. Regions (3.1-38: region.cpp)
-- `REGIONalloc` zeros; `REGIONclear` sets every field to 0; `REGIONcopy` copies; `REGIONprint`: `x y z  dx dy dz`
-  and a newline (two spaces in the middle).
-- `REGIONgetBoundingBox(mask, npad)`: the extremes of the columns, rows and slices of the frame-0 voxels whose
-  magnitude is not below `1e-5` (the comparison in `double`; a NaN counts; with none, minimum 1000000 and maximum
-  0); start `max(min - npad, 0)`, size `min(max - min + 2 npad, extent - start)` (32-bit integers).
-  `REGIONgetBoundingBoxM(mask, npad[6])`: the same with pads `npad[0]`, `npad[1]` before and after the columns,
-  `[2]`, `[3]` the rows, `[4]`, `[5]` the slices.
+(Made ready for the clean room by the spec finisher's relay 16: §69.2's groups `vregion` and `vrules17`.)
+- `REGIONalloc` zeros; `REGIONclear` sets every field to 0; `REGIONcopy` copies (into a new region when given
+  none); `REGIONprint`: `x y z  dx dy dz` (`%d`) and a newline (two spaces in the middle).
+- `REGIONgetBoundingBox(mask, npad)`: the extremes of the columns, rows and slices of the frame-0 voxels
+  (`MRIgetVoxVal`) whose magnitude is not below `1e-5` (the comparison in `double`; a NaN counts; with none, minimum
+  1000000 and maximum 0); start `max(min - npad, 0)`, size `min(max - min + 2 npad, extent - start)` (32-bit
+  integers; with no voxel the start is `1000000 - npad` and the size negative). FS-269: the size is one less than
+  the voxels from `min - npad` to `max + npad` (FreeSurfer's own description: the box to fit every voxel, grown by
+  `npad` on each side), so without a pad it leaves out the last voxel on each axis, and with a pad the far side's pad
+  is one voxel short; rule D (measure at its programs, then correct or keep): until measured both modes give
+  FreeSurfer's size, nothing noted. `REGIONgetBoundingBoxM(mask, npad[6])`: the same with pads `npad[0]`, `npad[1]`
+  before and after the columns (size `max - min + npad[0] + npad[1]`), `[2]`, `[3]` the rows, `[4]`, `[5]` the
+  slices (FS-269 likewise) (**(observed)**: `vregion`, `vrules17`).
 - `REGIONgetBoundingBoxEqOdd(mask, npad)`: the box, printed as `Volume size: <w> <h> <d>, OrigRegion: ` and the box;
   `dx > height`: `ERROR: REGIONgetBoundingBoxEqOdd(): dx is bigger than MRI height`, `dy > width`: `... dy is bigger
   than MRI width` (`NULL`). `dx == dy` with `dz` odd: the box. An even `dz` (C's `%`) grows by one when `dz <
@@ -2247,14 +2276,23 @@ statuses are not compared): the implementations' own tests, against these sectio
   printed text.
 
 ## 45. Validation plan (sections 41 to 44)
-The probe's commands `vv`, `vvsm`, `vvk`, `vvd`, `maskup` (section 41), `cov`, `mpca`, `pcast`, `fdr` (section 42),
-`rgbb` (section 43), `vxn` (section 44): generated volumes of every type (some without voxels or frames), 4 x 4
-matrices (voxel-to-voxel-like, or anything, or absent), voxel-shift maps and transforms, masks with values 0, 0.5, 1,
-p-value and -log10 volumes with given, absent or in-place outputs, PCA statistics written to standard output or a
-file (or a path that cannot be opened), points inside, near the faces and outside. Expected: identical with
+§41 and §43 (made ready by the spec finisher's relay 16): §69's groups `vv2v` (§41, with §55's `MRIaseg2volMU`
+upsampling and §56's `MRIvol2VolTkRegVSM`), `vregion` (§43) and `vrules17` (their fixed cases) (the open probe's
+`vv`, `vvsm`, `vvtk`, `vvk`, `vvd`, `rd2lta`, `maskup`, `a2vmu`, `rgbb`, `rgprt`; README.md says what each prints),
+identical with `reproduce` but where FreeSurfer crashes or reads or writes memory it does not own (the kernel's
+writes past a target's frames, a shift map of another extent read outside: FS-52, FS-53; FS-270's crashes), lines
+the loop allows; FS-482's shift never written is 0 in every probe run (`vrules17`'s tensor map), so `reproduce` gives
+0 there and the loop compares it; FS-269 (rule D) has no switch yet. FS-270's error is larmorx's own (the loop lets
+those lines differ, as FreeSurfer crashed there): the implementations' own tests, against §55's text.
+
+§42 and §44 are not yet in the open probe's groups (the probe holds their commands, `cov`, `mpca`, `pcast`, `fdr` and
+`vxn`, from the build of 39264dfc on; their groups and the read-through of §42 and §44 come with the spec finisher's
+next relay): until then, generated volumes of every type (some without voxels or frames), masks with values 0, 0.5,
+1, p-value and -log10 volumes with given, absent or in-place outputs, PCA statistics written to standard output or
+a file (or a path that cannot be opened), points inside, near the faces and outside; expected identical with
 `reproduce` but where FreeSurfer reads or writes memory it does not own or crashes (FS-53, FS-58, FS-290, FS-323,
-FS-482, FS-484, FS-485, FS-486, and the decompositions that never return: FS-47, FS-48), counted and not compared;
-the default differs only with a notice (FS-483, FS-485, GLIBC-07 for `pow`).
+FS-484, FS-485, FS-486, and the decompositions that never return: FS-47, FS-48), the default differing only with a
+notice (FS-483, FS-485, GLIBC-07 for `pow`).
 
 ## 46. Talairach helpers (3.1-38: talairachex.cpp)
 - `ModifyTalairachCRAS(mri_tal, lta)`: sets the Talairach volume's centre. With a transform array: it must hold
@@ -2819,13 +2857,14 @@ assigns its geometries as geometries assign (the cached matrices: section 1).
   (`LTAprint: a transform without a 4 x 4 matrix`).
 
 ## 55. Segmentations onto another grid; SPM warps (3.1-37)
-(Made ready for the clean room by the spec finisher's relay 15: §69.2's groups `vaseg` and `vrules15`; `MRIaseg2volMU`
-with `USF` -1 only.)
+(Made ready for the clean room by the spec finisher's relay 15: §69.2's groups `vaseg` and `vrules15`; and by its
+relay 16: `MRIaseg2volMU` with upsampling, the groups `vrules16`, `vv2v` and `vrules17`.)
 - **`MRIaseg2vol(aseg, tkR, voltemp, fthresh, &volhit, ct)`**: a colour table without a tissue-type table: `ERROR:
   MRIaeg2vol: if passing a ct it must have tissue type info` on standard output and `NULL` (**(observed)**: `vrules15`).
   The map from segmentation voxels to the template's: `Va2v = (inv(Kv) tkR) Ka` (`K` the tkregister vox2ras of each,
   `float` products; `tkR` from the template to the segmentation, as tkregister2 with the segmentation as target); its
-  inverse `Vv2a` (none when `Va2v` is singular). No `tkR` ends the program in the first product (`m2 is null`,
+  inverse `Vv2a` (none when `Va2v` is singular); all of them before the diagnostic line `ASeg2Vol: Building LUT` below,
+  so a product that ends the program prints none of those lines first. No `tkR` ends the program in the first product (`m2 is null`,
   `specs/freesurfer-maths.md` §8.1), a template whose `K` has no inverse (a voxel size of 0) in the same product (`m1 is
   null`), and a singular `Va2v` in the reverse map's first product below (`m1 is null`), reached when an output voxel's
   hit count is 0 (**(observed)**: `vrules15`). Every segmentation voxel (slices outermost, then rows, then columns; its
@@ -2836,7 +2875,14 @@ with `USF` -1 only.)
   each voxel's first pair the one a stable sort puts first). For each output voxel reached, its labels' hit counts: the
   label with the most hits wins (ties: the lowest label); its count goes to the hit volume; the label is written, or 0
   when `hits / total < fthresh` (in `double`; a NaN `fthresh` keeps every label, **(observed)**: `vrules15`).
-- With a colour table, a "no clear winner" voxel (the winner's share below 1/2 in `float`; FreeSurfer tests the voxel's
+- With a colour table, the tissue types are read at every output voxel a pair reaches, whether or not it then has a
+  clear winner: in the order of the output voxels (by index), each of the voxel's distinct labels once, in increasing
+  label order (the order of its sorted pairs), its type read from the colour table (FS-509's checks there), its hits
+  added to that type's count when the type is 0 or more, and `WARNING: color table entry <n> <name> has not been
+  assigned a tissue type` printed (standard output) when the type is -2; so a label of type -2 prints the warning once
+  for every voxel it reaches (**(observed)**: `vaseg`, labels 1, 0, 1, 0 onto four voxels of one pair each: the warning
+  for label 0 once; another line prints it five times for label 2). The counts start at 0 in every voxel.
+- Then a "no clear winner" voxel (the winner's share below 1/2 in `float`; FreeSurfer tests the voxel's
   highest label's share, FS-510) is decided by tissue type: the types 0 to the tissue table's count less one are
   compared and the one with the most hits wins (the lowest type on ties; types below 0 not counted; types from the count
   up counted but never compared), and in it the label with the most hits (the highest label on ties); no label of the
@@ -2845,9 +2891,9 @@ with `USF` -1 only.)
   program's first), noted where such a vote decides a voxel (**(observed)**: `vrules15`, the labels of type 0 voting).
   The vote's count is the winning label's hits, or 0; a voxel of count 0 is mapped back below like one no pair reached
   (**(observed)**: `vrules15`, types past the table, every type below 0). FS-510 (**(observed)**: `vrules15`, labels 1,
-  1, 2, 3 of the types 1, 0, 0: FreeSurfer votes and writes 3; by default 1 wins with half the hits). A tissue type of
-  -2 prints `WARNING: color table entry <n> <name> has not been assigned a tissue type`. Labels outside the table or of
-  an empty place, tissue types of 100 or more, more than 100 tissue types or 1,000 labels in a voxel: FS-509
+  1, 2, 3 of the types 1, 0, 0: FreeSurfer votes and writes 3; by default 1 wins with half the hits). Labels outside
+  the table or of an empty place, tissue types of 100 or more, more than 100 tissue types or 1,000 labels in a voxel:
+  FS-509
   (**(observed)**: `vrules15`, a label past the table and an empty place crash; a type of 100 is counted past the array).
 - Then every output voxel whose hit count is 0 (no pair, or a vote's count of 0) is mapped back by `Vv2a` (from the last
   mapped point's fourth coordinate on) and rounded: outside the segmentation 0, inside the segmentation's label with hit
@@ -2857,24 +2903,56 @@ with `USF` -1 only.)
   pair, that pair's segmentation voxel index, the label written, the output index, its column, row and slice, its pairs
   and the winner's hits) (**(observed)**: `vaseg`, `vrules15`).
 - **`MRIaseg2volMU(aseg, aseg2vol, fthresh, &volhit, USF, ct)`**: `USF` -1: the segmentation itself and a copy of the LTA
-  (its inverse when the segmentation is not its source); otherwise the segmentation cut to its bounding box padded by 2
-  and upsampled (`MRImaskAndUpsample`) with the LTA concatenated after the inverse of the cut's and reduced (the
-  caller's LTA has its inverses filled and may change type). The result is inverted when the segmentation is its
-  source, made `REGISTER_DAT`, and `MRIaseg2vol` maps onto a header of the LTA's other geometry (`int`, the
-  segmentation's pulse parameters). `USF` -1 is ready for the clean room (**(observed)**: `vaseg`, the segmentation the
-  array's source, its destination or neither, arrays of types 0 and 1); other values take `MRImaskAndUpsample` (§41,
-  part 9) and are not yet ready.
+  (its inverse when the segmentation is not its source); any other value: `MRImaskAndUpsample(aseg, none, USF, 2, 0)`
+  (§41: the segmentation's own bounding box padded by 2 (§43, FS-269), cut, upsampled by `USF` when above 1 without
+  conserving; its messages and ends: a segmentation without a voxel of magnitude 1e-5 or more ends the program,
+  status 1), the array from the segmentation's voxels to the cut's inverted (`LTAinvert`, §54), and
+  `LTAconcat([that inverse, the caller's LTA], 2, reduce)` (§54: the caller's LTA has its inverses filled, is changed
+  to the first's type, `LINEAR_VOX_TO_VOX`, when it has another, and is taken inverted when its destination, not its
+  source, is the segmentation: `WARNING: LTAconcat(): inverting LTA 1 to match geometry`; then reduced). FS-270: a
+  segmentation at neither end of the caller's LTA makes `LTAconcat` refuse (`ERROR: LTAconcat(): LTAs 0 and 1 do not
+  match`, both arrays printed, the dashes) and FreeSurfer then crashes on the missing array; both modes end the
+  program after those lines (larmorx's own error), noted. The result is inverted when the segmentation is its
+  source, made `REGISTER_DAT`, and `MRIaseg2vol` maps onto a header (`int`, one frame, the segmentation's pulse
+  parameters) of a geometry of the caller's LTA: its first transform's destination when the segmentation equals that
+  transform's source (`LTAmriIsSource`, §54: the segmentation's geometry, marked valid, against the source's), else its
+  first transform's source: so the source both when the segmentation is the destination and when it is neither end
+  (**(observed)**: `vrules16`, a segmentation of 2 x 2 x 2 voxels and an array from it to a 4 x 3 x 1 grid: the result
+  4 x 3 x 1; the segmentation the destination, or a third grid: 2 x 2 x 2). A source geometry not marked valid never
+  equals the segmentation: the array is inverted, its destination is then that geometry, and the change to
+  `REGISTER_DAT` ends the program (`LTAchangeType: dst geometry must be valid`, §54) (**(observed)**: `vrules16`).
+  With upsampling the result's source is the cut (upsampled) grid, so it is inverted, and the template's geometry is
+  chosen from the caller's LTA (as changed) by the same rule (**(observed)**: `vaseg`, `USF` -1, the segmentation the
+  array's source, its destination or neither, arrays of types 0 and 1; `vv2v`, `USF` 1 to 3 with the segmentation
+  the source, the destination and neither (FS-270's crashes), with and without a colour table; `vrules17`, `USF` 2
+  with the segmentation each end of an array of type 1).
 - **`MRIapplySpmWarp(vol, srclta, warp, LRRev, interp, out)`**: `interp` other than 0 (nearest) and 1 (trilinear):
   `ERROR: MRIapplySpmWarp():  sample type = <n>, must be 0 or 1` and `NULL`. `out`: given, or new (`float`, the warp's
-  grid and header, the volume's frames and pulse parameters). The 1-based vox2ras of SPM's input space: with `srclta`
-  (made `LINEAR_VOX_TO_VOX` first, `MRIapplySpmWarp(): changing Source LTA type to vox2vox`) the geometry at its other end
-  from the volume (`VGgetVoxelToRasXform(.., 1)`: direction cosines times sizes, translation `c - M (n/2 + 1)` in
-  `float`) and its matrix (inverted when the volume is its source: `MRIapplySpmWarp(): inverting Source LTA`), else the
-  volume's own (section 13, base 1). For each warp voxel 1 to extent - 2 (columns outermost): its frames 0 to 2 are an
-  RAS point; its voxel there (`MatrixMultiplyD` by the inverse vox2ras), minus 1 in `float`, reversed left to right with
-  `LRRev` (`ncols - 1 - c`), through the LTA's matrix (`MatrixMultiplyD`); outside the volume (a coordinate below 0 or
-  not below the extent) skipped; else every frame sampled (`MRIsampleVolumeFrameType`) into `out`. A sample that fails
-  before any succeeded: FS-511. A warp of fewer than three frames is read past its frames, and a given `out` of another
+  grid and header, the volume's frames and pulse parameters). SPM's input space (the space of the warp's RAS points),
+  its 1-based vox2ras, its width `ncols` and the map from its voxels to the volume's: with `srclta` (made
+  `LINEAR_VOX_TO_VOX` first by §54's change, `MRIapplySpmWarp(): changing Source LTA type to vox2vox`, which the
+  caller's array keeps; beyond that change nothing of it is changed, its inverse transforms neither read nor filled),
+  SPM's input space is the
+  array's first transform's end that is not the volume: when the volume is its source (`LTAmriIsSource`, §54), its
+  destination, and the map is the inverse of its matrix (`MatrixInverse` of the forward matrix,
+  `MRIapplySpmWarp(): inverting Source LTA`); otherwise (the volume its destination, or neither end) its source, and the
+  map is its matrix as it is. That geometry's vox2ras is `VGgetVoxelToRasXform(.., 1)` (direction cosines times sizes,
+  translation `c - M (n/2 + 1)` in `float`) and `ncols` its width. Without `srclta`: the volume's own vox2ras (section
+  13, base 1), the volume's width and no map. For each warp voxel 1 to extent - 2 (columns outermost): its frames 0 to 2
+  are an RAS point; its voxel there (`MatrixMultiplyD` by the inverse vox2ras), minus 1 in `float`, reversed left to
+  right with `LRRev` (`ncols - 1 - c`), through the map (`MatrixMultiplyD`); outside the volume (a coordinate below 0 or
+  not below the extent) skipped; else every frame sampled (`MRIsampleVolumeFrameType`) into `out` (**(observed)**:
+  `vrules16`, warp points placed through the array's other end land at their voxels of the volume, for the volume the
+  array's source and its destination, arrays of types 0 and 1, both reversals and both sample types; the same points
+  read in the volume's own space, without an array, land outside). A sample fails on a volume type the sampler cannot
+  read: the trilinear sampler (a point on a voxel in every coordinate takes the nearest one instead) of a type other
+  than `uchar`, `short`, `ushort`, `int`, `long` and `float` prints `error: MRIsampleVolumeFrame: unsupported type <t> `
+  (standard error, with the space before the newline) and writes no value; the nearest sampler of a type other than
+  `uchar`, `short`, `ushort`, `int` and `float` prints `error: MRIsampleVolumeFrameType: unsupported volume type <t> `
+  and gives 0. Where no value is written, `out`'s voxel takes the last value written in the call (a previous frame's,
+  voxel's or the nearest sampler's 0); before any, FreeSurfer stores a value never written (FS-511): both modes 0,
+  noted (0 in all four probe runs) (**(observed)**: `vrules16`, tensor and RGB volumes of one and two frames, the first
+  sample's point off the voxels, then on one, and the reverse order). A warp of fewer than three frames is read past its frames, and a given `out` of another
   extent or of fewer frames written outside, as the voxel functions read and write outside a volume (fs.mri §5, FS-52,
   FS-53); a warp of an extent below 3 in any direction has no voxel to take, and `out` keeps its voxels
   (**(observed)**: `vaseg`, `vrules15`: both sample types, reversed or not, with and without a source array of types 0
@@ -2883,12 +2961,16 @@ with `USF` -1 only.)
   starting with `tkreg` 2 (its first five letters in any case: `tkre` is -1), else -1 (**(observed)**: `vaseg`).
 
 ## 56. Segment statistics, borders, concatenation, edits and shifts (3.1-37)
-(Made ready for the clean room by the spec finisher's relay 15, but `MRIvol2VolTkRegVSM`, which waits for §41 (part 9):
-§69.2's groups `vsegs` and `vrules15`.) Labels are read as `MRIgetVoxVal`'s `float` stored in an `int` (truncated; NaN
+(Made ready for the clean room by the spec finisher's relay 15: §69.2's groups `vsegs` and `vrules15`; and by its
+relay 16: `MRIvol2VolTkRegVSM`, the groups `vv2v` and `vrules17`.) Labels are read as `MRIgetVoxVal`'s `float` stored in an `int` (truncated; NaN
 and values past `int`'s range the `int` minimum). Volumes of other extents or frames than a function reads or writes are
 read and written as the voxel functions do outside a volume (fs.mri §5, FS-52, FS-53).
 - **`MRIvol2VolTkRegVSM(mov, targ, R, interp, param, vsm, vsmlta, pedir)`**: `MRIvol2VolVSM` (section 41) with the vox2vox
-  `(inv(Tmov) R) Ttarg` (`T` the tkregister vox2ras), or none without `R`. Not yet ready (part 9).
+  `(inv(Tmov) R) Ttarg` (`T` the tkregister vox2ras of each, section 13; `float` products, `specs/freesurfer-maths.md`
+  §8.1, the inverse first and then the two products, before anything of `MRIvol2VolVSM`), or none without `R` (then
+  `MRIvol2VolVSM` makes its own from the scanner vox2ras); `R` from the target's tkregister RAS to the moving volume's.
+  Returns `MRIvol2VolVSM`'s status (**(observed)**: `vv2v`; `vrules17`, without a registration and with the
+  identity).
 - **`MRIsegBoundary(seg)`**: a clone (zeros) whose inner voxels (1 to extent - 2) hold their label (`int`) where any of
   the 27 voxels around them has another label, else 0 (**(observed)**: `vsegs`).
 - **`MRIsegBorder(seg, &maxlabel, topo)`**: an `int` volume of `1 + n` frames (`n` 6, 18, 26 for `topo` 1, 2, 3, else 0),
@@ -2908,12 +2990,13 @@ read and written as the voxel functions do outside a volume (fs.mri §5, FS-52, 
 - **`MRIsegFrameAvg(seg, segid, mri, favg)`**: each frame's mean over the segment (columns outermost, then rows, then
   slices; `sum + v` in `double`, the running sum the first operand, then divided by the count); all 0 for an empty
   segment; returns the count (**(observed)**: `vsegs`, `vrules15`).
-- **`MRIindexNo(in, out)`**: frame 0 holds each voxel's index `s h w + r w + c` (`out` new: `float`, the input's header)
-  (**(observed)**: `vsegs`).
+- **`MRIindexNo(in, out)`**: frame 0 holds each voxel's index `s h w + r w + c` (`out` new: `float`, one frame, the
+  input's header) (**(observed)**: `vsegs`).
 - **`MRIzconcat(mri1, mri2, nskip, out)`**: `mri1`'s slices then `mri2`'s from `nskip`; `out` new (`mri1`'s width, height,
   type, frames, header, `d1 + d2 - nskip` slices) or given. Messages and `NULL` (standard output): `ERROR: MRIzconcat():
   nskip=<n> >= nslices in mri2 <d>` (before anything), then `mri1 and mri2 mismatch width <a> <b>`, `... height`, `out
-  nframes mismatch`, `out width mismatch`, `out height mismatch`, `out depth mismatch`. `out` takes `mri1`'s pulse
+  nframes mismatch`, `out width mismatch`, `out height mismatch`, `out depth mismatch`, each followed by two numbers
+  (`%d %d`): `mri1`'s value (for the depth the slice count `d1 + d2 - nskip`) and then `mri2`'s or `out`'s. `out` takes `mri1`'s pulse
   parameters and vox2ras (`MRIsetVox2RASFromMatrix` of `mri1`'s scanner vox2ras, its messages included). FreeSurfer
   copies as many rows as there are columns (FS-512; by default every row): rows past the width keep their voxels (0 in
   a new `out`), and a width above the height reads and writes rows the volumes do not have. A negative `nskip` reads
@@ -2934,14 +3017,16 @@ read and written as the voxel functions do outside a volume (fs.mri §5, FS-52, 
   `invol` set to `lhVal` where `entowm` is 3006 (`Level` 1 or 3) or 3201 (7030 with `ACJ`; `Level` 2 or 3), to `rhVal`
   for 4006 and 4201 (7031); `MRIfixEntoWM(): nchanged = <n>`; returns the count (a NaN label is the `int` minimum and
   changes nothing; **(observed)**: `vsegs`, `vrules15`).
-- **`LabelAmygalaCortalJunction(seg, topo, out)`**: cortex voxels (3, 42) within `topo` steps of an inner amygdala voxel
+- **`LabelAmygalaCortalJunction(seg, topo, out)`**: cortex voxels (3, 42) among the 26 around an inner amygdala voxel
+  (offsets -1 to 1 on each axis) within `topo` steps (`|dc| + |dr| + |ds|`) of it
   (18 left, 54 right) get 7030 (left) or 7031 (right) in frame 0 of `out` (new: `int`, the segmentation's header and
   pulse parameters, and a colour table of 7,032 places from `CTABalloc` (its random colours, `specs/freesurfer-io.md`;
   the probe seeds 1 first) with all but 7030 and 7031 emptied; those two named `Left-Amygdala-Cortical-Junction` and
   `Right-Amygdala-Cortical-Junction`, red 255 and 254, green 85, blue 255, their `float` colours left as drawn).
   `LabelAmygalaCortalJunction((): nhits = <n>` (every write counted, a voxel written again counted again). A given
   `out` keeps its other voxels and its colour table. FS-514: with one thread the later write stays, in the order of the
-  amygdala voxels (columns outermost) and of their offsets (**(observed)**: `vsegs`; `vrules15`, a cortex voxel between
+  amygdala voxels (columns outermost, then rows, slices innermost) and of their offsets (the column offset outermost,
+  then the row's, the slice's innermost, each from -1) (**(observed)**: `vsegs`; `vrules15`, a cortex voxel between
   a left and a right amygdala voxel ends as 7031).
 
 ## 57. Crops (3.1-37)
@@ -2956,23 +3041,42 @@ read and written as the voxel functions do outside a volume (fs.mri §5, FS-52, 
   minimum and `WARNING: clip cmax ` when the extent is below `max - min`, in the order cmin, cmax, rmin, rmax, smin, smax
   (**(observed)**: `vcrops`; `vrules15`, no voxel at or above the threshold: the centroid's NaNs, the bounds 1000000 and
   0, the corner 0).
-- **`MRIcropAroundCRS(vol, center, FoV, iKeep)`**: first voxel `round(center - floor((FoV - 1) / 2))` per axis (as `int`;
-  a NaN centre the `int` minimum), last `first + FoV - 1`. Inside the volume: `MRIextractRegion` (`  using
+- **`MRIcropAroundCRS(vol, center, FoV, iKeep)`**: first voxel `round(center - floor((FoV - 1) / 2))` per axis (as `int`
+  as x86 converts, in both modes: a NaN or a value outside `int`'s range the `int` minimum), last `first + FoV - 1`
+  (in `int`, see FS-517 below). Inside the volume: `MRIextractRegion` (`  using
   MRIextractRegion()`); otherwise a new volume of `FoV` (the volume's type, frames, header, pulse parameters, colour
   table), its centre set from the RAS of the first voxel (`MRIp0ToCRAS`, printed as `P0 <g> <g> <g>` and `c_ras of new
   volume ...`), the voxels inside the volume copied. With `iKeep`, voxels whose value is in none of its labels become 0.
   Printed first: `MRIcropAroundCRS()`, `vol size`, `center` (`%g`), `fov`, `limits <c0> <c1>   <r0> <r1>   <s0> <s1>` and
   `iKeep ...`. A FoV of 0 inside the volume takes `MRIextractRegion`, whose volume prints `MRI::Shape::Shape(): volume
   size must be greater than 0 in every dimension` (fs.mri §4) and is returned; a negative FoV outside it ends the
-  program in the allocation (status 1) (**(observed)**: `vcrops`, `vrules15`). A last voxel beyond `int`: FS-517
-  (FreeSurfer's loop runs through `int`'s range and, as the official build compiles it, then writes outside the new
-  volume and crashes; **(observed)**: `vrules15`, a centre of 2147483647 with a FoV of 3, and a NaN centre with a FoV of
-  0).
+  program in the allocation (status 1) (**(observed)**: `vcrops`, `vrules15`). FS-517, in both modes: on an axis whose
+  last voxel (`first + FoV - 1`, computed exactly) lies past `int`'s range (above its maximum or below its minimum),
+  the lines above are printed (through `iKeep ...`; `limits` shows FreeSurfer's `int` values, the last wrapped) and the
+  program ends (larmorx's own error), noted; otherwise, on an axis whose last voxel is exactly `int`'s maximum, the
+  path outside the volume is taken up to its `P0` and `c_ras of new volume` lines (the allocation's own messages
+  included) and then the program ends the same way. FreeSurfer's own outcome in these cases, as its build compiles the
+  `int` overflow, is a crash or a returned volume of `FoV` holding none of the volume's voxels, by the axis and the path
+  (**(observed)**: `vrules16`, each axis with the others inside the volume or outside it: a last voxel past the maximum
+  crashes on the columns with the others inside (after `error: MRIextractInto: bad src location (2147483646, 1, 1)`)
+  and returns zeros otherwise, the rows and slices with that error printed first when the others are inside; exactly
+  the maximum returns zeros but on the slices with the others inside, a crash before any line is written; a NaN centre
+  with a FoV of 0 crashes with the others inside and returns a volume of no voxels otherwise; `vrules15`, a centre of
+  2147483647 with a FoV of 3, and a NaN centre with a FoV of 0: crashes).
 - **`MRIcropAroundRAS(vol, rasCenter, voxFoVRAS, lta, iKeep)`**: the RAS centre's voxel by the inverse vox2ras (with an
   LTA: a copy, oriented and made RAS to RAS, `Chaning Source LTA type to ras2ras`, applied first: `ras2vox * M`; the
-  matrices printed: `Input RAS2VOX`, `LTA RAS2RAS`, then `final ras2vox matrix`, the matrix and a line of dashes); each
-  voxel axis takes the FoV of `voxFoVRAS` (left-right, front-back, up-down) that its orientation letter names
-  (`ostr ...`, `rasCenter ...`, `crsCenter ...` printed); then `MRIcropAroundCRS`. The LTA's direction: by default
+  matrices printed: `Input RAS2VOX`, `LTA RAS2RAS`, then `final ras2vox matrix`, the matrix and a line of dashes). The
+  fields of view: `voxFoVRAS` holds them in RAS order (left-right, front-back, up-down), and by default each voxel axis
+  takes the entry its orientation letter (§14's orientation string) names: a column axis along `S` or `I` takes the
+  up-down entry. FreeSurfer (FS-268, `reproduce`) assigns them the other way round: for each voxel axis `k` in order,
+  entry `k` of `voxFoVRAS` goes to the voxel axis whose place is the RAS direction its letter names (`R`/`L` the first,
+  `A`/`P` the second, `S`/`I` the third), a later axis's write replacing an earlier one's. The two agree when the
+  orientation keeps every axis in place or swaps two of them (`RAS`, `LIA`, `SAR`, `ARS`) and differ when it moves all
+  three (`SRA`, `ASR`, `PIL`, `ASL`, `IRP`, ...): `SRA` with `(4, 1, 3)` crops `(1, 3, 4)` voxels with `reproduce` and
+  `(3, 4, 1)` by default; the default notes FS-268 where the voxel axes' fields of view differ (**(observed)**:
+  `vrules16`, nine orientations, two fields of view each, with and without an array; `vcrops`). Then `ostr <o> (<v0>
+  <v1> <v2>) (<f0> <f1> <f2>)` (the orientation, `voxFoVRAS`, the voxel axes' fields of view the mode takes),
+  `rasCenter ...`, `crsCenter ...` are printed; then `MRIcropAroundCRS`. The LTA's direction: by default
   inverted (`Inverting LTA`) when the volume is its source only and refused when the volume is neither end (`ERROR:
   MRIcropAroundRAS(): vol is not src or dst of LTA (<a>, <b>)`, the LTA, `vg_isEqual_Threshold = <g>`, `NULL`);
   FreeSurfer decides it backwards (FS-516): with `reproduce`, the volume is compared (`vg_isEqual`, §4) with its own
@@ -2980,8 +3084,13 @@ read and written as the voxel functions do outside a volume (fs.mri §5, FS-52, 
   the array inverted when the volume equals its destination and not its source, refused (`(1, 1)`) when it equals both,
   taken as it is otherwise (the volume its source, or neither end) (**(observed)**: `vcrops`; `vrules15`, the eight
   cases). A volume whose vox2ras has no inverse: `final ras2vox matrix`, `MatrixPrint`'s error and the end of the
-  program in the first product (`m1 is null`) (**(observed)**: `vrules15`). An orientation that names an axis twice or
-  is unknown: FS-515 (**(observed)**: `vrules15`, an invertible matrix whose first two columns are mostly x).
+  program in the first product (`m1 is null`) (**(observed)**: `vrules15`). An orientation that names an RAS direction
+  twice, or is unknown (`???`: `ras_good_flag` 0): FS-515: by default the program ends (larmorx's own error, status
+  252), noted; with `reproduce` the fields of view are assigned as FreeSurfer does (FS-268's way, the later axis's
+  write kept), and a voxel axis no letter reaches keeps a field of view FreeSurfer never set (memory contents),
+  taken as 0 and noted (the D13 rule for memory contents; 0 in all four probe runs) (**(observed)**: `vrules15`, an
+  invertible matrix whose first two columns are mostly x: `ostr RRS (2 2 1) (2 0 1)`; `vrules16`, the same with
+  `(4, 1, 3)`: `(1 0 3)`, the second axis's entry kept).
 
 ## 58. Validation plan (sections 54 to 57)
 §54 whole (made ready by the spec finisher's relays 12 to 14): §69's groups `vltapv`, `vrules10`, `vlta54` and
@@ -2992,17 +3101,18 @@ loop allows; the default differs only with a notice (FS-505, FS-506, FS-507); `m
 the six changes' products bit for bit. FS-504's and FS-508's errors are larmorx's own (the loop lets those lines
 differ): the implementations' own tests, against §54's text.
 
-§55 to §57 (made ready by the spec finisher's relay 15), but `MRIaseg2volMU` with `USF` other than -1 and
-`MRIvol2VolTkRegVSM` (part 9): §69's groups `vaseg` (§55), `vsegs` (§56), `vcrops` (§57) and `vrules15` (their fixed
-cases) (the open probe's `a2v`, `a2vmu`, `spmw`, `icode`, `sbound`, `sborder`, `idxno`, `ssrob`, `sfavg`, `zcat`,
-`aedit`, `shdim`, `fento`, `lacj`, `cfov`, `ccrs`, `crras`; README.md says what each prints), identical with `reproduce`
-but where FreeSurfer crashes or reads or writes memory it does not own (FS-509, FS-515, FS-517, the voxel functions'
-FS-52 and FS-53), lines the loop allows; the default differs only with a notice (FS-510, FS-512, FS-513, FS-514,
-FS-516, FS-267). FS-509's, FS-515's and FS-517's errors are larmorx's own (the loop lets those lines differ; FS-509's
-in both modes: a tissue type of 100 counted past FreeSurfer's array gives a value of its memory, the same in every
-run): the implementations' own tests, against these sections' text. Not in the probe: FS-511 (a sample that fails
-before any succeeded), more than 1,000 labels or 100 tissue types in one voxel (FS-509), FS-267's cross-call state
-(each probe call is a process of its own), FS-514's threads (the loop runs one thread).
+§55 to §57 (made ready by the spec finisher's relays 15 and 16): §69's groups `vaseg` (§55), `vsegs` (§56), `vcrops`
+(§57), `vrules15` and `vrules16` (their fixed cases), and for `MRIaseg2volMU`'s upsampling and `MRIvol2VolTkRegVSM`
+`vv2v` and `vrules17` (§45) (the open probe's `a2v`, `a2vmu`, `spmw`, `icode`, `sbound`, `sborder`, `idxno`, `ssrob`, `sfavg`,
+`zcat`, `aedit`, `shdim`, `fento`, `lacj`, `cfov`, `ccrs`, `crras`; README.md says what each prints), identical with
+`reproduce` but where FreeSurfer crashes or reads or writes memory it does not own (FS-509, FS-515, FS-517, the voxel
+functions' FS-52 and FS-53), lines the loop allows; the default differs only with a notice (FS-510, FS-512,
+FS-513, FS-514, FS-516, FS-267, FS-268). FS-509's, FS-515's and FS-517's errors are larmorx's own (the loop lets those
+lines differ; FS-509's in both modes: a tissue type of 100 counted past FreeSurfer's array gives a value of its memory,
+the same in every run): the implementations' own tests, against these sections' text. FS-511's and FS-515's values
+never written are 0 in every probe run (`vrules16`, `vrules15`), so `reproduce` gives 0 there and the loop compares
+those lines. Not in the probe: more than 1,000 labels or 100 tissue types in one voxel (FS-509), FS-267's cross-call
+state (each probe call is a process of its own), FS-514's threads (the loop runs one thread).
 
 ## 59. Filling a coarser grid, bright voxels outside the white matter, voxel topology (3.1-37: mri2.cpp, relay 29)
 - **`MRIvol2VolFill(src, mask, lta, UpsampleFactor, DoConserve, outfill)`**: maps the source onto the LTA's other end by
@@ -3164,7 +3274,13 @@ A relative name is the program's working directory's. Matrices are printed with 
   order. When `|W| < 1e-15` the first transform's matrix is copied. Otherwise for each transform in order, with share
   `w / W`: a share below `0.1 / n` is skipped, else the matrix times the share (as a `float`, each element's product in
   `float`) is added to the result element by element (`float`). More than 4,096 transforms: FS-886 (an error in both
-  modes). The C library's `exp`: glibc's with `reproduce`, correctly rounded by default (GLIBC-07).
+  modes). The C library's `exp`: glibc's with `reproduce`, correctly rounded by default (GLIBC-07). `errno`: each
+  weight's `exp` sets it to `ERANGE` (34) where its finite argument gives 0 (an underflow: `d / (2 s s)` above about
+  745.13) or an infinity, and leaves it as it was otherwise (a subnormal result, an argument of `-inf`, `+inf`, NaN or
+  0), in both modes, on the result the mode's `exp` gives; nothing else of the call sets or clears it. So a later
+  message that prints `errno`'s text (`ErrorPrintf`'s line, `specs/freesurfer-core.md` §2) after a point far from every
+  transform's centre shows `Numerical result out of range` (**(observed)**: glibc 2.35's `exp` as a black box,
+  `validation/investigations/freesurfer-make-uchar-errno/`; `mri_make_uchar`'s per-voxel errors print it).
 - **`LTAtransformInterp(src, dst, lta, interp)`** (`LTAtransform`: trilinear):
   1. A `REGISTER_DAT` array: `warning: changing input transform type from REGISTER_DAT to VOX_TO_VOX` on standard output,
      the array changed to `LINEAR_VOX_TO_VOX` (section 54).
@@ -3351,12 +3467,12 @@ both or none, into a new array, another array of 0 to 2 transforms or the source
 `reproduce` but where the original reads memory it does not own or crashes (FS-504, FS-957, the shared voxel defects),
 counted and not compared; the default differs only with a notice (FS-954, FS-956, FS-957 and the shared ones).
 
-## 69. Validation plan (black box), parts 1 to 8 and §54 to §57
+## 69. Validation plan (black box), parts 1 to 8, §41, §43 and §54 to §57
 
 ### 69.1 The probe
 
 The open probe folder `validation/investigations/freesurfer-volume-probe/` holds the probe's source
-(calls of the functions of §2 to §35, §37 to §39 and of §54 to §57 by name, and of fs.bspline's) and the
+(calls of the functions of §2 to §35, §37 to §39, §41 to §44 and of §54 to §57 by name, and of fs.bspline's) and the
 comparison loop; its README lists every
 command, its arguments and what it prints, and the encodings (every float and double as its bits;
 the volumes, geometries, matrices, colour tables and MINC transforms as the fs.mri probe encodes
@@ -3439,7 +3555,11 @@ for `vresamp` after its sources were given a good RAS in most cases, `fs-volume-
 | `vsegs` | 56 | 270 | 0 | 0 | 0 | `8dda65e52791c175c01af8f6daf9b8d6bd77c03983f3cef3069078e5c9c7d98d` |
 | `vcrops` | 57 | 95 | 0 | 0 | 0 | `cdf1e628c662578d2015734ab72762fa59cffbe9911a4afe46b079ed4914e51a` |
 | `vrules15` | 55-57 | 70 | 16 | 6 | 0 | `6246a0cb0173f1cf862d66618d3c72ea903ccf4cc92720bf6e19eec9337bd563` |
-| all | | 15,941 | 1,544 | 797 | 13 | |
+| `vrules16` | 55, 57 | 68 | 5 | 1 | 0 | `7f26519ddc0345fac0b8d7edb11873b125ab555a0988324f9b7536daec24eab4` |
+| `vv2v` | 41, 55, 56 | 415 | 9 | 35 | 0 | `21b4a84bb803c8ed418bd32e6043eea895661a4bc554dc657d424eb431bdc9c0` |
+| `vregion` | 43 | 160 | 0 | 0 | 0 | `38331d11d853740d3e1b7a4d799fb9b40472c95084c2487365b51fa292e2b2ad` |
+| `vrules17` | 41, 43, 55 | 45 | 1 | 5 | 0 | `818886dd611106193e94bfd349c986fda5b2ad84734ab112f052c917609b3d1e` |
+| all | | 16,629 | 1,559 | 838 | 13 | |
 
 The probe's groups `vbspline` and `vbsrules` are fs.bspline's (`specs/freesurfer-bspline.md` §9).
 
@@ -3720,6 +3840,34 @@ statistic's frame, the border frames written past the last, the concatenations' 
 FS-515's unset field of view, FS-517's crashes; their exits: the products' ends (no registration, singular matrices),
 the allocation of a negative field of view (status 1).
 
+Relay 16's groups (the prebuilt probe from 39264dfc, which adds part 9's commands; every earlier hash the same;
+logs `oracles/logs/fs-volume-probe-r16-vrules16b-2026-11-22.log` and `fs-volume-probe-r16-final-2026-11-22.log`):
+`vrules16` (§55's and §57's fixed cases from the fs.volume clean room's items 84 to 88: `MRIaseg2volMU`'s template
+geometry with the segmentation the array's source, its destination, neither end and a source not marked valid; 16
+SPM warps whose points land inside the volume through the array's other end (the volume the array's source and
+its destination, arrays of types 0 and 1, both reversals and sample types) and two without an array; nine
+orientations' fields of view in `MRIcropAroundRAS` (FS-268), one through an array, the orientation naming x twice
+with three different fields (FS-515); FS-517's 18 cases on each axis with the others inside or outside; FS-511's
+failing samples of tensor and RGB volumes; FS-517 allowed in both modes), `vv2v` (§41: 130 `MRIvol2Vol` calls,
+sources of uchar, int, long, float, short and ushort voxels of up to 4 x 4 x 4 and one or two frames, targets of the
+same frames in 88 %, voxel matrices near a scaling, of the linear transforms' kinds or none, sample types 0, 1, 2,
+5 and unknown ones, half-widths 0.5 to 3, outside values 0, 5 and NaN, the diagnostic level 1 in 10 %; 110
+`MRIvol2VolVSM` and `MRIvol2VolTkRegVSM` calls, shift maps in 75 % (shifts within 1.5 voxels, zeros, subnormal
+values, NaN; a map of another extent in a tenth), arrays of types 0 and 1 in 40 %, directions -4 to 4, the verbose
+bit; 40 kernels into targets of 8, 9 or 2 frames; 30 displacement volumes; 30 registrations' arrays; 45 masked
+and upsampled sources, factors -1 to 3, pads 0 to 2, conserving or not; 30 `MRIaseg2volMU` calls with upsampling
+factors 1 to 3, the segmentation either end or neither), `vregion` (§43: 150 bounding boxes of masks of up to 7
+x 7 x 6 voxels with one to three blocks, magnitudes 1e-5, 9.99e-6, -1e-5, a NaN, none; the three kinds, pads -1 to
+3; 10 prints, copies and clears) and `vrules17` (§41's and §43's fixed cases: the frames' mismatch, unknown sample
+types with and without a voxel inside, a half voxel on a source one voxel thick, sinc and the cubic B-spline of two
+frames, a singular source geometry without a matrix; the shift map's direction checks, its corners at and below
+`FLT_MIN`, arrays of types 0 and 1, a tensor map (FS-482); `MRIvol2VolTkRegVSM` with and without a registration;
+the kernel into two frames; an empty mask and a mask of one voxel; `MRIaseg2volMU` with upsampling from either end
+of an array of type 1; ten `REGIONgetBoundingBoxEqOdd` cases: both refusals, odd and even depths, equal and
+unequal sides). Their memory and crash lines: FS-517's and FS-270's crashes, the kernel's writes past a target's
+frames, a shift map of another extent read outside; their exits: unknown sample types and directions (status 1),
+the empty boxes' cuts (status 1), a singular source geometry and a source array not marked valid (status 252).
+
 `vrules` (relay 7, 2026-11-17: the prebuilt probe unchanged; log
 `oracles/logs/fs-volume-probe-r7-refs-2026-11-17.log`, the same hash from the cache and without it,
 the other groups' hashes unchanged) holds fixed cases of single statements: FS-291 with tensor
@@ -3768,8 +3916,9 @@ standard error) are taken out and their IDs kept. Every line must be identical, 
   sample never written) and FS-325 in `vlinear` (§29: a linear transform's samples before the first
   that succeeds); likewise FS-469 in `vpvlab` (§37: a label's mean read outside the table, from the
   stack beside it), FS-198, FS-504 and FS-508 in `vlta54` and `vrules14` (§54: a freed matrix, or a
-  transform the array does not hold, read), and FS-509 in `vrules15` (§55: a tissue type of 100 counted past
-  FreeSurfer's array, a value of its memory);
+  transform the array does not hold, read), FS-509 in `vrules15` (§55: a tissue type of 100 counted past
+  FreeSurfer's array, a value of its memory), and FS-517 in `vrules16` (§57: larmorx ends where FreeSurfer, as its
+  build compiles the overflow, returns a crop of zeros);
 - in both modes, the `bvr` line without a cache that FreeSurfer ends at its licence check (§23:
   `EXIT 255` with the licence message; LARMORX performs none).
 
@@ -3808,9 +3957,11 @@ memory line and 2 where FreeSurfer crashed in one process and not in another, `v
 unexplained difference in either mode; relay 15 (the prebuilt probe from 84fda65e, compare.py's `vrules14` grown by
 15 fixed calls): `vrules14` all but 3 memory lines, no unexplained difference in either mode; relay 15, §55 to §57
 (the prebuilt probe from 2c4d9f97): every earlier group's hash unchanged, every line of `vaseg`, `vsegs`, `vcrops`
-and `vrules15` identical in both modes; no unexplained difference in either mode.
+and `vrules15` identical in both modes; no unexplained difference in either mode. Relay 16 (the prebuilt probes from 2c4d9f97 and
+39264dfc): every earlier group's hash unchanged, every line of `vrules16`, `vv2v`, `vregion` and `vrules17` identical in
+both modes; no unexplained difference in either mode.
 
-### 69.4 The defects of parts 1 to 8 and §54 to §57 (index)
+### 69.4 The defects of parts 1 to 8, §41, §43 and §54 to §57 (index)
 
 | Defect | § | Defect | § | Defect | § |
 |---|---|---|---|---|---|
@@ -3842,7 +3993,8 @@ and `vrules15` identical in both modes; no unexplained difference in either mode
 | FS-509 | 55 | FS-510 | 55 | FS-511 | 55 |
 | FS-512 | 56 | FS-513 | 56 | FS-514 | 56 |
 | FS-515 | 57 | FS-516 | 57 | FS-517 | 57 |
-| FS-267 | 55 | | | | |
+| FS-267 | 55 | FS-268 | 57 | FS-269 | 43 |
+| FS-270 | 55 | FS-482 | 41 | | |
 
 Others' defects these parts meet: FS-12 (`nint`, `specs/freesurfer-core.md`), FS-52 (§35's second volumes), FS-53 and FS-58
 (`specs/freesurfer-mri.md`; FS-252, its header copy without cached matrices, in part 4), FS-47 and
@@ -3856,7 +4008,7 @@ cached matrices) and in part 8 (`vrules12`: a volume without its cached matrices
   when they are ported.
 - **Every platform:** the clean room's own golden checks (its results on the other five platforms
   are its Linux results; a NaN's bits as x86-64 gives them).
-- **§41 to §68** (but §54, in `vltapv`, `vrules10`, `vlta54` and `vrules14`, and §55 to §57, in `vaseg`, `vsegs`, `vcrops` and `vrules15`: relay 15) are not yet in the open probe: until they
+- **§41 to §68** (but §41 and §43, in `vv2v`, `vregion` and `vrules17`: relay 16; §54, in `vltapv`, `vrules10`, `vlta54` and `vrules14`; and §55 to §57, in `vaseg`, `vsegs`, `vcrops`, `vrules15` and `vrules16`: relays 15 and 16) are not yet in the open probe's groups (§42's and §44's commands are in the probe from 39264dfc on, their groups to come): until they
   are, their clean room checks them against the
   official programs as black boxes and against the replays; their validation plans name the replica's
   probe, which the implementer does not open.

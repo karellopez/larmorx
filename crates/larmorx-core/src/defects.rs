@@ -1391,6 +1391,12 @@ defects! {
         "raising each frame of a volume to its power (mri_framepower) given fewer powers than the volume has frames reads past the powers given: the later frames are raised to whatever memory holds there";
     FS_267 = "FS-267", "FreeSurfer", true,
         "mapping a segmentation onto another grid with a tissue-type vote (MRIaseg2vol with a colour table) whose tissue-type table has no places takes, as the vote's tissue type, the one an earlier vote of the same program chose (0 in its first): a later call's labels depend on the earlier calls";
+    FS_268 = "FS-268", "FreeSurfer", true,
+        "cropping around an RAS point (MRIcropAroundRAS) gives the fields of view, which it documents in RAS order (left-right, front-back, up-down), to the voxel axes the other way round: for an orientation that moves all three axes (SRA, ASR, PIL, ASL and the like) each axis gets another axis's field of view";
+    FS_269 = "FS-269", "FreeSurfer", false,
+        "the bounding box of a mask (REGIONgetBoundingBox, REGIONgetBoundingBoxM) is one voxel smaller on each axis than the voxels it should bound: without a pad it leaves out the mask's last voxel, with a pad the far side's pad is one voxel short (being measured: both modes keep the original's size)";
+    FS_270 = "FS-270", "FreeSurfer", true,
+        "mapping a segmentation onto another grid with upsampling (MRIaseg2volMU with an upsampling factor) when the segmentation is at neither end of the registration crashes the program after the concatenation's refusal";
     FS_331 = "FS-331", "FreeSurfer", true,
         "RASFromSurfaceRAS_ (and VGtkreg2RAS) given a matrix larger than 4 x 4 to fill computes the tkregister matrix's inverse into it as if it were 4 x 4 and the product into it again: a 4 x N matrix (N > 4) gets the numbers laid out across its rows, the program ends when one of the matrix's first 4 x 4 numbers left unwritten is not finite, and one of more than 4 rows gives nothing after a size-mismatch error";
     FS_332 = "FS-332", "FreeSurfer", true,
@@ -2940,7 +2946,7 @@ defects! {
     FS_510 = "FS-510", "FreeSurfer", true,
         "mapping a segmentation onto another grid with a tissue-type vote (MRIaseg2vol with a colour table) decides whether a voxel has a clear winner from the hits of its highest label instead of the label with the most hits, so a label with half or more of the voxel can lose to the tissue-type vote";
     FS_511 = "FS-511", "FreeSurfer", true,
-        "applying an SPM warp field (MRIapplySpmWarp) stores, where a sample fails before any has succeeded (a trilinear sample of a type it cannot read), a value never written";
+        "applying an SPM warp field (MRIapplySpmWarp) stores, where a trilinear sample of a volume type it cannot read fails before any sample of the call gave a value, a value never written";
     FS_512 = "FS-512", "FreeSurfer", true,
         "concatenating two volumes along the slices (MRIzconcat) copies as many rows as the volumes have columns: rows past the width stay 0, and where the width is larger it reads and writes rows the volumes do not have";
     FS_513 = "FS-513", "FreeSurfer", true,

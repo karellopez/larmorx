@@ -133,3 +133,11 @@ and `getVolGeom`, fs.mri's `RASFromSurfaceRAS_`, `MRIallocHeader`, `MRIalloc`, `
 fs.surf's `mrisComputeSurfaceDimensions` (track D's), in FreeSurfer's order; `transform.rs`'s `GcaLtaIo` is public
 (the programs that call `LTAread` themselves). The probe `validation/probes/fs-gcam/` (`fsgcam`) and its port side
 `examples/fs_gca_probe.rs`, `tests/fs_gca/cases.rs`, `tests/fs_gca_official.rs` (hash), `tests/surftransform.rs`.
+
+## Track D's relay 49: two pieces `mri_segstats` needs (queue item 3.2-20, new files)
+
+| FreeSurfer 8.2.0 | Functions | Module |
+|---|---|---|
+| `utils/gca.cpp` 19855-19933 | `GCAcolorTableCMA` (`mri_segstats --ctab-gca`; FS-1117) | `ctab_cma.rs` |
+| `utils/transform.cpp` 4460-4533 | `TransformLTA2RegDat` (`regio_read_registermat` of an `.lta`: `mri_segstats --reg`) | `regdat.rs` |
+

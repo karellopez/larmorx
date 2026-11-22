@@ -1,0 +1,138 @@
+{
+ "name": "freesurfer-mri-segstats",
+ "tool": "mri_segstats (FreeSurfer 8.2.0)",
+ "status": "experimental",
+ "larmorx_commit": "e6a827b2ffb1",
+ "generated": "2026-11-22",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_segstats/) and larmorx-freesurfer-gca (src/ctab_cma.rs, src/regdat.rs), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mri_segstats) and its recon-all runs' recorded steps (oracles/freesurfer-8.2.0/runs/)",
+ "replay": {
+  "reproduce": {
+   "runs": [
+    "ds000005-sub-01-classic",
+    "ds000005-sub-01-v8",
+    "ds000228-sub-pixar008-classic",
+    "ds000228-sub-pixar008-v8",
+    "ds002422-sub-02-classic",
+    "ds002422-sub-02-v8",
+    "ds004173-sub-603309-classic",
+    "ds004173-sub-603309-v8",
+    "ds005003-sub-RS001-classic",
+    "ds005003-sub-RS001-v8",
+    "ds005454-sub-16-classic",
+    "ds005454-sub-16-v8"
+   ],
+   "steps": 24,
+   "verdicts": {
+    "reproduced": 24
+   },
+   "threads": [
+    4
+   ],
+   "seconds": {
+    "recorded": 1151.1,
+    "replayed": 1004.8
+   },
+   "files": {
+    "provenance": 24
+   }
+  },
+  "fix": {
+   "runs": [
+    "ds000005-sub-01-classic",
+    "ds000005-sub-01-v8",
+    "ds000228-sub-pixar008-classic",
+    "ds000228-sub-pixar008-v8",
+    "ds002422-sub-02-classic",
+    "ds002422-sub-02-v8",
+    "ds004173-sub-603309-classic",
+    "ds004173-sub-603309-v8",
+    "ds005003-sub-RS001-classic",
+    "ds005003-sub-RS001-v8",
+    "ds005454-sub-16-classic",
+    "ds005454-sub-16-v8"
+   ],
+   "steps": 24,
+   "verdicts": {
+    "reproduced": 24
+   },
+   "threads": [
+    4
+   ],
+   "seconds": {
+    "recorded": 1151.1,
+    "replayed": 995.1
+   },
+   "files": {
+    "provenance": 24
+   }
+  }
+ },
+ "program": [
+  {
+   "seed": 1,
+   "cases": 145,
+   "verdicts": {
+    "identical": 138,
+    "fix-identical": 122,
+    "fix-explained": 16,
+    "reproduce-skip": 7,
+    "fix-skip": 7
+   }
+  },
+  {
+   "seed": 2,
+   "cases": 145,
+   "verdicts": {
+    "identical": 138,
+    "fix-identical": 122,
+    "fix-explained": 16,
+    "reproduce-skip": 7,
+    "fix-skip": 7
+   }
+  }
+ ],
+ "golden_sha256": {
+  "reproduce": "580141bcfeb2d1f7fe638ad61d685a15a7846f6c7df953fb42a3859ff3eef5f0",
+  "fix": "580141bcfeb2d1f7fe638ad61d685a15a7846f6c7df953fb42a3859ff3eef5f0"
+ },
+ "memory": [
+  {
+   "case": "nu-mean",
+   "mode": "reproduce",
+   "larmorx_mib": 150.0,
+   "freesurfer_mib": 183.0
+  },
+  {
+   "case": "nu-mean",
+   "mode": "fix",
+   "larmorx_mib": 149.5,
+   "freesurfer_mib": 183.0
+  },
+  {
+   "case": "aseg-pv",
+   "mode": "reproduce",
+   "larmorx_mib": 184.9,
+   "freesurfer_mib": 233.5
+  },
+  {
+   "case": "aseg-pv",
+   "mode": "fix",
+   "larmorx_mib": 185.1,
+   "freesurfer_mib": 233.5
+  },
+  {
+   "case": "wmparc",
+   "mode": "reproduce",
+   "larmorx_mib": 150.5,
+   "freesurfer_mib": 217.7
+  },
+  {
+   "case": "wmparc",
+   "mode": "fix",
+   "larmorx_mib": 150.2,
+   "freesurfer_mib": 217.7
+  }
+ ]
+}

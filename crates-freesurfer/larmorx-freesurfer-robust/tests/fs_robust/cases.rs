@@ -2344,7 +2344,7 @@ fn rreg(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
     }
     o.vm4(r.mfinal.as_ref());
     if r.mov2weights.is_some() {
-        let (h1, h2) = r.get_half_way_maps(io.err)?;
+        let (h1, h2) = r.get_half_way_maps(g, io.err)?;
         o.m4(&h1);
         o.m4(&h2);
     } else {

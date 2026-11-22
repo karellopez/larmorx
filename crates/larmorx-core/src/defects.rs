@@ -3135,6 +3135,10 @@ defects! {
         "the least-squares estimate of a single location returns memory contents instead of the mean; larmorx returns the mean in both modes (no program reaches it)";
     FS_1067 = "FS-1067", "FreeSurfer", true,
         "a robust registration step with fewer usable voxels than the transformation has parameters gives memory contents (the robust solve) or an arbitrary solution (least squares); refused with a clear error and status 1 by default";
+    FS_1068 = "FS-1068", "FreeSurfer", true,
+        "the half-way maps of a robust registration that ran no iteration (the finest level skipped with no coarser one) are read from empty matrices: a crash or memory contents; an error in both modes";
+    FS_1069 = "FS-1069", "FreeSurfer", true,
+        "a robust registration step of two images of different sizes (intensity scaling only, without symmetry, of images of different extents) reads past the smaller one: a crash or memory contents; an error in both modes";
 }
 
 /// The register entry with ID `id`.

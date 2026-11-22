@@ -31,7 +31,7 @@
 use std::io::Write;
 
 use larmorx_core::cfmt::ostream;
-use larmorx_core::defects::{FS_1061, FS_1062};
+use larmorx_core::defects::{FS_1061, FS_1062, FS_1069};
 use larmorx_core::math::Libm;
 use larmorx_freesurfer_core::cstd::note_glibc07;
 use larmorx_freesurfer_core::globals::Globals;
@@ -459,6 +459,31 @@ impl<T: Real> RegistrationStep<T> {
                 return Err(Fatal::Exit(1));
             }
             is2d = true;
+        }
+        let (vs, vt) = (&mri_s.vg, &mri_t.vg);
+        if (vs.width, vs.height, vs.depth, mri_s.nframes, mri_s.mtype)
+            != (vt.width, vt.height, vt.depth, mri_t.nframes, mri_t.mtype)
+        {
+            // FreeSurfer's size asserts are compiled out: it reads the target past its voxels
+            g.notices.add(
+                &FS_1069,
+                "a registration step of two images of different sizes, frames or types (FreeSurfer reads past one)",
+            );
+            let _ = writeln!(
+                err,
+                "RegistrationStep::constructAb: the source ({} x {} x {}, {} frames, type {}) and the target ({} x {} x {}, {} frames, type {}) differ (FreeSurfer reads past one of them here)",
+                vs.width,
+                vs.height,
+                vs.depth,
+                mri_s.nframes,
+                mri_s.mtype,
+                vt.width,
+                vt.height,
+                vt.depth,
+                mri_t.nframes,
+                mri_t.mtype
+            );
+            return Err(Fatal::Exit(1));
         }
         let (sw, sh, sd, snf) = (
             mri_s.vg.width,

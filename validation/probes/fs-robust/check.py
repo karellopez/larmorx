@@ -159,6 +159,10 @@ SKIP = (
     "FS-1067",
     # VNL's QR solve of one row whose entry is 0 leaves the solution unwritten
     "ITK-113",
+    # the registration's (3.2-03 part 2): the half-way maps before any iteration, a step of two
+    # images of different sizes (a crash or memory contents in FreeSurfer)
+    "FS-1068",
+    "FS-1069",
 )
 
 

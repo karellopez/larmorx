@@ -35,6 +35,7 @@
 use std::io::Write;
 
 use larmorx_core::cfmt::{self, ostream};
+use larmorx_core::defects::FS_1068;
 use larmorx_core::math::Libm;
 use larmorx_core::vnl_fixed;
 use larmorx_core::vnl_matrix::{VnlMatrix, matlab_print_long};
@@ -931,11 +932,23 @@ impl RegRobust {
     }
 
     /// `getHalfWayMaps()`: the maps from the inputs to the half-way space (`mov2weights Rsrc^-1`,
-    /// `dst2weights Rtrg^-1` after a resampling). Before any iteration (no maps: FreeSurfer reads
-    /// an empty matrix and crashes) an error.
-    pub fn get_half_way_maps(&self, err: &mut dyn Write) -> Result<(Mat4, Mat4), Fatal> {
+    /// `dst2weights Rtrg^-1` after a resampling). Before any iteration (FS-1068: FreeSurfer reads
+    /// empty matrices) an error in both modes, noted.
+    pub fn get_half_way_maps(
+        &self,
+        g: &mut Globals,
+        err: &mut dyn Write,
+    ) -> Result<(Mat4, Mat4), Fatal> {
         let (Some(m), Some(d)) = (self.mov2weights.as_ref(), self.dst2weights.as_ref()) else {
-            return Err(crash(err, "getHalfWayMaps (no iteration ran)"));
+            g.notices.add(
+                &FS_1068,
+                "the half-way maps of a registration that ran no iteration (FreeSurfer reads empty matrices)",
+            );
+            let _ = writeln!(
+                err,
+                "Registration::getHalfWayMaps: no half-way maps, the registration ran no iteration (FreeSurfer crashes here)"
+            );
+            return Err(Fatal::Exit(1));
         };
         if !self.resample {
             return Ok((fixed(m), fixed(d)));

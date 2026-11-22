@@ -35,7 +35,7 @@ const SKIP: &[&str] = &[
     "FS-567", "FS-568", "FS-569", "FS-570", "FS-571", "FS-573", "FS-575", "FS-579", "FS-581",
     "FS-582", "FS-583", "FS-586", "FS-588", "FS-589", "FS-591", "FS-593", "FS-597", "FS-598",
     "FS-600", "FS-601", "FS-615", "FS-618", "FS-966", "FS-967", "FS-1063", "FS-1064", "FS-1065",
-    "FS-1066", "FS-1067", "ITK-113",
+    "FS-1066", "FS-1067", "ITK-113", "FS-1068", "FS-1069",
 ];
 
 #[test]
@@ -156,4 +156,37 @@ fn registration_steps_fix_differs_only_with_a_notice() {
         let (f, ids) = cases::run_line(&line, UpstreamDefects::Fix);
         assert!(r == f || !ids.is_empty(), "{line}");
     }
+}
+
+/// The registration's stream (`check.py --family reg`: `rreg`), recorded 2026-11-22 (3.2-03 part 2:
+/// `RegRobust` with `Registration`'s code: `setSourceAndTarget` with its reordering and isotropic
+/// resampling, the pyramids, the initial transforms, `findSaturation`, the multiresolution and
+/// iterative registrations, the final and half-way maps, on pairs of structured volumes of 16 to
+/// 33 voxels a side, 2-D and 3-D, `float`, `uchar` and `short`, every model, symmetric or not, in
+/// `float` and `double`): 40 cases, 36 lines identical, 4 hashed as `SKIP` (FS-1063, `double` with
+/// `iscale`). The probe compares more (seeds 7 and 13); 40 keep the debug build's run near 50 s.
+const N_REG: usize = 40;
+const OFFICIAL_REG_SHA256: &str =
+    "5485548405ae9d5c608171b3bf6567e796903b3bf43f6614f114d2f8d9e5ecf3";
+const SKIPPED_REG: usize = 4;
+
+#[test]
+fn reproduce_gives_the_official_registrations() {
+    let mut h = Sha256::new();
+    let mut skipped = 0;
+    for line in cases::generate_reg(1, N_REG) {
+        let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
+        if ids.iter().any(|x| SKIP.contains(x)) {
+            skipped += 1;
+            h.update(b"SKIP\n");
+        } else {
+            h.update(out.as_bytes());
+            h.update(b"\n");
+        }
+        let (f, fids) = cases::run_line(&line, UpstreamDefects::Fix);
+        assert!(f == out || !fids.is_empty(), "{line}");
+    }
+    assert_eq!(skipped, SKIPPED_REG);
+    let hex: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    assert_eq!(hex, OFFICIAL_REG_SHA256);
 }

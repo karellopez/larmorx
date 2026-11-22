@@ -3948,7 +3948,10 @@ class Gen13(Gen12):
         rr = self.plain((4, 4, 2), perm=(0, 0, 2))
         L.append(f"crras {self.lab(rr, list(range(32)))} 0 1 {c1} 2 2 1 0 null")
         cs = (0.8, 0.6, 0.0, 0.75, -0.66, 0.0, 0.0, 0.0, 1.0)
-        ob = ((4, 4, 2), [*(f32(1.0) for _ in range(3)), "1", *(f32(x) for x in cs), *[f32(0.0)] * 6])
+        ob = (
+            (4, 4, 2),
+            [*(f32(1.0) for _ in range(3)), "1", *(f32(x) for x in cs), *[f32(0.0)] * 6],
+        )
         L.append(f"crras {self.lab(ob, list(range(32)))} 0 1 {c1} 2 2 1 0 null")
         gv = self.plain((4, 4, 2), c=(1.0, 0.0, 0.0))
         go = self.plain((3, 3, 3), c=(-2.0, 1.0, 0.0))

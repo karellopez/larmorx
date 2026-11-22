@@ -2836,7 +2836,14 @@ with `USF` -1 only.)
   each voxel's first pair the one a stable sort puts first). For each output voxel reached, its labels' hit counts: the
   label with the most hits wins (ties: the lowest label); its count goes to the hit volume; the label is written, or 0
   when `hits / total < fthresh` (in `double`; a NaN `fthresh` keeps every label, **(observed)**: `vrules15`).
-- With a colour table, a "no clear winner" voxel (the winner's share below 1/2 in `float`; FreeSurfer tests the voxel's
+- With a colour table, the tissue types are read at every output voxel a pair reaches, whether or not it then has a
+  clear winner: in the order of the output voxels (by index), each of the voxel's distinct labels once, in increasing
+  label order (the order of its sorted pairs), its type read from the colour table (FS-509's checks there), its hits
+  added to that type's count when the type is 0 or more, and `WARNING: color table entry <n> <name> has not been
+  assigned a tissue type` printed (standard output) when the type is -2; so a label of type -2 prints the warning once
+  for every voxel it reaches (**(observed)**: `vaseg`, labels 1, 0, 1, 0 onto four voxels of one pair each: the warning
+  for label 0 once; another line prints it five times for label 2). The counts start at 0 in every voxel.
+- Then a "no clear winner" voxel (the winner's share below 1/2 in `float`; FreeSurfer tests the voxel's
   highest label's share, FS-510) is decided by tissue type: the types 0 to the tissue table's count less one are
   compared and the one with the most hits wins (the lowest type on ties; types below 0 not counted; types from the count
   up counted but never compared), and in it the label with the most hits (the highest label on ties); no label of the
@@ -2845,9 +2852,9 @@ with `USF` -1 only.)
   program's first), noted where such a vote decides a voxel (**(observed)**: `vrules15`, the labels of type 0 voting).
   The vote's count is the winning label's hits, or 0; a voxel of count 0 is mapped back below like one no pair reached
   (**(observed)**: `vrules15`, types past the table, every type below 0). FS-510 (**(observed)**: `vrules15`, labels 1,
-  1, 2, 3 of the types 1, 0, 0: FreeSurfer votes and writes 3; by default 1 wins with half the hits). A tissue type of
-  -2 prints `WARNING: color table entry <n> <name> has not been assigned a tissue type`. Labels outside the table or of
-  an empty place, tissue types of 100 or more, more than 100 tissue types or 1,000 labels in a voxel: FS-509
+  1, 2, 3 of the types 1, 0, 0: FreeSurfer votes and writes 3; by default 1 wins with half the hits). Labels outside
+  the table or of an empty place, tissue types of 100 or more, more than 100 tissue types or 1,000 labels in a voxel:
+  FS-509
   (**(observed)**: `vrules15`, a label past the table and an empty place crash; a type of 100 is counted past the array).
 - Then every output voxel whose hit count is 0 (no pair, or a vote's count of 0) is mapped back by `Vv2a` (from the last
   mapped point's fourth coordinate on) and rounded: outside the segmentation 0, inside the segmentation's label with hit

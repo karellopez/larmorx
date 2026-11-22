@@ -47,6 +47,10 @@ fn fix_differs_only_with_a_notice() {
     for line in cases::generate(1, N) {
         let (r, _) = cases::run_line(&line, UpstreamDefects::Reproduce);
         let (f, ids) = cases::run_line(&line, UpstreamDefects::Fix);
-        assert!(r == f || !ids.is_empty(), "{}", &line[line.len().saturating_sub(200)..]);
+        assert!(
+            r == f || !ids.is_empty(),
+            "{}",
+            &line[line.len().saturating_sub(200)..]
+        );
     }
 }

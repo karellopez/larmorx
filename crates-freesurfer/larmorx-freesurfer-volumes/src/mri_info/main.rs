@@ -47,7 +47,9 @@ use larmorx_freesurfer_core::version::handle_version_option;
 use larmorx_freesurfer_gca::gcam::{GCAM_RAS, GCAM_VOX, cma_label_to_name, gcam_read};
 use larmorx_freesurfer_io::colortab::ctab_print_ascii;
 use larmorx_freesurfer_io::fio::{fio_extension, fio_is_directory};
-use larmorx_freesurfer_io::identify::{MGH_MORPH, MRI_VOLUME_TYPE_UNKNOWN, mri_identify, type_to_string};
+use larmorx_freesurfer_io::identify::{
+    MGH_MORPH, MRI_VOLUME_TYPE_UNKNOWN, mri_identify, type_to_string,
+};
 use larmorx_freesurfer_io::mriio::{mri_read_header, mri_read_volume};
 use larmorx_freesurfer_io::mriio_write::mri_tag_write;
 use larmorx_freesurfer_io::warpfield::{
@@ -881,13 +883,7 @@ fn print_stats(g: &mut Globals, r: &mut Run, fp: &mut Fp, mri: &Mri) -> Result<(
 
 /// The report (`do_file`'s end): the volume's header and its two matrices; the first line to
 /// `--o`'s file when given, the rest to standard output.
-fn report(
-    g: &mut Globals,
-    r: &mut Run,
-    fp: &mut Fp,
-    mri: &Mri,
-    fname: &str,
-) -> Result<(), Fatal> {
+fn report(g: &mut Globals, r: &mut Run, fp: &mut Fp, mri: &Mri, fname: &str) -> Result<(), Fatal> {
     let vg = &mri.vg;
     let precision = if g.gdiag & DIAG_INFO != 0 { 10 } else { 4 };
     let _ = writeln!(fpw(fp, r.out), "Volume information for {fname}");
@@ -1002,7 +998,11 @@ fn report(
         let _ = r.out.write_all(b"\n");
     }
     let _ = writeln!(r.out, "Orientation   : {}", orientation(vg));
-    let _ = writeln!(r.out, "Primary Slice Direction: {}", slice_direction_name(vg));
+    let _ = writeln!(
+        r.out,
+        "Primary Slice Direction: {}",
+        slice_direction_name(vg)
+    );
     let m = vox2ras(g, r, mri)?;
     let _ = r.out.write_all(b"\nvoxel to ras transform:\n");
     pretty_matrix_print(g, r, Some(&m), precision);
@@ -1209,11 +1209,7 @@ fn print_tags_to_file(
         let _ = r.out.write_all(b"  name:  ");
         let _ = r.out.write_all(frame.name.c_bytes());
         let _ = r.out.write_all(b"\n");
-        let _ = writeln!(
-            r.out,
-            "  thresh: {}",
-            cfmt::f(f64::from(frame.thresh), 6)
-        );
+        let _ = writeln!(r.out, "  thresh: {}", cfmt::f(f64::from(frame.thresh), 6));
     }
     Ok(())
 }
@@ -1237,10 +1233,7 @@ fn report_warp(g: &mut Globals, r: &mut Run, mri: &Mri, fname: &str) -> Result<(
         intent_name(mri.intent),
         mri.intent
     );
-    s += &format!(
-        "        format: {format} ({})\n",
-        mri.warp_field_format
-    );
+    s += &format!("        format: {format} ({})\n", mri.warp_field_format);
     s += &format!("       spacing: {}\n", mri.gcamorph_spacing);
     s += &format!("       exp_k  : {}\n", cfmt::f(mri.gcamorph_exp_k, 6));
     s += &format!(
@@ -1319,7 +1312,10 @@ mod tests {
     #[test]
     fn names_of_types() {
         assert_eq!(precision_name(MRI_FLOAT_COMPLEX, false), None);
-        assert_eq!(precision_name(MRI_FLOAT_COMPLEX, true), Some("float complex"));
+        assert_eq!(
+            precision_name(MRI_FLOAT_COMPLEX, true),
+            Some("float complex")
+        );
         assert_eq!(type_name(MRI_RGB, false), "UNKNOWN");
         assert_eq!(type_name(MRI_RGB, true), "RGB");
     }

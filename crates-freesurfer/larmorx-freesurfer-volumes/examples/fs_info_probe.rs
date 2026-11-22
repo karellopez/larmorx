@@ -41,7 +41,9 @@ fn main() {
             }
         }
         _ => {
-            eprintln!("usage: fs_info_probe cases <seed> <n> | golden-cases | run <cases> fix|reproduce");
+            eprintln!(
+                "usage: fs_info_probe cases <seed> <n> | golden-cases | run <cases> fix|reproduce"
+            );
             std::process::exit(2);
         }
     }

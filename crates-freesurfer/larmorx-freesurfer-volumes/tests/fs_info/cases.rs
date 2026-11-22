@@ -197,7 +197,17 @@ fn rand_matrix(g: &mut Gen) -> [f32; 16] {
 }
 
 fn rand_spec(g: &mut Gen) -> Spec {
-    let sizes = [1.0f32, 1.0, 1.0, 0.5, 2.0, 1.333_333_3, 0.999_5, 1.000_6, 3.0];
+    let sizes = [
+        1.0f32,
+        1.0,
+        1.0,
+        0.5,
+        2.0,
+        1.333_333_3,
+        0.999_5,
+        1.000_6,
+        3.0,
+    ];
     let dims = [
         g.int(1, 5) as i32,
         g.int(1, 5) as i32,
@@ -211,7 +221,12 @@ fn rand_spec(g: &mut Gen) -> Spec {
     } else {
         [g.pick(&sizes), g.pick(&sizes), g.pick(&sizes)]
     };
-    let names = ["talairach.xfm", "transforms/talairach.xfm", "/no/such/t.xfm", "t.xfm"];
+    let names = [
+        "talairach.xfm",
+        "transforms/talairach.xfm",
+        "/no/such/t.xfm",
+        "t.xfm",
+    ];
     let pedirs = ["ROW", "COL", "LR", "AP", "UNKNOWN"];
     let mut frames = Vec::new();
     if dims[3] > 1 || g.chance(5) {
@@ -370,7 +385,17 @@ fn write_volume(m: &mut Mri, name: &str) -> Vec<(String, Vec<u8>)> {
             MGZ_INTENT_UNKNOWN,
         );
     } else {
-        let _ = mri_write(&mut fs, &mut o, &mut e, &env, Some(t.path()), m, name, None, MGZ_INTENT_UNKNOWN);
+        let _ = mri_write(
+            &mut fs,
+            &mut o,
+            &mut e,
+            &env,
+            Some(t.path()),
+            m,
+            name,
+            None,
+            MGZ_INTENT_UNKNOWN,
+        );
     }
     collect(t.path())
 }
@@ -383,8 +408,10 @@ fn morph_files(g: &mut Gen, m3z: &str, warp: Option<&str>) -> Vec<(String, Vec<u
     let (mut o, mut e) = (Vec::new(), Vec::new());
     let env = Environment::default();
     let whd = [g.int(2, 3) as i32, g.int(2, 3) as i32, g.int(1, 3) as i32];
-    let mut w = mri_alloc_sequence(&mut fs, &mut o, &mut e, whd[0], whd[1], whd[2], MRI_FLOAT, 3)
-        .expect("a warp");
+    let mut w = mri_alloc_sequence(
+        &mut fs, &mut o, &mut e, whd[0], whd[1], whd[2], MRI_FLOAT, 3,
+    )
+    .expect("a warp");
     for x in 0..whd[0] {
         for y in 0..whd[1] {
             for z in 0..whd[2] {
@@ -403,7 +430,16 @@ fn morph_files(g: &mut Gen, m3z: &str, warp: Option<&str>) -> Vec<(String, Vec<u
     if let Some(warp) = warp
         && let Ok(Some(mut gc)) = gcam_read(&mut fs, &mut o, &mut e, &env, None, &p)
     {
-        let _ = gcam_write(&mut fs, &mut o, &mut e, &env, Some(t.path()), &mut gc, warp, 0);
+        let _ = gcam_write(
+            &mut fs,
+            &mut o,
+            &mut e,
+            &env,
+            Some(t.path()),
+            &mut gc,
+            warp,
+            0,
+        );
     }
     collect(t.path())
 }
@@ -412,19 +448,80 @@ fn morph_files(g: &mut Gen, m3z: &str, warp: Option<&str>) -> Vec<(String, Vec<u
 
 /// Every option without an argument.
 const FLAGS: &[&str] = &[
-    "--dump", "--zero-cras", "--tr", "--te", "--ti", "--fa", "--fad", "--flip_angle", "--pedir",
-    "--cres", "--xsize", "--rres", "--ysize", "--sres", "--zsize", "--voxvol", "--type",
-    "--is-1mm-iso", "--conformed", "--conformed-to-min", "--ncols", "--width", "--nrows",
-    "--height", "--nslices", "--depth", "--dim", "--res", "--min-res", "--dof", "--cdc", "--rdc",
-    "--sdc", "--vox2ras", "--ras2vox", "--vox2ras-tkr", "--ras2vox-tkr", "--vox2ras-fsl",
-    "--tkr2scanner", "--ctab", "--scanner2tkr", "--ras_good", "--cras", "--center", "--p0", "--det",
-    "--nframes", "--mid-frame", "--format", "--orientation", "--ori", "--slicedirection",
-    "--autoalign", "--orig_ras2vox", "--entropy", "--voxvolsum", "--stats", "--cmds",
-    "--diag-debug", "--debug",
+    "--dump",
+    "--zero-cras",
+    "--tr",
+    "--te",
+    "--ti",
+    "--fa",
+    "--fad",
+    "--flip_angle",
+    "--pedir",
+    "--cres",
+    "--xsize",
+    "--rres",
+    "--ysize",
+    "--sres",
+    "--zsize",
+    "--voxvol",
+    "--type",
+    "--is-1mm-iso",
+    "--conformed",
+    "--conformed-to-min",
+    "--ncols",
+    "--width",
+    "--nrows",
+    "--height",
+    "--nslices",
+    "--depth",
+    "--dim",
+    "--res",
+    "--min-res",
+    "--dof",
+    "--cdc",
+    "--rdc",
+    "--sdc",
+    "--vox2ras",
+    "--ras2vox",
+    "--vox2ras-tkr",
+    "--ras2vox-tkr",
+    "--vox2ras-fsl",
+    "--tkr2scanner",
+    "--ctab",
+    "--scanner2tkr",
+    "--ras_good",
+    "--cras",
+    "--center",
+    "--p0",
+    "--det",
+    "--nframes",
+    "--mid-frame",
+    "--format",
+    "--orientation",
+    "--ori",
+    "--slicedirection",
+    "--autoalign",
+    "--orig_ras2vox",
+    "--entropy",
+    "--voxvolsum",
+    "--stats",
+    "--cmds",
+    "--diag-debug",
+    "--debug",
 ];
 
 /// The in-type names `-it` is given.
-const TYPES: &[&str] = &["mgz", "nii", "analyze4d", "cor", "m3z", "minc", "bogus", "MGH", "nifti1"];
+const TYPES: &[&str] = &[
+    "mgz",
+    "nii",
+    "analyze4d",
+    "cor",
+    "m3z",
+    "minc",
+    "bogus",
+    "MGH",
+    "nifti1",
+];
 
 fn info_line(env: Option<&str>, files: &[(String, Vec<u8>)], args: &[String]) -> String {
     let mut t = vec![
@@ -466,7 +563,10 @@ fn prelude() -> Vec<String> {
         dof: 1,
         xform: Some("transforms/talairach.xfm".to_owned()),
         pedir: Some("ROW".to_owned()),
-        cmds: s(&["mri_convert a.mgz b.mgz --conform", "mri_add_xform_to_header -c t.xfm b.mgz"]),
+        cmds: s(&[
+            "mri_convert a.mgz b.mgz --conform",
+            "mri_add_xform_to_header -c t.xfm b.mgz",
+        ]),
         auto_align: Some(rand_matrix(&mut g)),
         orig: Some(rand_matrix(&mut g)),
         field: 3.0,
@@ -534,7 +634,11 @@ fn prelude() -> Vec<String> {
     // the environment's diagnostics
     // (a name without an extension: the program ends before any volume is read, whose licence
     // check prints the licence file under DIAG_NO)
-    out.push(info_line(Some("DIAG_NO=2"), &vol, &s(&["--voxel", "1", "1", "0", "noext"])));
+    out.push(info_line(
+        Some("DIAG_NO=2"),
+        &vol,
+        &s(&["--voxel", "1", "1", "0", "noext"]),
+    ));
     // the command line alone
     for a in [
         s(&[]),
@@ -570,7 +674,11 @@ fn prelude() -> Vec<String> {
     // other formats, each with the full report and a few options
     let mut o2 = base.clone();
     o2.dims = [4, 3, 2, 3];
-    o2.frames = vec![(2, 0.0, "a".into()), (0, 1.5, "b".into()), (41, -2.0, "c".into())];
+    o2.frames = vec![
+        (2, 0.0, "a".into()),
+        (0, 1.5, "b".into()),
+        (41, -2.0, "c".into()),
+    ];
     for name in ["f.nii", "f.nii.gz", "f.img", "f.mgh", "f.cor"] {
         let mut s2 = o2.clone();
         if name.ends_with(".cor") {
@@ -614,7 +722,13 @@ fn prelude() -> Vec<String> {
     conf.seg = true;
     let mut mc = build(&mut Gen::new(5), &conf);
     let cf = write_volume(&mut mc, "c.mgz");
-    for a in ["--conformed", "--conformed-to-min", "--is-1mm-iso", "--res", "--min-res"] {
+    for a in [
+        "--conformed",
+        "--conformed-to-min",
+        "--is-1mm-iso",
+        "--res",
+        "--min-res",
+    ] {
         out.push(info_line(None, &cf, &s(&[a, "c.mgz"])));
     }
     // morphs and warp fields
@@ -651,7 +765,13 @@ fn prelude() -> Vec<String> {
     let mut mz = build(&mut g, &zero);
     let zf = write_volume(&mut mz, "z.mgz");
     for a in [
-        "--ras2vox", "--ras2vox-tkr", "--tkr2scanner", "--scanner2tkr", "--det", "--center", "--vox2ras",
+        "--ras2vox",
+        "--ras2vox-tkr",
+        "--tkr2scanner",
+        "--scanner2tkr",
+        "--det",
+        "--center",
+        "--vox2ras",
     ] {
         out.push(info_line(None, &zf, &s(&[a, "z.mgz"])));
     }
@@ -668,14 +788,23 @@ fn seeded(g: &mut Gen) -> String {
         match g.below(14) {
             0 => {
                 let f = morph_files(g, &format!("m{k}.m3z"), Some(&format!("w{k}.mgz")));
-                let pick = if g.chance(2) { &f[0].0 } else { &f[f.len() - 1].0 };
+                let pick = if g.chance(2) {
+                    &f[0].0
+                } else {
+                    &f[f.len() - 1].0
+                };
                 inputs.push(pick.clone());
                 files.extend(f);
             }
-            1 => inputs.push(g.pick(&["nothere.mgz", "noext", "nothere.nii.gz"]).to_owned()),
+            1 => inputs.push(
+                g.pick(&["nothere.mgz", "noext", "nothere.nii.gz"])
+                    .to_owned(),
+            ),
             _ => {
                 let spec = rand_spec(g);
-                let ext = g.pick(&[".mgz", ".mgz", ".mgh", ".mgz", ".nii", ".nii.gz", ".img", ".mgh"]);
+                let ext = g.pick(&[
+                    ".mgz", ".mgz", ".mgh", ".mgz", ".nii", ".nii.gz", ".img", ".mgh",
+                ]);
                 let name = format!("v{k}{ext}");
                 let mut m = build(g, &spec);
                 let f = write_volume(&mut m, &name);
@@ -692,7 +821,10 @@ fn seeded(g: &mut Gen) -> String {
     for _ in 0..g.int(0, 3) {
         groups.push(match g.below(16) {
             0 => vec!["--o".into(), "out.txt".into()],
-            1 => vec!["--otags".into(), g.pick(&["t.bin", "t.mgz", "t.binz"]).into()],
+            1 => vec![
+                "--otags".into(),
+                g.pick(&["t.bin", "t.mgz", "t.binz"]).into(),
+            ],
             2 => vec![g.pick(&["-it", "--in_type"]).into(), g.pick(TYPES).into()],
             3 => {
                 let mut v = vec!["--voxel".to_owned()];
@@ -777,7 +909,8 @@ pub fn golden_cases() -> Vec<String> {
         sp.ty = if seg { MRI_UCHAR } else { MRI_FLOAT };
         sp.ctab = seg;
         let mut m = build(&mut g, &sp);
-        let mut v = mri_alloc_sequence(&mut fs, &mut o, &mut e, N, N, N, sp.ty, 1).expect("a volume");
+        let mut v =
+            mri_alloc_sequence(&mut fs, &mut o, &mut e, N, N, N, sp.ty, 1).expect("a volume");
         for z in 0..N {
             for y in 0..N {
                 for x in 0..N {
@@ -932,11 +1065,7 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
     let d = dir.to_string_lossy().into_owned();
     let mask = |b: &[u8]| escape(b).replace(&escape(d.as_bytes()), "<DIR>");
     let files = written(dir, &inputs);
-    let text = format!(
-        "EXIT {status} | {} | {} | {files}",
-        mask(&out),
-        mask(&err)
-    );
+    let text = format!("EXIT {status} | {} | {} | {files}", mask(&out), mask(&err));
     let ids = g.notices.as_slice().iter().map(|n| n.defect.id).collect();
     (text, ids)
 }

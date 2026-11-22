@@ -11,7 +11,7 @@ use super::{Dst, VolOut, Vols};
 use crate::maths::Returned;
 use crate::maths::matrix::{MATRIX_REAL, Matrix, real_point_f};
 use crate::mri::{Mri, types};
-use crate::process::{Process, Stop};
+use crate::process::{Process, Stop, codes};
 use crate::sse;
 
 /// A volume's extent.
@@ -44,9 +44,18 @@ impl Process {
 
     /// `mri_framepower(vol, powers)` (§39): frame `f`'s voxels (as `float`s directly) left for a
     /// power within 0.00001 of 1, `sqrtf` for one within 0.00001 of 0.5, else `powf` (glibc's
-    /// with `reproduce`; GLIBC-07). One power per frame: frames past the array are left.
+    /// with `reproduce`; GLIBC-07). One power per frame: fewer powers than frames end the program
+    /// before any frame changes (rule B, status 252; FreeSurfer reads past the array).
     pub fn mri_framepower(&mut self, m: &mut Mri, powers: &[f32]) -> Result<i32, Stop> {
         let (w, h, d) = extent(m);
+        if (powers.len() as i64) < i64::from(m.nframes) {
+            // rule B (§39): FreeSurfer reads past the array; larmorx ends before any frame changes
+            self.error_exit(
+                codes::BAD_PARM,
+                b"mri_framepower(): fewer powers than frames (FreeSurfer reads past them)\n",
+            )?;
+            return Ok(0);
+        }
         for f in 0..m.nframes {
             let Some(&p) = powers.get(f as usize) else {
                 break;
@@ -226,8 +235,9 @@ impl Process {
         for c in 0..w {
             for r in 0..h {
                 for s in 0..d {
+                    // the mask's frame 0 read once per voxel, before its frames (§39)
+                    let zero = has_mask && not_above(self.v0(v.b(), (c, r, s))?, 0.5);
                     for f in 0..nf {
-                        let zero = has_mask && not_above(self.v0(v.b(), (c, r, s))?, 0.5);
                         let x = if zero {
                             0.0
                         } else {

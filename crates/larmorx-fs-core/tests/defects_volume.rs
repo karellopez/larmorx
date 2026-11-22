@@ -1046,12 +1046,96 @@ fn fs479_a_transform_file_of_no_transform() {
             Err(2)
         }
     }
+    #[derive(Clone, Default)]
+    struct ErrBuf(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+    impl std::io::Write for ErrBuf {
+        fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().expect("buffer").extend_from_slice(b);
+            Ok(b.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
     for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
-        let mut p = Process::silent(Environment::new(), mode);
+        let e = ErrBuf::default();
+        let mut p = Process::new(
+            Environment::new(),
+            mode,
+            Box::new(std::io::sink()),
+            Box::new(e.clone()),
+        );
         let mut input = One(b"type = 1\nnxforms = 0\n".to_vec());
         let r = p.mri_estimate_tiv(b"talairach.lta", 1755.0, None, &mut input);
         assert!(r.is_err(), "the end of the program");
         assert!(noted(&mut p, "FS-479"));
+        p.flush();
+        let err = String::from_utf8_lossy(&e.0.lock().expect("buffer")).into_owned();
+        assert!(
+            err.contains(
+                "MRIestimateTIV(): talairach.lta holds no linear transform (FreeSurfer crashes here)\n"
+            ),
+            "{err}"
+        );
+    }
+}
+
+/// §37's FS-471 limits (`vrules13`): -1 to -3 count a volume of the label only (no border voxel)
+/// as usual; from -4 the first counted voxel ends the program (status 252); and FS-470's error
+/// names the border voxel. Both modes.
+#[test]
+fn fs470_fs471_the_errors_and_the_limits_off_the_border() {
+    // three voxels of label -200 (no border voxel), values 10, 50, 60
+    let labels = wp("3 1 1 3 1 0", "i3276275712", "0");
+    let vals = wp("3 1 1 3 1 0", PV_VALUES, "0");
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        for m in [-1, -2, -3] {
+            let (r, _) = run(
+                &format!("pvlab {labels} {vals} -200 {m} null null null"),
+                mode,
+            );
+            assert!(r.starts_with("40400000 "), "{m}: {r}");
+        }
+        for m in [-4, -17] {
+            let (r, ids) = run(
+                &format!("pvlab {labels} {vals} -200 {m} null null null"),
+                mode,
+            );
+            assert!(r.starts_with("EXIT 252 |"), "{m}: {r}");
+            assert!(
+                r.contains(&format!(
+                    "MRIvoxelsInLabelWithPartialVolumeEffects(): a negative maximum label number {m} (FreeSurfer crashes here)\n"
+                )),
+                "{r}"
+            );
+            assert!(ids.iter().any(|i| i == "FS-471"), "{ids:?}");
+        }
+        let line = format!(
+            "pvlab {} null 2 4 null null null",
+            wp("3 1 1 3 1 0", PV_LABELS, "0")
+        );
+        let (r, _) = run(&line, mode);
+        assert!(
+            r.contains(
+                "MRIvoxelsInLabelWithPartialVolumeEffects(): no intensity volume for the border voxel ("
+            ) && r.contains(") (FreeSurfer crashes here)\n"),
+            "{r}"
+        );
+    }
+}
+
+/// §39: fewer powers than frames (`mri_framepower`) end the program before any frame changes
+/// (rule B, status 252), both modes.
+#[test]
+fn framepower_with_fewer_powers_than_frames() {
+    let line = format!("fpow {} 1 40000000", wp("1 1 1 3 2 0", "i1073741824", "0"));
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let (r, _) = run(&line, mode);
+        assert!(r.starts_with("EXIT 252 |"), "{r}");
+        assert!(
+            r.contains("mri_framepower(): fewer powers than frames (FreeSurfer reads past them)\n"),
+            "{r}"
+        );
     }
 }
 

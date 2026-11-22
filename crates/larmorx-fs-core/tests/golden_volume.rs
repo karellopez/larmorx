@@ -243,11 +243,11 @@ const GOLDEN: &[(&str, &str)] = &[
     ),
     (
         "vox8.fix",
-        "cfe29cdf5318a1f841e71ae1c52d96eb908ae9c608a84f8ebc518943ee416b41",
+        "f18978fa925c7ae6c5c2503c82917b799a1093fbf250cf4a569647583c22031c",
     ),
     (
         "vox8.reproduce",
-        "5f0a412ca930f6fbc900e3b2dd5eb85e8c957754a235538a3caf294053d4d85c",
+        "406730a49b4dd05afb5d75a4e328f01262d62027e774fb3b197d565f764b3b62",
     ),
     (
         "ltatypes.reproduce",

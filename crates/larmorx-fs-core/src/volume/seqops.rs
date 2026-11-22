@@ -1063,8 +1063,9 @@ impl Process {
                 &FS_479,
                 "MRIestimateTIV: a transform file of no linear transform refused (FreeSurfer crashes)",
             );
-            let mut msg = b"MRIestimateTIV: no linear transform in ".to_vec();
+            let mut msg = b"MRIestimateTIV(): ".to_vec();
             msg.extend_from_slice(name);
+            msg.extend_from_slice(b" holds no linear transform (FreeSurfer crashes here)\n");
             self.error_exit(codes::BAD_PARM, &msg)?;
             return Ok(0.0);
         };

@@ -1,0 +1,263 @@
+{
+ "name": "freesurfer-mri-robust-register",
+ "tool": "mri_robust_register (FreeSurfer 8.2.0)",
+ "status": "experimental",
+ "larmorx_commit": "e0e05f174473",
+ "generated": "2026-11-22",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_robust_register/) on larmorx-freesurfer-robust (fs.robust), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mri_robust_register) on the recorded heads (oracles/freesurfer-8.2.0/runs/) and on synthetic cases",
+ "recorded_steps": "none: recon-all runs the program only as `mri_robust_register -all-info` (its version line in recon-all.log); fMRIPrep's call is compared on the recorded heads instead",
+ "real_heads": [
+  {
+   "head": "ds000005-sub-01",
+   "outputs": false,
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 65.9,
+    "reproduce": 94.2,
+    "fix": 95.9
+   },
+   "peak_mib": {
+    "official": 1799.176,
+    "reproduce": 1606.1,
+    "fix": 1606.8
+   }
+  },
+  {
+   "head": "ds000228-sub-pixar008",
+   "outputs": false,
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 20.7,
+    "reproduce": 45.6,
+    "fix": 45.7
+   },
+   "peak_mib": {
+    "official": 1100.465,
+    "reproduce": 1105.7,
+    "fix": 1105.4
+   }
+  },
+  {
+   "head": "ds002422-sub-02",
+   "outputs": false,
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 24.2,
+    "reproduce": 44.9,
+    "fix": 45.0
+   },
+   "peak_mib": {
+    "official": 1237.512,
+    "reproduce": 1142.5,
+    "fix": 1142.9
+   }
+  },
+  {
+   "head": "ds004173-sub-603309",
+   "outputs": false,
+   "reproduce": {
+    "status": true,
+    "stdout": false,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": false,
+    "files": true
+   },
+   "seconds": {
+    "official": 21.5,
+    "reproduce": 42.6,
+    "fix": 42.5
+   },
+   "peak_mib": {
+    "official": 1193.934,
+    "reproduce": 1098.4,
+    "fix": 1097.6
+   }
+  },
+  {
+   "head": "ds005003-sub-RS001",
+   "outputs": false,
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 20.2,
+    "reproduce": 41.0,
+    "fix": 40.5
+   },
+   "peak_mib": {
+    "official": 1348.379,
+    "reproduce": 1208.3,
+    "fix": 1208.1
+   }
+  },
+  {
+   "head": "ds005454-sub-16",
+   "outputs": false,
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 26.4,
+    "reproduce": 47.8,
+    "fix": 47.1
+   },
+   "peak_mib": {
+    "official": 1538.18,
+    "reproduce": 1366.6,
+    "fix": 1366.5
+   }
+  },
+  {
+   "head": "ds000005-sub-01",
+   "outputs": true,
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 79.2,
+    "reproduce": 112.3,
+    "fix": 110.7
+   },
+   "peak_mib": {
+    "official": 1799.809,
+    "reproduce": 1601.6,
+    "fix": 1601.6
+   }
+  },
+  {
+   "head": "ds004173-sub-603309",
+   "outputs": true,
+   "reproduce": {
+    "status": true,
+    "stdout": false,
+    "stderr": false,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": false,
+    "files": true
+   },
+   "seconds": {
+    "official": 38.7,
+    "reproduce": 64.1,
+    "fix": 64.0
+   },
+   "peak_mib": {
+    "official": 1194.766,
+    "reproduce": 1090.3,
+    "fix": 1090.8
+   }
+  }
+ ],
+ "probe": [
+  {
+   "set": "seed 1",
+   "cases": 300,
+   "identical": 280,
+   "different": 0,
+   "skipped": 8,
+   "not_ported": 12,
+   "fix_different_with_notice": 43,
+   "fix_different_without_notice": 0
+  },
+  {
+   "set": "seed 7",
+   "cases": 300,
+   "identical": 279,
+   "different": 0,
+   "skipped": 9,
+   "not_ported": 12,
+   "fix_different_with_notice": 40,
+   "fix_different_without_notice": 0
+  },
+  {
+   "set": "seed 13",
+   "cases": 300,
+   "identical": 280,
+   "different": 0,
+   "skipped": 8,
+   "not_ported": 12,
+   "fix_different_with_notice": 39,
+   "fix_different_without_notice": 0
+  }
+ ],
+ "golden_sha256": {
+  "official_and_reproduce": "069de7ceeaff8f3826ba76ef4333a0bfd0c233ed57a2b45a138683492badd6c7",
+  "fix": "069de7ceeaff8f3826ba76ef4333a0bfd0c233ed57a2b45a138683492badd6c7"
+ },
+ "memory": [
+  {
+   "case": "fmriprep",
+   "mode": "reproduce",
+   "larmorx_mib": 1105.6,
+   "freesurfer_mib": 1100.4
+  },
+  {
+   "case": "fmriprep",
+   "mode": "fix",
+   "larmorx_mib": 1106.2,
+   "freesurfer_mib": 1100.4
+  }
+ ]
+}

@@ -64,9 +64,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--runs", type=Path, help="the recorded runs' folder")
     ap.add_argument("--json", type=Path)
     a = ap.parse_args(argv)
-    runs = a.runs or Path(__file__).resolve().parents[4] / "oracles" / "freesurfer-8.2.0" / "runs"
-    if not runs.is_dir():
-        runs = Path(__file__).resolve().parents[6] / "oracles" / "freesurfer-8.2.0" / "runs"
+    if a.runs is None:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+        from larmorx_validation.oracle_cache.store import workspace
+
+        ws = workspace()
+        if ws is None:
+            raise SystemExit("no workspace with oracles/")
+        runs = ws / "oracles" / "freesurfer-8.2.0" / "runs"
+    else:
+        runs = a.runs
     out: dict[str, list] = {"mri_mask": [], "mri_binarize": []}
     for head in HEADS:
         sub = head.split("-", 1)[1]

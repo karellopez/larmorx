@@ -41,6 +41,9 @@ ported file is audited for third-party code first).
 | `utils/gtm.cpp` 306-391, 2516-2551 (3.2-20: only `mri_segstats` reaches them so far; they move to the GTM module with `mri_gtmpvc`) | `GTMdefaultSegReplacmentList`, `GTMloadReplacmentList` (FS-1108) | `src/mri_segstats/gtm.rs` |
 | `mri_info/mri_info.cpp` 56-118, 177-600 (queue item 3.2-08, track A relay 49) | the file statics (`Options`, `Flags`), `parse_commandline` (FS-1146, FS-1149, FS-1150), `print_usage` and `print_help` (their `printf` literals, copied), `print_version`, `check_options`, `usage_exit` | `src/mri_info/options.rs` |
 | `mri_info/mri_info.cpp` 121-174, 603-630, 633-1469 (3.2-08) | `main`, `PrettyMatrixPrint`, `do_file` (FS-1147, FS-1148, FS-1152, FS-1153), `__printTagsToFile` (FS-1150, FS-1151), `__reportWarp`; the program `mri_info` of `larmorx-freesurfer` | `src/mri_info/main.rs` |
+| `mris_calc/mris_calc.cpp` 62-638, 1627-1824 (queue item 3.2-21, track D relay 50) | `e_operation`, `fn_mul` to `fn_dev`, `Gfn_sum`, `Gfn_prod`, the counts' and minima's statics, `operation_lookup`, `b_outCurvFile_write`; the operand order and NaNs of the official build's object code (its disassembly: `fn_pctdiff`'s `* 0.5`, `fn_bcor`'s `sign * -log10(p)`, the sums' `a + sum`) | `src/mris_calc/ops.rs` |
+| `mris_calc/mris_calc.cpp` 56-60, 72-111, 221-278, 695-1626, 1826-2554, 2556-2628 (3.2-21) | `main`, `options_parse`, `options_print`, `version_print`, `synopsis_show`, `simpleSynopsis_show`, `verbosity_set`, `error_exit` and its callers, `xmalloc`, `output_init`, `fileType_find`, `fileIO_errorHander`, `fileRead`, `fileWrite`, `debuggingInfo_display`, `CURV_set`, `CURV_copy`, the label's `array_compressUsingLabelMask`, `primaryCurvs_backup`, `primaryCurvs_compress`, `label_initialize`, `array_expandUsingLabelMask`, `VOL_fileRead`, `VOL_fileWrite`, `CURV_fileRead`, `ascii_fileWrite`, `CURV_fileWrite`, `CURV_arrayProgress_print`, `CURV_process`, `PrintStatToFile`, `CURV_functionRunABC`, `CURV_functionRunAC` (FS-1119 to FS-1126); the program `mris_calc` of `larmorx-freesurfer` | `src/mris_calc/main.rs` |
+| `mris_calc/mris_calc.help.xml` | the help text `synopsis_show` renders (FreeSurfer's file, copied unchanged) | `src/mris_calc/mris_calc.help.xml` |
 
 Third-party code: none in `mri_normalize.cpp` (FreeSurfer's own file, MGH's notice). Its library
 calls are the other crates' (`larmorx-freesurfer-filter`'s normalisation, `-volume`, `-surf`,
@@ -106,3 +109,12 @@ tkregister matrices and histogram; `-core`'s matrices and version) and `larmorx-
   `CTABwriteIntoBinary: fp was NULL`); its debug lines with `--diag-debug` (positions of a file that
   is not there, -1) are not printed. `MRIread` of a type given with `-it` (FS-1147's correction) is
   `MRIread` of `<name>@<type>`, its own way of naming a type.
+- `mris_calc` (relay 50): the file statics are one struct (`Calc`), the arrays owned vectors (the
+  C's frees are drops; `norm`'s two arrays FreeSurfer leaks are not kept); standard output is held
+  until the C program flushes it, so that a crash or an abort in `reproduce` loses what
+  FreeSurfer's buffer would (at most whole 4,096-byte blocks written); the elementwise loops run
+  on one thread (FreeSurfer's only at ROMP's experimental level); the C library's `powf`,
+  `atan2f`, `log10f`, `logf`, `pow`, `log10` through larmorx-core's `Libm` choice with glibc's NaNs
+  in both modes, `fmodf` as glibc's measured results (`ops::fmodf_glibc`); `stat` and `strtof`'s
+  `errno` modelled (the fatal errors print it); `atof`'s `ERANGE` from fs.core's scanner;
+  `docs/findings/freesurfer-mris-calc.md`.

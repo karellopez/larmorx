@@ -2003,6 +2003,22 @@ defects! {
         "mri_segstats --ctab-gca writes a GCA label of 1,000 or more past the list it marks labels in (undefined behaviour), and crashes on a label that FreeSurferColorLUT.txt does not hold; larmorx keeps every label and ends with an error for one the table lacks";
     FS_1118 = "FS-1118", "FreeSurfer", true,
         "mri_segstats --id with a colour table: an id outside the table after other ids is accepted or refused by the answer for the id before it (an accepted one is reported with an empty name and colour); larmorx refuses it (ERROR: cannot find seg id)";
+    FS_1119 = "FS-1119", "FreeSurfer", true,
+        "mris_calc ends with a buffer-overflow abort (signal 6) where a name or a message built from one passes 65,535 bytes (the output or label name, an input name that is no file, the type and write messages); larmorx uses the name whole";
+    FS_1120 = "FS-1120", "FreeSurfer", true,
+        "mris_calc ends with status 0 when its output (volume, curvature, ascii or statistic file) cannot be written, after a [ error ] mark, an ERROR or Write error line, or nothing at all; larmorx ends with could not establish write access (status 252)";
+    FS_1121 = "FS-1121", "FreeSurfer", true,
+        "mris_calc combines two volumes of other dimensions holding as many values value by value in its packing order and writes the second volume's dimensions; larmorx refuses them with the size mismatch (status 10)";
+    FS_1122 = "FS-1122", "FreeSurfer", true,
+        "mris_calc with an operation of two values (add, mul, set, masked, ...) and no second input crashes (signal 11); larmorx ends with a message (status 10)";
+    FS_1123 = "FS-1123", "FreeSurfer", true,
+        "mris_calc with an option that takes a value (-o, -l, --verbosity, threads) given last crashes (signal 11); larmorx ends with a message (status 1)";
+    FS_1124 = "FS-1124", "FreeSurfer", true,
+        "mris_calc threads (nthreads) with a value that is no number prints a thread count from memory never written (measured 0); larmorx prints 0";
+    FS_1125 = "FS-1125", "FreeSurfer", true,
+        "mris_calc --label with a point whose vertex number is outside input 1's values writes outside its mask (memory corruption; such points never count); larmorx refuses the label (status 10)";
+    FS_1126 = "FS-1126", "FreeSurfer", true,
+        "mris_calc prints the index of the minimum and the negative, zero and positive counts through a float, and keeps a label's indices as floats: beyond 16,777,216 values they are rounded (a label's values then land at a rounded index); larmorx keeps them exact";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

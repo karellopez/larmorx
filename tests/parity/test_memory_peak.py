@@ -15,7 +15,8 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 2026-11-11); FreeSurfer's ``mri_normalize`` against the ``larmorx-freesurfer`` replica
 (``MRI_NORMALIZE_CASES``, 2026-11-19), ``mri_binarize`` (``MRI_BINARIZE_CASES``, 2026-11-21),
 ``mri_convert`` (``MRI_CONVERT_CASES``, 2026-11-21), ``mri_segstats`` (``MRI_SEGSTATS_CASES``,
-2026-11-22) and ``mri_info`` (``MRI_INFO_CASES``, 2026-11-22).
+2026-11-22), ``mri_info`` (``MRI_INFO_CASES``, 2026-11-22) and ``mris_calc`` (``MRIS_CALC_CASES``,
+2026-11-22).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -2392,3 +2393,80 @@ def test_mri_info_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, a
         )
         if "out.txt" in words:
             assert (r_dir / "out.txt").read_bytes() == (o_dir / "out.txt").read_bytes(), name
+
+
+#: FreeSurfer's ``mris_calc`` against the ``larmorx-freesurfer`` replica (queue item 3.2-21,
+#: 2026-11-22), on a recorded head (ds000005 sub-01's classic run), one thread, both D13 modes:
+#: ``mri_nu_correct.mni``'s rescale of a 256^3 volume, the sum of two volumes (both packed, the
+#: program's largest), recon-all's vertex areas (two curvature files); every file written
+#: identical to FreeSurfer's (provenance aside).
+# fmt: off
+MRIS_CALC_CASES = [
+    ("nu-rescale", ["-o", "nu0.mgz", "{mri}/orig.mgz", "mul", "1.50205015575164325309"]),
+    ("volume-pair", ["-o", "sum.mgz", "{mri}/norm.mgz", "add", "{mri}/brain.mgz"]),
+    ("vertex-areas", ["-o", "lh.area.mid", "{surf}/lh.area", "add", "{surf}/lh.area.pial"]),
+]
+# fmt: on
+
+
+@pytest.mark.parametrize(("name", "args"), MRIS_CALC_CASES)
+def test_mris_calc_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, args):
+    from larmorx_validation.freesurfer import files as fsfiles
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / "mris_calc" if ws else None
+    subj = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / "ds000005-sub-01-classic" / "subjects"
+        / "sub-01"
+        if ws
+        else None
+    )  # fmt: skip
+    if exe is None or not exe.is_file() or not (subj / "surf" / "lh.area.pial").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    words = [a.format(mri=subj / "mri", surf=subj / "surf") for a in args]
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        "FS_DISABLE_LANG": "1",
+        **freesurfer_env(),
+    }
+    o_dir = tmp_path / "freesurfer"
+    o_dir.mkdir()
+    # its last line, the process's peak memory, changes from run to run
+    code, fs_mib = _original_peak(
+        ["mris_calc", *words],
+        env,
+        "freesurfer",
+        _emptier(o_dir),
+        o_dir,
+        (r"VmPeak +-?\d+",),
+        "freesurfer",
+    )
+    assert code == 0
+    outs = sorted(p.name for p in o_dir.iterdir() if p.is_file())
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mris_calc", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(f"mris_calc {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"mris_calc {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        assert sorted(p.name for p in r_dir.iterdir() if p.is_file()) == outs, name
+        for out in outs:
+            c = fsfiles.compare(
+                o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out
+            )
+            assert c.same, f"mris_calc {name} ({mode}): {out}: {c.verdict} {c.detail}"

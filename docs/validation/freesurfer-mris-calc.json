@@ -1,0 +1,107 @@
+{
+ "name": "freesurfer-mris-calc",
+ "tool": "mris_calc (FreeSurfer 8.2.0)",
+ "status": "experimental",
+ "larmorx_commit": "f9a22e16eff5",
+ "generated": "2026-11-22",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mris_calc/), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mris_calc) and its recon-all runs' files (oracles/freesurfer-8.2.0/runs/)",
+ "real": {
+  "runs": [
+   "ds000005-sub-01-classic",
+   "ds000005-sub-01-v8",
+   "ds000228-sub-pixar008-classic",
+   "ds000228-sub-pixar008-v8",
+   "ds004173-sub-603309-classic",
+   "ds004173-sub-603309-v8"
+  ],
+  "calls": 30,
+  "kinds": {
+   "nu rescale": 6,
+   "vertexvol lh": 6,
+   "vertexvol rh": 6,
+   "label-cortex and lh": 6,
+   "label-cortex and rh": 6
+  },
+  "verdicts": {
+   "identical": 30,
+   "fix-identical": 30
+  },
+  "recorded": {
+   "reproduce-identical": 12,
+   "fix-identical": 12
+  },
+  "seconds": {
+   "reproduce": 12.8,
+   "fix": 12.8,
+   "official": 0.0
+  }
+ },
+ "program": [
+  {
+   "seed": 1,
+   "cases": 228,
+   "verdicts": {
+    "identical": 223,
+    "fix-explained": 46,
+    "fix-identical": 177,
+    "reproduce-skip": 5,
+    "fix-skip": 5
+   }
+  },
+  {
+   "seed": 2,
+   "cases": 228,
+   "verdicts": {
+    "identical": 223,
+    "fix-explained": 43,
+    "fix-identical": 180,
+    "reproduce-skip": 5,
+    "fix-skip": 5
+   }
+  }
+ ],
+ "golden_sha256": {
+  "reproduce": "b458bcb2273de933e2d984c81896ec11a90b8f92d92d2d17145b0bc010f3c608",
+  "fix": "4c2c95918dc4f37bcf540273acd190fac4c1c56c71f6836ee8dea47ae4e6bd7f"
+ },
+ "memory": [
+  {
+   "case": "nu-rescale",
+   "mode": "reproduce",
+   "larmorx_mib": 197.2,
+   "freesurfer_mib": 198.1
+  },
+  {
+   "case": "nu-rescale",
+   "mode": "fix",
+   "larmorx_mib": 196.8,
+   "freesurfer_mib": 198.1
+  },
+  {
+   "case": "volume-pair",
+   "mode": "reproduce",
+   "larmorx_mib": 213.0,
+   "freesurfer_mib": 214.0
+  },
+  {
+   "case": "volume-pair",
+   "mode": "fix",
+   "larmorx_mib": 213.0,
+   "freesurfer_mib": 214.0
+  },
+  {
+   "case": "vertex-areas",
+   "mode": "reproduce",
+   "larmorx_mib": 6.2,
+   "freesurfer_mib": 6.8
+  },
+  {
+   "case": "vertex-areas",
+   "mode": "fix",
+   "larmorx_mib": 6.2,
+   "freesurfer_mib": 6.8
+  }
+ ]
+}

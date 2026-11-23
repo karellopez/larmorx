@@ -353,12 +353,31 @@ const ALWAYS: [&str; 3] = ["fsh/", "subjects/", "fsl/"];
 /// The environment every case starts from.
 const BASE_ENV: [&str; 2] = ["FREESURFER_HOME=@DIR@/fsh", "SUBJECTS_DIR=@DIR@/subjects"];
 
-/// A case line: the inputs' files and folders the arguments name, and the case's own folders.
+/// The options that read the case's own FreeSurfer, subjects or FSL folders (the other cases get
+/// none of their files: fewer files to write, a quicker recorded test on Windows).
+const FOLDER_OPTIONS: [&str; 7] = [
+    "--fstarg",
+    "--tal",
+    "--talxfm",
+    "--mni152reg",
+    "--morph",
+    "--inv-morph",
+    "--noDefM3zPath",
+];
+
+/// A case line: the inputs' files and folders the arguments name, and the case's own folders when
+/// an option reads them.
 pub fn line(env: &[&str], i: &Inputs, args: &[String]) -> String {
+    let folders = args
+        .iter()
+        .any(|a| FOLDER_OPTIONS.iter().any(|o| a.eq_ignore_ascii_case(o)));
     let files: Vec<&(String, Vec<u8>)> = i
         .files
         .iter()
-        .filter(|(f, _)| args.iter().any(|a| names(a, f)) || ALWAYS.iter().any(|p| f.starts_with(p)))
+        .filter(|(f, _)| {
+            args.iter().any(|a| names(a, f))
+                || (folders && ALWAYS.iter().any(|p| f.starts_with(p)))
+        })
         .collect();
     let dirs: Vec<&String> = i
         .dirs

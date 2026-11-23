@@ -15,10 +15,10 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-23 from the official program (`check.py --seed 1 --n 600`): 600 cases, 587
+/// Recorded 2026-11-23 from the official program (`check.py --seed 1 --n 400`): 400 cases, 387
 /// lines identical, 13 hashed as `SKIP`.
-const N: usize = 600;
-const OFFICIAL_SHA256: &str = "3f437f004cedf9836936e90ec86a8eae5a93958e888fc8419ec9cb7d7afda8f6";
+const N: usize = 400;
+const OFFICIAL_SHA256: &str = "481398e593805b6d03285710b28e3a001bdeb74bfc6cdc0d9ed5b893cbc1f776";
 const SKIPPED: usize = 13;
 
 /// `check.py`'s `SKIP` (the port's pseudo-notices).

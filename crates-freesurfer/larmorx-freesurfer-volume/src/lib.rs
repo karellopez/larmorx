@@ -36,6 +36,7 @@ pub mod morph;
 pub mod mri2ops;
 pub mod mrihisto;
 pub mod mriset;
+pub mod mritransform;
 pub mod mrivoxel;
 pub mod order;
 pub mod orient;

@@ -141,18 +141,17 @@ FreeSurfer's help text for `mri_mask` (its XML rendered as the other programs' h
     computed in this order when given, a later one replacing the region):
     - `-BB`: `Computing bounding box, npad = <six pads, ", "-separated>`; the box of the mask's
       nonzero voxels padded (`REGIONgetBoundingBoxM`, `specs/freesurfer-volume.md` §43). FS-269:
-      FreeSurfer's box is one voxel smaller on each axis than the voxels from the first nonzero
-      one minus the pad before it to the last plus the pad after it. On an axis whose pad after
-      the mask is 0 or less it ends before the mask's last voxels; by default the box is one voxel
-      larger on that axis (its start unchanged: with a pad after of 0 it then holds every nonzero
-      voxel), and FS-269 is noted; `reproduce` gives FreeSurfer's box. On an axis whose pad after
-      is 1 or more (recon-all's v8 `-bb 3`) both modes give FreeSurfer's box (it holds every
-      nonzero voxel; only the last padding voxel on the far side is missing). A mask with no
-      nonzero voxel gets FreeSurfer's box in both modes.
+      the box is one voxel smaller on each axis than the voxels from the first nonzero one minus
+      the pad before it to the last plus the pad after it, so on an axis whose pad after the mask
+      is 0 or less it ends before the mask's last voxels. Both modes give that box (FreeSurfer's)
+      for every pad, and FS-269 is noted where it leaves out nonzero voxels (`..., FreeSurfer's
+      kept in both modes`): recon-all's v8 stream relies on it (`-bb 3`, and `mri_vsinus_seg`'s
+      `-crop 0`, §6). A mask with no nonzero voxel gets the same box in both modes.
     - `-BBEQ n`: `Computing bounding box with ncols=nrows, npad = <n>`; `REGIONgetBoundingBoxEqOdd`
-      (§43: its `Volume size: ...` lines), which starts from the box of `-BB n` as just described
-      (FS-269 likewise: with `n` of 0 or less the default starts from the larger box); no box:
-      FS-1133.
+      (§43: its `Volume size: ...` lines), which starts from `REGIONgetBoundingBox(mask, n)`, the
+      same box as `-BB n` but for FS-269: with `n` of 0 or less the default starts from the box one
+      voxel larger on each axis whose pad after is 0 or less (it then holds every nonzero voxel),
+      noted; `reproduce` from FreeSurfer's; no box: FS-1133.
     - `-crop-to-fov c r s`: `MRIcropToFoV(mask, c, r, s, threshold)` (§57; the threshold as it
       stands, -1e10 when none was given).
     - `-crop-to-fov-mm c r s`: the same with `ceil(c / xsize)`, `ceil(r / ysize)`, `ceil(s /
@@ -207,7 +206,8 @@ for FS-1135's other cases.
 
 The library's defects the program reaches: FS-01 (the NUL byte of error messages), FS-17 (`(int)`
 of a NaN or of a value beyond `int`: a NaN mask voxel or a NaN `-transfer`), FS-269 (the bounding
-box of a pad after the mask of 0 or less, §2.10: corrected by default), FS-307, FS-309, FS-310 (a
+box of a pad after the mask of 0 or less, §2.10: FreeSurfer's in both modes for the crops,
+corrected by default for `-BBEQ`'s start), FS-307, FS-309, FS-310 (a
 transform file FreeSurfer crashes on or never returns from: an error in both modes), and those of
 the readers and writers.
 
@@ -225,11 +225,15 @@ The port reads and writes as FreeSurfer does; its peak memory is FreeSurfer's or
 <vsinus> <ctxsegmask> <vsinus>`, `mri_mask -T .001 -crop 0 <prior> <prior> <prior.mincrop>`, `mri_mask
 -T .001 -crop-to-fov-mm 80 80 80 <nu> <prior.lh|rh>.nii.gz <crop>.nii.gz` and `mri_mask -oval 1
 -invert brain.finalsurfs.mgz <mca-dura|vsinus> brain.finalsurfs.mgz` (in place). Of these only
-`mri_vsinus_seg`'s `-T .001 -crop 0` meets FS-269: by default its crop of the prior holds the
-prior's last voxels (one more column, row and slice than FreeSurfer's where the prior reaches its
-last voxel there); `mri_vsinus_seg` uses that crop only for its centre (`mri_binarize
---crop-around-ras ... cras <crop>`), which moves by half a voxel on each axis that gains one. The
-prior is a temporary file the recorded runs do not keep (not measured).
+`mri_vsinus_seg`'s `-T .001 -crop 0` meets FS-269: its crop of the prior leaves out the prior's last
+column, row and slice, and the script uses the crop only for its centre (`mri_binarize
+--crop-around-ras ... cras <crop>`), the input of the network that segments the venous sinuses.
+Measured on the six recorded heads (the prior made again from the recorded files): the full box moves
+that centre by half a voxel on each axis and the network's input by a voxel on 1 to 3 axes, and
+`vsinus.mgz` then differs from FreeSurfer's in 553 to 1,105 voxels (each label's Dice 0.84 to 0.98)
+**(observed)**; the network was trained on FreeSurfer's crops. So both modes keep FreeSurfer's box for
+`-bb`, `-crop`, `-crop-crs` and `-BBM` (rule C), noted where it leaves out mask voxels; recon-all's
+`-bb 3` and `-crop 0` calls give FreeSurfer's outputs in both modes.
 
 ## 7. Notes on the order of the output
 
@@ -254,8 +258,8 @@ lines come first.
   status, both streams and every file written; `reproduce` must match everywhere but the cases
   counted for FS-307, FS-309 and FS-310.
 - **Golden cases** (`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_mask_golden.rs`'s
-  inputs): fourteen cases on 32^3 volumes and a 16 x 16 x 32 pair (`-bb 0` among them, FS-269 in
-  the default); the official value is in the
+  inputs): fourteen cases on 32^3 volumes and a 16 x 16 x 32 pair (`-bb 0` among them: FreeSurfer's
+  box in both modes, FS-269 noted); the official value is in the
   replica's test.
 - **Real calls.** recon-all's steps on the recorded heads (`<workspace>/oracles/freesurfer-8.2.0/
   runs/*-{classic,v8}`: each recorded call with its recorded inputs, every output compared), and

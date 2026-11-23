@@ -2,7 +2,7 @@
  "name": "freesurfer-mri-mask",
  "tool": "mri_mask (FreeSurfer 8.2.0)",
  "status": "experimental",
- "larmorx_commit": "6370322a2642",
+ "larmorx_commit": "98558163365c",
  "generated": "2026-11-23",
  "platform": "Linux x86_64",
  "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_mask/), the larmorx-freesurfer program",
@@ -32,7 +32,7 @@
    ],
    "seconds": {
     "recorded": 21.5,
-    "replayed": 26.7
+    "replayed": 69.1
    },
    "files": {
     "provenance": 24
@@ -62,7 +62,7 @@
    ],
    "seconds": {
     "recorded": 21.5,
-    "replayed": 31.1
+    "replayed": 27.6
    },
    "files": {
     "provenance": 24
@@ -96,8 +96,8 @@
    "cases": 195,
    "verdicts": {
     "identical": 194,
-    "fix-identical": 113,
-    "fix-explained": 81,
+    "fix-identical": 120,
+    "fix-explained": 74,
     "reproduce-skip": 1,
     "fix-skip": 1
    }
@@ -107,8 +107,8 @@
    "cases": 195,
    "verdicts": {
     "identical": 194,
-    "fix-identical": 113,
-    "fix-explained": 81,
+    "fix-identical": 120,
+    "fix-explained": 74,
     "reproduce-skip": 1,
     "fix-skip": 1
    }
@@ -116,25 +116,25 @@
  ],
  "golden_sha256": {
   "reproduce": "e3ec07a6ffc9e79e099e459680a210d9f7e96905b4250beb97f4b0d9116c3444",
-  "fix": "20be6598c53f16ef1c90f6d63f502590d7c7cad20fa3d2d7814e249d0624542b"
+  "fix": "49d53f9d0f00efc92f8ca8a725804fd8f3157e5ecfba416cc894dc9a5a90cefa"
  },
  "memory": [
   {
    "case": "T5",
    "mode": "reproduce",
-   "larmorx_mib": 70.2,
+   "larmorx_mib": 70.0,
    "freesurfer_mib": 71.8
   },
   {
    "case": "T5",
    "mode": "fix",
-   "larmorx_mib": 69.5,
+   "larmorx_mib": 69.8,
    "freesurfer_mib": 71.8
   },
   {
    "case": "invert",
    "mode": "reproduce",
-   "larmorx_mib": 165.8,
+   "larmorx_mib": 166.0,
    "freesurfer_mib": 167.7
   },
   {

@@ -8,6 +8,9 @@
 //! - [`main`]: the program (`main`, `get_option`, `print_usage`), its entry point [`main::run`].
 //! - [`aseg`]: the path recon-all's `seg2cc` runs (`-aseg`): `find_cc_with_aseg`,
 //!   `cc_cutting_plane_correct`, `remove_fornix_new` and `find_voxels_close_to_both_hemis`.
+//! - [`wm`]: the white-matter path (`-a 0`): `find_corpus_callosum`, `find_cc_slice`,
+//!   `remove_fornix` and `edge_detection`.
 
 pub mod aseg;
 pub mod main;
+pub mod wm;

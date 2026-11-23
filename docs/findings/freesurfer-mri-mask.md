@@ -95,30 +95,36 @@ again in a larger box (the rule); `real.py` runs the forward direction only (6 c
 runs, identical in both modes; the first, uncached run: official 20.8 s, the port 26.7 s for the
 six: a speed item for later).
 
-## 6. The bounding box after FS-269's decision (relay 53)
+## 6. The bounding box after FS-269's decision (relays 53 and 54)
 
-`-BB`, `-crop`, `-boundingbox`, `-BBM`, `-BBMM` and their long names crop to
+`-BB`, `-crop`, `-boundingbox`, `-crop-crs`, `-BBM`, `-BBMM` and their long names crop to
 `REGIONgetBoundingBoxM(mask, npad)` and `-BBEQ` to `REGIONgetBoundingBoxEqOdd`, which starts from
-`REGIONgetBoundingBox`. Track C's relay 45 (batch 93) decided FS-269 in fs.volume's `region.rs`: on an
-axis whose pad after the mask is 0 or less the box gains one voxel by default (its start
-unchanged), noted, `reproduce` FreeSurfer's; with a pad after of 1 or more FreeSurfer's box in
-both modes. The program is unchanged. Checked (2026-11-23, from the merged code): the open probe's
-195 cases (two added: `-bb 0`, `-BBMM 2 2 2 0 2 2`) give the official program's results in
-`reproduce` on every compared case; the default differs, with FS-269 noted, on the nine crops with
-a pad after of 0 or less (`-crop 0`, `-BB -3`, `-boundingboxm 0 0 0`, `-boundingboxmm 2 0 2 0 2 0`,
-`-BBEQ 0` twice, `-dilate 1 -BB 0`, `-bb 0`, and the `-BBMM` case on its one axis: 16 x 20 x 12
-voxels for `-bb 0` by default against FreeSurfer's 15 x 19 x 11). The golden cases gain `-bb 0`.
+`REGIONgetBoundingBox`. Both boxes are one voxel short on each axis (FS-269, fs.volume's `region.rs`,
+track C): with a pad after the mask of 0 or less they leave out the mask's last voxels on that axis.
 
-recon-all's calls: the v8 stream's `-bb 3` (SynthMorph's crop of `orig.mgz`, `real.py`) is
-unchanged. `mri_vsinus_seg`'s `mri_mask -T .001 -crop 0 <prior> <prior> <prior.mincrop>` meets the
-corrected case: by default the crop of the prior holds its last nonzero column, row and slice. The
-script reads that crop only for its centre (`mri_binarize --crop-around-ras <out> <invol> nolta cras
-<prior.mincrop> 0 <fov> <fov> <fov>`): `c_ras` moves by half a voxel on each axis that gains one,
-and the crop of the intensity volume around it may then start one voxel further, which changes the
-input of the network that segments the venous sinuses (`vsinus.mgz`, then `brain.finalsurfs.mgz`
-through `-oval 1 -invert`). Not measured: the prior is a temporary file the recorded runs do not
-keep. A point for the decision's owner (track C) and the orchestrator: whether this call should
-keep FreeSurfer's box (rule C, as `-bb 3`) once the v8 stream's vsinus step is replayed.
+- **Relay 53** (batch 93's decision, rule A for both): the default gained the voxel; the open
+  probe's 195 cases gave the official results in `reproduce` and differed in the default, with
+  FS-269 noted, on the nine crops with a pad after of 0 or less (`-crop 0`, `-BB -3`, `-boundingboxm
+  0 0 0`, `-boundingboxmm 2 0 2 0 2 0`, `-BBEQ 0` twice, `-dilate 1 -BB 0`, `-bb 0`, and the `-BBMM`
+  case on its one axis: 16 x 20 x 12 voxels for `-bb 0` by default against FreeSurfer's 15 x 19 x 11).
+- **Relay 46 of track C (batch 98, measured):** `mri_vsinus_seg`'s `mri_mask -T .001 -crop 0 <prior>
+  <prior> <prior.mincrop>` uses the crop only for its centre (`mri_binarize --crop-around-ras <out>
+  <invol> nolta cras <prior.mincrop> 0 144 144 144`), the input of the venous-sinus network. With the
+  prior made again from each recorded head's files, the full box moved that centre by half a voxel
+  per axis and the network's input by a voxel on 1 to 3 axes on 6 of 6 heads; `vsinus.mgz` then
+  differed from FreeSurfer's in 553 to 1,105 voxels (each label's Dice 0.84 to 0.98) and
+  `brain.finalsurfs.mgz` in 534 to 1,035 (`docs/findings/freesurfer-volume.md` §32,
+  `validation/investigations/freesurfer-fs269-bbox/vsinus.py`). The network was trained on crops
+  placed with FreeSurfer's box: rule C for `REGIONgetBoundingBoxM`, whose one caller is `mri_mask`:
+  FreeSurfer's box in both modes for every pad, FS-269 noted where it leaves out mask voxels
+  (`..., FreeSurfer's kept in both modes`). `REGIONgetBoundingBox` keeps rule A, so `-BBEQ 0` (and a
+  negative `-BBEQ`) still starts from the larger box by default.
+- **Relay 54 (this check, on batch 98's code):** the program is unchanged; the open probe's 195
+  cases, the golden cases (the `-bb 0` case's default now FreeSurfer's box, its hash re-recorded by
+  the orchestrator at batch 98's merge) and the record are redone (the numbers in `docs/validation/freesurfer-mri-mask.md`).
+
+recon-all's calls: the v8 stream's `-bb 3` (SynthMorph's crop of `orig.mgz`, `real.py`) and
+`mri_vsinus_seg`'s `-crop 0` give FreeSurfer's outputs in both modes.
 
 ## 7. The recorded calls
 

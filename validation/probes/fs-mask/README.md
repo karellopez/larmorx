@@ -23,6 +23,14 @@
     scripts/orchestration/boxed.sh 16 python -P validation/probes/fs-mask/prog.py --golden
     scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-mask/real.py --json real.json
 
+## Results (relay 54 of track D, 2026-11-23: after FS-269's rule C for the crops, batch 98)
+
+On batch 98's code (the program unchanged): the open probe's seeds 1 and 2 (195 cases each): 194
+identical in `reproduce`, 1 counted (FS-309), 0 different; `fix` 120 identical, 74 explained by a
+notice (FS-269 only on the two `-BBEQ 0` cases, whose start keeps rule A); golden (fourteen cases)
+`e3ec07a6...` (the official value, unchanged) and `49d53f9d...` (the default, re-recorded at batch
+98's merge: the `-bb 0` case now FreeSurfer's box). The record: `docs/validation/freesurfer-mri-mask.md`.
+
 ## Results (relay 53 of track D, 2026-11-23: after FS-269's default)
 
 From the clean commit of `docs/validation/freesurfer-mri-mask.md`: the 24 recorded steps reproduced

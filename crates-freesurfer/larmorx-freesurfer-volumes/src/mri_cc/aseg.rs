@@ -928,6 +928,7 @@ pub fn find_cc_with_aseg(
     if diag_write_verbose(g) {
         write_volume(g, r, &mut cc, "s2.mgz")?;
     }
+    super::main::slab_inside(g, r, best_slice, thick, cc.vg.width)?;
     let mut tmp = mri_copy(g, r.out, r.err, &cc, None)?.unwrap_new();
     for i in 1..=thick {
         for y in 0..cc.vg.height {

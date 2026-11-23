@@ -5209,6 +5209,8 @@ class Gen18(Gen17):
         nvol = self.lab(self.plain((3, 2, 2)), [1.0, QNAN, 2.0, QNAN, 4.0, 5.0] * 2, t=3)
         L.append(f"sstat {sg} 0 {nvol} 0 1 0")
         L.append(f"sstat {sg} 0 {nvol} 0 3 0")
+        L.append(f"sstat {sg} 0 {nvol} 0 5 0")  # one voxel, NaN
+        L.append(f"sstat {sg} 0 {nvol} 0 0 0")  # one voxel, 5
         # item 110: an outside value that is not 0 (dilo: MRIdilate with the source's outside value)
         dv = [0.0] * 12
         dv[4] = 2.0  # column 1, row 1, slice 0 of 3 x 2 x 2

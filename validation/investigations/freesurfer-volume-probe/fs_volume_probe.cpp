@@ -2762,6 +2762,17 @@ static void call(const std::string &c)
     fflush(stdout);
     putres(res, a, NULL, d);
   }
+  else if (c == "dilo") {
+    // relay 19: MRIdilate with the source's outside value (a double) set first
+    MRI *a = getw();
+    paint(a);
+    a->outside_val = getd();
+    MRI *d = getdst(a);
+    fflush(stdout);
+    MRI *res = MRIdilate(a, d);
+    fflush(stdout);
+    putres(res, a, NULL, d);
+  }
   else if (c == "msegs") {
     MRI *a = getw();
     paint(a);

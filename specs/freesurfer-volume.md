@@ -2520,7 +2520,7 @@ written), so nothing notes it.
 Made ready by the spec finisher's relay 18: §69's groups `vtal` (seeded) and `vrules20` (fixed cases) (the open
 probe's `talcras`, `talmat` (the four matrices), `talpt` (the four point functions and `TransformWithMatrix` on a
 matrix of its own, NaNs included), `talvol` (the three resamplings, with and without the second volume; nearest,
-trilinear and sinc); README.md says what each prints): generated volumes of bytes, ints, longs, floats and shorts
+trilinear and sinc); README.md says what each prints): generated volumes of bytes, ints, floats and shorts
 up to 4 x 4 x 3 voxels and transform arrays of 0, 1 or 2 transforms of the types 0, 1 and 2 (the first one's matrix
 near a scaling, any affine or with special entries, its destination geometry valid or not), `NO_AVERAGE305` set
 (empty or not) or not, `DIAG_SHOW` and `DIAG_VERBOSE`. Expected: identical with `reproduce` but where FreeSurfer
@@ -2541,12 +2541,21 @@ value beyond the `int` range or NaN is FS-12 here too (clamped by default, NaN t
   slices outermost, then rows, then columns; its voxels are visited slices, rows, columns (**(observed)**: `vdil`;
   `vrules20`, an all-zero volume of one voxel and of two, a float volume's rows read as bytes).
 - `MRIdilate(src, dst)`: a byte `src` is `MRIdilateUchar`. Otherwise the same destination rules; the bounding box of
-  the voxels above 0 in any frame (nearest samples at whole coordinates, `MRIsampleVolumeFrameType`), grown and
-  clipped likewise; for each frame, each voxel in the box becomes the largest of 0 and the 27 neighbourhood samples
-  (a NaN never wins; a type the sampler refuses samples 0 with its error), written with `MRIsetVoxVal` (a
-  destination with fewer frames is written as the voxel functions write outside a volume: fs.mri §5, FS-52, FS-53)
+  the voxels above 0 in any frame (nearest samples at whole coordinates, `MRIsampleVolumeFrameType`, section 18; the
+  search runs frames outermost, then slices, rows, columns), grown and clipped likewise; then for each frame in turn,
+  each voxel in the box (slices, rows, columns) becomes the largest of 0 and the 27 neighbourhood samples, written
+  with `MRIsetVoxVal` (a destination with fewer frames is written as the voxel functions write outside a volume:
+  fs.mri §5, FS-52, FS-53). A NaN never wins. The neighbours' coordinates are clamped to the volume (the index
+  tables, as `MRIdilateUchar`'s: a neighbour past a face is the face's own voxel), so every sample is inside the
+  volume and the source's outside value never enters (**(observed)**: `vrules21`, `dilo`, sources of floats, ints,
+  shorts and bytes with outside values 5, 0, -1 and NaN: the same results as with 0). A type the nearest sampler
+  refuses (longs, section 18: each refused sample gives 0 and prints the error `MRIsampleVolumeFrameType:
+  unsupported volume type <t>`) finds no voxel above 0, so its box is empty unless all three extents are 1 (then the
+  one voxel is written 0); such a call prints the error once per voxel and frame in the search and 27 times per frame
+  for the one voxel's writes; the lines are all the same, so the order of the samples shows in nothing a caller sees
   (**(observed)**: `vdil`; `vrules20`, a volume of the same value everywhere into itself, a destination of another
-  extent: `MRIcheckVolDims`' end).
+  extent: `MRIcheckVolDims`' end; `vrules21`, long volumes of one voxel with one and two frames (28 and 56 lines), of
+  2 x 1 x 1 with two frames (4) and of 1 x 2 x 1 (2), one into itself).
 - `MRImatchSegs(seg, list, n, MaskId, mask)`: without `mask` a copy of `seg` (`MRIcopy`). Over `seg`'s extent
   (columns outermost), frame 0 of `mask` is set to 0, then to `MaskId` (as a `float`) where `(int)` of `seg`'s frame-0
   value is in the list (the first equal entry; FS-12 for the conversion). A `mask` of another extent is not checked:
@@ -2574,9 +2583,9 @@ value beyond the `int` range or NaN is FS-12 here too (clamped by default, NaN t
   nbins - 1]`. FS-490: a count of 0 bins has no bin to count in (FreeSurfer writes before the array: memory it does
   not own); both modes count nowhere, noted (**(observed)**: `vdil`; `vrules20`, 0 bins, -1 and -4, one bin, a NaN
   width, NaN values).
-- Validation (made ready by the spec finisher's relay 18): §69's groups `vdil` (seeded) and `vrules20` (fixed cases)
-  (the open probe's `dilate`, `dilu`, `msegs`, `sstat`, `hseg`; README.md says what each prints): bytes, ints, longs,
-  floats and shorts of one or two frames, destinations new, the source itself, a volume of the same extent and of
+- Validation (made ready by the spec finisher's relay 18): §69's groups `vdil` (seeded) and `vrules20` (fixed cases),
+  and `vrules21` (relay 19's fixed cases) (the open probe's `dilate`, `dilu`, `dilo`, `msegs`, `sstat`, `hseg`;
+  README.md says what each prints): bytes, ints, floats and shorts of one or two frames (longs in `vrules21`), destinations new, the source itself, a volume of the same extent and of
   another, label lists, bin ranges that give negative, zero and positive counts. Expected: identical with
   `reproduce` but FS-490 and memory the original does not own (FS-52, FS-53), lines the loop allows; the default
   differs only with a notice (FS-12, FS-489).
@@ -4130,7 +4139,7 @@ Part 10a (relay 18, the prebuilt probe rebuilt from 2a612716, which adds the com
 `talvol`, `dilate`, `dilu`, `msegs`, `sstat` and `hseg`): `vtal` (§46: 60 `ModifyTalairachCRAS`, 80 matrices (the
 four kinds), 60 point lines of 1 to 4 points (the four point functions and `TransformWithMatrix` on a matrix with
 special entries in half), 40 resamplings (the three kinds; with and without the second volume, nearest, trilinear
-and sinc); volumes of bytes, ints, longs, floats and shorts up to 4 x 4 x 3 voxels; arrays none (15 %), of one
+and sinc); volumes of bytes, ints, floats and shorts up to 4 x 4 x 3 voxels; arrays none (15 %), of one
 transform (mostly) or of 0 or 2, of the types 1 (mostly), 0 and 2, the first matrix near a scaling, any affine or with
 special entries, the destination valid in 60 %; `NO_AVERAGE305` set (empty or not) in 30 %, `DIAG_SHOW` and
 `DIAG_VERBOSE` in 25 %), `vdil` (§48: 90 dilations, bytes, ints, floats and shorts of one or two frames, destinations

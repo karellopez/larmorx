@@ -277,6 +277,14 @@ const GOLDEN: &[(&str, &str)] = &[
         "part9.reproduce",
         "4812be080c938fff62a644c69092d9e347faa3f47ad11d771d862440275baf13",
     ),
+    (
+        "part10.fix",
+        "717c089bd04f4f31c7c270255a014601f45b69d635a55970d30727727c652c1a",
+    ),
+    (
+        "part10.reproduce",
+        "ba929f5fd03d002eb6a6341ba8836a082b4121a44b34825a28b1291097cba075",
+    ),
 ];
 
 fn check(name: &str, bytes: &[u8]) {
@@ -3652,4 +3660,173 @@ const PART9: &[(&str, Make)] = &[
 #[test]
 fn part9_resampling_regions_covariance_and_neighbourhoods() {
     group("part9", PART9, 4);
+}
+
+/// `null` or an array for §46: mostly one RAS-to-RAS transform between a pool's valid
+/// geometries; rarely a voxel-to-voxel one, two transforms or none (the program's ends).
+fn tal_lta(g: &mut G) -> String {
+    if g.one_in(5) {
+        return "null".to_owned();
+    }
+    let pool = lta_pool(g);
+    let ty = if g.one_in(6) { "0" } else { "1" };
+    let n = [1, 1, 1, 1, 1, 2, 0][g.below(7) as usize];
+    pool_lta(g, &pool, ty, n, false, None).0
+}
+
+/// A 4 x 4 matrix for `TransformWithMatrix`: a pool's, or `mat4`'s when it is 4 x 4.
+fn tal_m4(g: &mut G) -> String {
+    let m = g.mat4();
+    if m.starts_with("4 4 ") {
+        m
+    } else {
+        pool_mat(g)
+    }
+}
+
+/// `n` points (three doubles each), special values in some.
+fn tal_points(g: &mut G) -> String {
+    let n = g.int(1, 2);
+    let mut v = vec![n.to_string()];
+    for _ in 0..3 * n {
+        let special = g.one_in(6);
+        v.push(g.d(special));
+    }
+    v.join(" ")
+}
+
+/// A double's bits.
+fn dbits(x: f64) -> String {
+    format!("{:016x}", x.to_bits())
+}
+
+/// A sparse volume for §48: zeros with a few labels (negatives, and large values).
+fn dil_w(g: &mut G, e: (i64, i64, i64), kind: i64, frames: i64) -> String {
+    seg_w(g, e, kind, frames, &[0, 0, 0, 0, 1, 2, 5, -3, 250])
+}
+
+/// Part 10a (§46 and §48).
+const PART10: &[(&str, Make)] = &[
+    ("talcras", |g| {
+        let e = ext(g, 1, 3);
+        let kind = pi(g, &[0, 1, 3, 4]);
+        let w = seg_w(g, e, kind, 1, &[0, 1, 2]);
+        format!("{w} 0 {}", tal_lta(g))
+    }),
+    ("+env=NO_AVERAGE305= +gdiag=10000040 talcras", |g| {
+        let e = ext(g, 1, 3);
+        let w = seg_w(g, e, 3, 1, &[0, 1]);
+        format!("{w} 0 {}", tal_lta(g))
+    }),
+    ("talmat", |g| {
+        let k = g.int(0, 3);
+        let e = ext(g, 1, 3);
+        let kind = pi(g, &[0, 3]);
+        let w = seg_w(g, e, kind, 1, &[0]);
+        format!("{k} {w} 0 {}", tal_lta(g))
+    }),
+    ("+gdiag=10000000 talpt", |g| {
+        let k = g.int(0, 4);
+        if k == 4 {
+            let m = tal_m4(g);
+            return format!("4 {m} {}", tal_points(g));
+        }
+        let e = ext(g, 1, 3);
+        let w = seg_w(g, e, 3, 1, &[0]);
+        let a = tal_lta(g);
+        format!("{k} {w} 0 {a} {}", tal_points(g))
+    }),
+    ("talvol", |g| {
+        let k = g.int(0, 2);
+        let e = ext(g, 1, 3);
+        let kind = pi(g, &[0, 3]);
+        let w = seg_w(g, e, kind, 1, &[0, 1, 2, 5]);
+        let t = if k == 2 || g.one_in(2) {
+            let te = ext(g, 1, 3);
+            format!("{} 0", seg_w(g, te, 3, 1, &[0]))
+        } else {
+            "new".to_owned()
+        };
+        let a = tal_lta(g);
+        let interp = if k == 0 {
+            format!(" {}", g.pick(&["0", "1", "2"]))
+        } else {
+            String::new()
+        };
+        format!("{k} {w} 0 {t} {a}{interp}")
+    }),
+    ("dilate", |g| {
+        let e = ext(g, 1, 3);
+        let (kind, nf) = (pi(g, &[0, 1, 3, 4]), g.int(1, 2));
+        let s = dil_w(g, e, kind, nf);
+        let d = match g.int(0, 3) {
+            0 => "new".to_owned(),
+            1 => "self".to_owned(),
+            2 => {
+                let k = pi(g, &[0, 3]);
+                seg_w(g, e, k, nf, &[0])
+            }
+            _ => {
+                let o = ext(g, 1, 3);
+                seg_w(g, o, 3, nf, &[0])
+            }
+        };
+        format!("{s} 0 {d}")
+    }),
+    ("dilu", |g| {
+        let e = ext(g, 1, 3);
+        let kind = pi(g, &[0, 0, 3]);
+        let s = dil_w(g, e, kind, 1);
+        let d = match g.int(0, 2) {
+            0 => "new".to_owned(),
+            1 => "self".to_owned(),
+            _ => seg_w(g, e, 0, 1, &[0]),
+        };
+        format!("{s} 0 {d}")
+    }),
+    ("msegs", |g| {
+        let e = ext(g, 1, 3);
+        let kind = pi(g, &[0, 1, 3]);
+        let s = dil_w(g, e, kind, 1);
+        let d = match g.int(0, 2) {
+            0 => "new".to_owned(),
+            1 => "self".to_owned(),
+            _ => seg_w(g, e, 3, 1, &[0]),
+        };
+        let n = g.int(0, 3);
+        let list: Vec<String> = (0..n)
+            .map(|_| g.pick(&["0", "1", "2", "5", "-3", "250"]).to_owned())
+            .collect();
+        let sep = if n > 0 { " " } else { "" };
+        format!(
+            "{s} 0 {d} {n}{sep}{} {}",
+            list.join(" "),
+            g.pick(&["1", "9", "-2"])
+        )
+    }),
+    ("sstat", |g| {
+        let e = ext(g, 1, 3);
+        let nf = g.int(1, 2);
+        let (ks, kv) = (pi(g, &[0, 1, 3]), pi(g, &[0, 3]));
+        let s = dil_w(g, e, ks, 1);
+        let v = seg_w(g, e, kv, nf, &[0, 1, 2, 5, -3, 7]);
+        let id = g.pick(&["0", "1", "2", "5", "7"]);
+        format!("{s} 0 {v} 0 {id} {}", g.int(0, nf - 1))
+    }),
+    ("hseg", |g| {
+        let e = ext(g, 1, 3);
+        let ks = pi(g, &[0, 1, 3]);
+        let s = dil_w(g, e, ks, 1);
+        let v = seg_w(g, e, 3, 1, &[0, 1, 2, 5, -3, 7]);
+        let id = g.pick(&["0", "1", "2", "5"]);
+        let lo = [0.0, -4.0, 0.5][g.below(3) as usize];
+        let hi = lo + [8.0, 3.0, 0.0, -2.0][g.below(4) as usize];
+        let dl = [1.0, 2.0, 0.5][g.below(3) as usize];
+        format!("{s} 0 {v} 0 {id} {} {} {}", dbits(lo), dbits(hi), dbits(dl))
+    }),
+];
+
+#[test]
+fn part10_talairach_dilation_and_segments() {
+    group("part10", PART10, 4);
 }

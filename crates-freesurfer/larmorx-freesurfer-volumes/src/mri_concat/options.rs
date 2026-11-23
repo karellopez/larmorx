@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-FreeSurfer
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
-//! `mri_concat`'s `parse_commandline` (`mri_concat.cpp` 777-1201), `check_options` (1305-1366),
-//! `usage_exit`, `print_usage`, `print_help`, `print_version` and `argnerr` (1203-1303).
+//! `mri_concat`'s `parse_commandline` (`mri_concat.cpp` 778-1184), `check_options` (1310-1365),
+//! `usage_exit`, `print_usage`, `print_help`, `print_version` and `argnerr` (1186-1308).
 //!
 //! The options are read one by one; an argument that is no option is an input (any argument
 //! FreeSurfer does not know, `--foo` included). `--help` the usage and the help (status 1),

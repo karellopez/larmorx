@@ -2804,7 +2804,7 @@ defects! {
     FS_1244 = "FS-1244", "FreeSurfer", true,
         "mri_concat --pca with an output stem of 1,990 bytes or more: the official build aborts naming its matrix files (*** buffer overflow detected ***: terminated, status 134); corrected: the whole name is used";
     FS_1245 = "FS-1245", "FreeSurfer", true,
-        "mri_concat --pca with an output name without a volume extension (.mgz, .mgh, .nii, .nii.gz, .img, ...) writes its matrices as (null).u.mtx and (null).stats.dat; corrected: <output>.u.mtx and <output>.stats.dat";
+        "mri_concat --pca with an output name without a volume extension (.mgz, .mgh, .nii, .nii.gz, .img, ...) writes its matrices as (null).u.mtx and (null).stats.dat (before the output itself is refused: unknown file type); corrected: <output>.u.mtx and <output>.stats.dat";
     FS_1246 = "FS-1246", "FreeSurfer", true,
         "mri_concat --mtx with a matrix whose columns are not the frame count prints the matrix's row count in ERROR: dimension mismatch between inputs (<n>) and matrix (<rows>); corrected: its column count, the one compared";
     FS_1248 = "FS-1248", "FreeSurfer", true,

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-FreeSurfer
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
-//! `mri_concat`'s `main` (`mri_concat.cpp` 131-773), `GroupedMeanMatrix` (1374-1393) and
-//! `MRIfirstNonZero` (1468-1498): the program's entry point [`run`] (registered as `mri_concat`
+//! `mri_concat`'s `main` (`mri_concat.cpp` 139-772), `GroupedMeanMatrix` (1373-1394) and
+//! `MRIfirstNonZero` (1471-1497): the program's entry point [`run`] (registered as `mri_concat`
 //! in the crate's `PROGRAMS`) and [`main`].
 //!
 //! `mri_concat [options] <in>... --o <out>`. The version options first (`handleVersionOption`;

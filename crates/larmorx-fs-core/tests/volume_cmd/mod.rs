@@ -16,10 +16,10 @@ pub mod args;
 
 mod bspline;
 mod lta54;
+mod part10;
 mod part7b;
 mod part8;
 mod part9;
-mod part10;
 mod segcrop;
 
 use std::io::Write;

@@ -113,8 +113,7 @@ impl Process {
                             }
                         }
                     }
-                    let place =
-                        self.row_place(dst, i64::from(x), i64::from(y), i64::from(z), 0, 1);
+                    let place = self.row_place(dst, i64::from(x), i64::from(y), i64::from(z), 0, 1);
                     self.direct_write(dst, place, &[m], name);
                 }
             }

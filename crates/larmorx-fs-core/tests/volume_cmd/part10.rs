@@ -68,7 +68,11 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
                 let (x, y, z) = (l.getd(), l.getd(), l.getd());
                 p.flush();
                 let (r, pt) = if kind == 4 {
-                    (0, mat.as_ref().and_then(|mm| transform_with_matrix(mm, x, y, z)))
+                    (
+                        0,
+                        mat.as_ref()
+                            .and_then(|mm| transform_with_matrix(mm, x, y, z)),
+                    )
                 } else {
                     let k = match kind {
                         0 => TalPoint::VoxelToTalairach,

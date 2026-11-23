@@ -68,7 +68,11 @@ pub fn transform_with_matrix(m: &Matrix, x: f64, y: f64, z: f64) -> Option<[f64;
         let row = r as i32 + 1;
         let prod = |k: usize| {
             let e = m.at(row, k as i32 + 1);
-            if r < 2 { mul32(e, p[k]) } else { mul32(p[k], e) }
+            if r < 2 {
+                mul32(e, p[k])
+            } else {
+                mul32(p[k], e)
+            }
         };
         let t = add32(add32(prod(0), prod(1)), prod(2));
         *o = sse::widen(add32(t, m.at(row, 4)));
@@ -176,7 +180,11 @@ impl Process {
         let a = self.mtalairach_from_voxel(src, lta)?;
         let tal = self.talairach_volume(src, lta)?;
         let r2i = self.extract_r_to_i(&tal.geom)?;
-        Ok(made(self.matrix_multiply(r2i.as_ref(), a.as_ref(), None)?))
+        Ok(made(self.matrix_multiply(
+            r2i.as_ref(),
+            a.as_ref(),
+            None,
+        )?))
     }
 
     /// `MvoxelFromTalairach(dst, lta)` (§46): the inverse of the array's first transform (the
@@ -205,7 +213,11 @@ impl Process {
             None => made(self.matrix_identity(4, None)?),
         };
         let r2i = self.extract_r_to_i(&dst.geom)?;
-        Ok(made(self.matrix_multiply(r2i.as_ref(), inv.as_ref(), None)?))
+        Ok(made(self.matrix_multiply(
+            r2i.as_ref(),
+            inv.as_ref(),
+            None,
+        )?))
     }
 
     /// `MvoxelFromTalVoxel(dst, lta)` (§46): the Talairach volume of the destination, its

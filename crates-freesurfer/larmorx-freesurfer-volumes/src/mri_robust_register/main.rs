@@ -49,8 +49,11 @@
 //! `--highit 0`, and no coarser one) `ERROR: no half way space created (not implemented for this
 //! cost function)!`.
 //!
-//! Not ported yet (each ends with its message and status 1): the test mode (`--test`) and the
-//! debug output of `--debug` (the library's intermediate images and its key presses).
+//! The test mode (`--test <n> <image>`, [`super::options`]): `testRobust`
+//! ([`larmorx_freesurfer_robust::testmode`]), which ends the program.
+//!
+//! Not ported yet (ends with its message and status 1): the debug output of `--debug` (the
+//! library's intermediate images and its key presses).
 //!
 //! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-robust-register.md`):
 //! - FS-1070: [`super::options`].
@@ -175,6 +178,7 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
             out: &mut *r.out,
             err: &mut *r.err,
             env: r.env,
+            dir: r.dir,
         };
         if p.satit && p.robust() {
             reg.find_saturation(g, &mut io)?;
@@ -922,6 +926,7 @@ fn init_registration(
         out: &mut *r.out,
         err: &mut *r.err,
         env: r.env,
+        dir: r.dir,
     };
     reg.set_source_and_target(g, &mut io, &mov, &dst, !p.floattype)?;
     Ok((pmov, pdst))

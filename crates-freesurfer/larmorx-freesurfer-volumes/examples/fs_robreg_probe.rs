@@ -7,6 +7,7 @@
 //!     fs_robreg_probe powell-cases                the Powell registration's 40 cases
 //!     fs_robreg_probe histo-cases                 the joint-histogram and SB costs' 32 cases
 //!     fs_robreg_probe halfway-cases               the Powell registration's half-way outputs' 24
+//!     fs_robreg_probe test-cases                  the test mode's cases (`--test`)
 //!     fs_robreg_probe golden-cases                the golden cases
 //!     fs_robreg_probe golden-halfway-cases        the golden cases of the Powell half-way outputs
 //!                                                (`tests/mri_robust_register_golden.rs`)
@@ -38,6 +39,11 @@ fn main() {
         }
         Some("histo-cases") => {
             for line in cases::histo_cases() {
+                println!("{line}");
+            }
+        }
+        Some("test-cases") => {
+            for line in cases::test_cases() {
                 println!("{line}");
             }
         }
@@ -83,7 +89,7 @@ fn main() {
         }
         _ => {
             eprintln!(
-                "usage: fs_robreg_probe cases <seed> <n> | powell-cases | histo-cases | halfway-cases | golden-cases | golden-halfway-cases | run <cases> fix|reproduce | run-seed <seed> <n> fix|reproduce"
+                "usage: fs_robreg_probe cases <seed> <n> | powell-cases | histo-cases | halfway-cases | test-cases | golden-cases | golden-halfway-cases | run <cases> fix|reproduce | run-seed <seed> <n> fix|reproduce"
             );
             std::process::exit(2);
         }

@@ -62,6 +62,14 @@ plan is in `specs/mri_robust_register.md` §7.
   program's memory still held the target's geometry). The measurement of the official program
   alone: `validation/investigations/freesurfer-fs1075-halfway/`. The golden cases'
   `golden-halfway-cases` (two) hold the port's hash (both modes).
+- `check.py --family test` (relay 48): the test mode (`--test <n> <image>`), 31 cases
+  (`cases::test_cases`: every test number, unknown ones, a word; byte images of 16^3 and 34^3,
+  short and float images of 34^3, a 2-D image, a file that does not read, missing arguments,
+  options before it). Measured 2026-11-23: 28 identical, 0 different, 3 not compared (FS-1070's
+  segmentation fault and abort, FS-1077's segmentation fault); the default differs on 7, each with
+  FS-1076's or FS-1078's notice. Its hash is in `tests/fs_robreg_test_official.rs`; the seeded
+  family's prelude case `--test 1 mov.mgz` is compared now (seed 1 x 120 with `--preload`: 111
+  identical, 0 different, 8 not compared, 1 not ported, `--debug`).
 - `record.py`: the validation record `docs/validation/freesurfer-mri-robust-register.{json,md}`
   from the summaries above (from a clean commit).
 

@@ -12,9 +12,8 @@ on each case through the oracle-output cache at one thread, in a folder of its o
 on the same cases with ``--upstream-defects`` ``reproduce`` and ``fix``, and compares the lines
 (exit status, standard output, standard error, every file written; the line of the time taken
 masked): ``reproduce`` must give FreeSurfer's on every case but those where FreeSurfer's result is
-undefined (``SKIP``) and those the port does not run yet (``not ported yet``: the costs of
-FreeSurfer's Powell registration, the entropy images, ``--test``, ``--debug``), which are counted,
-not compared; ``fix`` may differ only where a defect it corrects changed the result (its notices).
+undefined (``SKIP``) and those the port does not run yet (``not ported yet``: ``--debug``), which
+are counted, not compared; ``fix`` may differ only where a defect it corrects changed the result (its notices).
 Prints the counts and the hash the port's recorded test checks (``tests/fs_robreg_official.rs``).
 
 The official side runs with ``FS_DISABLE_LANG=1``: FreeSurfer's start sets the numbers' locale
@@ -64,8 +63,10 @@ SKIP = (
     "FS-1068",
     "FS-1069",
     # relay 48: the Powell registration's half-way geometry, memory FreeSurfer has freed (its
-    # defined parts compared apart: DEFINED_BEFORE)
+    # defined parts compared apart: defined_before_half_way); the test mode's unreadable image (a
+    # crash)
     "FS-1075",
+    "FS-1077",
     "FS-167",
     "FS-58",
     "FS-288",
@@ -251,11 +252,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", type=Path)
     ap.add_argument(
         "--family",
-        choices=("seeded", "powell", "histo", "halfway"),
+        choices=("seeded", "powell", "histo", "halfway", "test"),
         default="seeded",
         help="the cases: the prelude, the entropy images and seeded ones (--seed, --n), the "
         "Powell registration's 40 (relay 46), its joint-histogram and SB costs' 32 (relay 47), or "
-        "its half-way outputs' 24 (relay 48: FS-1075, never served from the cache)",
+        "its half-way outputs' 24 (relay 48: FS-1075, never served from the cache), or the test "
+        "mode's (relay 48)",
     )
     ap.add_argument(
         "--preload",

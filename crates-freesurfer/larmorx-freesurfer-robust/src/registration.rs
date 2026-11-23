@@ -27,10 +27,11 @@
 //!   [`RegRobust::get_minit_resampled`], the centroids (`getCentroidS`, `getCentroidT`,
 //!   `getCentroidSinT`) and [`RegRobust::convert_p2md`].
 //!
-//! Not reached by either program: `flipInputs`, `init_scaling`, `buildGaussianPyramid` (only
-//! `testRobust`), `setSource`, `setTarget`, `RegRobust::estimateIScale` (no caller). `testRobust`
-//! (`--test`) and the `--debug` writes (the intermediate images, the keypress waits) come with
-//! `mri_robust_register` (queue 3.2-13): a debug level above 0 ends here with "not ported yet".
+//! Not reached by either program: `flipInputs`, `init_scaling`, `setSource`, `setTarget`,
+//! `RegRobust::estimateIScale` (no caller). `testRobust` (`--test`) and `buildGaussianPyramid`:
+//! [`crate::testmode`]. The `--debug` writes (the intermediate images, the keypress waits) come
+//! with `mri_robust_register` (queue 3.2-13): a debug level above 0 ends here with "not ported
+//! yet".
 
 // the 4 x 4 and 3 x 3 matrices are indexed as FreeSurfer's code indexes them
 #![allow(clippy::needless_range_loop)]
@@ -220,11 +221,13 @@ impl Default for RegRobust {
     }
 }
 
-/// The streams and environment every call writes to and reads.
+/// The streams and environment every call writes to and reads, and the folder relative names are
+/// read from and written to (`None`: the process's own; the debug and test files).
 pub struct Io<'a> {
     pub out: &'a mut dyn Write,
     pub err: &'a mut dyn Write,
     pub env: &'a Environment,
+    pub dir: Option<&'a std::path::Path>,
 }
 
 impl RegRobust {

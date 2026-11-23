@@ -357,6 +357,7 @@ impl RegRobust {
                     out: &mut Shared(&buf_out),
                     err: &mut Shared(&buf_err),
                     env: io.env,
+                    dir: io.dir,
                 };
                 match ctx.cost(g, &mut sub, x) {
                     Ok(v) => Some(v),

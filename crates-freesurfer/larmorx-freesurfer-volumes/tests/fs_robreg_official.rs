@@ -20,25 +20,25 @@ use sha2::{Digest, Sha256};
 /// ported) from the official program with the decided `cabs` and `csqrt` preloaded (`check.py
 /// --preload`, `decided_complex.sh`: the user's D4 decision, which the port's matrix square roots
 /// follow); and again 2026-11-23 (relay 47: `MI`, `NMI`, `ECC`, `SCR` and `SB` ported, the same
-/// preload). 120 cases, 110 lines identical, 8 hashed as `SKIP`, 2 as `NOTPORTED` (`--debug` and
-/// `--test`). The Powell families: `fs_robreg_powell_official.rs`, `fs_robreg_histo_official.rs`.
+/// preload); and again 2026-11-23 (relay 48: the test mode, `--test`, ported, the same preload).
+/// 120 cases, 111 lines identical, 8 hashed as `SKIP`, 1 as `NOTPORTED` (`--debug`). The Powell families: `fs_robreg_powell_official.rs`, `fs_robreg_histo_official.rs`.
 const N: usize = 120;
-const OFFICIAL_SHA256: &str = "70ea2e644455db29d5a7e2b5332748ad3bb816bc9d8add6410f59e819678a0d2";
+const OFFICIAL_SHA256: &str = "172c0971dfe907da32e54122d14d4c1c509d122f4dcd363209ce9208c40be1a0";
 /// In a debug build (CI's) the five cases of a joint histogram's cost or SB are hashed as `SLOW`,
 /// not run (about 270 s at one thread in a debug build; `cases::histogram_or_sb_cost`): the same
 /// official lines with those five so (`check.py`'s `official_sha256_skip_debug`). A release build
 /// compares them too, and `fs_robreg_histo_official.rs` holds 32 more.
 const OFFICIAL_SHA256_DEBUG: &str =
-    "f9f10b84d937b70438d4c4d5cde4247a5cb6cd98e4ee0c4d03b54766e34bfb4c";
+    "f0e55e32dd089cde0d46edcf5c6c9742e85f53e6142577dcb3d1eed5ee24d96c";
 const SLOW_IN_DEBUG: usize = 5;
 const SKIPPED: usize = 8;
-const NOT_PORTED: usize = 2;
+const NOT_PORTED: usize = 1;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 22] = [
-    "FS-1070", "FS-1071", "FS-1072", "FS-1063", "FS-1067", "FS-1068", "FS-1069", "FS-167", "FS-58",
-    "FS-288", "FS-290", "FS-294", "FS-441", "FS-302", "FS-303", "FS-304", "FS-305", "FS-306",
-    "FS-307", "FS-308", "FS-309", "FS-310",
+const SKIP: [&str; 24] = [
+    "FS-1070", "FS-1071", "FS-1072", "FS-1063", "FS-1067", "FS-1068", "FS-1069", "FS-1075",
+    "FS-1077", "FS-167", "FS-58", "FS-288", "FS-290", "FS-294", "FS-441", "FS-302", "FS-303",
+    "FS-304", "FS-305", "FS-306", "FS-307", "FS-308", "FS-309", "FS-310",
 ];
 
 /// Both modes of every case, on four threads (the cases are independent; the lines are joined in

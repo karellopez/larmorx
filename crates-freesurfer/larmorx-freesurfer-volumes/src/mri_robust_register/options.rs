@@ -31,6 +31,7 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::help_xml::output_help_xml;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
 use larmorx_freesurfer_core::run::Environment;
+use larmorx_freesurfer_robust::registration::{Io, RegRobust};
 use larmorx_freesurfer_robust::regstep::Cost;
 
 /// `mri_robust_register.help.xml`, the text `printUsage` renders (`outputHelpXml`).
@@ -247,7 +248,8 @@ fn missing(g: &mut Globals, r: &mut Run, arg: &str, string: bool) -> Fatal {
 }
 
 /// `parseNextCommand(argc, argv, P)` on `args[0]` (the option) and what follows it: the arguments
-/// it takes after its own. `Err` ends the program (the help, an unknown option or cost, `--test`).
+/// it takes after its own. `Err` ends the program (the help, an unknown option or cost, the test
+/// mode `--test`, which runs `RegRobust::testRobust` and ends with its status).
 fn parse_next_command(
     g: &mut Globals,
     r: &mut Run,
@@ -569,12 +571,22 @@ fn parse_next_command(
             say!("--maskdst: Will apply {} to mask dst/target !", p.maskdst);
         }
         "TEST" => {
+            // `RegRobust R; R.testRobust(argv[2], atoi(argv[1])); exit(0)`: the number first
+            // (FreeSurfer's `atoi(NULL)` crashes when there is none), then the image's name
             say!("--test: TEST-MODE ");
-            let _ = writeln!(
-                r.err,
-                "mri_robust_register: the test mode (--test, RegRobust::testRobust) is not ported yet"
-            );
-            return Err(Fatal::Exit(1));
+            let testno = i(g, r)?;
+            let Some(fname) = args.get(2).cloned() else {
+                return Err(missing(g, r, arg, true));
+            };
+            let mut reg = RegRobust::new();
+            let mut io = Io {
+                out: &mut *r.out,
+                err: &mut *r.err,
+                env: r.env,
+                dir: r.dir,
+            };
+            reg.test_robust(g, &mut io, &fname, testno)?;
+            return Err(Fatal::Exit(0));
         }
         "CONFORM" => {
             p.conform = true;

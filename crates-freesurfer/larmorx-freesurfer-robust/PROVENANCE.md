@@ -96,8 +96,17 @@ case, and the cost function's lines written among Powell's in their order (one s
 2.35's bits with `reproduce` (`log2_glibc`, relay 47), correctly rounded by default; `sqrt(8 *
 log(2))` is the constant GCC folds.
 
-Not yet: `testRobust` and `constructAb2` (`--test`) and the `debug > 0` paths (with `mri_robust_register`,
-3.2-13); not reached by either program: `flipInputs`, `init_scaling`, `buildGaussianPyramid`, `setSource`,
+Relay 48 of track C (queue 3.2-13): `src/testmode.rs` from `mri_robust_register/Registration.cpp`
+(`testRobust` 1315-1700: the tests 0 to 7, 9 and 30 and the unknown test, then the robust
+registration with the intensity scale only; FS-1076 (the second level past a one-level pyramid),
+FS-1077 (an image that does not read), FS-1078 (tests 5 and 6's byte writes, `MRIvox`);
+`buildGaussianPyramid` 3053-3141 with `MyMRI::subSample`'s default `randpos` 0); `src/powell.rs`:
+`getHalfWayGeom` (`RegPowell.h` 62-65: the byte target's header kept, FS-1075) as
+`RegRobust::powell_hw`; `Io` gains the folder relative names are read from and written to.
+`constructAb2` (`Registration.cpp` 2475) has no caller in 8.2.0.
+
+Not yet: the `debug > 0` paths (with `mri_robust_register`, 3.2-13); not reached by either program:
+`flipInputs`, `init_scaling`, `setSource`,
 `setTarget`, `RegRobust::estimateIScale`; the functions only one program reaches (their items).
 
 ## Changes from the originals

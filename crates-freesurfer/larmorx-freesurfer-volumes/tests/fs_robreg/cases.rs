@@ -841,7 +841,8 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
 /// fMRIPrep's call with every output, an affine registration with its half-way outputs, one of a
 /// short source onto a float target with anisotropic voxels, the entropy images of a short
 /// source and a byte target (`--cost ROBENT`, both written), and the Powell registration of the
-/// short source onto the byte target (`--cost NCC`).
+/// short source onto the byte target (`--cost NCC`); the joint histogram's and SB costs on 16^3
+/// images (relay 47); four of the test mode (`--test`, relay 48).
 pub fn golden_cases() -> Vec<String> {
     let mut g = Gen::new(32);
     let mut a = Img::base(32, MRI_UCHAR);
@@ -965,12 +966,78 @@ pub fn golden_cases() -> Vec<String> {
     ];
     let mut lines = lines;
     lines.extend(more.iter().map(|args| line(None, &small, &[], args)));
+    // relay 48: the test mode (`--test`): a byte image of 32^3 (a pyramid of two levels: the test
+    // registers its 16^3 level), the rotation, translation and intensity test; the pattern of
+    // test 5 on a float image (FS-1078); the lowest level; a 16^3 image (one level: FS-1076)
+    let mut f = Img::base(32, MRI_FLOAT);
+    f.noise = 4;
+    let test_files = vec![
+        ("mov.mgz".to_owned(), files[0].1.clone()),
+        (
+            "f32.mgz".to_owned(),
+            write_as(&mut image(&mut g, &f), "f32.mgz"),
+        ),
+        ("mov16.mgz".to_owned(), small[0].1.clone()),
+    ];
+    for args in [
+        s(&["--test", "4", "mov.mgz"]),
+        s(&["--test", "5", "f32.mgz"]),
+        s(&["--test", "30", "mov.mgz"]),
+        s(&["--test", "0", "mov16.mgz"]),
+    ] {
+        lines.push(line(None, &test_files, &[], &args));
+    }
     lines
 }
 
 // ------------------------------------------------------------------ the port's answer
 
-/// Text files listed with their bytes: transforms and the intensity scale.
+/// The test mode's cases (relay 48, `--test <n> <image>`: `check.py --family test`): every test
+/// number (0 to 7, 9, the lowest level's 30, the unknown 8 and 10, a negative one, a word), on a
+/// byte image of 16^3 (a pyramid of one level), 34^3 images of bytes, shorts and floats (two
+/// levels), a 2-D image, a file that does not read, the arguments missing, options before it.
+pub fn test_cases() -> Vec<String> {
+    let mut g = Gen::new(0x0074_6573);
+    let mk = |g: &mut Gen, n: i32, ty: i32, name: &str| -> (String, Vec<u8>) {
+        let mut a = Img::base(n, ty);
+        a.noise = 4;
+        (name.to_owned(), write_as(&mut image(g, &a), name))
+    };
+    let mut flat = Img::base(20, MRI_UCHAR);
+    flat.dims = [20, 18, 1];
+    let files = vec![
+        mk(&mut g, 16, MRI_UCHAR, "b16.mgz"),
+        mk(&mut g, 34, MRI_UCHAR, "b34.mgz"),
+        mk(&mut g, 34, MRI_SHORT, "s34.mgz"),
+        mk(&mut g, 34, MRI_FLOAT, "f34.mgz"),
+        (
+            "flat.mgz".to_owned(),
+            write_as(&mut image(&mut g, &flat), "flat.mgz"),
+        ),
+    ];
+    let mut cases: Vec<Vec<String>> = Vec::new();
+    for n in [
+        "0", "1", "2", "3", "4", "5", "6", "7", "9", "30", "8", "10", "-1", "abc",
+    ] {
+        cases.push(s(&["--test", n, "b34.mgz"]));
+    }
+    for n in ["0", "1", "5", "30"] {
+        cases.push(s(&["--test", n, "b16.mgz"]));
+    }
+    for n in ["1", "4", "5", "6"] {
+        cases.push(s(&["--test", n, "f34.mgz"]));
+        cases.push(s(&["--test", n, "s34.mgz"]));
+    }
+    cases.push(s(&["--test", "1", "flat.mgz"]));
+    cases.push(s(&["--test", "1", "nofile.mgz"]));
+    cases.push(s(&["--test", "2"]));
+    cases.push(s(&["--test"]));
+    cases.push(s(&[
+        "--mov", "b34.mgz", "--affine", "--test", "3", "b34.mgz", "--dst", "x",
+    ]));
+    cases.iter().map(|a| line(None, &files, &[], a)).collect()
+}
+
 /// The golden cases of the Powell registration's half-way outputs (relay 48, FS-1075;
 /// `tests/mri_robust_register_golden.rs`' third test): on 16^3 byte images, `LS` with every
 /// half-way output, and with the finest level skipped and no coarser one (no half-way space).
@@ -1032,6 +1099,7 @@ pub fn golden_halfway_cases() -> Vec<String> {
     .collect()
 }
 
+/// Text files listed with their bytes: transforms and the intensity scale.
 fn is_text(name: &str) -> bool {
     [".lta", ".xfm", ".dat", ".txt"]
         .iter()

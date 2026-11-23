@@ -5339,14 +5339,22 @@ class Gen18(Gen17):
         for _ in range(8):
             d = (r.randint(1, 4), r.randint(1, 4), r.randint(1, 3))
             t = r.choice([0, 1, 3, 4])
-            w = self.svol(r, d, t, nf=r.choice([1, 1, 2]), geo=self.cgeo(r, d), pz=0.2, labels=(1, 50, 200))
+            w = self.svol(
+                r, d, t, nf=r.choice([1, 1, 2]), geo=self.cgeo(r, d), pz=0.2, labels=(1, 50, 200)
+            )
             if r.random() < 0.2:
                 w = self.ras_bad(w)
             L.append(f"conform 0 {w} 0")
         # the conformed grid itself: bytes (nothing to do), floats (a change of type only), and a
         # slight rotation (resampled)
-        grid = ((256, 256, 256), [f32(1.0)] * 3 + ["1"] + [f32(x) for x in (-1, 0, 0, 0, 0, -1, 0, 1, 0)]
-                + [f32(1.5), f32(-2.0), f32(3.0)] + [f32(0.0)] * 3)
+        grid = (
+            (256, 256, 256),
+            [f32(1.0)] * 3
+            + ["1"]
+            + [f32(x) for x in (-1, 0, 0, 0, 0, -1, 0, 1, 0)]
+            + [f32(1.5), f32(-2.0), f32(3.0)]
+            + [f32(0.0)] * 3,
+        )
         gw = self.lab(grid, [0], t=0).split(" ")
         gw[6] = "77"  # the probe's seeded byte fill
         L.append(f"conform 0 {' '.join(gw)} 0")
@@ -5424,7 +5432,11 @@ class Gen18(Gen17):
             d = dims()
             t = r.choice([0, 1, 3, 3])
             a = self.p9vol(r, d, t, r.choice([1, 2]))[0]
-            mk = "null" if r.random() < 0.4 else self.svol(r, d, r.choice([0, 3]), labels=(1,), pz=0.4) + " 0"
+            mk = (
+                "null"
+                if r.random() < 0.4
+                else self.svol(r, d, r.choice([0, 3]), labels=(1,), pz=0.4) + " 0"
+            )
             frame = 0 if mk == "null" or r.random() < 0.7 else 1
             pct = r.choice([10.0, 25.0, 50.0, 90.0, 99.0, 1.0])
             L.append(f"pthr {a} 0 {mk} {frame} {f64(pct)}")
@@ -5436,23 +5448,34 @@ class Gen18(Gen17):
             k = r.randrange(5)
             if k == 0:
                 n = r.randint(0, 4)
-                pairs = " ".join(f"{r.choice([0, 1, 2, 3, 7])} {r.choice([0, 5, 9, 255, 256, -2])}" for _ in range(n))
+                pairs = " ".join(
+                    f"{r.choice([0, 1, 2, 3, 7])} {r.choice([0, 5, 9, 255, 256, -2])}"
+                    for _ in range(n)
+                )
                 mk = "null" if r.random() < 0.5 else self.svol(r, d, 3, labels=(1,), pz=0.4) + " 0"
                 dst = "new" if r.random() < 0.6 else self.svol(r, d, r.choice([0, 1, 3]), pz=1.0)
                 L.append(f"rlist {a} 0 {n}{' ' if n else ''}{pairs} {mk} {dst}")
             elif k == 1:
                 vin = r.choice([0.0, 1.0, 2.0, 2.5, -1.0, 1.0000001])
-                L.append(f"rvonly {a} 0 {self.dst10(r, d, t, nf)} {f32(vin)} {f32(r.choice([9.0, 0.0, -3.5, 300.0]))}")
+                L.append(
+                    f"rvonly {a} 0 {self.dst10(r, d, t, nf)} {f32(vin)} {f32(r.choice([9.0, 0.0, -3.5, 300.0]))}"
+                )
             elif k == 2:
                 dst = "self" if r.random() < 0.2 else self.svol(r, d, r.choice([0, t, 3]), pz=1.0)
                 L.append(f"cplab {a} 0 {dst} {r.choice([1, 2, 3, 0, 300])}")
             elif k == 3:
                 lb = self.svol(r, d, r.choice([0, 1, 3]))
-                dst = r.choice(["self", "other"]) if r.random() < 0.2 else self.svol(r, d, r.choice([0, t, 3]), pz=1.0)
+                dst = (
+                    r.choice(["self", "other"])
+                    if r.random() < 0.2
+                    else self.svol(r, d, r.choice([0, t, 3]), pz=1.0)
+                )
                 L.append(f"cplv {a} 0 {lb} 0 {dst} {r.choice([1, 2, 3, 0])}")
             else:
                 lb = self.svol(r, d, r.choice([0, 1, 3]))
-                L.append(f"slv {a} 0 {lb} 0 {self.dst10(r, d, t, nf, other=True)} {r.choice([1, 2, 3, 0])} {f32(r.choice([9.0, 0.5, -2.0, 1e6]))}")
+                L.append(
+                    f"slv {a} 0 {lb} 0 {self.dst10(r, d, t, nf, other=True)} {r.choice([1, 2, 3, 0])} {f32(r.choice([9.0, 0.5, -2.0, 1e6]))}"
+                )
         return [Batch("vset", "vset", L)]
 
     def vmorph(self) -> list[Batch]:
@@ -5471,7 +5494,9 @@ class Gen18(Gen17):
         for _ in range(170):
             d = dims()
             t = r.choice(T)
-            cmd = r.choice(["erodenn", "erode", "erode2d", "dil6", "openn", "openn", "erodeseg", "dilseg"])
+            cmd = r.choice(
+                ["erodenn", "erode", "erode2d", "dil6", "openn", "openn", "erodeseg", "dilseg"]
+            )
             # the segmentation functions copy a source of two frames into their one-frame output
             # (FreeSurfer writes outside it: vrules22 holds that case once)
             nf = 1 if r.random() < 0.85 or cmd in ("erodeseg", "dilseg") else 2
@@ -5505,14 +5530,24 @@ class Gen18(Gen17):
             v = self.svol(r, d, r.choice([0, 0, 3]), labels=(50, 100, 115, 120, 200), pz=0.2)
             k = r.random()
             if k < 0.45:
-                dst = r.choice(["new", "self", "other"]) if r.random() < 0.6 else self.svol(r, d, 0, pz=1.0)
+                dst = (
+                    r.choice(["new", "self", "other"])
+                    if r.random() < 0.6
+                    else self.svol(r, d, 0, pz=1.0)
+                )
                 L.append(
                     f"dtl {r.randrange(2)} {a} 0 {v} 0 {dst} {r.choice([130, 130, 1, 2, 300])} "
                     f"{r.choice([1, 2, 3, 5])} {r.choice([115, 100, 0, 200])}"
                 )
             else:
-                dst = r.choice(["new", "self"]) if r.random() < 0.6 else self.svol(r, d, r.choice([0, ts, 3]), pz=1.0)
-                L.append(f"dlab {r.randrange(2)} {a} 0 {dst} {r.choice([130, 1, 2])} {r.choice([1, 2, 3])}")
+                dst = (
+                    r.choice(["new", "self"])
+                    if r.random() < 0.6
+                    else self.svol(r, d, r.choice([0, ts, 3]), pz=1.0)
+                )
+                L.append(
+                    f"dlab {r.randrange(2)} {a} 0 {dst} {r.choice([130, 1, 2])} {r.choice([1, 2, 3])}"
+                )
         for _ in range(80):
             d = dims()
             k = r.randrange(3)
@@ -5548,9 +5583,21 @@ class Gen18(Gen17):
             t = r.choice(T)
             nf = 1 if r.random() < 0.8 else 2
             geo = self.rgeo(r, d)
-            a = self.pk(geo, self.lvals(r, d[0] * d[1] * d[2] * nf, t, labels=(4, 9, 100), pz=0.2), t=t, nf=nf)
+            a = self.pk(
+                geo,
+                self.lvals(r, d[0] * d[1] * d[2] * nf, t, labels=(4, 9, 100), pz=0.2),
+                t=t,
+                nf=nf,
+            )
             same = r.random() < 0.6
-            mgeo = geo if same else self.rgeo(r, d if r.random() < 0.8 else (r.randint(1, 5), r.randint(1, 4), r.randint(1, 3)))
+            mgeo = (
+                geo
+                if same
+                else self.rgeo(
+                    r,
+                    d if r.random() < 0.8 else (r.randint(1, 5), r.randint(1, 4), r.randint(1, 3)),
+                )
+            )
             mt = r.choice([0, 3])
             mn = mgeo[0][0] * mgeo[0][1] * mgeo[0][2]
             mk = self.pk(mgeo, self.lvals(r, mn, mt, labels=(1, 2), pz=0.5), t=mt)
@@ -5561,13 +5608,27 @@ class Gen18(Gen17):
             if r.random() < 0.15:
                 pre += "+gdiag=1 "
             if k < 0.45:
-                dst = r.choice(["new", "self", "other"]) if r.random() < 0.6 else self.svol(r, d, r.choice([t, t, 3]), nf=nf, pz=1.0)
-                L.append(f"{pre}mmask 0 {a} 0 {mk} 0 {dst} {r.choice([0, 0, 1, 2])} {f32(r.choice([0.0, -1.0, 7.5]))}")
+                dst = (
+                    r.choice(["new", "self", "other"])
+                    if r.random() < 0.6
+                    else self.svol(r, d, r.choice([t, t, 3]), nf=nf, pz=1.0)
+                )
+                L.append(
+                    f"{pre}mmask 0 {a} 0 {mk} 0 {dst} {r.choice([0, 0, 1, 2])} {f32(r.choice([0.0, -1.0, 7.5]))}"
+                )
             elif k < 0.65:
-                dst = "new" if r.random() < 0.7 else self.svol(r, d, r.choice([t, 3]), nf=nf, pz=1.0)
-                L.append(f"mmask 1 {a} 0 {mk} 0 {dst} {r.choice([0, 1])} {f32(r.choice([0.0, 9.0]))}")
+                dst = (
+                    "new" if r.random() < 0.7 else self.svol(r, d, r.choice([t, 3]), nf=nf, pz=1.0)
+                )
+                L.append(
+                    f"mmask 1 {a} 0 {mk} 0 {dst} {r.choice([0, 1])} {f32(r.choice([0.0, 9.0]))}"
+                )
             else:
-                dst = r.choice(["new", "self"]) if r.random() < 0.6 else self.svol(r, d, r.choice([0, t, 3]), pz=1.0)
+                dst = (
+                    r.choice(["new", "self"])
+                    if r.random() < 0.6
+                    else self.svol(r, d, r.choice([0, t, 3]), pz=1.0)
+                )
                 L.append(
                     f"tmask {a} 0 {mk} 0 {dst} {f32(r.choice([0.5, 1.0, 1.5, 0.0]))} "
                     f"{f32(r.choice([0.0, 5.0, 255.0, 2.5]))}"
@@ -5593,7 +5654,17 @@ class Gen18(Gen17):
                 L.append(f"conform 2 {w} 0 8 {f64(1.0)} {keep}")
         L.append(f"conform 1 {bad} 0")
         # FS-492: fields of view beyond the int range, NaN; widths 0 and below; sizes 0 and below
-        for cw, sz in ((256, 1e10), (3, 1e10), (8, float("nan")), (8, float("inf")), (8, 0.0), (8, -2.0), (0, 1.0), (-1, 1.0), (1, 1.0)):
+        for cw, sz in (
+            (256, 1e10),
+            (3, 1e10),
+            (8, float("nan")),
+            (8, float("inf")),
+            (8, 0.0),
+            (8, -2.0),
+            (0, 1.0),
+            (-1, 1.0),
+            (1, 1.0),
+        ):
             L.append(f"conform 2 {lia} 0 {cw} {f64(sz)} 1")
         L.append(f"conform 2 {lia} 0 -2 {f64(1.0)} 0")
         # MRIconform of a header-only volume and of one of 0 voxels
@@ -5618,7 +5689,9 @@ class Gen18(Gen17):
         L.append(f"erodeseg {self.lab(P((4, 4, 3)), [1] * 48, t=1, nf=2)} 0 new 1 0")
         L.append(f"dilseg {sg} 0 self 1 null 0 {f64(0.5)}")
         L.append(f"dilseg {sg} 0 {self.lab(P((4, 3, 3)), [0], t=1)} 1 null 0 {f64(0.5)}")
-        L.append(f"dilseg {self.lab(P((4, 4, 3)), [1, 0] * 48, t=1, nf=2)} 0 new 1 null 0 {f64(0.5)}")
+        L.append(
+            f"dilseg {self.lab(P((4, 4, 3)), [1, 0] * 48, t=1, nf=2)} 0 new 1 null 0 {f64(0.5)}"
+        )
         # the lines that never end (FS-493, FS-497: the alarm of 1 second ends them) run without the guard
         # allocator: the erosion's steps each keep a copy, and under the guard allocator the process runs out
         # of mappings before the alarm, sooner or later from run to run
@@ -5635,7 +5708,9 @@ class Gen18(Gen17):
             cx = self.lab(P((4, 2, 1)), vals * 2, t=3).split(" ")
             cx[3] = "7"
             cxw = " ".join(cx)
-            (H if vals[0] else L).append(f"{'@1 ' if vals[0] else ''}dilseg {cxw} 0 new -1 null 0 {f64(0.5)}")
+            (H if vals[0] else L).append(
+                f"{'@1 ' if vals[0] else ''}dilseg {cxw} 0 new -1 null 0 {f64(0.5)}"
+            )
             L.append(f"dilseg {cxw} 0 new 1 null 0 {f64(0.5)}")
         # masks of the dilation: a NaN mask value is inside; a frame of the mask
         mk = self.lab(P((4, 4, 3)), [1.0, QNAN, 0.0, 0.4] * 12, t=3) + " 0"
@@ -5647,13 +5722,22 @@ class Gen18(Gen17):
         row = self.lab(P((8, 1, 1)), [130, 0, 0, 0, 0, 0, 0, 0], t=0)
         val = self.lab(P((8, 1, 1)), [200] * 8, t=0)
         for k in (0, 1):
-            for lab_, nit, th in ((130, 0, 115), (130, 1, 115), (130, 3, 115), (386, 2, 115), (130, 2, 200), (130, 2, 201)):
+            for lab_, nit, th in (
+                (130, 0, 115),
+                (130, 1, 115),
+                (130, 3, 115),
+                (386, 2, 115),
+                (130, 2, 200),
+                (130, 2, 201),
+            ):
                 L.append(f"dtl {k} {row} 0 {val} 0 new {lab_} {nit} {th}")
         L.append(f"dtl 0 {row} 0 {val} 0 {self.lab(P((4, 1, 1)), [0], t=0)} 130 1 115")
         for k in (0, 1):
             for lab_, nit in ((130, 0), (130, -1), (386, 2), (130, 2)):
                 L.append(f"dlab {k} {row} 0 new {lab_} {nit}")
-        frow = self.lab(P((6, 1, 1)), [2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], t=3, nf=2)
+        frow = self.lab(
+            P((6, 1, 1)), [2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], t=3, nf=2
+        )
         L.append(f"dlab 0 {frow} 0 new 2 2")
         # MRIopenN of order 0 and -1; MRIdilate6 in place and new on NaN values
         blob = self.lab(P((4, 4, 2)), [0.0, 1.0, 2.0, 0.0, QNAN, 3.0, 0.0, 1.0] * 4, t=3)
@@ -5668,13 +5752,17 @@ class Gen18(Gen17):
         L.append(f"rlist {bseg} 0 1 1 256 null {self.lab(P((4, 2, 1)), [0], t=0)}")
         L.append(f"rlist {bseg} 0 2 1 255 2 -2 null {self.lab(P((4, 2, 1)), [0], t=0)}")
         L.append(f"rlist {bseg} 0 1 1 9 null {self.lab(P((2, 2, 1)), [0], t=1)}")
-        L.append(f"rlist {bseg} 0 2 1 9 1 7 {self.lab(P((4, 2, 1)), [1.0, 0.4, QNAN, 0.5, 0.0, 1.0, 0.6, 0.49], t=3)} 0 new")
+        L.append(
+            f"rlist {bseg} 0 2 1 9 1 7 {self.lab(P((4, 2, 1)), [1.0, 0.4, QNAN, 0.5, 0.0, 1.0, 0.6, 0.49], t=3)} 0 new"
+        )
         # MRIthresholdMask of bytes with replacement values outside 0..255 and NaN (FS-494)
         bsrc = self.lab(P((4, 2, 1)), [10, 20, 30, 40, 50, 60, 70, 80], t=0)
         bmk = self.lab(P((4, 2, 1)), [0, 1, 2, 0, 1, 2, 0, 1], t=0)
         for ov in (300.0, -1.0, float("nan"), 1e10, 255.5, 2.7, -0.5):
             L.append(f"tmask {bsrc} 0 {bmk} 0 new {f32(1.0)} {f32(ov)}")
-        L.append(f"tmask {bsrc} 0 {bmk} 0 {self.lab(P((4, 2, 1)), [0.0], t=3)} {f32(1.0)} {f32(300.0)}")
+        L.append(
+            f"tmask {bsrc} 0 {bmk} 0 {self.lab(P((4, 2, 1)), [0.0], t=3)} {f32(1.0)} {f32(300.0)}"
+        )
         # MRIpercentThresh: the list's end, past it, below it, NaN (FS-495, FS-496), an empty mask
         pv = self.lab(P((3, 2, 2)), [float(i) for i in (5, 3, 9, 1, 7, 2, 8, 4, 6, 0, 11, 10)], t=3)
         pm = self.lab(P((3, 2, 2)), [1.0, 0.0, 0.0] * 4, t=3) + " 0"
@@ -5694,7 +5782,9 @@ class Gen18(Gen17):
         mk_b = self.lab(gb, [0.0, 1.0, 2.0] * 4, t=3)
         mk_c = self.lab(gc, [0.0, 1.0] * 4, t=3)
         for envv in ("", "0", "1", "x", "2abc", "-1"):
-            L.append(f"+env=FS_MRIMASK_ALLOW_DIFF_GEOM={envv} mmask 0 {ms} 0 {mk_b} 0 new 0 {f32(-9.0)}")
+            L.append(
+                f"+env=FS_MRIMASK_ALLOW_DIFF_GEOM={envv} mmask 0 {ms} 0 {mk_b} 0 new 0 {f32(-9.0)}"
+            )
         L.append(f"+gdiag=1 mmask 0 {ms} 0 {mk_a} 0 new 0 {f32(-9.0)}")
         L.append(f"mmask 0 {ms} 0 {mk_a} 0 {self.lab(ga, [0], t=1)} 0 {f32(-9.0)}")
         L.append(f"mmask 0 {ms} 0 {mk_c} 0 new 1 {f32(-9.0)}")
@@ -5710,21 +5800,27 @@ class Gen18(Gen17):
         # MRIturnOffBG: a voxel whose nearest label is 4 away, and none within 4
         ob = self.lab(P((12, 1, 1)), [0] * 11 + [9], t=0)
         L.append(f"offbg {ob} 0 {self.lab(P((12, 1, 1)), [0], t=0)} 0")
-        L.append(f"offbg {self.lab(P((4, 1, 1)), [7, 0, 6, 0], t=0)} 0 {self.lab(P((4, 1, 1)), [0], t=0)} 0")
+        L.append(
+            f"offbg {self.lab(P((4, 1, 1)), [7, 0, 6, 0], t=0)} 0 {self.lab(P((4, 1, 1)), [0], t=0)} 0"
+        )
         # MRIreplaceValuesOnly within FLT_EPSILON (the previous float of 1 is, the next is not)
         ev = self.lab(P((3, 1, 1)), ["3f800000", "3f800001", "3f7fffff"], t=3)
         L.append(f"rvonly {ev} 0 new {f32(1.0)} {f32(9.0)}")
         L.append(f"rvonly {ev} 0 self {f32(1.0)} {f32(9.0)}")
         # MRIcopyLabel: a byte label outside the range; floats equal to the label
         L.append(f"cplab {bseg} 0 {self.lab(P((4, 2, 1)), [0], t=0)} 258")
-        L.append(f"cplab {self.lab(P((3, 2, 1)), [2.0, 2.5, 2.0, QNAN, 0.0, 1.0], t=3)} 0 {self.lab(P((3, 2, 1)), [0.0], t=3)} 2")
+        L.append(
+            f"cplab {self.lab(P((3, 2, 1)), [2.0, 2.5, 2.0, QNAN, 0.0, 1.0], t=3)} 0 {self.lab(P((3, 2, 1)), [0.0], t=3)} 2"
+        )
         # MRIcomplement of two frames into a new one-frame volume (written outside: FS-53)
         L.append(f"compl {self.lab(P((2, 2, 1)), [0, 1, 2, 0, 3, 0, 0, 1], t=1, nf=2)} 0 new")
         # MRIsetEdges: NaN and a value beyond the float range
         for v in (float("nan"), 1e40, -0.0):
             L.append(f"edges {self.lab(P((3, 3, 3)), [1.0] * 27, t=3)} 0 {f64(v)} new")
         # MRIbinMaskToCol into a volume of other frames; MRIcomputeCentroid of NaN, zero, negative
-        L.append(f"b2c {self.lab(P((3, 2, 1)), [1.0] * 6, t=3)} 0 {self.lab(P((3, 2, 1)), [0], t=1, nf=2)}")
+        L.append(
+            f"b2c {self.lab(P((3, 2, 1)), [1.0] * 6, t=3)} 0 {self.lab(P((3, 2, 1)), [0], t=1, nf=2)}"
+        )
         for cv in ([QNAN, 1.0, 0.0], [0.0, 0.0, 0.0], [-1.0, 0.5, 0.25], ["33d6bf95", 0.0, 0.0]):
             L.append(f"cent {self.lab(P((3, 1, 1)), cv, t=3)} 0")
         # MRIcountValInNbhd: window sizes 0, -1, -2, 2, 1 at a corner
@@ -5733,7 +5829,10 @@ class Gen18(Gen17):
         for w in (0, -1, -2, 2, 1, 3):
             pts += [str(w), "0", "0", "0", "1"]
         L.append(f"cnbhd {cn} 0 6 {' '.join(pts)}")
-        return [Batch("vrules22", "vrules22", L), Batch("vrules22", "vrules22-hang", H, guards=False)]
+        return [
+            Batch("vrules22", "vrules22", L),
+            Batch("vrules22", "vrules22-hang", H, guards=False),
+        ]
 
 
 GROUPS = [

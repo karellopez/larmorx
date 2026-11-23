@@ -123,11 +123,15 @@ def main(argv: list[str] | None = None) -> int:
            "OMP_NUM_THREADS": "1", "FS_DISABLE_LANG": "1", "USER": "probe",
            **freesurfer_env()}  # fmt: skip
     runs_dir = ws / "oracles" / "freesurfer-8.2.0" / "runs"
-    runs = a.runs if a.runs is not None else sorted(
-        p.name for p in runs_dir.iterdir() if p.name.endswith("-v8")
+    runs = (
+        a.runs
+        if a.runs is not None
+        else sorted(p.name for p in runs_dir.iterdir() if p.name.endswith("-v8"))
     )
-    classic = a.classic if a.classic is not None else sorted(
-        p.name for p in runs_dir.iterdir() if p.name.endswith("-classic")
+    classic = (
+        a.classic
+        if a.classic is not None
+        else sorted(p.name for p in runs_dir.iterdir() if p.name.endswith("-classic"))
     )
     work = ws / "oracles" / "inputs" / "fs-vol2vol-real"
     avg = fsh / "average"

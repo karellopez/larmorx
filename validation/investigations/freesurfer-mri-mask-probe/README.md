@@ -45,7 +45,8 @@ another geometry with and without `-no-allow-diff-geom`; odd and one-voxel volum
 with each later option; missing or unreadable inputs; the output's names (`.mgh`, `.nii`,
 `.nii.gz`, no extension, an unknown extension, a folder that does not exist, `a.b/c`); and (cases
 193 and 194, added 2026-11-23) recon-all's spelling `-bb 0` and `-BBMM` with a pad of 0 after the
-mask on one axis only (FS-269: the default differs there with a notice).
+mask on one axis only (FS-269: the crops keep FreeSurfer's box in both modes, noted; `-BBEQ 0`'s
+default starts from the box one voxel larger).
 
 Compared for each case and mode: the exit status (a process ended by a signal as 128 + its
 number); standard output and standard error (the case's folder in messages that name a file by its
@@ -72,3 +73,10 @@ Run it in a memory box (every case needs less than 200 MiB).
 The replica as the candidate, seeds 1 and 2, 195 cases each: 194 identical in `reproduce`, 1 counted
 (FS-309), 0 different; `fix` identical on 113, explained by a notice on 81 (FS-269 on the nine
 crops whose pad after the mask is 0 or less on some axis).
+
+## Results (observed, relay 54 of track D, 2026-11-23: after FS-269's rule C for the crops)
+
+The replica as the candidate, seeds 1 and 2, 195 cases each: 194 identical in `reproduce`, 1 counted
+(FS-309), 0 different; `fix` identical on 120, explained by a notice on 74 (FS-269 only on the two
+`-BBEQ 0` cases; the seven other crops with a pad after the mask of 0 or less are now identical in
+both modes).

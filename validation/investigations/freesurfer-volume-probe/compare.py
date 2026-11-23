@@ -4834,6 +4834,327 @@ class Gen16(Gen15):
         return [Batch("vrules19", "vrules19", L)]
 
 
+class Gen17(Gen16):
+    """Part 10a (relay 18): the Talairach helpers (§46), dilation and the segment helpers (§48);
+    the fixed cases of the clean room's items 95 and 101 (§41, §43)."""
+
+    def tarr(self, n: int, ty: int, ga, gb, m: str, valid: int = 1) -> str:
+        """An array of n transforms of the type: the first with the matrix (the others the
+        identity), each from ga to gb (gb's ``valid`` flag given), the inverse transforms the
+        identity from gb to ga."""
+        ident = "4 4 " + " ".join(f32(1.0 if i % 5 == 0 else 0.0) for i in range(16))
+
+        def lt(mm: str, a: str, b: str) -> str:
+            return " ".join([f32(0.0)] * 3 + [f32(1.0), mm, Z44, Z44, "0", "0", a, b])
+
+        fw = [lt(m if i == 0 else ident, self.g_of(ga), self.g_of(gb, valid)) for i in range(n)]
+        inv = [lt(ident, self.g_of(gb), self.g_of(ga)) for _ in range(n)]
+        return f"{n} {ty} {f32(1.0)} {xs('')} {' '.join(fw + inv)}".rstrip()
+
+    def talm(self, r: random.Random) -> str:
+        """A Talairach-like matrix: near a scaling, any affine, or one with special entries."""
+        k = r.random()
+        if k < 0.6:
+            return self.near(r, scale=r.choice([1.0, 1.1, 0.9]), t=20.0)
+        if k < 0.9:
+            return self.affine(r)
+        return self.affine(r, special=1.0)
+
+    def talarr(self, r: random.Random, ga) -> str:
+        """``null`` or an array: mostly one RAS-to-RAS transform, its destination valid or not;
+        sometimes none, two, or another type."""
+        k = r.random()
+        if k < 0.15:
+            return "null"
+        n = 1 if r.random() < 0.85 else r.choice([0, 2])
+        ty = 1 if r.random() < 0.85 else r.choice([0, 2])
+        gb = self.rgeo(r, (r.randint(1, 5), r.randint(1, 5), r.randint(1, 4)))
+        return self.tarr(n, ty, ga, gb, self.talm(r), valid=1 if r.random() < 0.6 else 0)
+
+    def talpre(self, r: random.Random) -> str:
+        """NO_AVERAGE305 set or not, DIAG_SHOW and DIAG_VERBOSE or not."""
+        pre = ""
+        if r.random() < 0.3:
+            pre += f"+env=NO_AVERAGE305={r.choice(['true', ''])} "
+        k = r.random()
+        if k < 0.25:
+            pre += f"+gdiag={r.choice(['10000040', '10000000', '40'])} "
+        return pre
+
+    def vtal(self) -> list[Batch]:
+        """§46: ModifyTalairachCRAS, the four matrices, the four point functions and
+        TransformWithMatrix (NaN and infinite coordinates and matrix entries), the three
+        resamplings (with and without the second volume; nearest, trilinear and sinc), on volumes
+        of several types, geometries and extents, with arrays of 0 to 2 transforms of several
+        types, destinations valid or not, NO_AVERAGE305 and the diagnostic bits."""
+        r = self.rng("vtal")
+        L = []
+
+        def vol(dmax=(4, 4, 3)):
+            d = (r.randint(1, dmax[0]), r.randint(1, dmax[1]), r.randint(1, dmax[2]))
+            t = r.choice([0, 3, 3, 1, 4])
+            w, geo = self.p9vol(r, d, t, 1)
+            return w, geo
+
+        for _ in range(60):
+            w, geo = vol()
+            L.append(f"{self.talpre(r)}talcras {w} 0 {self.talarr(r, geo)}")
+        for _ in range(80):
+            w, geo = vol()
+            arr = self.talarr(r, geo)
+            if arr.startswith("0 ") and r.random() < 0.7:
+                arr = "null"  # FreeSurfer reads past an empty array in some (memory): a few only
+            L.append(f"{self.talpre(r)}talmat {r.randrange(4)} {w} 0 {arr}")
+        for _ in range(60):
+            kind = r.choice([0, 1, 2, 3, 4, 4])
+            n = r.randint(1, 4)
+            pts = []
+            for _ in range(n * 3):
+                pts.append(self.od(r) if r.random() < 0.15 else f64(r.uniform(-20.0, 20.0)))
+            if kind == 4:
+                m = self.affine(r, special=0.5)
+                L.append(f"talpt 4 {m} {n} {' '.join(pts)}")
+            else:
+                w, geo = vol()
+                arr = self.talarr(r, geo)
+                if arr.startswith("0 "):
+                    arr = "null"
+                L.append(f"{self.talpre(r)}talpt {kind} {w} 0 {arr} {n} {' '.join(pts)}")
+        for _ in range(40):
+            kind = r.choice([0, 0, 1, 2])
+            w, geo = vol((3, 3, 3))
+            t = "new"
+            if kind == 2 or r.random() < 0.5:
+                t = (
+                    self.p9vol(r, (r.randint(1, 3), r.randint(1, 3), r.randint(1, 3)), 3, 1)[0]
+                    + " 0"
+                )
+            arr = self.talarr(r, geo)
+            if arr.startswith("0 "):
+                arr = "null"
+            interp = f" {r.choice([0, 1, 2])}" if kind == 0 else ""
+            L.append(f"{self.talpre(r)}talvol {kind} {w} 0 {t} {arr}{interp}")
+        return [Batch("vtal", "vtal", L)]
+
+    def dilvol(self, r: random.Random, d, t: int, nf: int = 1) -> str:
+        """A sparse volume: zeros with a few values (labels, negatives, NaN for floats)."""
+        n = d[0] * d[1] * d[2] * nf
+        vals = []
+        for _ in range(n):
+            k = r.random()
+            if k < 0.7:
+                vals.append(0 if t != 3 else 0.0)
+            elif t == 3:
+                vals.append(QNAN if r.random() < 0.08 else r.choice([1.0, 7.5, -3.0, 250.0, 0.25]))
+            elif t == 0:
+                vals.append(r.randint(1, 255))
+            else:
+                vals.append(r.choice([1, 2, 3, 300, -4, 17]))
+        return self.lab(self.rgeo(r, d), vals, t=t, nf=nf)
+
+    def vdil(self) -> list[Batch]:
+        """§48: MRIdilate and MRIdilateUchar (bytes, ints, longs, floats, shorts, 1 or 2 frames,
+        destinations new, the source itself, a volume of the same extent and, rarely, of another);
+        MRImatchSegs (label lists, destinations new, the source itself, a volume); MRIsegStats
+        (frames, segments present and absent); HISTOseg (bin ranges of positive, zero and
+        negative counts)."""
+        r = self.rng("vdil")
+        L = []
+
+        def dims():
+            return (r.randint(1, 5), r.randint(1, 4), r.randint(1, 3))
+
+        for _ in range(90):
+            d = dims()
+            t = r.choice([0, 0, 1, 3, 3, 4])
+            nf = 1 if r.random() < 0.8 else 2
+            src = self.dilvol(r, d, t, nf)
+            k = r.random()
+            if k < 0.45:
+                dst = "new"
+            elif k < 0.7:
+                dst = "self"
+            else:
+                dd = d if r.random() < 0.9 else dims()
+                dst = self.lab(self.rgeo(r, dd), [0], t=r.choice([0, t, 3]), nf=nf)
+            cmd = "dilate" if r.random() < 0.7 else "dilu"
+            L.append(f"{cmd} {src} 0 {dst}")
+        for _ in range(60):
+            d = dims()
+            t = r.choice([0, 1, 3])
+            seg = self.dilvol(r, d, t)
+            k = r.random()
+            dst = "new" if k < 0.6 else "self" if k < 0.75 else self.lab(self.rgeo(r, d), [0], t=3)
+            n = r.randint(0, 4)
+            lst = [r.choice([0, 1, 2, 3, 7, 17, 300, -4, 255]) for _ in range(n)]
+            L.append(
+                f"msegs {seg} 0 {dst} {n}{' ' if n else ''}{' '.join(map(str, lst))} "
+                f"{r.choice([1, 5, 255, -2])}"
+            )
+        for _ in range(60):
+            d = dims()
+            nf = r.randint(1, 2)
+            seg = self.dilvol(r, d, r.choice([0, 1, 3]))
+            vol = self.p9vol(r, d, r.choice([0, 3, 3]), nf)[0]
+            L.append(f"sstat {seg} 0 {vol} 0 {r.choice([0, 1, 1, 2, 3, 17])} {r.randrange(nf)}")
+        for _ in range(60):
+            d = dims()
+            seg = self.dilvol(r, d, r.choice([0, 1, 3]))
+            vol = self.p9vol(r, d, r.choice([0, 3, 3]), 1)[0]
+            lo = r.choice([0.0, -10.0, 5.0, 0.5])
+            hi = lo + r.choice([10.0, 100.0, 3.0, 0.0, 250.0])
+            dl = r.choice([1.0, 2.0, 5.0, 0.5, 10.0])
+            L.append(
+                f"hseg {seg} 0 {vol} 0 {r.choice([0, 1, 1, 2, 3, 17])} {f64(lo)} {f64(hi)} {f64(dl)}"
+            )
+        return [Batch("vdil", "vdil", L)]
+
+    def vrules20(self) -> list[Batch]:
+        """Fixed cases (relay 18): the clean room's item 95 (REGIONgetBoundingBoxEqOdd's room
+        after the box, §43) and item 101 (the orders a target or moving volume of width 0 shows,
+        §41); §46: ModifyTalairachCRAS's every branch and message, the matrices' ends, a point
+        through a matrix that could not be made (FS-487), TransformWithMatrix's NaN operands,
+        MRIfromTalairachEx without a target (FS-488); §48: an empty volume of extent 1, FS-489,
+        FS-490, a negative bin count, one voxel and none in MRIsegStats."""
+        L = []
+        # item 95: the room after the box is taken with the box's own size
+        L.append(f"rgbb {self.p9bmask((8, 8, 3), [((2, 0, 0), (3, 7, 1))])} 0 2 0")
+        # item 101: a target or moving volume of width 0, singular scanner matrices
+        sing = (
+            (3, 3, 3),
+            [
+                *(f32(1.0) for _ in range(3)),
+                "1",
+                *(f32(x) for x in (1, 0, 0, 1, 0, 0, 0, 0, 1)),
+                *[f32(0.0)] * 6,
+            ],
+        )
+        one = self.plain((3, 3, 3))
+        s3 = self.lab(one, [float(i) for i in range(27)], t=3)
+        ss = self.lab(sing, [1.0] * 27, t=3)
+        t0 = self.lab(self.plain((0, 2, 2)), [0.0], t=3)
+        ident = "4 4 " + " ".join(f32(1.0 if i % 5 == 0 else 0.0) for i in range(16))
+        z0 = f64(0.0)
+        L += [
+            f"vvk {ss} 0 {t0} 0 null",
+            f"vvk {s3} 0 {t0} 0 null",
+            f"vvd {ss} 0 {t0} 0 null",
+            f"vvd {s3} 0 {t0} 0 null",
+            f"rd2lta {t0} {ss} null",
+            f"rd2lta {ss} {t0} null",
+            f"rd2lta {s3} {t0} null",
+            f"rd2lta {t0} {s3} null",
+            f"rd2lta {t0} {s3} {ident}",
+            f"rd2lta {s3} {t0} {ident}",
+            f"vvtk {s3} 0 {z0} {t0} 0 {ident} 0 {f32(1.0)} null null 0",
+            f"vvtk {t0} 0 {z0} {s3} 0 {ident} 0 {f32(1.0)} null null 0",
+        ]
+        # §46: ModifyTalairachCRAS
+        ga = self.plain((3, 3, 2), c=(1.0, -2.0, 3.0))
+        gb = self.plain((4, 4, 4), c=(5.0, 6.0, 7.0))
+        v = self.lab(ga, [float(i) for i in range(18)], t=3)
+        m = "4 4 " + " ".join(f32(x) for x in (1, 0, 0, 2, 0, 1, 0, -3, 0, 0, 1, 4, 0, 0, 0, 1))
+        a1 = self.tarr(1, 1, ga, gb, m)
+        a1i = self.tarr(1, 1, ga, gb, m, valid=0)
+        a1v2 = self.tarr(1, 1, ga, gb, m, valid=2)
+        a0 = self.tarr(0, 1, ga, gb, m)
+        a2 = self.tarr(2, 1, ga, gb, m)
+        a2t = self.tarr(2, 0, ga, gb, m)
+        a1t = self.tarr(1, 0, ga, gb, m)
+        for pre in (
+            "",
+            "+env=NO_AVERAGE305= ",
+            "+gdiag=10000000 ",
+            "+env=NO_AVERAGE305=1 +gdiag=10000000 ",
+        ):
+            L.append(f"{pre}talcras {v} 0 null")
+        for pre in ("", "+gdiag=40 ", "+gdiag=10000000 ", "+gdiag=10000040 "):
+            L.append(f"{pre}talcras {v} 0 {a1}")
+        for pre in (
+            "",
+            "+env=NO_AVERAGE305=true ",
+            "+gdiag=10000000 ",
+            "+env=NO_AVERAGE305=true +gdiag=10000040 ",
+        ):
+            L.append(f"{pre}talcras {v} 0 {a1i}")
+        L.append(f"talcras {v} 0 {a1v2}")  # valid 2 is not 1
+        for a in (a0, a2, a2t, a1t):
+            L.append(f"talcras {v} 0 {a}")
+        # the matrices: every kind with each array
+        for k in range(4):
+            for a in ("null", a1, a1i, a1t, a2):
+                L.append(f"talmat {k} {v} 0 {a}")
+        # a header-only volume, a volume of width 0
+        hv = self.lab(ga, [0.0], t=3).split(" ")
+        hv[5] = "1"
+        L.append(f"talmat 1 {' '.join(hv)} 0 {a1}")
+        L.append(f"talmat 3 {t0} 0 {a1}")
+        # a singular voxel-to-RAS matrix: the products end the program; FS-487: a point through a
+        # matrix that could not be made (a transform matrix of 3 x 3: the product's size mismatch)
+        pts = "2 " + " ".join(f64(x) for x in (1.0, 2.0, 0.5, -1.0, 0.0, 3.0))
+        m3 = "3 3 " + " ".join(f32(1.0 if i % 4 == 0 else 0.0) for i in range(9))
+        a3 = self.tarr(1, 1, ga, gb, m3)
+        for k in range(4):
+            L.append(f"talpt {k} {ss} 0 null {pts}")
+            L.append(f"talpt {k} {ss} 0 {self.tarr(1, 1, sing, gb, m)} {pts}")
+            L.append(f"talpt {k} {v} 0 {a3} {pts}")
+            L.append(f"talmat {k} {v} 0 {a3}")
+        # TransformWithMatrix: NaN matrix entries and coordinates, in each row and operand
+        nans = [QNAN, "7fc12345", "ffc00000", "7f800001", INF]
+        dnan = f"{DSPECIAL[5]:016x}"
+        for row in range(3):
+            for col in range(4):
+                vals = [f32(1.0 if i % 5 == 0 else 0.5) for i in range(16)]
+                vals[row * 4 + col] = nans[(row + col) % len(nans)]
+                L.append(
+                    f"talpt 4 4 4 {' '.join(vals)} 2 {f64(float('nan'))} {f64(2.0)} {f64(3.0)} "
+                    f"{f64(1.0)} {f64(float('inf'))} {dnan}"
+                )
+        # the resamplings: MRIfromTalairachEx without a target (FS-488), and the other two
+        tv = self.lab(gb, [0.0], t=3)
+        L.append(f"talvol 2 {v} 0 new {a1}")
+        L.append(f"talvol 2 {v} 0 {tv} 0 null")
+        L.append(f"talvol 0 {v} 0 new null 1")
+        L.append(f"talvol 1 {v} 0 {tv} 0 {a1i}")
+        # §48: an all-zero volume of extent 1 and of two voxels; every voxel set
+        for d in ((1, 1, 1), (2, 1, 1)):
+            for t in (0, 3):
+                z = self.lab(self.plain(d), [0] * (d[0] * d[1] * d[2]), t=t)
+                L.append(f"dilate {z} 0 new")
+                L.append(f"dilu {z} 0 new")
+        full = self.lab(self.plain((3, 2, 2)), [5.0] * 12, t=3)
+        L.append(f"dilate {full} 0 self")
+        L.append(f"dilate {full} 0 {self.lab(self.plain((2, 2, 2)), [0.0], t=3)}")  # another extent
+        # MRIdilateUchar of a float volume: its rows read as bytes
+        L.append(
+            f"dilu {self.lab(self.plain((3, 2, 1)), [0.0, 1.0, 0.0, 0.0, 0.0, 2.0], t=3)} 0 new"
+        )
+        # FS-489: the mask in the segmentation itself
+        sg = self.lab(self.plain((3, 2, 2)), [1, 2, 3, 2, 2, 0, 1, 1, 3, 5, 2, 2], t=1)
+        L.append(f"msegs {sg} 0 self 2 2 3 9")
+        L.append(f"msegs {sg} 0 new 2 2 3 9")
+        L.append(f"msegs {sg} 0 self 1 0 4")
+        L.append(f"msegs {sg} 0 {self.lab(self.plain((2, 2, 2)), [0], t=1)} 1 2 9")
+        # MRIsegStats: one voxel, none, NaN values
+        vol = self.lab(self.plain((3, 2, 2)), [float(i) * 1.5 for i in range(12)], t=3)
+        nvol = self.lab(self.plain((3, 2, 2)), [1.0, QNAN, 2.0, QNAN, 4.0, 5.0] * 2, t=3)
+        for sid in (2, 5, 7, 0):
+            L.append(f"sstat {sg} 0 {vol} 0 {sid} 0")
+        L.append(f"sstat {sg} 0 {nvol} 0 2 0")
+        # HISTOseg: zero bins (FS-490), a negative count, one bin, a NaN width
+        for lo, hi, dl in (
+            (0.0, -2.0, 2.0),
+            (0.0, -3.0, 2.0),
+            (0.0, -10.0, 2.0),
+            (0.0, 0.0, 1.0),
+            (0.0, 10.0, float("nan")),
+            (0.0, 10.0, 2.0),
+        ):
+            L.append(f"hseg {sg} 0 {vol} 0 2 {f64(lo)} {f64(hi)} {f64(dl)}")
+        L.append(f"hseg {sg} 0 {nvol} 0 2 {f64(0.0)} {f64(10.0)} {f64(2.0)}")
+        return [Batch("vrules20", "vrules20", L)]
+
+
 GROUPS = [
     "vgblock",
     "vgcopy",
@@ -4890,6 +5211,9 @@ GROUPS = [
     "vcov",
     "vvoxel",
     "vrules19",
+    "vtal",
+    "vdil",
+    "vrules20",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -5047,7 +5371,7 @@ def licence_guard(b: Batch) -> None:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen16) else Gen16(gen.seed)
+    gen = gen if isinstance(gen, Gen17) else Gen17(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

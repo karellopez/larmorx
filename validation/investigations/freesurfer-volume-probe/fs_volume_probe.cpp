@@ -51,6 +51,7 @@
 #include "mri.h"
 #include "mri2.h"
 #include "region.h"
+#include "talairachex.h"
 #include "resample.h"
 #include "transform.h"
 #include "utils.h"
@@ -2682,6 +2683,126 @@ static void call(const std::string &c)
       putf(MRIvoxelDirection(m, x, y, z, w));
       putf(MRIvoxelGradientDir2ndDerivative(m, x, y, z, w));
       fflush(stdout);
+    }
+  }
+  // part 10a: the Talairach helpers (§46), dilation and the segment helpers (§48)
+  else if (c == "talcras") {
+    MRI *m = getw();
+    paint(m);
+    LTA *l = take("null") ? NULL : getlta();
+    fflush(stdout);
+    int r = ModifyTalairachCRAS(m, l);
+    fflush(stdout);
+    puti(r);
+    putv(m);
+  }
+  else if (c == "talmat") {
+    int kind = geti();
+    MRI *m = getw();
+    paint(m);
+    LTA *l = take("null") ? NULL : getlta();
+    fflush(stdout);
+    MATRIX *res = kind == 0   ? MtalairachFromVoxel(m, l)
+                  : kind == 1 ? MtalVoxelFromVoxel(m, l)
+                  : kind == 2 ? MvoxelFromTalairach(m, l)
+                              : MvoxelFromTalVoxel(m, l);
+    fflush(stdout);
+    putm(res);
+  }
+  else if (c == "talpt") {
+    int kind = geti();
+    MRI *m = NULL;
+    MATRIX *M = NULL;
+    LTA *l = NULL;
+    if (kind == 4)
+      M = getm();
+    else {
+      m = getw();
+      paint(m);
+      l = take("null") ? NULL : getlta();
+    }
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd(), y = getd(), z = getd(), px = UNSETD, py = UNSETD, pz = UNSETD;
+      int r = 0;
+      fflush(stdout);
+      if (kind == 4) TransformWithMatrix(M, x, y, z, &px, &py, &pz);
+      else if (kind == 0) r = MRIvoxelToTalairachEx(m, x, y, z, &px, &py, &pz, l);
+      else if (kind == 1) r = MRIvoxelToTalairachVoxelEx(m, x, y, z, &px, &py, &pz, l);
+      else if (kind == 2) r = MRItalairachToVoxelEx(m, x, y, z, &px, &py, &pz, l);
+      else r = MRItalairachVoxelToVoxelEx(m, x, y, z, &px, &py, &pz, l);
+      fflush(stdout);
+      puti(r);
+      putd(px);
+      putd(py);
+      putd(pz);
+    }
+  }
+  else if (c == "talvol") {
+    int kind = geti();
+    MRI *m = getw();
+    paint(m);
+    MRI *t = take("new") ? NULL : getw();
+    if (t) paint(t);
+    LTA *l = take("null") ? NULL : getlta();
+    int interp = kind == 0 ? geti() : 0;
+    fflush(stdout);
+    MRI *res = kind == 0   ? MRItoTalairachExInterp(m, t, l, interp)
+               : kind == 1 ? MRItoTalairachEx(m, t, l)
+                           : MRIfromTalairachEx(m, t, l);
+    fflush(stdout);
+    putres(res, m, NULL, t);
+  }
+  else if (c == "dilate" || c == "dilu") {
+    MRI *a = getw();
+    paint(a);
+    MRI *d = getdst(a);
+    fflush(stdout);
+    MRI *res = c == "dilate" ? MRIdilate(a, d) : MRIdilateUchar(a, d);
+    fflush(stdout);
+    putres(res, a, NULL, d);
+  }
+  else if (c == "msegs") {
+    MRI *a = getw();
+    paint(a);
+    MRI *d = getdst(a);
+    int n = geti();
+    std::vector<int> list(n > 0 ? (size_t)n : 1);
+    for (int i = 0; i < n; i++) list[(size_t)i] = geti();
+    int id = geti();
+    fflush(stdout);
+    MRI *res = MRImatchSegs(a, list.data(), n, id, d);
+    fflush(stdout);
+    putres(res, a, NULL, d);
+  }
+  else if (c == "sstat" || c == "hseg") {
+    MRI *s = getw();
+    paint(s);
+    MRI *v = getw();
+    paint(v);
+    int id = geti();
+    if (c == "sstat") {
+      int f = geti();
+      float mn = 7.0f, mx = 7.0f, rg = 7.0f, me = 7.0f, sd = 7.0f;
+      fflush(stdout);
+      int n = MRIsegStats(s, id, v, f, &mn, &mx, &rg, &me, &sd);
+      fflush(stdout);
+      puti(n);
+      for (float x : {mn, mx, rg, me, sd}) putf(x);
+    }
+    else {
+      double lo = getd(), hi = getd(), dl = getd();
+      fflush(stdout);
+      HISTOGRAM *h = HISTOseg(s, id, v, lo, hi, dl);
+      fflush(stdout);
+      // the histogram: max_bins nbins bin_size min max, then each bin's value and count
+      puti(h->max_bins);
+      puti(h->nbins);
+      for (float x : {h->bin_size, h->min, h->max}) putf(x);
+      for (int i = 0; i < h->nbins; i++) {
+        putf(h->bins[i]);
+        putf(h->counts[i]);
+      }
     }
   }
   else

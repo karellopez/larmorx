@@ -2433,31 +2433,42 @@ FreeSurfer's count with `reproduce`, FS-483's decided count with `fix` (**(obser
 as the model, none different; FS-483's count changes 43 of them). FS-486 is not reached (§44: every sample is
 written), so nothing notes it.
 
-## 46. Talairach helpers (3.1-38: talairachex.cpp)
+## 46. Talairach helpers (3.1-38)
+(Made ready for the clean room by the spec finisher's relay 18: §69.2's groups `vtal` and `vrules20`.)
 - `ModifyTalairachCRAS(mri_tal, lta)`: sets the Talairach volume's centre. With a transform array: it must hold
   exactly one transform (otherwise `<Progname>: xfm has more than one xfrm`, also for none) of type
-  `LINEAR_RAS_TO_RAS` (otherwise `<Progname>: xfm passed is not of RAS-to-RAS type`; both end the program with
-  `ERROR_BADPARM`, the count checked first). Its destination geometry's centre is taken when that geometry's `valid`
-  is 1 (with both `DIAG_SHOW` and `DIAG_VERBOSE`: `INFO: Modifying dst c_(r,a,s), using the transform dst` on
+  `LINEAR_RAS_TO_RAS` (otherwise `<Progname>: xfm passed is not of RAS-to-RAS type`; both end the program as
+  C-style errors with `ERROR_BADPARM`, status 252, `specs/freesurfer-core.md` §2 and §3, the count checked first;
+  `<Progname>` the program's name, the probe's `fs_volume_probe`). Its destination geometry's centre is taken when that geometry's `valid`
+  is exactly 1 (with both `DIAG_SHOW` and `DIAG_VERBOSE` in `Gdiag`: `INFO: Modifying dst c_(r,a,s), using the transform dst` on
   standard output). Otherwise, and without a transform array: when the environment has `NO_AVERAGE305` (any value,
   empty included) `INFO: tal c_(r,a,s) not modified` on standard error and the centre is kept; else the centre
   becomes average_305's, the `double` constants -0.095, -16.51 and 9.75 stored as `float`s (with `DIAG_VERBOSE`, on
   standard error: `INFO: Modifying talairach volume c_(r,a,s) based on average_305.` and `INFO: If not preferred,
   set environmental varible NO_AVERAGE305 true.` with a transform array, `INFO: Modifying talairach volume c_(r,a,s)
   based on average_305` without). Then both cached matrices are recomputed from the geometry (voxel-to-RAS, then
-  its inverse: section 2's rules). Returns 0.
-- The Talairach volume of a volume `v`: a header of `v`'s extent and type with one frame, `v`'s header copied into
-  it, then `ModifyTalairachCRAS` with the same transform array (its messages each time).
+  its inverse: section 2's rules), whichever branch was taken. Returns 0 (**(observed)**: `vtal`; `vrules20`, every
+  branch: no array with and without `NO_AVERAGE305` (set empty or not) and `DIAG_VERBOSE`, a valid destination
+  with each diagnostic bit, a destination not valid (0 or 2) with and without `NO_AVERAGE305`, arrays of 0 and 2
+  transforms and of another type).
+- The Talairach volume of a volume `v`: a header of `v`'s extent and type with one frame (fs.mri §4: an extent of 0
+  prints the shape message), `v`'s header copied into it, then `ModifyTalairachCRAS` with the same transform array
+  (its messages and ends each time).
 - `MtalairachFromVoxel(src, lta)`: `src`'s voxel-to-RAS matrix (section 2, no shear), with a transform array
   multiplied on the left by its first transform's matrix (`MatrixMultiply(M, A)`); without, a copy. A transform
   array holding no transform ends the program with `lta does not have xform`, one of another type than
-  `LINEAR_RAS_TO_RAS` with `lta must be RAS_TO_RAS transform` (`ERROR_BADPARM`; checked in that order).
+  `LINEAR_RAS_TO_RAS` with `lta must be RAS_TO_RAS transform` (C-style errors, `ERROR_BADPARM`, status 252; checked
+  in that order, after the voxel-to-RAS matrix is made). The product follows fs.maths' `MatrixMultiply` (its size
+  rules: a transform matrix that is not 4 x 4 gives no matrix with its error and returns, **(observed)**:
+  `vrules20`).
 - `MtalVoxelFromVoxel(src, lta)`: `MtalairachFromVoxel` first, then the Talairach volume of `src`; the product of the
   Talairach volume's RAS-to-voxel matrix and the first (`NULL` when either is: `MatrixMultiply`'s messages).
 - `MvoxelFromTalairach(dst, lta)`: the inverse of the first transform's matrix (`MatrixInverse`, its messages), or a
   4 x 4 identity without a transform array; then `dst`'s RAS-to-voxel matrix times it (`NULL` when either is). The
-  type of the array is not checked. FS-487: an array holding no transform is taken as having no matrix
-  (`MatrixInverse: NULL input matrix!`, the program ends).
+  type of the array is not checked. FS-487: an array holding no transform has no first transform, and FreeSurfer
+  reads past the array for its matrix (memory it does not own; no matrix in every probe run); in both modes it is
+  taken as having no matrix (`MatrixInverse: NULL input matrix!`, the program ends), noted (**(observed)**:
+  `vtal`).
 - `MvoxelFromTalVoxel(dst, lta)`: the Talairach volume of `dst` first, its voxel-to-RAS matrix, then
   `MvoxelFromTalairach(dst, lta)`, and the product of the latter and the former.
 - `TransformWithMatrix(M, x, y, z)`: each coordinate rounded to `float`; then for each of the first three rows `r`,
@@ -2468,8 +2479,14 @@ written), so nothing notes it.
 - The point functions return 0 and write the point through their matrix: `MRIvoxelToTalairachEx` (through
   `MtalairachFromVoxel(src)`), `MRIvoxelToTalairachVoxelEx` (`MtalVoxelFromVoxel(src)`), `MRItalairachToVoxelEx`
   (`MvoxelFromTalairach(dst)`), `MRItalairachVoxelToVoxelEx` (`MvoxelFromTalVoxel(dst)`), each matrix computed again
-  for every point (its messages each time). FS-487: where that matrix is `NULL` the original crashes; larmorx gives
-  the error `<function>: no matrix to transform the point with` and leaves the point unset.
+  for every point (its messages and ends each time; a matrix that cannot be inverted or multiplied ends the
+  program inside those products, as fs.maths says). FS-487: where the matrix is none without an end (a transform
+  matrix of another size than 4 x 4: the product's size error, which returns none), FreeSurfer crashes on the
+  point; in both modes the point is left unset, the function returns 0 and prints `error: <function>: no matrix to
+  transform the point with` and a newline on standard error (`specs/freesurfer-core.md` §2's C++ error form),
+  noted (**(observed)**: `vrules20`, a 3 x 3 transform matrix through each point function: the size error, then
+  `CRASH 11` for `MRIvoxelToTalairachEx` and `MRItalairachToVoxelEx`, and the program's end in the second product
+  of the other two).
 - `MRItoTalairachExInterp(src, tal, lta, interp)` and `MRItoTalairachEx(src, tal, lta)`: the matrix
   `MtalVoxelFromVoxel(src, lta)`, then `voxel to talairach voxel transform` and the matrix (`MatrixPrint`, 5 decimals;
   `MatrixPrint: mat = NULL!` for none) on standard error; without `tal`, a clone of `src` (voxels not copied) with
@@ -2477,49 +2494,72 @@ written), so nothing notes it.
   the second), whose result is ignored; returns `tal`.
 - `MRIfromTalairachEx(tal, dst, lta)`: `MvoxelFromTalVoxel(dst, lta)`, `talairach voxel to voxel transform` and the
   matrix on standard error, `MRIlinearTransform(tal, dst, M)`; returns `dst`. FS-488: without `dst` the original
-  crashes before its check; larmorx ends with that check's `<Progname>: Needs target volume to recover c_(ras)`
-  (`ERROR_BADPARM`).
+  crashes before its check (it makes the matrix from the target it does not have); in both modes the program ends
+  first with that check's `<Progname>: Needs target volume to recover c_(ras)` (a C-style error, `ERROR_BADPARM`,
+  status 252), noted (**(observed)**: `vrules20`, `CRASH 11`).
 - `MRASFromTalVoxel` and `MRItalairachVoxelToWorldEx` are reached by no program and not ported.
 
 ## 47. Validation plan (section 46)
-The probe's commands `talcras`, `talmat` (the four matrices), `talpt` (the four point functions and
-`TransformWithMatrix` on a matrix of its own, NaNs included), `talvol` (the three resamplings, with and without the
-second volume; sampling methods but the cubic B-spline): generated volumes and transform arrays of 0, 1 or 2
-transforms of several types (the first one's matrix voxel-to-voxel-like, anything or with NaNs, its destination
-geometry valid or not), `NO_AVERAGE305` set or not, `DIAG_SHOW` and `DIAG_VERBOSE`. Expected: identical with
-`reproduce` but where FreeSurfer crashes or reads memory it does not own (FS-487, FS-488, and the resampling's FS-53,
-FS-325), counted and not compared; the default differs only with a notice.
+Made ready by the spec finisher's relay 18: §69's groups `vtal` (seeded) and `vrules20` (fixed cases) (the open
+probe's `talcras`, `talmat` (the four matrices), `talpt` (the four point functions and `TransformWithMatrix` on a
+matrix of its own, NaNs included), `talvol` (the three resamplings, with and without the second volume; nearest,
+trilinear and sinc); README.md says what each prints): generated volumes of bytes, ints, longs, floats and shorts
+up to 4 x 4 x 3 voxels and transform arrays of 0, 1 or 2 transforms of the types 0, 1 and 2 (the first one's matrix
+near a scaling, any affine or with special entries, its destination geometry valid or not), `NO_AVERAGE305` set
+(empty or not) or not, `DIAG_SHOW` and `DIAG_VERBOSE`. Expected: identical with `reproduce` but where FreeSurfer
+crashes or reads memory it does not own (FS-487, FS-488, and the resampling's FS-53, FS-325), lines the loop allows;
+the default differs only with a notice. FS-487's and FS-488's ends are larmorx's own (the loop lets those lines
+differ, as FreeSurfer crashed there): the implementations' own tests, against section 46's text.
 
-## 48. Dilation and segment helpers (3.1-38: mriset.cpp's MRIdilate, mri2.cpp's segment functions)
+## 48. Dilation and segment helpers (3.1-38)
+(Made ready for the clean room by the spec finisher's relay 18: §69.2's groups `vdil` and `vrules20`.) `(int) v` of a
+value beyond the `int` range or NaN is FS-12 here too (clamped by default, NaN to 0, noted; -2147483648 with
+`reproduce`), as section 50's common rules say.
 - `MRIdilateUchar(src, dst)`: without `dst` a clone of `src` (voxels zero); a `dst` of another extent ends the program
   (`MRIcheckVolDims`'s message); `dst == src`: the dilation goes into a clone, copied back with `MRIcopy` at the end.
   The bounding box of `src`'s nonzero bytes (frame 0, read as bytes), grown by one voxel and clipped to the volume
   (starting from `[w-1, 0]` per axis, so an all-zero volume of extent 1 still visits its voxel); in it each voxel of
   `dst` becomes the largest byte of the 3 x 3 x 3 neighbourhood (coordinates clamped to the volume), written as a byte
-  at the voxel's index of the row (whatever `dst`'s type). Other voxels of `dst` are not touched.
+  at the voxel's index of the row (whatever `dst`'s type). Other voxels of `dst` are not touched. The box is found
+  slices outermost, then rows, then columns; its voxels are visited slices, rows, columns (**(observed)**: `vdil`;
+  `vrules20`, an all-zero volume of one voxel and of two, a float volume's rows read as bytes).
 - `MRIdilate(src, dst)`: a byte `src` is `MRIdilateUchar`. Otherwise the same destination rules; the bounding box of
   the voxels above 0 in any frame (nearest samples at whole coordinates, `MRIsampleVolumeFrameType`), grown and
   clipped likewise; for each frame, each voxel in the box becomes the largest of 0 and the 27 neighbourhood samples
-  (a NaN never wins; a type the sampler refuses samples 0 with its error), written with `MRIsetVoxVal`.
+  (a NaN never wins; a type the sampler refuses samples 0 with its error), written with `MRIsetVoxVal` (a
+  destination with fewer frames is written as the voxel functions write outside a volume: fs.mri §5, FS-52, FS-53)
+  (**(observed)**: `vdil`; `vrules20`, a volume of the same value everywhere into itself, a destination of another
+  extent: `MRIcheckVolDims`' end).
 - `MRImatchSegs(seg, list, n, MaskId, mask)`: without `mask` a copy of `seg` (`MRIcopy`). Over `seg`'s extent
   (columns outermost), frame 0 of `mask` is set to 0, then to `MaskId` (as a `float`) where `(int)` of `seg`'s frame-0
-  value is in the list. FS-489: with `mask == seg` FreeSurfer reads the voxel after clearing it (every voxel matches as
-  label 0); by default the label is read first; `reproduce` as FreeSurfer.
+  value is in the list (the first equal entry; FS-12 for the conversion). A `mask` of another extent is not checked:
+  it is written as the voxel functions write outside a volume (fs.mri §5, FS-52, FS-53). FS-489: with `mask == seg`
+  FreeSurfer reads the voxel after clearing it (every voxel matches as label 0); by default the label is read first,
+  noted; `reproduce` as FreeSurfer (**(observed)**: `vdil`; `vrules20`, the segmentation as its own mask with and
+  without 0 in the list, a mask of another extent).
 - `MRIsegStats(seg, segid, mri, frame, ...)`: returns the count of the voxels (over `seg`'s extent, columns outermost)
   whose `(int)` frame-0 label is `segid`; of `mri`'s `frame` values there: `min` and `max` (`float`, from the first;
   both 0 when there is none), `range = max - min` (`float`), `mean = (float)(sum / n)` (0 for none) with `sum = sum + v`
   and `sum2 = v v + sum2` in `double`, and for `n > 1` `std = (float)sqrt(((double)((float)n * mean * mean) - (double)(mean
   + mean) * sum + sum2) / (n - 1))` (the `float` products left to right; 0 otherwise). Of two NaN operands the left
-  one's survives in each operation as written here.
+  one's survives in each operation as written here. The values are compared as `min > v` and `max < v` (the
+  `float` widened), so a NaN value never replaces them but enters the sums (**(observed)**: `vdil`; `vrules20`, one
+  voxel, none, NaN values).
 - `HISTOseg(seg, segid, vol, bmin, bmax, bdelta)`: `nbins = (int)(round((bmax - bmin) / bdelta) + 1)` (`round` half away
-  from zero), `HISTOinit(NULL, nbins, bmin, bmax)` (a negative count ends the program with `error: Cannot allocate
-  memory` and `HISTOalloc(<n>): could not allocate histogram`); each voxel whose frame-0 label (as a `double`) equals
-  `segid` counts one in bin `(int)(round(v - bmin) / bdelta)` of `vol`'s frame 0, clamped to `[0, nbins - 1]`. FS-490: a
-  count of 0 bins has no bin to count in (FreeSurfer writes before the array); both modes count nowhere.
-- Validation: the probe's `dilate`, `dilu`, `msegs`, `sstat`, `hseg` (every type, header-only volumes, destinations
-  new, given (of the same or another extent) and in place, label lists, bin ranges that give negative, zero and
-  positive counts): identical with `reproduce` but FS-490 and memory the original does not own (FS-53, FS-58, FS-290),
-  the default different only with a notice.
+  from zero; FS-12 for the conversion, so a NaN width gives 0 bins by default and -2147483648 with `reproduce`),
+  `HISTOinit(NULL, nbins, bmin, bmax)` (`specs/freesurfer-maths.md` §5; a negative count ends the program with `error:
+  Cannot allocate memory` and `error: HISTOalloc(<n>): could not allocate histogram`, status 254); each voxel
+  (columns outermost) whose frame-0 label (as a `double`) equals `segid` counts one (`float`) in bin `(int)(round(v -
+  bmin) / bdelta)` of `vol`'s frame 0 (FS-12 for the conversion: a NaN value bin 0 in both modes), clamped to `[0,
+  nbins - 1]`. FS-490: a count of 0 bins has no bin to count in (FreeSurfer writes before the array: memory it does
+  not own); both modes count nowhere, noted (**(observed)**: `vdil`; `vrules20`, 0 bins, -1 and -4, one bin, a NaN
+  width, NaN values).
+- Validation (made ready by the spec finisher's relay 18): §69's groups `vdil` (seeded) and `vrules20` (fixed cases)
+  (the open probe's `dilate`, `dilu`, `msegs`, `sstat`, `hseg`; README.md says what each prints): bytes, ints, longs,
+  floats and shorts of one or two frames, destinations new, the source itself, a volume of the same extent and of
+  another, label lists, bin ranges that give negative, zero and positive counts. Expected: identical with
+  `reproduce` but FS-490 and memory the original does not own (FS-52, FS-53), lines the loop allows; the default
+  differs only with a notice (FS-12, FS-489).
 
 ## 49. Conforming (3.1-38: mri_conform.cpp)
 - The conformed grid: a header-only byte volume of 256 x 256 x 256 voxels and the input's frame count; `imnr0` 1,

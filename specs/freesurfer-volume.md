@@ -2306,9 +2306,15 @@ as decided, by its relay 17: the group `vrules18` and `models.py region`.)
   make z odd: z=<z>, dz=<dz>, nz=<d>` (`NULL`). Equal sides: the box. Else with `dxy = max(dx, dy)`: if `x + dxy <=
   width` and `y + dxy <= height` both sides become `dxy`; else `delta = |dx - dy|`, `delta1 = delta / 2`, `delta2 =
   delta - delta1`: the smaller side (say x) starts `delta1` earlier and grows by `delta` when `x - delta1 > 0` and
-  `x + dx + delta2 <= width`; else it takes the larger side's size, at 0 when `x` is below the room after the box
-  (`width - (x + dx)`), else ending at the edge, printed as `Volume size: <w> <h> <d>, xAsymRegion: ` (or
-  `yAsymRegion`) and the box. The decided box can change the outcome (**(observed)** FreeSurfer's, `vrules18`): a 6
+  `x + dx + delta2 <= width`; else the room after the box, `width - (x + dx)`, is taken with the box's own (smaller)
+  `dx`, before anything changes; then the side takes the larger side's size (`dx = dy`), starting at 0 when `x` is
+  below that room, else at `width - dy` (ending at the edge), and is printed as `Volume size: <w> <h> <d>,
+  xAsymRegion: ` and the box; the same on y (the room `height - (y + dy)` with the box's own `dy`, `yAsymRegion`).
+  `delta` is `|dx - dy|` (an integer: the sizes are 32-bit integers, their difference exact). The two readings of the
+  room differ (**(observed)** FreeSurfer's, `vrules20`): an 8 x 8 x 3 mask filling columns 2 to 3, rows 0 to 7 and
+  slices 0 to 1 with pad 0 gives FreeSurfer's box `2 0 0  1 7 1` and then `0 0 0  7 7 1` (the room `8 - (2 + 1) = 5`
+  is above 2; taken after the change, `8 - (2 + 7)`, it would give `1 0 0  7 7 1`); by default the box `2 0 0  2 8 2`
+  becomes `0 0 0  8 8 3`. The decided box can change the outcome (**(observed)** FreeSurfer's, `vrules18`): a 6
   x 6 x 4 mask filling columns and rows 1 to 3 and slices 1 to 2 with pad 0 gives FreeSurfer's `1 1 1  2 2 1`
   (equal sides, an odd depth: returned as it is), by default the box `1 1 1  3 3 2` (printed as `OrigRegion`) grown
   to `1 1 1  3 3 3`; a 4 x 3 x 3 mask filling columns 0 to 3 and rows 0 to 1 of slice 0 gives FreeSurfer's `0 0 0  3

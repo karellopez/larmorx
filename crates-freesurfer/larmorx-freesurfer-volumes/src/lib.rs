@@ -31,6 +31,7 @@ pub mod mri_make_uchar;
 pub mod mri_mask;
 pub mod mri_robust_register;
 pub mod mri_segstats;
+pub mod mri_vol2vol;
 pub mod mris_calc;
 
 /// The programs of this crate, by their original names.
@@ -82,6 +83,10 @@ pub const PROGRAMS: &[Program] = &[
     Program {
         name: mri_segstats::main::NAME,
         run: mri_segstats::main::run,
+    },
+    Program {
+        name: mri_vol2vol::main::NAME,
+        run: mri_vol2vol::main::run,
     },
     Program {
         name: mris_calc::main::NAME,

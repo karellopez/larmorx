@@ -2719,6 +2719,18 @@ defects! {
         "getfullpath given a name that starts with a dash (other than - alone) passes it to dirname as options: dirname: invalid option, unrecognized option or missing operand, then if: Missing file name., status 1; corrected: the name as given";
     FS_1176 = "FS-1176", "FreeSurfer", true,
         "getfullpath reads the physical path of the name's folder again as shell words: several blanks or a tab in it print as one space, and pattern characters in it are matched against the files (echo: No match., status 1, when nothing matches); corrected: the path as it is";
+    FS_1177 = "FS-1177", "FreeSurfer", true,
+        "mri_vol2vol --crop without a target volume, an LTA or --downsample stops with ERROR: No target volume supplied. (status 1), although --crop makes its own target; corrected: the crop is made";
+    FS_1178 = "FS-1178", "FreeSurfer", true,
+        "mri_vol2vol: a target or registration name built from SUBJECTS_DIR, FSLDIR or FREESURFER_HOME (--fstarg, --tal, --mni152reg) of 2,000 bytes or more, or a --save-reg output name of 996 bytes or more: the official build aborts (*** buffer overflow detected ***: terminated, status 134); corrected: the whole name is used";
+    FS_1179 = "FS-1179", "FreeSurfer", true,
+        "mri_vol2vol --downsample with a factor of 0 for the second or third axis ends with a floating-point exception (status 136); a factor below 0 makes a grid of negative size, refused by the allocation's messages (status 1); corrected: ERROR: --downsample's factors must be 1 or more, status 1";
+    FS_1180 = "FS-1180", "FreeSurfer", true,
+        "mri_vol2vol --inv with an LTA and no --mov crashes (status 139) where it reads the moving volume's header (with --keep-precision, or with --targ); corrected: an error naming the missing --mov, status 1";
+    FS_1181 = "FS-1181", "FreeSurfer", true,
+        "mri_vol2vol --crop cuts the moving volume to one voxel more than the box of its voxels above 0 on each axis (the output one voxel per axis larger, times the scale), and crashes (status 139) when the box reaches the volume's last voxel on any axis; corrected: the box itself";
+    FS_1182 = "FS-1182", "FreeSurfer", true,
+        "mri_vol2vol --crop with a scale that leaves no voxel (0, or so small that a size rounds to 0) writes an empty volume with status 0, and a negative scale stops with the allocation's messages (status 1); corrected: ERROR: --crop's scale <s> leaves no voxel, status 1";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

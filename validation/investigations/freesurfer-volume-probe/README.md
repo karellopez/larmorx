@@ -1,4 +1,4 @@
-# FreeSurfer 8.2.0's volume functions and B-splines, as a black box (fs.volume parts 1 to 10a and §54 to §57, fs.bspline)
+# FreeSurfer 8.2.0's volume functions and B-splines, as a black box (fs.volume parts 1 to 10b and §54 to §57, fs.bspline)
 
 The probe behind the **(observed)** marks and the validation plan (§69) of
 [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 8 (§1 to §35, §37 to §39, and §54's changes of a transform array between the voxel, RAS-to-RAS and physical-voxel types:
@@ -24,7 +24,7 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
 | `licence_reach.py` | which of a prebuilt probe's commands can reach FreeSurfer's licence check ("The licence check" below): `licence_reach.py <probe> <source.cpp> [--expect a,b]` (the same step after each build, not the implementer's: it reads the probe binary) |
-| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 39 groups of seeded cases and nineteen of fixed cases (`vrules`, `vrules4` to `vrules20`, `vbsrules`; 18,639 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 43 groups of seeded cases and 21 of fixed cases (`vrules`, `vrules4` to `vrules22`, `vbsrules`; 19,863 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 | `models.py` | statements of the spec checked as models of the probe's printed results (`region` and `cov` also a candidate's, in both modes): `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `region` (§43's boxes, FS-269 as decided: every `rgbb` line of `vregion`, `vrules17`, `vrules18` and `vrules20`, on the probe and, with `--candidate`, a candidate's lines in both modes), `cov` (§42's `MRIcovarianceMatrix`, FS-483's count as decided: every `cov` line of `vcov` and `vrules19` whose mask has the volume's extent) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
@@ -264,6 +264,26 @@ The spec's sections in brackets.
 | `msegs W P D n i×n i` | `MRImatchSegs` (the label list, the mask's value) into D [§48] | the result |
 | `sstat W P W P i i` | `MRIsegStats` (the segmentation, the volume, the segment, the frame) [§48] | the count, then the five floats `min max range mean std` (unset: 7) |
 | `hseg W P W P i d d d` | `HISTOseg` (the segmentation, the volume, the segment, `bmin`, `bmax`, `bdelta`) [§48] | the histogram: `max_bins nbins`, `bin_size min max` (floats), then each bin's value and count (floats) |
+| `dilo W P d D` | `MRIdilate` with the source's `outside_val` set to the double first [§48] | the result |
+| `conform k W P [i d i]` | k 0 `MRIconform`, 1 `MRIgetConformMatrix`, 2 `MRIconformedTemplate` (the width, the size (a double), `KeepDC`) of the volume [§49] | k 0 and 2 the result, k 1 the matrix (M, `null` for none); then the input after the call; each volume printed as `a volume (printed)` but its voxels as `h` and the FNV-1a 64 hash of their bytes (16 hexadecimal digits; `novox` without voxels) |
+| `union W P W P D`, `isect W P W P D`, `mand W P W P D i`, `mxor W P W P D i i` | `MRIunion`, `MRIintersect`, `MRIand` (the threshold), `MRIxor` (`t1`, `t2`) of the two volumes into D (`other`: the second) [§50] | the result (`other` when it is the second volume) |
+| `compl W P D`, `erode W P D`, `erode2d W P D`, `dil6 W P D`, `mnot W P D`, `b2c W P D` | `MRIcomplement`, `MRIerode`, `MRIerode2D`, `MRIdilate6`, `MRInot`, `MRIbinMaskToCol` [§50] | the result |
+| `edges W P d D` | `MRIsetEdges` (the value) [§50] | the result |
+| `erodenn W P D i i`, `erodeseg W P D i i` | `MRIerodeNN` (`NNDef`, `ErodeEdges`), `MRIerodeSegmentation` (the count, the threshold) [§50] | the result |
+| `dilseg W P D i (null\|W P) i d` | `MRIdilateSegmentation` (the count; the mask or `null`, its frame and threshold) [§50] | the result, then `nchanges` (7 before) |
+| `dtl k W P W P D i i i` | k 0 `MRIdilateThreshLabel`, 1 `MRIdilateInvThreshLabel` (the source, the value volume, D (`other`: the value volume); the label, the steps, the threshold) [§50] | the result |
+| `dlab k W P D i i` | k 0 `MRIdilateLabel`, 1 `MRIdilateLabelUchar` (the label, the steps) [§50] | the result |
+| `openn k W P D [i]` | k 0 `MRIopenN` (the order), 1 `MRIopen`, 2 `MRIclose` [§50] | the result |
+| `rlist W P n (i i)×n (null\|W P) D` | `MRIreplaceList` (the source and target of each pair, the mask or `null`, the output: D, `other` the mask) [§50] | the result |
+| `rvonly W P D f f` | `MRIreplaceValuesOnly` (the value to replace, its replacement) [§50] | the result |
+| `mmask k W P W P D i f`, `tmask W P W P D f f` | k 0 `MRImask`, 1 `MRImaskDifferentGeometry` (the source, the mask, D (`other`: the mask), the mask value, the replacement); `MRIthresholdMask` (the threshold, the replacement) [§50] | the result |
+| `grow W P W P i i`, `onfg W P W P W P`, `offbg W P W P` | `MRIgrowLabel` (the volume, the filled volume, `in`, `out`), `MRIturnOnFG` (the volume, the foreground, the background), `MRIturnOffBG` (the volume, the background) [§50] | the status, then every volume after the call |
+| `cplab W P D i`, `cplv W P W P D i` | `MRIcopyLabel` (the source, D: `self` or a W, the label); `MRIcopyLabeledVoxels` (the source, the labels, D: `self`, `other` or a W, the label) [§50] | the count, then the destination |
+| `slv W P W P D i f` | `MRIsetLabelValues` (the source, the labels, D (`other`: the labels), the label, the value) [§50] | the result |
+| `cntv k W P [i]` | k 0 `MRItotalVoxelsOn`, 1 `MRIvoxelsInLabel`, 2 `MRIlabelInVolume` (an integer each), 3 `MRInMask` [§50] | the count |
+| `cent W P` | `MRIcomputeCentroid` [§50] | the status and the three doubles (unset: 7) |
+| `pthr W P (null\|W P) i d` | `MRIpercentThresh` (the mask or `null`, the frame, the percentage) [§50] | the threshold (a double) |
+| `cnbhd W P n (i i i i i)×n` | for each `w x y z val`, `MRIcountValInNbhd` [§50] | the count per point |
 
 ## The models
 

@@ -2751,7 +2751,7 @@ its voxels are read or written: FS-58.
   written as `MRIsetVoxVal` writes it). Columns outermost, frame 0: `(int)` label; where the mask's frame-0 value is
   below 0.5 the label (a NaN mask value is not below); else the target of the first equal source entry, or the
   label; each written as a value (**(observed)**: `vset`; `vrules22`).
-- `MRIreplaceValuesOnly(src, dst, in, out)`: check; clone; two byte volumes: `MRIreplaceValuesUchar(src, dst,
+- `MRIreplaceValuesOnly(src, dst, in, out)`: check; clone; a byte source and a byte destination: `MRIreplaceValuesUchar(src, dst,
   (byte) nint(in), (byte) nint(out))` (section 31); else each value of each frame (z, y, x, frame innermost) with
   `|(float)(v - in)| < FLT_EPSILON` becomes `out`; others are not written.
 - `MRImaskDifferentGeometry(src, mask, dst, m, out)`: the voxel-to-voxel matrix `src` to `mask`
@@ -2771,10 +2771,13 @@ its voxels are read or written: FS-58.
   the variable's forms, the diagnostic line, a destination of another type, masks of another geometry of the same and
   of another extent).
 - `MRInMask(mask)`: the number of values of every frame above 0.5.
-- `MRIthresholdMask(src, mask, dst, thresh, out)`: check (src, mask); clone; two byte volumes: bytes, the source's
-  where the mask byte is `>= thresh` (`float`), else `out` as a byte; FS-494: `out` outside 0..255 or NaN becomes in
-  FreeSurfer the low byte of its truncation to a 32-bit integer (-2147483648 for NaN and beyond); by default clamped to
-  0..255 (NaN to 0). Otherwise frame 0 values, `out` where the mask is below `thresh`.
+- `MRIthresholdMask(src, mask, dst, thresh, out)`: check (src, mask); clone; a byte source with a byte mask (whatever
+  the destination's type): bytes, the source's where the mask byte is `>= thresh` (`float`), else `out` as a byte
+  (written into the destination's rows as bytes); FS-494: `out` outside 0..255 or NaN becomes in FreeSurfer the low
+  byte of its truncation toward zero to a 32-bit integer (-2147483648 for NaN and beyond: 300 gives 44, -1 255, 255.5
+  255, 2.7 2, -0.5 0, NaN and 1e10 0); by default clamped to 0..255 and truncated (NaN to 0). Otherwise frame 0
+  values, `out` where the mask is below `thresh` (a NaN mask value is not below) (**(observed)**: `vmask`; `vrules22`,
+  those replacement values and a float destination).
 - `MRIgrowLabel(mri, filled, in, out)`: check; bytes. For `in != 0` the box of `mri`'s `in` voxels; for `in == 0` the
   box of nonzero voxels and every voxel on or outside its faces set to `out` in `filled` (counted). The box starts
   from `[w, 0]` per axis in both cases and is not grown: with no such voxel it is empty, and for `in == 0` every voxel
@@ -2787,7 +2790,8 @@ its voxels are read or written: FS-58.
   takes the most frequent byte above 5 (`WM_MIN_VAL`) in the cube of half-width 1 around it in the volume (the lowest
   of a tie), the half-width grown up to 4 while none is found, else 0 (voxels set earlier in the pass count). Both
   return 0 (**(observed)**: `vmorph`; `vrules22`, a voxel whose nearest label is 4 or more away).
-- `MRIcopyLabel(src, dst, label)`: check; frame 0; two byte volumes: bytes equal to `label` copied as `(byte) label`;
+- `MRIcopyLabel(src, dst, label)`: check; frame 0; a byte source and a byte destination: bytes equal to `label` copied
+  as `(byte) label`;
   else values equal to `(float) label` set to it. Returns the count.
 - `MRItotalVoxelsOn(mri, t)`: values of every frame `>= (float) t`. `MRIvoxelsInLabel(mri, l)`: frame-0 values with
   `nint(v) == l`. `MRInot(src, dst)`: check; clone; columns outermost: `1` where `nint(v) == 0`, else `0`.

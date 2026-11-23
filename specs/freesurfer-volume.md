@@ -2453,14 +2453,23 @@ written), so nothing notes it.
   standard error: `INFO: Modifying talairach volume c_(r,a,s) based on average_305.` and `INFO: If not preferred,
   set environmental varible NO_AVERAGE305 true.` with a transform array, `INFO: Modifying talairach volume c_(r,a,s)
   based on average_305` without). Then both cached matrices are recomputed from the geometry (voxel-to-RAS, then
-  its inverse: section 2's rules), whichever branch was taken. Returns 0 (**(observed)**: `vtal`; `vrules20`, every
+  its inverse: fs.mri §3's cache), whichever branch was taken. Returns 0 (**(observed)**: `vtal`; `vrules20`, every
   branch: no array with and without `NO_AVERAGE305` (set empty or not) and `DIAG_VERBOSE`, a valid destination
   with each diagnostic bit, a destination not valid (0 or 2) with and without `NO_AVERAGE305`, arrays of 0 and 2
   transforms and of another type).
 - The Talairach volume of a volume `v`: a header of `v`'s extent and type with one frame (fs.mri §4: an extent of 0
   prints the shape message), `v`'s header copied into it, then `ModifyTalairachCRAS` with the same transform array
   (its messages and ends each time).
-- `MtalairachFromVoxel(src, lta)`: `src`'s voxel-to-RAS matrix (section 2, no shear), with a transform array
+- **The matrices below are computed from the volumes' geometry at every call** (fs.mri §3: `extract_i_to_r`, the
+  scanner voxel-to-RAS matrix of base 0 without the shear, and `extract_r_to_i`, its float inverse, none when the
+  inverse fails, with `MatrixInverse`'s messages), never taken from a volume's cached matrices: a volume whose cache
+  is stale (as its allocation left it) or absent gives the same matrices and points as with its cache up to date
+  (**(observed)**: `vrules21`, every matrix and point function on a source or destination with the cache of its
+  allocation's geometry, and the two that make no Talairach volume (`MtalairachFromVoxel`, `MvoxelFromTalairach`
+  and their point functions) on a volume with none; the other two copy that volume's header into the Talairach volume, which crashes FreeSurfer without the
+  cache: FS-252, fs.mri §6, both modes copy none and note it, the Talairach volume's matrices then recomputed by
+  `ModifyTalairachCRAS` as above).
+- `MtalairachFromVoxel(src, lta)`: `src`'s voxel-to-RAS matrix (`extract_i_to_r`), with a transform array
   multiplied on the left by its first transform's matrix (`MatrixMultiply(M, A)`); without, a copy. A transform
   array holding no transform ends the program with `lta does not have xform`, an array whose own type is not
   `LINEAR_RAS_TO_RAS` with `lta must be RAS_TO_RAS transform` (the transforms' own types not looked at, as
@@ -2469,14 +2478,15 @@ written), so nothing notes it.
   rules: a transform matrix that is not 4 x 4 gives no matrix with its error and returns, **(observed)**:
   `vrules20`).
 - `MtalVoxelFromVoxel(src, lta)`: `MtalairachFromVoxel` first, then the Talairach volume of `src`; the product of the
-  Talairach volume's RAS-to-voxel matrix and the first (`NULL` when either is: `MatrixMultiply`'s messages).
+  Talairach volume's RAS-to-voxel matrix (`extract_r_to_i`) and the first (`NULL` when either is: `MatrixMultiply`'s messages).
 - `MvoxelFromTalairach(dst, lta)`: the inverse of the first transform's matrix (`MatrixInverse`, its messages), or a
-  4 x 4 identity without a transform array; then `dst`'s RAS-to-voxel matrix times it (`NULL` when either is). The
+  4 x 4 identity without a transform array; then `dst`'s RAS-to-voxel matrix (`extract_r_to_i` of `dst`'s geometry)
+  times it (`NULL` when either is). The
   type of the array is not checked. FS-487: an array holding no transform has no first transform, and FreeSurfer
   reads past the array for its matrix (memory it does not own: no matrix in the probe's plain runs, which another
   run need not agree with); in both modes it is taken as having no matrix (`MatrixInverse: NULL input matrix!`, the program ends), noted (**(observed)**:
   `vtal`).
-- `MvoxelFromTalVoxel(dst, lta)`: the Talairach volume of `dst` first, its voxel-to-RAS matrix, then
+- `MvoxelFromTalVoxel(dst, lta)`: the Talairach volume of `dst` first, its voxel-to-RAS matrix (`extract_i_to_r`), then
   `MvoxelFromTalairach(dst, lta)`, and the product of the latter and the former.
 - `TransformWithMatrix(M, x, y, z)`: each coordinate rounded to `float`; then for each of the first three rows `r`,
   in `float` arithmetic, `((M[r][1] x + M[r][2] y) + M[r][3] z) + M[r][4]`, rounded once per operation (no fused

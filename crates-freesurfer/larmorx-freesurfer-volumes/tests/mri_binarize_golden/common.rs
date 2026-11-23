@@ -23,8 +23,9 @@ pub const N: i32 = 32;
 
 /// The command lines: a match with its count file; a threshold inside a mask merged with the
 /// segmentation, as `uchar`; replacements only; a dilation, a face erosion and the bounding box;
-/// a surface of the hippocampi; the topology fix of a shape with a handle.
-pub const CASES: [&[&str]; 6] = [
+/// a surface of the hippocampi; the topology fix of a shape with a handle; the bounding box
+/// without a pad (FS-269: FreeSurfer's leaves out the mask's last voxels, kept by default).
+pub const CASES: [&[&str]; 7] = [
     &[
         "--i",
         "seg.mgz",
@@ -100,15 +101,19 @@ pub const CASES: [&[&str]; 6] = [
         "--o",
         "out.mgz",
     ],
+    &[
+        "--i", "seg.mgz", "--match", "2", "41", "--bb", "0", "--o", "out.mgz",
+    ],
 ];
 
 /// The files each case writes (compared by digest).
-pub const OUTPUTS: [&[&str]; 6] = [
+pub const OUTPUTS: [&[&str]; 7] = [
     &["out.mgz", "count.txt"],
     &["out.mgz"],
     &["out.mgz"],
     &["out.mgz"],
     &["lh.out"],
+    &["out.mgz"],
     &["out.mgz"],
 ];
 

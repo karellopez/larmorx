@@ -14,12 +14,14 @@ mod common;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-22 by `prog.py --golden` from the official program on Linux x64 (the port's
-/// `reproduce` gave the same): thirteen cases, 32^3 volumes and a 16 x 16 x 32 pair.
-const OFFICIAL_SHA256: &str = "f3af007dd90c7e0cc0984075bc516ba8c0f1bd83bd3c7ad64c1116ec62389eb7";
+/// Recorded 2026-11-23 by `prog.py --golden` from the official program on Linux x64 (the port's
+/// `reproduce` gave the same): fourteen cases, 32^3 volumes and a 16 x 16 x 32 pair (2026-11-22:
+/// the first thirteen, f3af007dd90c7e0cc0984075bc516ba8c0f1bd83bd3c7ad64c1116ec62389eb7).
+const OFFICIAL_SHA256: &str = "e3ec07a6ffc9e79e099e459680a210d9f7e96905b4250beb97f4b0d9116c3444";
 /// The port's default on Linux x64 (`cases_digest(Fix)`): no NUL byte in the error lines
-/// (FS-01), an error for `-BBEQ` without a box (FS-1133).
-const FIX_SHA256: &str = "5606171d737750ae73cc1fb9a7781b8e1e2bc67409408f99c7b1798e793846aa";
+/// (FS-01), an error for `-BBEQ` without a box (FS-1133), the box of `-bb 0` holding the mask's
+/// last voxels (FS-269).
+const FIX_SHA256: &str = "20be6598c53f16ef1c90f6d63f502590d7c7cad20fa3d2d7814e249d0624542b";
 
 fn cases_digest(mode: UpstreamDefects) -> String {
     let dir = tempfile::tempdir().expect("a folder");

@@ -6,7 +6,8 @@
 //! output (the report's machine, user and folder masked) and outputs' digests, against the value
 //! FreeSurfer 8.2.0's official program gives on the same inputs (`validation/probes/fs-binarize/
 //! prog.py --golden`, Linux x64) with `reproduce`, and against the port's own Linux x64 value with
-//! the default (the topology fix's case keeps the first voxel: FS-1022).
+//! the default (the topology fix's case keeps the first voxel: FS-1022; the box without a pad holds
+//! the mask's last voxels: FS-269).
 
 #[path = "mri_binarize_golden/common.rs"]
 mod common;
@@ -14,11 +15,13 @@ mod common;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-21 by `prog.py --golden` from the official program on Linux x64 (the port's
-/// `reproduce` gave the same): six cases, 32^3 inputs.
-const OFFICIAL_SHA256: &str = "42a367a2dc0faa347eb31e6a315b95ac3098e1dd3f50a5b8c25691cf04d7a5d5";
-/// The port's default on Linux x64 (`cases_digest(Fix)`, recorded with the official value).
-const FIX_SHA256: &str = "e2cb236f9a1c5c592df596f988a37c38adea2a1b8fc919aa52268badc6da55a8";
+/// Recorded 2026-11-23 by `prog.py --golden` from the official program on Linux x64 (the port's
+/// `reproduce` gave the same): seven cases, 32^3 inputs (2026-11-21: the first six,
+/// 42a367a2dc0faa347eb31e6a315b95ac3098e1dd3f50a5b8c25691cf04d7a5d5).
+const OFFICIAL_SHA256: &str = "76bdf3d94f233cad211f17a0e4ca5b0122fe6fc798a292543122ba4d163f0897";
+/// The port's default on Linux x64 (`cases_digest(Fix)`, recorded with the official value; the
+/// box of `--bb 0` holds the mask's last voxels, FS-269).
+const FIX_SHA256: &str = "be04301f13838bbdf18d4ed1d06209755228937f1be1f748ddf8bb3606698216";
 
 fn cases_digest(mode: UpstreamDefects) -> String {
     let dir = tempfile::tempdir().expect("a folder");

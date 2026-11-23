@@ -514,6 +514,10 @@ def cases(f: dict[str, Path]) -> list[list[str]]:
         [*base[:2], "o.xyz"],
         [*base[:2], "nodir/o.mgz"],
         [*base[:2], "a.b/c"],
+        # added 2026-11-23 (after the first 193): recon-all's spelling of the bounding box
+        # without a pad, and with one per side of 0 after the mask on one axis only
+        ["-bb", "0", *base],
+        ["-BBMM", "2", "2", "2", "0", "2", "2", *base],
     ]
     return c
 

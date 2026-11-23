@@ -2145,8 +2145,9 @@ statuses are not compared): the implementations' own tests, against these sectio
   (`MRIvol2Vol`'s). At each target voxel that maps inside: `cvsm =
   floor(c)`, `rvsm = floor(r)` (single precision) must satisfy `0 <= cvsm`, `cvsm + 1 < width`, the same for rows
   (the source's extent); the shift map's frame-0 values at `(cvsm, rvsm)`, `(cvsm+1, rvsm)`, `(cvsm, rvsm+1)`,
-  `(cvsm+1, rvsm+1)` on the voxel's slice must each have magnitude at least `FLT_MIN` (1.17549435e-38), else the
-  voxel is skipped; the shift is `MRIsampleSeqVolume` of the map's frame 0 at the point (kept in one `float` across
+  `(cvsm+1, rvsm+1)`, in that order, on the slice `nint(s)` (the slice the source point rounds to, the one the
+  inside test above used, before any shift), must each have magnitude at least `FLT_MIN` (1.17549435e-38; the value
+  widened to `double`, `|v| < FLT_MIN` skips, so a NaN corner is kept), else the voxel is skipped; the shift is `MRIsampleSeqVolume` of the map's frame 0 at the point (kept in one `float` across
   voxels: a map type the sampler refuses leaves the previous value, and at the first such voxel a value never
   written: FS-482, both modes 0, noted); a shift of 0 skips the voxel; else `coordinate[|pedir|] += shift * (pedir
   < 0 ? -1 : 1)` (single precision), then with `vsmlta` the point `(c, r, s, 1)` is mapped by the map's

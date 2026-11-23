@@ -146,7 +146,12 @@ impl Process {
     }
 
     /// A new volume of the source's extent with `kind` and `nframes`, the source's header.
-    fn new_with_header(&mut self, src: &Mri, kind: i32, nframes: i32) -> Result<Mri, Stop> {
+    pub(crate) fn new_with_header(
+        &mut self,
+        src: &Mri,
+        kind: i32,
+        nframes: i32,
+    ) -> Result<Mri, Stop> {
         let g = &src.geom;
         let mut d = self.mri_alloc_sequence(g.width, g.height, g.depth, kind, nframes)?;
         self.copy_header_into(src, &mut d)?;

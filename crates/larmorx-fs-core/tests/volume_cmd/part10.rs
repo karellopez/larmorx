@@ -139,6 +139,15 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
             p.flush();
             putres(l, r, &a, None, &d);
         }
+        "dilo" => {
+            let mut a = getwp(p, l)?;
+            a.outside_val = l.getd();
+            let mut d = getdst(p, l, false)?;
+            p.flush();
+            let r = p.mri_dilate(&mut a, dst(&mut d))?;
+            p.flush();
+            putres(l, r, &a, None, &d);
+        }
         "msegs" => {
             let mut a = getwp(p, l)?;
             let mut d = getdst(p, l, false)?;

@@ -17,6 +17,7 @@ pub mod args;
 mod bspline;
 mod lta54;
 mod part10;
+mod part10b;
 mod part7b;
 mod part8;
 mod part9;
@@ -1339,6 +1340,7 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                 && !segcrop::call(p, l, &c)?
                 && !part9::call(p, l, &c)?
                 && !part10::call(p, l, &c)?
+                && !part10b::call(p, l, &c)?
             {
                 args::bad("unknown command")
             }

@@ -1,7 +1,7 @@
-# fs.volume's and fs.bspline's clean rooms against FreeSurfer 8.2.0, as a black box (parts 1 to 9, 10a, §54 to §57, fs.bspline)
+# fs.volume's and fs.bspline's clean rooms against FreeSurfer 8.2.0, as a black box (parts 1 to 9, 10a, 10b, §54 to §57, fs.bspline)
 
 larmorx's clean rooms of FreeSurfer's volume functions (`crates/larmorx-fs-core/src/volume/`, written
-from [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) §1 to §48 and §54 to §58 alone) and of its
+from [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) §1 to §51 and §54 to §58 alone) and of its
 B-splines (`crates/larmorx-fs-core/src/bspline/`, from
 [`specs/freesurfer-bspline.md`](../../../specs/freesurfer-bspline.md) alone) compared
 with the prebuilt probe of the open folder [`../freesurfer-volume-probe/`](../freesurfer-volume-probe/README.md)
@@ -11,6 +11,7 @@ allocator). The probe is only run, never built.
 | Path | What it is |
 |---|---|
 | `candidate/` | `fs-volume-candidate batch <file>`: the probe's commands and print forms over the clean room (its own Cargo workspace, a validation tool outside larmorx's build); each line on a process state of its own, `LARMORX_UPSTREAM_DEFECTS` the mode, the defect notices of a line on its standard error |
+| `hand/` | hand cases that settled a reading the groups do not show, run on the probe and the candidate alike (its README) |
 | `speed/` | the timing lines (`mk.py` writes them, `run.sh <probe> <candidate>` times them in a memory box and checks that the result lines agree) |
 | `../../../crates/larmorx-fs-core/tests/volume_cmd/` | the commands themselves (the probe's grammar and print forms; the volume, geometry, matrix, colour-table and transform encodings are fs.mri's, `tests/mri_cmd/args.rs`, included by path), shared with the crate's golden cases (`tests/golden_volume.rs`); the candidate includes the folder by path |
 
@@ -30,10 +31,10 @@ The golden cases: `cargo test -p larmorx-fs-core --test golden_volume` (record w
 NAN_TRAP_DIR=<scratch>/nt`, the library built from `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`
 as that folder's README says. The defects' own tests: `cargo test -p larmorx-fs-core --test defects_volume`.
 
-## Results (2026-11-23, relay 18, seed 7, every group of the volume spec's §69.2 and the B-spline spec's §9; the probe's reference hashes are the specs', the probe of commit `2a612716`)
+## Results (2026-11-24, relay 20, seed 7, every group of the volume spec's §69.2 and the B-spline spec's §9; the probe's reference hashes are the specs', the probe of commit `4d00c36e`)
 
 `compare.py` per group: calls, identical, FreeSurfer did not finish, memory, defect corrected,
-unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay18-full.log`).
+unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay20-full.log`).
 
 | Group | Calls | reproduce | fix |
 |---|---|---|---|
@@ -74,12 +75,12 @@ unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay18-full.log`).
 | vrules10 | 65 | 65 / 0 / 0 / 0 / **0** | 27 / 0 / 0 / 38 / **0** |
 | vrules11 | 28 | 28 / 0 / 0 / 0 / **0** | 28 / 0 / 0 / 0 / **0** |
 | vpvlab | 90 | 83 / 1 / 3 / 3 / **0** | 83 / 1 / 3 / 3 / **0** |
-| vfr8 | 490 | 482 / 7 / 1 / 0 / **0** | 395 / 7 / 10 / 78 / **0** |
+| vfr8 | 490 | 479 / 7 / 4 / 0 / **0** | 394 / 7 / 11 / 78 / **0** |
 | vmri2 | 390 | 384 / 3 / 3 / 0 / **0** | 321 / 3 / 4 / 62 / **0** |
 | vrules12 | 112 | 105 / 6 / 1 / 0 / **0** | 80 / 6 / 2 / 24 / **0** |
 | vrules13 | 13 | 6 / 7 / 0 / 0 / **0** | 6 / 7 / 0 / 0 / **0** |
 | vlta54 | 225 | 217 / 4 / 4 / 0 / **0** | 121 / 4 / 5 / 95 / **0** |
-| vrules14 | 109 | 96 / 3 / 10 / 0 / **0** | 51 / 3 / 10 / 45 / **0** |
+| vrules14 | 109 | 96 / 4 / 9 / 0 / **0** | 51 / 4 / 9 / 45 / **0** |
 | vaseg | 219 | 219 / 0 / 0 / 0 / **0** | 216 / 0 / 0 / 3 / **0** |
 | vsegs | 270 | 270 / 0 / 0 / 0 / **0** | 243 / 0 / 0 / 27 / **0** |
 | vcrops | 95 | 95 / 0 / 0 / 0 / **0** | 77 / 0 / 0 / 18 / **0** |
@@ -95,9 +96,30 @@ unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay18-full.log`).
 | vtal | 240 | 240 / 0 / 0 / 0 / **0** | 190 / 0 / 1 / 49 / **0** |
 | vdil | 270 | 270 / 0 / 0 / 0 / **0** | 266 / 0 / 0 / 4 / **0** |
 | vrules20 | 111 | 108 / 3 / 0 / 0 / **0** | 76 / 3 / 1 / 31 / **0** |
-| all | 18,639 | 17,467 / 924 / 221 / 27 / **0** | 13,216 / 924 / 605 / 3,894 / **0** |
+| vrules21 | 71 | 65 / 6 / 0 / 0 / **0** | 56 / 6 / 0 / 9 / **0** |
+| vconf | 71 | 71 / 0 / 0 / 0 / **0** | 46 / 0 / 0 / 25 / **0** |
+| vset | 500 | 494 / 3 / 3 / 0 / **0** | 452 / 3 / 5 / 40 / **0** |
+| vmorph | 340 | 340 / 0 / 0 / 0 / **0** | 326 / 0 / 0 / 14 / **0** |
+| vmask | 110 | 108 / 2 / 0 / 0 / **0** | 95 / 2 / 0 / 13 / **0** |
+| vrules22 | 134 | 121 / 11 / 1 / 0 / **1** | 97 / 11 / 3 / 23 / **0** |
+| all | 19,865 | 18,663 / 947 / 227 / 27 / **1** | 14,287 / 947 / 613 / 4,018 / **0** |
 
-Totals: `reproduce` 17,467 of 18,639 identical (924 where FreeSurfer did not finish, 9 of them
+Relay 20 (64 groups, 19,865 calls): `reproduce` 18,663 identical, 947 where FreeSurfer did not finish,
+227 memory lines, the same 27 lines §69.3 allows, and **one unexplained**: `vrules22`'s
+`MRIdilateThreshLabel` copying an 8-voxel source into a 4-voxel destination, where `MRIcopy` ends the
+program in both modes (fs.mri §13's "the destination is too small") and FreeSurfer writes past the
+destination the same way in each of the probe's four runs, so the loop cannot see it as a memory line
+(a question for the spec writer); `fix` 14,287 identical (947 not finished, 613 memory, 4,018
+corrected by a noted defect), none unexplained. Relay 20 followed the spec writer's answers to relay
+18's items 107 to 111 (`MRIdilate`'s neighbours clamped to the volume, its search frames outermost;
+`vtal`, `vdil`, `vrules20` and the new fixed group `vrules21` identical with `reproduce` but its six
+FS-252 crash lines) and found, with hand cases (`hand/`), that both dilations' box is not grown when
+the search finds nothing; then part 10b (§49 to §51: `vconf`, `vset`, `vmorph`, `vmask`, `vrules22`).
+Of the earlier groups only `vfr8` and `vrules14` moved, between "identical", "memory" and "did not
+finish" (the rebuilt probe's runs classify its memory lines anew). `models.py region` and `cov` with
+the candidate: none different. fs.mri (16 groups, 9,511 calls): none unexplained in either mode.
+
+Relay 18's totals: `reproduce` 17,467 of 18,639 identical (924 where FreeSurfer did not finish, 9 of them
 FS-314's aborts that the candidate gives too, which §69.3 checks; 221 memory lines; 27 lines where the
 candidate noted a defect whose value in FreeSurfer is memory, or whose end the loop allows in both
 modes, as §69.3 says: FS-300 in `vsample` and `vresamp`, FS-325 in `vlinear`, FS-469 in 3 `vpvlab`
@@ -154,8 +176,12 @@ run it and what it showed).
   §54's changes of type, the groups `ltapv` and `ltatypes`; part 8's commands, the groups `fr8` and
   `vox8`; §54's other operations, the group `lta54`; §55 to §57's 18 commands, the group `segs57`;
   part 9's 16 commands with §55's upsampling and §56's shift-map resampling, the group `part9`;
-  part 10a's 9 commands, with `NO_AVERAGE305` and the diagnostic bits, the group `part10`),
-  both modes, 66 SHA-256 over 33 groups (0.24 s in a debug build). Identical in debug and release builds and under the AArch64 NaN emulation of both.
+  part 10a's 9 commands, with `NO_AVERAGE305` and the diagnostic bits, the group `part10`;
+  part 10b's 34 commands (conforming's matrix and template: `MRIconform`'s 256^3 result is beyond
+  the golden size, `vconf` holds it), with `FS_MRIMASK_ALLOW_DIFF_GEOM` and a diagnostic bit, the
+  group `part10b`), both modes, 68 SHA-256 over 34 groups (0.26 s in a debug build). Identical in
+  debug and release builds and under the AArch64 NaN emulation of both (every test of the crate:
+  221 in each of the four configurations, relay 20).
 - `cargo test -p larmorx-fs-core --test defects_volume`: each defect of the spec's §69.4 (FS-265,
   FS-285 to FS-318) and FS-332, FS-258 noted in both modes on a line of the comparison's own batches
   (the shortest), FS-292, FS-296, FS-297, FS-302, FS-305, FS-311 to FS-315 and FS-258 on lines

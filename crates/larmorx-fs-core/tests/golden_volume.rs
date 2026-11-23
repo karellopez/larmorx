@@ -285,6 +285,14 @@ const GOLDEN: &[(&str, &str)] = &[
         "part10.reproduce",
         "ba929f5fd03d002eb6a6341ba8836a082b4121a44b34825a28b1291097cba075",
     ),
+    (
+        "part10b.fix",
+        "19d5ff20c93d5a5c1f678aa91c58069a3228e420b2477c6e88d41a70dea9f532",
+    ),
+    (
+        "part10b.reproduce",
+        "791be1f5596d4af53232de9ddb39c72d91b232bc5201a59fa205030ed61dce13",
+    ),
 ];
 
 fn check(name: &str, bytes: &[u8]) {
@@ -3829,4 +3837,385 @@ const PART10: &[(&str, Make)] = &[
 #[test]
 fn part10_talairach_dilation_and_segments() {
     group("part10", PART10, 4);
+}
+
+/// A float volume filled from the probe's table (`t<seed>`: zeros, halves, NaNs, infinities, ...),
+/// in `seg_w`'s ordinary geometry.
+fn tab_w(g: &mut G, (w, h, d): (i64, i64, i64), frames: i64) -> String {
+    let seed = g.int(0, 33);
+    let mut f = vec![g.size(false), g.size(false), g.size(false), "1".to_owned()];
+    f.extend(g.cosines(false));
+    f.extend((0..3).map(|_| g.f(false)));
+    f.extend(["00000000"; 3].map(str::to_owned));
+    let z11 = ["00000000"; 11].join(" ");
+    format!(
+        "{w} {h} {d} 3 {frames} 0 t{seed} {} 1 {d} {z11} 0000000000000000 0 00000000 00000000 0 1 null null",
+        f.join(" ")
+    )
+}
+
+/// A label volume of §50 (labels inside and outside the byte range, halves for floats).
+fn lab_w(g: &mut G, e: (i64, i64, i64), kind: i64, frames: i64) -> String {
+    if kind == 3 && g.one_in(3) {
+        return tab_w(g, e, frames);
+    }
+    seg_w(g, e, kind, frames, &[0, 0, 1, 2, 5, -3, 250, 300])
+}
+
+/// A destination of §50: none, the source itself, the second volume (`two`) or a volume of the
+/// extent.
+fn dst50(g: &mut G, e: (i64, i64, i64), two: bool) -> String {
+    match g.int(0, if two { 3 } else { 2 }) {
+        0 => "new".to_owned(),
+        1 => "self".to_owned(),
+        2 => {
+            let k = pi(g, &[0, 3]);
+            format!("{} 0", seg_w(g, e, k, 1, &[0]))
+        }
+        _ => "other".to_owned(),
+    }
+}
+
+/// Part 10b (§49 and §50); `MRIconform`'s 256^3 result is beyond the golden size (rule 10):
+/// its matrix and the template only.
+const PART10B: &[(&str, Make)] = &[
+    ("conform", |g| {
+        let e = ext(g, 1, 3);
+        let w = {
+            let k = pi(g, &[0, 3]);
+            let f = 1;
+            seg_w(g, e, k, f, &[0, 1, 2])
+        };
+        if g.one_in(2) {
+            return format!("1 {w} 0");
+        }
+        let wd = g.pick(&["0", "4", "8"]);
+        let sz = [1.0, 0.5, 2.0][g.below(3) as usize];
+        format!("2 {w} 0 {wd} {} {}", dbits(sz), g.int(0, 1))
+    }),
+    ("union", |g| {
+        let e = ext(g, 1, 3);
+        let (a, b) = (lab_w(g, e, 0, 1), {
+            let k = pi(g, &[0, 3]);
+            let f = 1;
+            lab_w(g, e, k, f)
+        });
+        format!("{a} 0 {b} 0 {}", dst50(g, e, true))
+    }),
+    ("isect", |g| {
+        let e = ext(g, 1, 3);
+        let (a, b) = (lab_w(g, e, 3, 1), lab_w(g, e, 1, 1));
+        format!("{a} 0 {b} 0 {}", dst50(g, e, true))
+    }),
+    ("mand", |g| {
+        let e = ext(g, 1, 3);
+        let (a, b) = (lab_w(g, e, 3, 1), lab_w(g, e, 0, 1));
+        format!("{a} 0 {b} 0 {} {}", dst50(g, e, true), g.int(-1, 3))
+    }),
+    ("mxor", |g| {
+        let e = ext(g, 1, 3);
+        let (a, b) = (lab_w(g, e, 1, 1), lab_w(g, e, 3, 1));
+        format!(
+            "{a} 0 {b} 0 {} {} {}",
+            dst50(g, e, true),
+            g.int(0, 2),
+            g.int(1, 5)
+        )
+    }),
+    ("compl", |g| {
+        let e = ext(g, 1, 3);
+        format!(
+            "{} 0 {}",
+            {
+                let k = pi(g, &[0, 3]);
+                let f = 1;
+                lab_w(g, e, k, f)
+            },
+            dst50(g, e, false)
+        )
+    }),
+    ("erode", |g| {
+        let e = ext(g, 1, 3);
+        format!(
+            "{} 0 {}",
+            {
+                let k = pi(g, &[0, 3, 4]);
+                let f = g.int(1, 2);
+                lab_w(g, e, k, f)
+            },
+            dst50(g, e, false)
+        )
+    }),
+    ("erode2d", |g| {
+        let e = ext(g, 1, 3);
+        format!(
+            "{} 0 {}",
+            {
+                let k = pi(g, &[0, 3]);
+                let f = 1;
+                lab_w(g, e, k, f)
+            },
+            dst50(g, e, false)
+        )
+    }),
+    ("dil6", |g| {
+        let e = ext(g, 1, 3);
+        format!("{} 0 {}", lab_w(g, e, 3, 1), dst50(g, e, false))
+    }),
+    ("mnot", |g| {
+        let e = ext(g, 1, 3);
+        format!(
+            "{} 0 {}",
+            {
+                let k = pi(g, &[1, 3]);
+                let f = 1;
+                lab_w(g, e, k, f)
+            },
+            dst50(g, e, false)
+        )
+    }),
+    ("b2c", |g| {
+        let e = ext(g, 1, 3);
+        format!("{} 0 new", lab_w(g, e, 3, 1))
+    }),
+    ("edges", |g| {
+        let e = ext(g, 1, 3);
+        let v = [7.5, -1.0, f64::NAN][g.below(3) as usize];
+        format!(
+            "{} 0 {} {}",
+            {
+                let f = g.int(1, 2);
+                lab_w(g, e, 3, f)
+            },
+            dbits(v),
+            dst50(g, e, false)
+        )
+    }),
+    ("erodenn", |g| {
+        let e = ext(g, 1, 3);
+        let d = if g.one_in(3) { "self" } else { "new" };
+        format!(
+            "{} 0 {d} {} {}",
+            lab_w(g, e, 3, 1),
+            g.int(0, 3),
+            g.int(0, 1)
+        )
+    }),
+    ("erodeseg", |g| {
+        let e = ext(g, 2, 4);
+        format!(
+            "{} 0 new {} {}",
+            lab_w(g, e, 1, 1),
+            g.int(1, 2),
+            g.int(0, 3)
+        )
+    }),
+    ("dilseg", |g| {
+        let e = ext(g, 1, 3);
+        let mask = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            format!("{} 0", lab_w(g, e, 3, 1))
+        };
+        let n = g.pick(&["1", "2", "-1"]);
+        format!("{} 0 new {n} {mask} 0 {}", lab_w(g, e, 1, 1), dbits(0.5))
+    }),
+    ("dtl", |g| {
+        let e = ext(g, 1, 4);
+        let (a, b) = (lab_w(g, e, 0, 1), lab_w(g, e, 0, 1));
+        let lab = g.pick(&["1", "2", "300"]);
+        format!(
+            "{} {a} 0 {b} 0 {} {lab} {} {}",
+            g.int(0, 1),
+            dst50(g, e, true),
+            g.int(0, 3),
+            g.int(0, 3)
+        )
+    }),
+    ("dlab", |g| {
+        let e = ext(g, 1, 3);
+        let k = g.int(0, 1);
+        let a = {
+            let k = pi(g, &[0, 3]);
+            let f = 1;
+            lab_w(g, e, k, f)
+        };
+        let d = if g.one_in(2) { "self" } else { "new" };
+        format!(
+            "{k} {a} 0 {d} {} {}",
+            g.pick(&["1", "2", "250"]),
+            g.int(0, 2)
+        )
+    }),
+    ("openn", |g| {
+        let e = ext(g, 1, 3);
+        let k = g.int(0, 2);
+        let a = {
+            let k = pi(g, &[0, 3]);
+            let f = 1;
+            lab_w(g, e, k, f)
+        };
+        let order = if k == 0 {
+            format!(" {}", g.int(-1, 2))
+        } else {
+            String::new()
+        };
+        format!("{k} {a} 0 {}{order}", dst50(g, e, false))
+    }),
+    ("rlist", |g| {
+        let e = ext(g, 1, 3);
+        let a = {
+            let k = pi(g, &[1, 3]);
+            let f = 1;
+            lab_w(g, e, k, f)
+        };
+        let mask = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            format!("{} 0", lab_w(g, e, 3, 1))
+        };
+        let d = if g.one_in(3) {
+            format!("{} 0", seg_w(g, e, 0, 1, &[0]))
+        } else {
+            "new".to_owned()
+        };
+        format!("{a} 0 2 1 7 5 -2 {mask} {d}")
+    }),
+    ("rvonly", |g| {
+        let e = ext(g, 1, 3);
+        let a = {
+            let k = pi(g, &[0, 3]);
+            let f = g.int(1, 2);
+            lab_w(g, e, k, f)
+        };
+        let (i, o) = (
+            g.pick(&["3f800000", "40000000"]),
+            g.pick(&["40e00000", "7fc00000"]),
+        );
+        format!("{a} 0 {} {i} {o}", dst50(g, e, false))
+    }),
+    ("mmask", |g| {
+        let e = ext(g, 1, 3);
+        let (a, m) = (lab_w(g, e, 3, 1), {
+            let k = pi(g, &[0, 3]);
+            let f = 1;
+            lab_w(g, e, k, f)
+        });
+        format!(
+            "{} {a} 0 {m} 0 {} {} 40f00000",
+            g.int(0, 1),
+            dst50(g, e, true),
+            g.int(0, 2)
+        )
+    }),
+    ("+env=FS_MRIMASK_ALLOW_DIFF_GEOM=0 +gdiag=1 mmask 0", |g| {
+        let e = ext(g, 1, 3);
+        let (a, m) = (lab_w(g, e, 3, 1), lab_w(g, e, 3, 1));
+        format!("{a} 0 {m} 0 new 1 40f00000")
+    }),
+    ("tmask", |g| {
+        let e = ext(g, 1, 3);
+        let k = pi(g, &[0, 3]);
+        let (a, m) = (lab_w(g, e, k, 1), lab_w(g, e, k, 1));
+        let o = g.pick(&["43960000", "bf800000", "40400000", "7fc00000"]);
+        format!("{a} 0 {m} 0 {} 3f800000 {o}", dst50(g, e, true))
+    }),
+    ("grow", |g| {
+        let e = ext(g, 2, 4);
+        let (a, f) = (lab_w(g, e, 0, 1), seg_w(g, e, 0, 1, &[0, 0, 0, 9]));
+        format!("{a} 0 {f} 0 {} 9", g.pick(&["0", "1", "2"]))
+    }),
+    ("onfg", |g| {
+        let e = ext(g, 1, 3);
+        let (a, f, b) = (lab_w(g, e, 0, 1), lab_w(g, e, 0, 1), lab_w(g, e, 0, 1));
+        format!("{a} 0 {f} 0 {b} 0")
+    }),
+    ("offbg", |g| {
+        let e = ext(g, 2, 4);
+        let (a, b) = (
+            seg_w(g, e, 0, 1, &[0, 0, 0, 7, 9]),
+            seg_w(g, e, 0, 1, &[0, 0, 1]),
+        );
+        format!("{a} 0 {b} 0")
+    }),
+    ("cplab", |g| {
+        let e = ext(g, 1, 3);
+        let a = {
+            let k = pi(g, &[0, 3]);
+            let f = 1;
+            lab_w(g, e, k, f)
+        };
+        let d = if g.one_in(2) {
+            "self".to_owned()
+        } else {
+            format!("{} 0", {
+                let k = pi(g, &[0, 3]);
+                let f = 1;
+                seg_w(g, e, k, f, &[0])
+            })
+        };
+        format!("{a} 0 {d} {}", g.pick(&["1", "2", "300"]))
+    }),
+    ("cplv", |g| {
+        let e = ext(g, 1, 3);
+        let (a, l) = (lab_w(g, e, 3, 1), lab_w(g, e, 1, 1));
+        let d = match g.int(0, 2) {
+            0 => "self".to_owned(),
+            1 => "other".to_owned(),
+            _ => format!("{} 0", seg_w(g, e, 3, 1, &[0])),
+        };
+        format!("{a} 0 {l} 0 {d} {}", g.pick(&["1", "2"]))
+    }),
+    ("slv", |g| {
+        let e = ext(g, 1, 3);
+        let (a, l) = (lab_w(g, e, 3, 1), lab_w(g, e, 1, 1));
+        format!(
+            "{a} 0 {l} 0 {} {} 41200000",
+            dst50(g, e, true),
+            g.pick(&["1", "2"])
+        )
+    }),
+    ("cntv", |g| {
+        let e = ext(g, 1, 3);
+        let k = g.int(0, 3);
+        let a = {
+            let k = pi(g, &[0, 3]);
+            let f = g.int(1, 2);
+            lab_w(g, e, k, f)
+        };
+        if k == 3 {
+            return format!("3 {a} 0");
+        }
+        format!("{k} {a} 0 {}", g.pick(&["0", "1", "2", "300"]))
+    }),
+    ("cnbhd", |g| {
+        let e = ext(g, 1, 3);
+        let a = lab_w(g, e, 1, 1);
+        format!("{a} 0 3 3 0 0 0 1 1 1 1 0 2 5 2 1 1 0")
+    }),
+    ("cent", |g| {
+        let e = ext(g, 1, 3);
+        format!("{} 0", lab_w(g, e, 3, 1))
+    }),
+    ("pthr", |g| {
+        let e = ext(g, 1, 3);
+        let a = lab_w(g, e, 3, 1);
+        let mask = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            format!("{} 0", lab_w(g, e, 3, 1))
+        };
+        let pct = [50.0, 10.0, 99.0, 0.0, f64::NAN][g.below(5) as usize];
+        format!("{a} 0 {mask} 0 {}", dbits(pct))
+    }),
+    ("dilo", |g| {
+        let e = ext(g, 1, 3);
+        let v = [5.0, f64::NAN][g.below(2) as usize];
+        format!("{} 0 {} new", lab_w(g, e, 3, 1), dbits(v))
+    }),
+];
+
+#[test]
+fn part10b_conforming_sets_morphology_masks() {
+    group("part10b", PART10B, 3);
 }

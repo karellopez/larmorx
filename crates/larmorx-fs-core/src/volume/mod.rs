@@ -14,7 +14,8 @@
 //! `seqops`) and voxelwise operations (§39, `voxelwise`); and of §54's parts ready for the clean
 //! room, the inverses' fill and the changes between the voxel, RAS-to-RAS and physical-voxel
 //! types (`ltaops`); part 10a, the Talairach helpers (§46, `talairach`) and dilation and the
-//! segment helpers (§48, `dilate`).
+//! segment helpers (§48, `dilate`); part 10b, conforming (§49, `conform`), set operations,
+//! counts and labels (§50, `setops`), morphology (§50, `morph`) and masks (§50, `masks`).
 //!
 //! Functions that take a destination (§6) take a [`Dst`]: none (the function makes one), the
 //! first source itself, the second source itself, or the caller's volume; they return a
@@ -24,6 +25,7 @@
 pub mod arith;
 pub mod aseg;
 pub mod cma;
+pub mod conform;
 pub mod crops;
 pub mod deriv;
 pub mod dilate;
@@ -37,6 +39,8 @@ pub mod linear;
 pub mod ltachain;
 pub mod ltaops;
 pub mod ltaread;
+pub mod masks;
+pub mod morph;
 pub mod moves;
 pub mod nbhd;
 pub mod pca;
@@ -47,6 +51,7 @@ pub mod resample;
 pub mod sample;
 pub mod segs;
 pub mod seqops;
+pub mod setops;
 pub mod skull;
 pub mod stats;
 pub mod talairach;
@@ -133,6 +138,10 @@ impl<'a> Vols<'a> {
     }
 
     /// Whether the destination is the first source itself.
+    pub(crate) fn has_b(&self) -> bool {
+        self.b.is_some()
+    }
+
     pub(crate) fn d_is_a(&self) -> bool {
         matches!(self.d, Slot::A)
     }

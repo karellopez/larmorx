@@ -18,7 +18,7 @@ use crate::process::{Process, Stop, codes};
 use crate::sse;
 
 /// `CompareDoubles` (§38): -1 when `a < b`, +1 when `a > b`, else 0 (a NaN equal to all).
-fn compare_doubles(a: &f64, b: &f64) -> i32 {
+pub(crate) fn compare_doubles(a: &f64, b: &f64) -> i32 {
     if a < b {
         -1
     } else if a > b {

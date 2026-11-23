@@ -1,10 +1,11 @@
 # fs.volume's clean room: what black-box runs showed (unrestricted)
 
-The clean room of FreeSurfer 8.2.0's volume functions, parts 1 to 9 and 10a of the spec and §54 to §57
+The clean room of FreeSurfer 8.2.0's volume functions, parts 1 to 9, 10a and 10b of the spec and §54 to §57
 (`crates/larmorx-fs-core/src/volume/`, the rest of queue item C3.1-05), was written from
-[`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) §1 to §48 and §54 to §58 (part 9: volume-to-volume
+[`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) §1 to §51 and §54 to §58 (part 9: volume-to-volume
 resampling, frame covariance and PCA, the false discovery rate, regions, voxel neighbourhood measures;
-part 10a: the Talairach helpers, dilation and the segment helpers;
+part 10a: the Talairach helpers, dilation and the segment helpers; part 10b: conforming, the set
+operations, morphology, masks and counts;
 the operations on a transform array; segmentations onto another grid, SPM warps, segment statistics and
 shifts, crops), and checked only against
 black boxes: the prebuilt probe `fs_volume_probe` (FreeSurfer's compiled library and the C library,
@@ -18,7 +19,18 @@ fs.bspline's clean room, which the cubic B-spline paths of §29 and §31 use, ha
 
 ## The comparison
 
-- **What:** the 58 groups of the spec's §69.2 and of `specs/freesurfer-bspline.md` §9 (18,639 calls,
+- **Relay 20 (2026-11-24):** the 64 groups (19,865 calls; part 10b's `vconf`, `vset`, `vmorph`,
+  `vmask` and the fixed groups `vrules21` and `vrules22` added; the probe of commit `4d00c36e`).
+  `reproduce`: 18,663 identical, 947 where FreeSurfer did not finish, 227 memory lines, the same 27
+  lines §69.3 allows, and one unexplained line: `vrules22`'s `MRIdilateThreshLabel` copying an
+  8-voxel source into a 4-voxel destination, which `MRIcopy` refuses in both modes (fs.mri §13: the
+  destination is too small) while FreeSurfer writes past the destination, the same way in each of the
+  probe's four runs (so the loop cannot see it as memory). `fix`: 14,287 identical, 947 not finished,
+  613 memory, 4,018 corrected by a noted defect, none other. Only `vfr8` and `vrules14` of the earlier
+  groups moved between "identical", "memory" and "did not finish" (the rebuilt probe's runs classify
+  its memory lines anew). fs.mri (16 groups, 9,511 calls): none unexplained in either mode. Log
+  `oracles/logs/fs-cleanroom-2-relay20-full.log`.
+- **What (relay 18):** the 58 groups of the spec's §69.2 and of `specs/freesurfer-bspline.md` §9 (18,639 calls,
   seed 7: parts 1 to 3's ten, the fixed groups `vrules` and `vrules4` to `vrules20`, part 4's
   `vsample`, `vmove`, `vskull`, `vltaread`, part 5's `vcma`, part 6a's `vres`, part 6b's `vframes`,
   `vderiv`, `vlinear`, part 6c's `vresamp`, the cubic B-spline paths' `vbsvol`, part 7a's `vstat7`, part
@@ -375,6 +387,41 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
 - **How we know:** *validated* (`vaseg`, `vsegs`, `vcrops`, `vrules15`, `vrules16`, both modes,
   2026-11-23, relay 17; the defect tests in `tests/defects_volume.rs`).
 
+## Part 10b: conforming, set operations, morphology, masks and counts (§49 to §51)
+
+- **What:** `vconf` (71 calls), `vset` (500), `vmorph` (340), `vmask` (110) and the fixed group
+  `vrules22` (134, 6 of them in its batch without the guard runs) are identical with `reproduce` in
+  every line but where FreeSurfer crashed or hung (FS-493's counts and FS-497's complex volume end
+  after the probe's alarm; the copies and complements written past a one-frame destination, FS-53; a
+  header-only volume conformed, FS-58), the probe's memory lines, and one line (above: an 8-voxel
+  source copied into a 4-voxel destination, which fs.mri §13 refuses in both modes). `fix`: every
+  other line identical or corrected by a noted defect (FS-491 to FS-496, FS-12, and the earlier
+  parts' FS-01, FS-161, FS-162, FS-163, FS-289, FS-461, FS-53).
+- Readings the probe decided, where the spec's text says nothing or allows two:
+  - `MRIerode` and `MRIerode2D` check a given destination's extent (`MRIcheckVolDims`'s end, status
+    252), as `vmorph`'s destinations of another extent show (and `MRIclose`'s erosion into one).
+  - `MRIdilateSegmentation` writes only the voxels a step changes: a voxel whose `(int)` label is not
+    0 keeps what `MRIcopy` put there (a float label -1 copied into a byte destination stays 255, not
+    the 0 that writing the label back would give).
+  - `MRIdilateLabelUchar` finds the box of the source's label again at each step: with the source as
+    its own destination the box follows the label (two steps of a 3 x 1 x 2 volume reach its far
+    column); with another destination the source does not change, so the box is the same.
+  - `MRImaskDifferentGeometry` walks the destination's extent and frames: with the mask as the
+    destination (`vmask`), every voxel of the mask is written, also those beyond the source's extent.
+  - The probe's `conform` prints voxels as `h` and an FNV-1a 64 hash whose start state is
+    1469598103934665603 (the usual offset basis 14695981039346656037 without its last digit), with
+    the usual prime: five inputs of known bytes all fit it
+    (`validation/investigations/freesurfer-cleanroom-volume/hand/conform_hash.py`). The candidate uses
+    that start state.
+- Lines where FreeSurfer reads past its memory the same way in every run (so the loop counts them as
+  identical or unexplained rather than memory): `vset`'s `MRIpercentThresh` of frame 1 of a one-frame
+  volume (the candidate notes FS-53 and reads 0; FreeSurfer's value is half of a neighbouring float's
+  bits), `vrules22`'s percentages past the list (FS-496) and the copy above. They are for the spec
+  writer's loop.
+- **How we know:** *validated* (the six groups, both modes, 2026-11-24, relay 20, log
+  `oracles/logs/fs-cleanroom-2-relay20-full.log`; the defect tests in `tests/defects_volume.rs`:
+  FS-491 to FS-497 on `vrules22`'s own lines).
+
 ## Part 10a: the Talairach helpers, dilation and the segment helpers (§46 to §48)
 
 - **What:** `vtal` (240 calls), `vdil` (270) and the fixed group `vrules20` (111) are identical with
@@ -393,9 +440,15 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
   volumes' RAS-to-voxel matrices are computed from their geometries (an inverse that fails gives none
   silently, so the product's `m1 is null` ends the program, as `vrules20`'s singular volumes show);
   `MRIsegStats`' first value starts `min` and `max`, so a NaN first value leaves both NaN (with the
-  range, mean and spread). Not decided by the probe (every outside value it uses is 0): `MRIdilate`'s
-  neighbours past the volume's faces are sampled as the nearest sampler gives them (the outside value)
-  rather than clamped as `MRIdilateUchar`'s are.
+  range, mean and spread). `MRIdilate`'s neighbours past the volume's faces: relay 18 sampled them as
+  the nearest sampler gives them (the outside value), which no group then showed; the spec writer's
+  `dilo` (`vrules21`, outside values 5, 0, -1 and NaN) shows them clamped to the volume, as
+  `MRIdilateUchar`'s are, and relay 20 changed the code. Relay 20 also found (hand cases,
+  `validation/investigations/freesurfer-cleanroom-volume/hand/dilate_empty_box.py`, 13 cases, probe and
+  candidate the same) that when the search finds nothing both dilations' box is not grown: an extent of 1
+  in all three axes visits its voxel, widths 2, 3 and 4, a 2 x 2 and a 3 x 3 none (`vrules21`'s long
+  volumes of 2 x 1 x 1 and 1 x 2 x 1 print only the search's errors); the candidate starts the search at
+  `[e, -1]` per axis and grows the box, which gives exactly that.
 - **How we know:** *validated* (the three groups, both modes, 2026-11-23, relay 18, log
   `oracles/logs/fs-cleanroom-2-relay18-full.log`; the defect tests in `tests/defects_volume.rs`).
 
@@ -546,9 +599,10 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
   the transform files in memory, several in one process; part 5's labels, segmentation functions
   and the statistics cache's text and reading in memory; part 6a's 11 commands; part 6b's and 6c's
   13, the diagnostic bits' prints included; part 7a's 11, fs.bspline's 10 and the cubic B-spline
-  paths; part 7b's 16 commands and §54's changes of type; part 8's 32 commands but `tiv`, which reads files and is in the defect tests; §54's other operations, `lta54`, over pools of three geometries with mostly invertible matrices; §55 to §57's 18 commands, `segs57`, on volumes of labels with ordinary geometries; part 9's 16 commands, `part9`, with §55's upsampling and §56's shift-map resampling; part 10a's 9 commands, `part10`, with `NO_AVERAGE305` and the diagnostic bits; 0.24 s in a debug build), identical in debug and release builds on x86-64 and under the
+  paths; part 7b's 16 commands and §54's changes of type; part 8's 32 commands but `tiv`, which reads files and is in the defect tests; §54's other operations, `lta54`, over pools of three geometries with mostly invertible matrices; §55 to §57's 18 commands, `segs57`, on volumes of labels with ordinary geometries; part 9's 16 commands, `part9`, with §55's upsampling and §56's shift-map resampling; part 10a's 9 commands, `part10`, with `NO_AVERAGE305` and the diagnostic bits; part 10b's 34 commands, `part10b` (conforming's matrix and template only: `MRIconform`'s 256^3 result is beyond rule 10's golden size, `vconf` compares it); 68 SHA-256 over 34 groups, about 0.26 s in a debug build), identical in debug and release builds on x86-64 and under the
   AArch64 NaN emulation of both (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`).
-- **How we know:** *measured* (2026-11-23, relays 10 to 18).
+- **How we know:** *measured* (2026-11-23 and 24, relays 10 to 20; relay 20 ran every test of the
+  crate, 221, in the four configurations).
 
 ## NaN choices made in code, and NaN test inputs made by their bits (relay 19)
 

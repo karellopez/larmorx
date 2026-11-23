@@ -22,6 +22,14 @@ pub struct SegStats {
     pub std: f32,
 }
 
+/// The search box's start per axis: `[e, -1]`, so a search that finds nothing grows to
+/// `[e - 1, 0]`, which holds a voxel only for an extent of 1 (observed: an all-zero volume of
+/// extent 1 visits its voxel, one of 2, 3 or 3 x 3 none; `vrules21`'s longs and the hand
+/// cases of `validation/investigations/freesurfer-cleanroom-volume/hand/`).
+const fn box_start(e: i32) -> (i32, i32) {
+    (e, -1)
+}
+
 /// The inclusive box `[lo, hi]` per axis grown by one voxel and clipped to `[0, e - 1]`.
 fn grow(lo: i32, hi: i32, e: i32) -> (i32, i32) {
     (lo.saturating_sub(1).max(0), hi.saturating_add(1).min(e - 1))
@@ -83,7 +91,8 @@ impl Process {
                 }
             }
         }
-        let (mut x0, mut x1, mut y0, mut y1, mut z0, mut z1) = (w - 1, 0, h - 1, 0, d - 1, 0);
+        let ((mut x0, mut x1), (mut y0, mut y1), (mut z0, mut z1)) =
+            (box_start(w), box_start(h), box_start(d));
         for z in 0..d {
             for y in 0..h {
                 for x in 0..w {
@@ -122,8 +131,9 @@ impl Process {
     }
 
     /// `MRIdilate(src, dst)` (§48): a byte source is [`Process::mri_dilate_uchar`]; else, in
-    /// the box of the voxels above 0 in any frame (nearest samples) grown by one voxel, each
-    /// voxel of each frame the largest of 0 and its 27 neighbourhood samples (a NaN never wins),
+    /// the box of the voxels above 0 in any frame (nearest samples, frames outermost) grown by
+    /// one voxel, each voxel of each frame the largest of 0 and its 27 neighbourhood samples at
+    /// coordinates clamped to the volume (a NaN never wins; the outside value never enters),
     /// written with `MRIsetVoxVal`.
     pub fn mri_dilate(&mut self, src: &mut Mri, dst: Dst) -> Result<VolOut, Stop> {
         if src.kind == types::UCHAR {
@@ -154,11 +164,13 @@ impl Process {
             return Ok(());
         }
         let nf = src.nframes;
-        let (mut x0, mut x1, mut y0, mut y1, mut z0, mut z1) = (w - 1, 0, h - 1, 0, d - 1, 0);
-        for z in 0..d {
-            for y in 0..h {
-                for x in 0..w {
-                    for f in 0..nf {
+        let ((mut x0, mut x1), (mut y0, mut y1), (mut z0, mut z1)) =
+            (box_start(w), box_start(h), box_start(d));
+        // the search: frames outermost, then slices, rows, columns (item 111)
+        for f in 0..nf {
+            for z in 0..d {
+                for y in 0..h {
+                    for x in 0..w {
                         if self.whole_sample(src, x, y, z, f)? > 0.0 {
                             x0 = x0.min(x);
                             x1 = x1.max(x);
@@ -179,10 +191,15 @@ impl Process {
                 for y in y0..=y1 {
                     for x in x0..=x1 {
                         let mut m = 0.0f64;
+                        // the neighbours through the index tables: clamped to the volume, so
+                        // the outside value never enters (item 110)
                         for dz in -1..=1 {
+                            let zz = (z + dz).clamp(0, d - 1);
                             for dy in -1..=1 {
+                                let yy = (y + dy).clamp(0, h - 1);
                                 for dx in -1..=1 {
-                                    let v = self.whole_sample(src, x + dx, y + dy, z + dz, f)?;
+                                    let xx = (x + dx).clamp(0, w - 1);
+                                    let v = self.whole_sample(src, xx, yy, zz, f)?;
                                     if v > m {
                                         m = v;
                                     }

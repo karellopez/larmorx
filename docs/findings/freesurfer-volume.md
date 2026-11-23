@@ -686,8 +686,9 @@ Source: `utils/mriset.cpp` 108-3990 (the reached functions; `MRIdilate`, `MRIdil
   `nDils` 0 or below -1 run until `n` wraps around (about 2^32 recursive steps): the probe's child is killed by its
   5-second alarm (`CRASH 14`). Both modes: an error.
 - **FS-497** (a, a hang): `MRIdilateSegmentation(seg, out, -1, ...)` loops `while (nchanges)`; on a complex volume
-  (`MRI_FLOAT_COMPLEX`) `MRIcopy(out, seg2)` copies half of each row (FS-161), so the labels written into the second
-  half never reach `seg2` and every step counts the same changes (seed 13's case: `CRASH 14` in FreeSurfer). The
+  (`MRI_FLOAT_COMPLEX`) `MRIcopy(out, seg2)` copies only the first `width` bytes of each row (FS-161: an eighth of a
+  float complex row's `8 width` bytes), so the labels written past them never reach `seg2` and every step counts the
+  same changes (seed 13's case: `CRASH 14` in FreeSurfer). The
   port compares an FNV-1a hash of `seg2`'s voxels before and after the copy: unchanged with changes counted is an
   error in both modes (with FS-161 corrected, the default copies whole rows and the dilation ends).
 - **FS-494** (c, rule A): `MRIthresholdMask`'s byte branch `*pdst++ = out_val` (a `float` into `unsigned char`) is

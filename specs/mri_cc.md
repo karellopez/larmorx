@@ -458,13 +458,13 @@ crash (FS-1203, FS-1205, FS-1211) or an abort (FS-1212) loses what was held.
   program: its licence check then prints the licence file. The diagnostic outputs (§1.5, the
   volumes the diagnostic flags write) are specified here and not compared.
 - **The open probe** `validation/investigations/freesurfer-mri-cc-probe/compare.py` (its README:
-  133 command lines on seeded subjects: every option, given last, by its first letter, its value
+  112 command lines on seeded subjects: every option, given last, by its first letter, its value
   forms, names of 1,023 and 1,024 bytes, the subjects folder from `-sdir` and from the environment,
   missing inputs, read-only output folders, the aseg path on small segmentations (empty, one
   hemisphere, the callosum present) and on a conformed phantom head with each option, the
   white-matter path on small volumes (NaNs, an unidentified `wm`, voxels of 0.45 mm) and on the
   phantom as a NIfTI file, as a COR folder and with voxels of 1.4 mm; with `--heads`, recon-all's
-  call and the white-matter path on the six recorded heads' two streams). Compare exit status,
+  call and the white-matter path on the six recorded heads' two streams, 24 more). Compare exit status,
   both streams and every file written; `reproduce` must match everywhere but the cases counted for
   FS-53, FS-1201 and FS-1206.
 - **Golden cases** (`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_cc_golden.rs`'s

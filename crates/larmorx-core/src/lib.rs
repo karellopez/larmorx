@@ -22,6 +22,9 @@
 //!   gives them (a clean room of `specs/glibc-random.md`).
 //! - [`glibc_qsort`]: the C library's `qsort` and `qsort_r`, the arrangement and the comparator
 //!   calls of glibc 2.35 (a clean room of `specs/glibc-qsort.md`).
+//! - [`stdsort`]: C++'s `std::sort` and `std::nth_element` as GCC's libstdc++ moves the
+//!   elements (the SGI STL's introsort and introselect), for replicas of C++ programs whose
+//!   results depend on the order of equal elements.
 //! - [`cubic_spline`]: the cubic spline of FreeSurfer's intensity normalisation (a clean room of
 //!   `specs/burkardt-spline.md`).
 //! - [`ranlux`]: RANLUX389 and the random distributions FreeSurfer draws from (a clean room of
@@ -68,6 +71,7 @@ pub mod parallel;
 pub mod python;
 pub mod ranlux;
 pub mod rotation;
+pub mod stdsort;
 pub mod vnl_cholesky;
 #[cfg(test)]
 mod vnl_digests;

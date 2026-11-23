@@ -159,6 +159,12 @@ impl Libm {
         self.choose64(|| super::log10(x), || super::log10_glibc(x))
     }
 
+    /// The base-2 logarithm ([`super::log2`] or [`super::log2_glibc`]).
+    #[inline]
+    pub fn log2(&self, x: f64) -> f64 {
+        self.choose64(|| super::log2(x), || super::log2_glibc(x))
+    }
+
     /// `x^y` ([`super::pow`] or [`super::pow_glibc`]).
     #[inline]
     pub fn pow(&self, x: f64, y: f64) -> f64 {

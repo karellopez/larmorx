@@ -66,6 +66,23 @@ def with_times(rows: list[dict], path: Path | None) -> list[dict]:
     return rows
 
 
+#: The paths the port does not run yet (counted as ``not ported``, never compared); relay 47.
+NOT_PORTED_YET = "the Powell registration's half-way outputs, `--debug`, `--test`"
+
+
+def probe_set(p: dict) -> str:
+    """A check.py summary's name: its seed, or the Powell registration's family (relay 47)."""
+    fam = p.get("family")
+    name = (
+        "the Powell family"
+        if fam == "powell"
+        else "the joint-histogram and SB family"
+        if fam == "histo"
+        else f"seed {p['seed']}"
+    )
+    return name + (" (the decided `cabs` and `csqrt` preloaded)" if p.get("preload") else "")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--probe", type=Path, nargs="+", required=True)
@@ -151,7 +168,8 @@ def main(argv: list[str] | None = None) -> int:
         "real_heads": real,
         "probe": [
             {
-                "set": f"seed {p['seed']}",
+                "set": probe_set(p),
+                "decided_complex_preloaded": p.get("preload", False),
                 "cases": p["cases"],
                 "identical": p["reproduce_equal"],
                 "different": p["reproduce_differ"],
@@ -254,10 +272,18 @@ def main(argv: list[str] | None = None) -> int:
         "outputs, the intensity scale's file, outputs that cannot be written), the entropy "
         "images (`--cost ROBENT`: byte, short and float images, masks, 2-D images, every "
         "entropy option, a radius below 0, FS-1074); then seeded pairs "
-        "of head-like images of every type, extent and orientation with random options. Exit "
+        "of head-like images of every type, extent and orientation with random options; and "
+        "the Powell registration's family (`--family powell`: 40 cases of the `LS`, `NCC`, `TB`, "
+        "`LNCC` and `SAD` costs with random models, intensity scales, symmetry or not, full "
+        "images, tolerances, subsampling, 2-D pairs and outputs) and its joint-histogram and SB "
+        "family (`--family histo`: 32 cases of `MI`, `NMI`, `ECC`, `SCR` and `SB` with the same "
+        "random options). Every Powell evaluation with "
+        "symmetry takes the matrix square roots, so the official program runs with the decided "
+        "`cabs` and `csqrt` preloaded (`--preload`, `decided_complex.sh`: the user's D4; without "
+        "it 4 of the 40 differ in their last printed digits, glibc's `hypot`). Exit "
         "status, both streams and every file written, case by case; counted apart: the cases "
         "whose result in FreeSurfer is undefined (`check.py`'s `SKIP`) and the paths not ported "
-        "yet (the Powell costs, `--debug`, `--test`):",
+        f"yet ({NOT_PORTED_YET}):",
         "",
     ]
     for p in payload["probe"]:
@@ -271,10 +297,12 @@ def main(argv: list[str] | None = None) -> int:
         "",
         "## Golden cases",
         "",
-        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_robust_register_golden.rs`: 4 "
+        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_robust_register_golden.rs`: 7 "
         "cases on 32^3 images made with integer arithmetic (fMRIPrep's call with every output, "
         "an affine registration with its half-way outputs, a short source onto a float target "
-        "of anisotropic voxels, the entropy images of a short source and a byte target), on "
+        "of anisotropic voxels, the entropy images of a short source and a byte target, the "
+        "Powell registration with `--cost NCC`; and on 16^3 byte images `--cost MI` and "
+        "`--cost SB`), on "
         "every platform: `reproduce` "
         f"`{a.golden}` (the official program's value on the same inputs, `check.py --golden`), "
         f"`fix` `{a.golden_fix}`.",

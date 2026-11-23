@@ -66,7 +66,7 @@ HouseholderSequence and Jacobi rotations of a 4 x 4 matrix) - Mozilla Public Lic
   Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL
   was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, log10, sin, cos, asin, acos, atan2, cbrt, tanh, hypot, powf, expf, logf, sinf, cosf, tanhf, cbrtf, acosf, log10f; hypot since 2026-11-11, for the confounds' part; acosf since 2026-11-13, log10 since 2026-11-14 and log10f since 2026-11-16, for FreeSurfer's foundations) - MIT License
+CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, log10, log2, sin, cos, asin, acos, atan2, cbrt, tanh, hypot, powf, expf, logf, sinf, cosf, tanhf, cbrtf, acosf, log10f; hypot since 2026-11-11, for the confounds' part; acosf since 2026-11-13, log10 since 2026-11-14, log10f since 2026-11-16 and log2 since 2026-11-23, for FreeSurfer's foundations) - MIT License
   exp.c: Copyright (c) 2022-2025 Alexei Sibidanov.
   log.c: Copyright (c) 2022 INRIA and CERN. Authors: Paul Zimmermann and Tom Hubrecht.
   dint.h: Copyright (c) 2022 CERN. Author: Tom Hubrecht.
@@ -83,6 +83,7 @@ CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, log10, sin, cos, asi
   acosf.c: Copyright (c) 2023 Alexei Sibidanov.
   log10.c: Copyright (c) 2022-2025 INRIA and CERN. Authors: Paul Zimmermann and Tom Hubrecht.
   log10f.c: Copyright (c) 2022-2026 Alexei Sibidanov.
+  log2.c: Copyright (c) 2023 Alexei Sibidanov.
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -298,6 +299,30 @@ slices in place of the stream's pointers). Its licence:
   2. Altered source versions must be plainly marked as such, and must not be misrepresented as
      being the original software.
   3. This notice may not be removed or altered from any source distribution.
+
+The SGI STL (std::sort's introsort and std::nth_element's introselect, as GCC's libstdc++ keeps
+them), written in Rust from their description in crates/larmorx-core/src/stdsort.rs (since
+2026-11-23; until then in the FSL family's crates-nc/larmorx-nc-core/src/stdsort.rs), modified:
+the pivot step as libstdc++ refines it (the median of the second, middle and last elements moved
+to the first place, the rest partitioned), and a form with every index checked against the
+vector's ends (std::sort of values that may be NaN). Their notices:
+
+  Copyright (c) 1994 Hewlett-Packard Company
+
+  Permission to use, copy, modify, distribute and sell this software and its documentation for
+  any purpose is hereby granted without fee, provided that the above copyright notice appear in
+  all copies and that both that copyright notice and this permission notice appear in
+  supporting documentation. Hewlett-Packard Company makes no representations about the
+  suitability of this software for any purpose. It is provided "as is" without express or
+  implied warranty.
+
+  Copyright (c) 1996 Silicon Graphics Computer Systems, Inc.
+
+  Permission to use, copy, modify, distribute and sell this software and its documentation for
+  any purpose is hereby granted without fee, provided that the above copyright notice appear in
+  all copies and that both that copyright notice and this permission notice appear in
+  supporting documentation. Silicon Graphics makes no representations about the suitability of
+  this software for any purpose. It is provided "as is" without express or implied warranty.
 
 SciPy 1.15.2 (scipy/ndimage: map_coordinates, spline_filter, spline_filter1d) and SciPy 1.18.1
 (scipy/ndimage; since 2026-11-08 also scipy/sparse: kron, hstack, the CSR and CSC products;
@@ -1056,12 +1081,13 @@ f2c (src/eispack/eis_svd.c, eis_pythag.c), and f2c's libf2c routine d_sign (src/
 
 Arm Optimized Routines v19.11 (math/sincosf.h, sincosf.c, sinf.c, cosf.c, sincosf_data.c,
 logf.c, logf_data.c, expf.c, exp2f_data.c, powf.c, powf_log2_data.c, exp.c, exp_data.c, log.c,
-log_data.c, pow.c, pow_log_data.c, math_config.h: the single-precision sine, cosine, logarithm,
-exponential and power and the double exponential, logarithm and power that glibc 2.35 ships) -
-MIT License
+log_data.c, pow.c, pow_log_data.c, log2.c, log2_data.c, math_config.h: the single-precision sine,
+cosine, logarithm, exponential and power and the double exponential, logarithm, base-2 logarithm
+and power that glibc 2.35 ships) - MIT License
   Copyright (c) 1999-2019, Arm Limited.
   Translated into Rust in crates/larmorx-core/src/math/sincosf_glibc.rs, logf_glibc.rs,
-  expf_glibc.rs, powf_glibc.rs, exp_glibc.rs, log_glibc.rs and pow_glibc.rs (since 2026-11-04;
+  expf_glibc.rs, powf_glibc.rs, exp_glibc.rs, log_glibc.rs, pow_glibc.rs and (since 2026-11-23)
+  log2_glibc.rs (since 2026-11-04;
   the AFNI replicas' sine and cosine, translated in crates/larmorx-afni-replica/src/sincosf.rs
   from 2026-10-29, now use them), modified from the originals. The licence text is in
   LICENSES/MIT-arm-optimized-routines.txt.

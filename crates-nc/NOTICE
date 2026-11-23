@@ -192,10 +192,12 @@ The SGI STL (std::sort's introsort and std::nth_element's introselect, as libstd
   supporting documentation. Silicon Graphics makes no representations about the suitability of
   this software for any purpose. It is provided "as is" without express or implied warranty.
 
-  The algorithms are written in larmorx-nc-core/src/stdsort.rs from their description,
-  modified: the pivot step as libstdc++ refines it (the median of the second, middle and last
-  elements moved to the first place, the rest partitioned), and every index checked against the
-  vector's ends (std::sort of floats that may be NaN, FSL-22).
+  The algorithms are written from their description, modified: the pivot step as libstdc++
+  refines it (the median of the second, middle and last elements moved to the first place, the
+  rest partitioned), and every index checked against the vector's ends (std::sort of floats that
+  may be NaN, FSL-22). Since 2026-11-23 they are in the Apache-2.0 crate larmorx-core
+  (../crates/larmorx-core/src/stdsort.rs; this notice also in ../NOTICE), which
+  larmorx-nc-core/src/stdsort.rs re-exports with FSL's own uses (until then written there).
 
 
 Data included

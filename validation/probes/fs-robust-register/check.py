@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import itertools
 import json
 import os
 import re
@@ -124,6 +125,22 @@ def written(d: Path, inputs: set[str]) -> str:
     return " ".join(out)
 
 
+def slow_in_debug(line: str) -> bool:
+    """A case of the Powell registration with a joint histogram's cost or SB (``--cost`` ``MI``,
+    ``NMI``, ``ECC``, ``SCR``, ``SB``), which the recorded test's debug build hashes as ``SLOW``
+    (``cases::histogram_or_sb_cost``; relay 47)."""
+    t = line.split()
+    for a, b in itertools.pairwise(t):
+        if a == "2d2d636f7374":
+            try:
+                cost = bytes.fromhex(b).decode()
+            except ValueError:
+                continue
+            if cost.upper() in ("MI", "NMI", "ECC", "SCR", "SB"):
+                return True
+    return False
+
+
 def official_line(exe: Path, line: str, root: Path, k: int) -> str:
     t = line.split()
     assert t[0] == "rreg"
@@ -202,10 +219,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", type=Path)
     ap.add_argument(
         "--family",
-        choices=("seeded", "powell"),
+        choices=("seeded", "powell", "histo"),
         default="seeded",
-        help="the cases: the prelude, the entropy images and seeded ones (--seed, --n), or the "
-        "Powell registration's 40 (relay 46)",
+        help="the cases: the prelude, the entropy images and seeded ones (--seed, --n), the "
+        "Powell registration's 40 (relay 46), or its joint-histogram and SB costs' 32 (relay 47)",
     )
     ap.add_argument(
         "--preload",
@@ -235,15 +252,15 @@ def main(argv: list[str] | None = None) -> int:
     inputs.mkdir(parents=True, exist_ok=True)
     global PRELOAD
     PRELOAD = str(a.preload.resolve()) if a.preload else ""
-    tag = ("golden" if a.golden else "powell" if a.family == "powell" else f"{a.seed}-{a.n}") + (
+    tag = ("golden" if a.golden else a.family if a.family != "seeded" else f"{a.seed}-{a.n}") + (
         "-preload" if a.preload else ""
     )
     cases_path = inputs / f"cases-{tag}.txt"
     gen = (
         ["golden-cases"]
         if a.golden
-        else ["powell-cases"]
-        if a.family == "powell"
+        else [f"{a.family}-cases"]
+        if a.family != "seeded"
         else ["cases", str(a.seed), str(a.n)]
     )
     text = subprocess.run([EXAMPLE, *gen], check=True, capture_output=True, text=True).stdout
@@ -276,20 +293,31 @@ def main(argv: list[str] | None = None) -> int:
     equal = differ = skipped = skipped_same = not_ported = 0
     fix_differ, fix_unexplained, fix_ids, rep_ids = 0, 0, Counter(), Counter()
     hashed = hashlib.sha256()
+    # relay 47: the recorded test's debug build hashes the cases of a joint histogram's cost or SB
+    # as SLOW (cases::histogram_or_sb_cost)
+    hashed_debug = hashlib.sha256()
     first = []
     for k, (case, c, (r, ids), (f, fids)) in enumerate(zip(cases, official, rep, fix, strict=True)):
         for x in ids:
             rep_ids[x] += 1
+        if slow_in_debug(case):
+            hashed_debug.update(b"SLOW\n")
         if NOT_PORTED in r:
             not_ported += 1
             hashed.update(b"NOTPORTED\n")
+            if not slow_in_debug(case):
+                hashed_debug.update(b"NOTPORTED\n")
             continue
         if any(x in ids for x in SKIP):
             skipped += 1
             skipped_same += c == r
             hashed.update(b"SKIP\n")
+            if not slow_in_debug(case):
+                hashed_debug.update(b"SKIP\n")
             continue
         hashed.update(c.encode() + b"\n")
+        if not slow_in_debug(case):
+            hashed_debug.update(c.encode() + b"\n")
         if c == r:
             equal += 1
         else:
@@ -308,6 +336,9 @@ def main(argv: list[str] | None = None) -> int:
                     first.append({"case": k, "official": c[:900], "fix": f[:900]})
     summary = {
         "seed": a.seed,
+        # relay 47: which cases, and whether the official program ran with --preload's library
+        "family": "golden" if a.golden else a.family,
+        "preload": bool(a.preload),
         "cases": len(cases),
         "reproduce_equal": equal,
         "reproduce_differ": differ,
@@ -319,6 +350,7 @@ def main(argv: list[str] | None = None) -> int:
         "fix_differ_without_notice": fix_unexplained,
         "fix_notices": dict(fix_ids),
         "official_sha256_skip": hashed.hexdigest(),
+        "official_sha256_skip_debug": hashed_debug.hexdigest(),
         "first_differ": first,
     }
     print(json.dumps(summary, indent=1))

@@ -20,10 +20,12 @@
 //!
 //! The costs here: least squares (`LS`) and absolute differences (`SAD`) with the intensity scale
 //! split between the images (`sqrt(exp(s))`), Tukey's biweight (`TB`), the normalised correlation
-//! (`NCC`) and its local form (`LNCC`, blocks of 5^3 every fifth voxel): [`crate::costs`]. The
-//! joint-histogram costs (`MI`, `NMI`, `ECC`, `SCR`) and the segmentation-based one (`SB`) end
-//! the program with "not ported yet" before the registration (in `mri_robust_register`).
+//! (`NCC`) and its local form (`LNCC`, blocks of 5^3 every fifth voxel): [`crate::costs`]; the
+//! joint-histogram costs (`MI`, `NMI`, `ECC`, `SCR`: [`crate::jointhisto`], the histogram of every
+//! evaluation smoothed by 7 bins, its sign turned so that Powell minimises) and the SB cost
+//! ([`crate::costs::sb_cost`], on the shared emulation of libstdc++'s `std::sort`).
 
+use std::cell::RefCell;
 use std::io::Write;
 
 use larmorx_core::cfmt;
@@ -40,12 +42,27 @@ use larmorx_freesurfer_mri::mri::{MRI_UCHAR, Mri};
 use larmorx_freesurfer_volume::arith::Pair;
 use larmorx_freesurfer_volume::resize::mri_seq_change_type;
 
-use crate::costs::{abs_diff, least_squares, local_ncc, minmax, ncc, tukey_biweight};
+use crate::costs::{abs_diff, least_squares, local_ncc, minmax, ncc, sb_cost, tukey_biweight};
+use crate::jointhisto::JointHisto;
 use crate::mymatrix::{Mat4, matrix_sqrt};
 use crate::mymri::{mri_valscale, wide};
 use crate::registration::{Io, RegRobust, dynm, fixed, identity4, inv4, mul4};
 use crate::regstep::Cost;
 use crate::transformation::Transformation;
+
+/// A stream that appends to a shared buffer: Powell's lines and the cost function's, in order.
+struct Shared<'a>(&'a RefCell<Vec<u8>>);
+
+impl Write for Shared<'_> {
+    fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+        self.0.borrow_mut().extend_from_slice(b);
+        Ok(b.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
 
 /// `vnl_matrix_fixed::print` (`std::cout << M`): each row's numbers separated by a blank, at the
 /// stream's precision, one row per line.
@@ -101,6 +118,11 @@ struct Ctx<'a> {
     mh2: Mat4,
     scf: &'a mut Mri,
     tcf: &'a mut Mri,
+    /// The joint histogram (`costFunction`'s static `H`).
+    histo: JointHisto,
+    /// The standard output's precision (the histogram's error lines).
+    prec: usize,
+    debug: bool,
 }
 
 impl Ctx<'_> {
@@ -127,21 +149,42 @@ impl Ctx<'_> {
         }
         let d = [self.subsamp; 3];
         let (s, t) = (&mut *self.scf, &mut *self.tcf);
-        Ok(match self.cost {
-            Cost::Ls => least_squares(g, io.err, s, t, &msi, &mti, d, si, sii),
-            Cost::Tb => tukey_biweight(g, io.err, s, t, &msi, &mti, d, 4.6851),
-            Cost::Lncc => -local_ncc(g, io.out, io.err, s, t, &msi, &mti, [5, 5, 5])?,
-            Cost::Ncc => -ncc(g, io.out, io.err, s, t, &msi, &mti, d)?,
-            Cost::Sad => abs_diff(g, io.err, s, t, &msi, &mti, d, si, sii),
+        match self.cost {
+            Cost::Ls => return Ok(least_squares(g, io.err, s, t, &msi, &mti, d, si, sii)),
+            Cost::Tb => return Ok(tukey_biweight(g, io.err, s, t, &msi, &mti, d, 4.6851)),
+            Cost::Lncc => return Ok(-local_ncc(g, io.out, io.err, s, t, &msi, &mti, [5, 5, 5])?),
+            Cost::Ncc => return Ok(-ncc(g, io.out, io.err, s, t, &msi, &mti, d)?),
+            Cost::Sad => return Ok(abs_diff(g, io.err, s, t, &msi, &mti, d, si, sii)),
+            Cost::Sb => return sb_cost(g, io.out, io.err, s, t, &msi, &mti, d),
+            _ => {}
+        }
+        // the costs of a joint histogram
+        self.histo
+            .create(g, io.out, io.err, s, t, &msi, &mti, d, self.prec)?;
+        self.histo.smooth(self.libm, 7.0);
+        let dd = match self.cost {
+            Cost::Mi => -self.histo.compute_mi(self.libm),
+            Cost::Nmi => -self.histo.compute_nmi(self.libm),
+            Cost::Ecc => -self.histo.compute_ecc(self.libm),
+            Cost::Scr => -self.histo.compute_scr(),
             other => {
                 let _ = writeln!(
-                    io.err,
-                    "RegPowell: the cost function {} is not ported yet",
+                    io.out,
+                    " RegPowell::costFunction ERROR cannot deal with cost function {} ! ",
                     other as i32
                 );
                 return Err(Fatal::Exit(1));
             }
-        })
+        };
+        if self.debug {
+            // the evaluation's report and the first evaluation's half-way images
+            let _ = writeln!(
+                io.err,
+                "RegPowell: the debug output (--debug) is not ported yet"
+            );
+            return Err(Fatal::Exit(1));
+        }
+        Ok(dd)
     }
 }
 
@@ -250,6 +293,9 @@ impl RegRobust {
                 mh2,
                 scf: &mut scf,
                 tcf: &mut tcf,
+                histo: JointHisto::new(),
+                prec: self.cout_precision,
+                debug: self.debug > 0,
             };
             self.powell_minimize(g, io, &mut ctx, &mut p, &mut xi, pcount)
         };
@@ -296,13 +342,14 @@ impl RegRobust {
         let _ = writeln!(io.out, "   - initial cost: {}", self.os(min_sse));
         let _ = writeln!(io.out, " START POWELL");
         let mut failed: Option<Fatal> = None;
-        let mut buf_out: Vec<u8> = Vec::new();
-        let mut buf_err: Vec<u8> = Vec::new();
+        // the cost function's lines and Powell's own go to the same streams in their order
+        let buf_out = RefCell::new(Vec::new());
+        let buf_err = RefCell::new(Vec::new());
         let code = {
             let mut f = |x: &[f64]| -> Option<f64> {
                 let mut sub = Io {
-                    out: &mut buf_out,
-                    err: &mut buf_err,
+                    out: &mut Shared(&buf_out),
+                    err: &mut Shared(&buf_err),
                     env: io.env,
                 };
                 match ctx.cost(g, &mut sub, x) {
@@ -319,15 +366,21 @@ impl RegRobust {
             let mut minimizer = FsPowell::new();
             minimizer.base.set_x_tolerance(self.xtol);
             minimizer.base.ftol = self.ftol;
-            let code = minimizer.minimize(&mut functor, p, xi, io.out, io.err);
+            let code = minimizer.minimize(
+                &mut functor,
+                p,
+                xi,
+                &mut Shared(&buf_out),
+                &mut Shared(&buf_err),
+            );
             (
                 code,
                 minimizer.base.num_iterations,
                 minimizer.base.end_error,
             )
         };
-        let _ = io.out.write_all(&buf_out);
-        let _ = io.err.write_all(&buf_err);
+        let _ = io.out.write_all(&buf_out.into_inner());
+        let _ = io.err.write_all(&buf_err.into_inner());
         if let Some(e) = failed {
             return Err(e);
         }

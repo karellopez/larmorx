@@ -42,6 +42,14 @@ plan is in `specs/mri_robust_register.md` §7.
   in the matrix square roots, which every Powell evaluation with symmetry takes: the D4 divergence).
   `--seed 1 --n 120 --preload`: 105 identical, 0 different, 8 not compared, 7 not ported (`MI`,
   `NMI`, `ECC`, `SCR`, `SB`, `--debug`, `--test`). The recorded tests hold the preloaded values.
+- `check.py --family histo` (relay 47): the joint-histogram costs (`MI`, `NMI`, `ECC`, `SCR`) and
+  `SB`, 32 cases with the Powell family's random options (`cases::histo_cases`). Measured
+  2026-11-23 with `--preload`: 29 identical, 0 different, 3 not compared (FS-1063); its first run
+  found the order of the cost function's lines among Powell's (an empty histogram's warning; case
+  19), now kept. `--seed 1 --n 120 --preload`: 110 identical, 0 different, 8 not compared, 2 not
+  ported (`--debug`, `--test`). The golden cases gained `--cost MI` and `--cost SB` (16^3 images).
+  The summary's `official_sha256_skip_debug` is the hash the recorded test's debug build checks (the
+  cases of these costs as `SLOW`: `slow_in_debug`, `cases::histogram_or_sb_cost`).
 - `record.py`: the validation record `docs/validation/freesurfer-mri-robust-register.{json,md}`
   from the summaries above (from a clean commit).
 

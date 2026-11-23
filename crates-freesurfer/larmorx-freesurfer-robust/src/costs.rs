@@ -626,3 +626,94 @@ pub fn local_ncc(
     }
     Ok(div64(add64(0.0, total), f64::from(dcount)))
 }
+
+/// `CostFunctions::SBCost(mriS, mriT, Msi, Mti, d1, d2, d3)`: both images mapped ([`map_mri`],
+/// every `d`-th voxel); each made zero-mean ([`mean`]) and unit-norm as a vector; the voxels
+/// ordered by `vs + sign(vs . vt) vt`, largest first (libstdc++'s `std::sort` of the indices,
+/// which moves equal keys in its own order: [`larmorx_core::stdsort::sort_by`]); then
+/// `-n max_i (Cs_i^2 + Ct_i^2) / ((i + 1)(n - 1 - i))` over the cumulative sums `Cs`, `Ct` of the
+/// ordered vectors (`i < n - 1`; 0 when nothing is above 0). Images of other extents print
+/// `CostFunctions::SBCost image dimensions differ!`, images of more than one frame
+/// `CostFunctions::SBCost only works on single frame inputs!` on standard error and end the
+/// program (status 1).
+#[allow(clippy::too_many_arguments)]
+pub fn sb_cost(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    s: &Mri,
+    t: &Mri,
+    msi: &Mat4,
+    mti: &Mat4,
+    d: [i32; 3],
+) -> Result<f64, Fatal> {
+    if s.vg.width != t.vg.width || s.vg.height != t.vg.height || s.vg.depth != t.vg.depth {
+        let _ = writeln!(err, "CostFunctions::SBCost image dimensions differ!");
+        return Err(Fatal::Exit(1));
+    }
+    if s.nframes > 1 || t.nframes > 1 {
+        let _ = writeln!(
+            err,
+            "CostFunctions::SBCost only works on single frame inputs!"
+        );
+        return Err(Fatal::Exit(1));
+    }
+    let ns = map_mri(g, out, err, s, msi, d)?;
+    let nt = map_mri(g, out, err, t, mti, d)?;
+    let n = (ns.vg.width as u32)
+        .wrapping_mul(ns.vg.height as u32)
+        .wrapping_mul(ns.vg.depth as u32);
+    let m1 = mean(g, err, &ns, 0)?;
+    let m2 = mean(g, err, &nt, 0)?;
+    let mut iv1 = Vec::with_capacity(n as usize);
+    let mut iv2 = Vec::with_capacity(n as usize);
+    let (mut norm1, mut norm2) = (0.0f64, 0.0f64);
+    for z in 0..ns.vg.depth {
+        for y in 0..ns.vg.height {
+            for x in 0..ns.vg.width {
+                let f1 = sub64(wide(mri_get_vox_val(g, err, &ns, x, y, z, 0, 0)?), m1);
+                let f2 = sub64(wide(mri_get_vox_val(g, err, &nt, x, y, z, 0, 0)?), m2);
+                iv1.push(f1);
+                iv2.push(f2);
+                norm1 = add64(norm1, mul64(f1, f1));
+                norm2 = add64(norm2, mul64(f2, f2));
+            }
+        }
+    }
+    let norm1 = sqrt64(norm1);
+    let norm2 = sqrt64(norm2);
+    let mut prod = 0.0f64;
+    for (a, b) in iv1.iter_mut().zip(iv2.iter_mut()) {
+        *a = div64(*a, norm1);
+        *b = div64(*b, norm2);
+        prod = add64(prod, mul64(*a, *b));
+    }
+    // `int sign = std::copysign(1, prod)`
+    let sign = f64::from(1.0f64.copysign(prod) as i32);
+    for (a, &b) in iv1.iter_mut().zip(&iv2) {
+        *a = add64(*a, mul64(sign, b));
+    }
+    let mut idx: Vec<usize> = (0..iv1.len()).collect();
+    larmorx_core::stdsort::sort_by(&mut idx, |&i1, &i2| iv1[i1] > iv1[i2]);
+    let mut c1 = Vec::with_capacity(idx.len());
+    let mut c2 = Vec::with_capacity(idx.len());
+    let (mut f1, mut f2) = (0.0f64, 0.0f64);
+    for &k in &idx {
+        f1 = add64(f1, iv1[k]);
+        f2 = add64(f2, iv2[k]);
+        c1.push(f1);
+        c2.push(f2);
+    }
+    let nd = f64::from(n);
+    let mut mm = 0.0f64;
+    for i in 0..(n as usize).saturating_sub(1) {
+        let fi = i as f64;
+        let num = add64(mul64(c1[i], c1[i]), mul64(c2[i], c2[i]));
+        let den = mul64(fi + 1.0, sub64(sub64(nd, 1.0), fi));
+        let f = div64(num, den);
+        if f > mm {
+            mm = f;
+        }
+    }
+    Ok(mul64(-mm, nd))
+}

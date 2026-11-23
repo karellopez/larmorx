@@ -2606,3 +2606,21 @@ The part's decisions, from its notes ("FROM THE ORCHESTRATOR", 2026-11-11 to 13;
 - **Continuity** (the user: "make sure you save the progress and information"): the relays' notes, briefs, handoffs
   and reviews, kept in the orchestrator session's scratch folder that is cleared at boot, are mirrored hourly into
   `<workspace>/archive/orchestration-notes/` and to the USB disk.
+
+## 2026-11-23: one std::sort for every family; FreeSurfer's maths correctly rounded (the user, and the orchestrator within the user's rules)
+
+- **The user, 2026-11-23:** the generic emulation of libstdc++'s `std::sort` and `std::nth_element` (the SGI STL's
+  introsort and introselect, written from their published description under the HP/SGI permission notice, no FSL or
+  GCC code) moves from `larmorx-nc-core` into `larmorx-core` (Apache-2.0, the HP/SGI notice in NOTICE; the package's
+  licence expression gains `HPND-sell-variant`), so every family's replicas share it (FreeSurfer's
+  `mri_robust_register --cost SB` first). The FSL-only parts (`sort_f32_checked`, FSL-22's `reproduce`) stay in
+  `larmorx-nc-core`, which re-exports the rest; the FSL replicas' results are unchanged (their tests and the
+  libstdcxx-sort probe). The question went to the user because CLAUDE.md's hard rule 1 makes any move out of a
+  replica package the user's decision.
+- **The orchestrator, applying the user's decision of 2026-11-04** (correctly rounded `acos`, `asin`, `atan`, `tan`
+  in `reproduce` too, no LGPL data) to FreeSurfer: glibc's `acos` is not reproduced (4,364,142 of 9.6e9 arguments one
+  ulp off, track C's measurement); FreeSurfer's replicas use the correctly rounded functions in both modes, and
+  queue item 3.1-08 is closed. The same holds for `hypot` inside `MatrixSqrt`'s `cabs`/`csqrt` (rule D4): the
+  official `mri_robust_register` built with the correctly rounded functions prints larmorx's digits on all six
+  recorded heads, byte for byte; the official build's last two printed digits on one head come from glibc's `hypot`
+  (findings `freesurfer-robust-register.md` §3).

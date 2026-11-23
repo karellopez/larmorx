@@ -3,9 +3,9 @@
 Status: the robust cost complete (queue item 3.2-13, part 1: the command line, every message of
 the robust registration's path, its outputs, the exit statuses, the defects with their switches,
 the validation plan, §7); the entropy images (`--cost ROBENT`, §2.1; relay 45); the Powell
-registration with `--cost` `LS`, `NCC`, `TB`, `LNCC` and `SAD` (§2.2; relay 46); not yet specified:
-the joint-histogram costs, `SB`, the Powell registration's half-way outputs, the test mode and the
-debug output (§6). Written by the replica's author (track C, relay 44) as the
+registration with `--cost` `LS`, `NCC`, `TB`, `LNCC` and `SAD` (§2.2; relay 46); its joint-histogram
+costs `MI`, `NMI`, `ECC`, `SCR` and the `SB` cost (§2.3; relay 47); not yet specified: the Powell
+registration's half-way outputs, the test mode and the debug output (§6). Written by the replica's author (track C, relay 44) as the
 spec writer: behaviour, conventions and messages, for the clean room (`larmorx-fs-volumes`), which
 works from this file, the library modules' specs (`specs/freesurfer-robust.md` §16 for the
 registration itself, `freesurfer-volume.md` for the transforms' reading, conversion, writing and
@@ -273,6 +273,66 @@ function:`, ` Multimodal image registration through simultaneous segmentation,`,
 Fischl. IEEE Signal Processing Letters 24(11):1661-1665, 2017.`, ` https://doi.org/10.1109/LSP.2017.2754263`
 and an empty line).
 
+### 2.3 The Powell registration's joint-histogram costs (`MI`, `NMI`, `ECC`, `SCR`) and `SB`
+
+The run is §2.2's; only the cost of step 6 differs. Every line a cost prints goes to standard output
+in its place among Powell's lines (step 7).
+
+1. `SB` (the segmentation-based cost of Aganj and Fischl, 2017): the source and the target byte
+   images must have the same extents (else `CostFunctions::SBCost image dimensions differ!` on
+   standard error, status 1) and one frame (else `CostFunctions::SBCost only works on single frame
+   inputs!`, status 1). Both are resampled as for `NCC` (each by its own map, every `d`-th voxel,
+   stored as `float`; outside the volume each image's own outside value, as set when it was made
+   bytes), each made zero-mean by `NCC`'s mean of its first frame (the voxels that are not -1; the sum
+   from 0 in slice, row, column order divided by the count as an unsigned number) over all its `n`
+   voxels in slice, row, column order, `a_k = v_k - mean`, and divided by its norm (`sqrt(sum a_k^2)`,
+   the sum in order from 0; a zero norm gives NaN, SSE's default NaN). `sign` is +1 or -1, the sign
+   bit of `sum a_k b_k` (in order, from 0; a NaN's sign bit counts), and the keys are `a_k + sign b_k`.
+   The voxel indices `0..n` are ordered by their keys, largest first, by C++'s `std::sort` of
+   libstdc++ (GCC's introsort, comparing `key_i > key_j`; equal keys end where its sequence of moves
+   puts them, which this cost depends on; `larmorx_core::stdsort::sort_by` gives it). Over the ordered
+   voxels the cumulative sums `A_i` of `a` and `B_i` of `b` (from 0, in that order), then the maximum
+   of `(A_i^2 + B_i^2) / ((i + 1) ((n - 1) - i))` over `i` from 0 below `n - 1` starting from 0 (a
+   value not above the current maximum, a NaN among them, leaves it); the cost is `-max * n`.
+2. The others build a joint histogram of 256 x 256 bins (row: the source's bin, column: the
+   target's), all 0, then for the target's voxels `(x, y, z)` from 0 below `extent - d + 1` in steps
+   of `d` (slices, rows, columns; frame 0 only): the target's point `mti (x, y, z)` and the source's
+   `msi (x, y, z)`, each coordinate `((m0 x + m1 y) + m2 z) + m3` in that order; both images' outside
+   value set to -1 for good (also for later evaluations); the source sampled first (trilinear, frame
+   0); a sample of -1 skips the voxel (the target is then not sampled); its bin `i = (int) floor(vs)`;
+   then the target likewise, `j = (int) floor(vt)` (x86-64's conversion: a NaN or out-of-range value
+   is `INT_MIN`). A bin outside 0..255 prints on standard output `ERROR at ( <x> <y> <z> ) `, ` PS: (
+   <xs> <ys> <zs> )  PT: ( <xt> <yt> <zt> )` and ` ivs: <i>  ivt: <j>  n: 256` (the points with C++'s
+   current precision) and ends the program (status 1). Otherwise, with `s = vs - i`, `t = vt - j`:
+   `(1 - s)(1 - t)` is added to bin `(i, j)`, `s (1 - t)` to `(i + 1, j)` when `i < 255`, `(1 - s) t`
+   to `(i, j + 1)` when `j < 255`, `s t` to `(i + 1, j + 1)` when both, in that order, and the
+   histogram's sum gains 1. No voxel counted: ` WARNING JointHisto::create : histogram is empty (no
+   overlap?) ` (one blank before and after).
+3. The histogram smoothed: `sigma = 7 / c` where `c` is `sqrt(8 ln 2)` with each step correctly
+   rounded (a constant of the build); 0.001 if below it; `w = (int) floor(3 sigma + 0.5)` (9); the
+   kernel `g_i = exp(i^2 / -(sigma^2))` for `i` from `-w` to `w` (`-(sigma^2)` as `(-sigma) sigma`;
+   the C library's `exp`: glibc's bits with `reproduce`), its sum in that order, each divided by it.
+   Along each row, every bin's new value is the sum from 0 over `k` from `j - w` to `j + w` of
+   `bin(i, k) g_{k - j + w}` (in that order, the bins outside 0..255 left out); then along each column
+   of the result likewise; the histogram's sum becomes the sum of the final bins (row by row, in
+   order).
+4. Each cost first normalises: unless the sum is 0 or 1, every bin divided by it and the sum set to
+   1; then the row sums `R_i` and the column sums `C_j` (each from 0 in the index order, the bins
+   multiplied by 1). `log2` is the C library's (glibc 2.35's bits with `reproduce`; by default the
+   correctly rounded one, GLIBC-07 not named: the cost is iterative). The cost is the negative of:
+   - `MI`: the sum over the rows `i`, then the columns `j`, of the bins `P` not 0 of
+     `P log2(P / (R_i C_j))`;
+   - `ECC`: for each row `i` in order: `R_i log2 R_i` added to a sum `S` when `R_i` is not 0, then
+     `C_i log2 C_i` when `C_i` is not 0, then that row's `MI` terms added to `MI`; the result
+     `((-2) MI) / S`;
+   - `NMI`: -100 when the sum is 0 (before normalising); else as `ECC`, `S` the same and `T` the sum
+     of `P log2 P` over the row's bins not 0, the result `S / T`;
+   - `SCR`: the means `m1 = sum R_i i`, `m2 = sum C_i i`, the variances `v1 = sum (R_i (i - m1)) (i -
+     m1)`, `v2` likewise; for each column `i` of `C_i` not 0: `mu = (sum_j j P(j, i)) / C_i` and `sum_j
+     (P(j, i) (j - mu)) (j - mu)` added to `D1`; for each row `i` of `R_i` not 0 the same with
+     `P(i, j)` and `R_i`, added to `D2`; the result `(1 - D1 / v1) + (1 - D2 / v2)`.
+5. With `--debug` the evaluation's report follows the cost (§6).
+
 ## 3. The results
 
 1. An empty line, `Final Transform:`, the final voxel transform (§16.7, with its message when the
@@ -362,11 +422,12 @@ FS-1074 with `reproduce`); FS-1074 by default 1.
 
 ## 6. Not specified yet (the replica ends each with its own message and status 1)
 
-The Powell registration's joint-histogram costs (`MI`, `NMI`, `ECC`, `SCR`) and `SB` (the replica
-ends at the first cost: `RegPowell: the cost function <n> is not ported yet`), its half-way outputs
+The Powell registration's half-way outputs
 (FreeSurfer's half-way space is then its byte copy of the target, freed by then: `mri_robust_register:
 the half-way outputs of the Powell registration are not ported yet`), the test mode (`--test`: after
-its line) and the debug output (`--debug`: the library's intermediate images and key presses).
+its line) and the debug output (`--debug`: the library's intermediate images and key presses; with a
+joint-histogram cost the replica ends after the first cost: `RegPowell: the debug output (--debug)
+is not ported yet`).
 
 ## 7. Validation plan (for the clean room)
 
@@ -376,6 +437,10 @@ its line) and the debug output (`--debug`: the library's intermediate images and
   `cabs` and `csqrt` preloaded (the project's matrix square roots; without them 4 of the 40 cases
   differ in their last printed digits, **(observed)**): every compared case identical
   **(observed)**; the cases of FS-1063 (translation with the intensity scale) not compared.
+- The joint-histogram costs and `SB` (§2.3): a family of 32 cases of `MI`, `NMI`, `ECC`, `SCR` and
+  `SB` with the Powell family's random options, the same preload: 29 identical, 3 of FS-1063 not
+  compared (**(observed)**); an empty histogram's warning among Powell's lines in its place
+  (**(observed)**: one case).
 - fMRIPrep's call (`--satit --iscale --mov T1.mgz --dst <T1w> --lta <out>`) on the six recorded
   heads' `T1.mgz` onto their `rawavg.mgz` (`<workspace>/oracles/freesurfer-8.2.0/runs/<head>-classic/
   subjects/<subject>/mri/`), against the official program at one thread: the transform byte for byte,

@@ -4,8 +4,10 @@
 //! `mri_robust_register`'s golden cases on every platform: the program on 32^3 images made with
 //! integer arithmetic (`fs_robreg/cases.rs`' `golden_cases`: fMRIPrep's call with every output, an
 //! affine registration with its half-way outputs, a short source onto a float target of
-//! anisotropic voxels, the entropy images, the Powell registration), the SHA-256 of each case's line (exit status, standard output and error,
-//! every file written; the time taken masked), against the value FreeSurfer 8.2.0's official
+//! anisotropic voxels, the entropy images, the Powell registration; and on 16^3 byte images the
+//! mutual information and the SB cost), the SHA-256 of each case's line (exit status, standard
+//! output and error, every file written; the time taken masked), against the value FreeSurfer
+//! 8.2.0's official
 //! program gives on the same inputs (`validation/probes/fs-robust-register/check.py --golden`,
 //! Linux x64) with `reproduce`, and against the port's own Linux x64 value with the default.
 
@@ -18,10 +20,11 @@ use sha2::{Digest, Sha256};
 /// Recorded 2026-11-22 by `check.py --golden` from the official program on Linux x64: 3 cases;
 /// re-recorded 2026-11-23 (relay 45): 4 cases, the entropy images added; again (relay 46): 5
 /// cases, the Powell registration (`--cost NCC`) added (the same value with the decided `cabs` and
-/// `csqrt` preloaded).
-const OFFICIAL_SHA256: &str = "e965a37c96c37a7ea74241651d24a2d09d23e2adf26faa2bc9268107e91c24a8";
+/// `csqrt` preloaded); again (relay 47, with that preload): 7 cases, `--cost MI` and `--cost SB` on
+/// 16^3 images added.
+const OFFICIAL_SHA256: &str = "a483135a74d4d5280b52d4fcbed46d6634978d6da5e8b7e17d018af80e8fec18";
 /// The port's default on Linux x64.
-const FIX_SHA256: &str = "e965a37c96c37a7ea74241651d24a2d09d23e2adf26faa2bc9268107e91c24a8";
+const FIX_SHA256: &str = "a483135a74d4d5280b52d4fcbed46d6634978d6da5e8b7e17d018af80e8fec18";
 
 fn cases_digest(mode: UpstreamDefects) -> String {
     let mut h = Sha256::new();

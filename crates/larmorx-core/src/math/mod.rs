@@ -32,6 +32,8 @@ mod log10;
 mod log10_glibc;
 mod log10f;
 mod log10f_glibc;
+mod log2;
+mod log2_glibc;
 mod log_glibc;
 mod logf;
 mod logf_glibc;
@@ -110,6 +112,10 @@ pub use atanf_glibc::atanf_glibc_with_at0;
 /// original's result depends on glibc's last bits; [`tanhf`] (correctly rounded) is the default.
 pub use tanhf_glibc::{expm1f_glibc, tanhf_glibc};
 
+/// The base-2 logarithm with glibc 2.35's bits (x86-64, its one build `log2@@GLIBC_2.29`, Arm's
+/// `log2.c` without fused multiply-adds; 0.547 ulp), for `reproduce` only ([`log2`] is the
+/// default). No fused operation, so no FMA-compiled copy.
+pub use log2_glibc::log2_glibc;
 /// The base-10 logarithm for `f64` with glibc 2.35's bits (fdlibm's `__ieee754_log10`, Sun's
 /// notice, over glibc's FMA-build `log`, behind its SVID wrapper's results for `x <= 0`), not
 /// correctly rounded, for `reproduce`; [`log10`] (correctly rounded) is the default
@@ -288,6 +294,11 @@ dispatch!(
     log10
 );
 dispatch!(
+    /// The base-2 logarithm of `x`, correctly rounded (CORE-MATH's `cr_log2`). glibc's `log2` is
+    /// not correctly rounded ([`log2_glibc`] has its bits, for `reproduce`).
+    log2
+);
+dispatch!(
     /// The arcsine of `x`, correctly rounded (CORE-MATH's `cr_asin`). ITK's `std::asin`
     /// (glibc's `asin`), as in `Euler3DTransform::ComputeMatrixParameters`.
     asin
@@ -420,6 +431,7 @@ mod fma {
     }
     fma_copy!(log);
     fma_copy!(log10);
+    fma_copy!(log2);
     fma_copy!(sin);
     fma_copy!(asin);
     fma_copy!(acos);
@@ -504,6 +516,7 @@ mod tests {
                 (super::exp(x), super::exp::exp(x)),
                 (super::log(x.abs()), super::log::log(x.abs())),
                 (super::log10(x.abs()), super::log10::log10(x.abs())),
+                (super::log2(x.abs()), super::log2::log2(x.abs())),
                 (super::cbrt(x), super::cbrt::cbrt(x)),
                 (super::atan2(x, 1.5), super::atan2::atan2(x, 1.5)),
                 (super::atan2(-0.25, x), super::atan2::atan2(-0.25, x)),
@@ -527,6 +540,10 @@ mod tests {
                 (
                     super::log10(1.0 + u / 64.0),
                     super::log10::log10(1.0 + u / 64.0),
+                ),
+                (
+                    super::log2(1.0 + u / 64.0),
+                    super::log2::log2(1.0 + u / 64.0),
                 ),
                 (super::asin(u), super::asin::asin(u)),
                 (super::acos(u), super::acos::acos(u)),

@@ -5,6 +5,7 @@
 //!
 //!     fs_robreg_probe cases <seed> <n>            the case file, on standard output
 //!     fs_robreg_probe powell-cases                the Powell registration's 40 cases
+//!     fs_robreg_probe histo-cases                 the joint-histogram and SB costs' 32 cases
 //!     fs_robreg_probe golden-cases                the golden cases
 //!                                                (`tests/mri_robust_register_golden.rs`)
 //!     fs_robreg_probe run <cases> fix|reproduce   one line per case: the output, a tab, the
@@ -30,6 +31,11 @@ fn main() {
         }
         Some("powell-cases") => {
             for line in cases::powell_cases() {
+                println!("{line}");
+            }
+        }
+        Some("histo-cases") => {
+            for line in cases::histo_cases() {
                 println!("{line}");
             }
         }
@@ -65,7 +71,7 @@ fn main() {
         }
         _ => {
             eprintln!(
-                "usage: fs_robreg_probe cases <seed> <n> | golden-cases | run <cases> fix|reproduce | run-seed <seed> <n> fix|reproduce"
+                "usage: fs_robreg_probe cases <seed> <n> | powell-cases | histo-cases | golden-cases | run <cases> fix|reproduce | run-seed <seed> <n> fix|reproduce"
             );
             std::process::exit(2);
         }

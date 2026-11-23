@@ -599,7 +599,21 @@ pub fn powell_cases() -> Vec<String> {
     (0..40).map(|_| seeded_powell(&mut g)).collect()
 }
 
+/// The Powell registration's costs of a joint histogram and the SB cost (relay 47): 32 cases of
+/// `MI`, `NMI`, `ECC`, `SCR` and `SB` with the Powell family's random options, a seed of their own
+/// (the Powell family's 40 cases stay as they were).
+pub fn histo_cases() -> Vec<String> {
+    let mut g = Gen::new(0x0068_6973);
+    (0..32)
+        .map(|_| seeded_powell_with(&mut g, &["mi", "nmi", "ecc", "scr", "sb", "MI"]))
+        .collect()
+}
+
 fn seeded_powell(g: &mut Gen) -> String {
+    seeded_powell_with(g, &["ls", "ncc", "tb", "lncc", "sad", "LS"])
+}
+
+fn seeded_powell_with(g: &mut Gen, costs: &[&str]) -> String {
     let flat = g.chance(8);
     let n = g.pick(&[16, 16, 17, 18]);
     let ty = g.pick(&[MRI_UCHAR, MRI_UCHAR, MRI_SHORT, MRI_FLOAT, MRI_INT]);
@@ -620,10 +634,7 @@ fn seeded_powell(g: &mut Gen) -> String {
         ("dst.mgz".to_owned(), write_as(&mut image(g, &b), "dst.mgz")),
     ];
     let mut args = s(&["--mov", "mov.mgz", "--dst", "dst.mgz", "--lta", "out.lta"]);
-    args.extend(s(&[
-        "--cost",
-        g.pick(&["ls", "ncc", "tb", "lncc", "sad", "LS"]),
-    ]));
+    args.extend(s(&["--cost", g.pick(costs)]));
     let mut opt = |g: &mut Gen, k: u64, a: &[&str]| {
         if g.chance(k) {
             args.extend(s(a));
@@ -811,7 +822,7 @@ pub fn golden_cases() -> Vec<String> {
         ("smov.mgz".to_owned(), smov),
         ("fdst.mgz".to_owned(), fdst),
     ];
-    [
+    let lines = [
         s(&[
             "--mov",
             "mov.mgz",
@@ -866,7 +877,54 @@ pub fn golden_cases() -> Vec<String> {
     ]
     .iter()
     .map(|args| line(None, &files, &[], args))
-    .collect()
+    .collect::<Vec<_>>();
+    // relay 47: a joint histogram's cost (mutual information: log2, exp) and the SB cost
+    // (libstdc++'s sort), on 16^3 byte images of their own (the cost of a debug build)
+    let c = Img::base(16, MRI_UCHAR);
+    let mut d = c;
+    d.shift = [2, -1, 1];
+    d.gain = 9;
+    let small = vec![
+        (
+            "mov16.mgz".to_owned(),
+            write_as(&mut image(&mut g, &c), "mov16.mgz"),
+        ),
+        (
+            "dst16.mgz".to_owned(),
+            write_as(&mut image(&mut g, &d), "dst16.mgz"),
+        ),
+    ];
+    let more = [
+        s(&[
+            "--mov",
+            "mov16.mgz",
+            "--dst",
+            "dst16.mgz",
+            "--lta",
+            "reg.lta",
+            "--cost",
+            "MI",
+            "--nomulti",
+            "--transonly",
+            "--powelltol",
+            "0.01",
+        ]),
+        s(&[
+            "--mov",
+            "mov16.mgz",
+            "--dst",
+            "dst16.mgz",
+            "--lta",
+            "reg.lta",
+            "--cost",
+            "SB",
+            "--nomulti",
+            "--transonly",
+        ]),
+    ];
+    let mut lines = lines;
+    lines.extend(more.iter().map(|args| line(None, &small, &[], args)));
+    lines
 }
 
 // ------------------------------------------------------------------ the port's answer
@@ -1025,6 +1083,30 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
     let text = format!("{end} | {} | {} | {files}", mask(&out), mask(&err));
     let ids = g.notices.as_slice().iter().map(|n| n.defect.id).collect();
     (text, ids)
+}
+
+/// Whether a case runs the Powell registration with a joint histogram's cost or SB (`--cost` `MI`,
+/// `NMI`, `ECC`, `SCR`, `SB` in any case), whose evaluations take seconds each in a debug build
+/// (relay 47: the recorded test hashes them as `SLOW` there; `check.py` applies the same rule).
+#[allow(dead_code)]
+pub fn histogram_or_sb_cost(line: &str) -> bool {
+    let unhex = |h: &str| -> Option<String> {
+        let b: Option<Vec<u8>> = (0..h.len())
+            .step_by(2)
+            .map(|i| h.get(i..i + 2).and_then(|x| u8::from_str_radix(x, 16).ok()))
+            .collect();
+        b.and_then(|b| String::from_utf8(b).ok())
+    };
+    let t: Vec<&str> = line.split_whitespace().collect();
+    t.windows(2).any(|w| {
+        w[0] == "2d2d636f7374"
+            && unhex(w[1]).is_some_and(|c| {
+                matches!(
+                    c.to_ascii_uppercase().as_str(),
+                    "MI" | "NMI" | "ECC" | "SCR" | "SB"
+                )
+            })
+    })
 }
 
 /// [`run_line_in`] in a fresh temporary folder.

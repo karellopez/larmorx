@@ -4,13 +4,15 @@
 //! volume, a registration's array, the masked and upsampled source; regions and their boxes (the
 //! commands and encodings: `validation/investigations/freesurfer-volume-probe/README.md`).
 
+use larmorx_fs_core::maths::matrix::{MATRIX_REAL, Matrix};
 use larmorx_fs_core::mri::{Mri, Region};
+use larmorx_fs_core::volume::pca::FdrOut;
 use larmorx_fs_core::volume::region::{region_clear, region_copy};
 use larmorx_fs_core::{Process, Stop};
 
 use super::args::Line;
 use super::bspline::getlta;
-use super::{getw, paint, putlta, putv};
+use super::{getw, hexbytes, paint, putlta, putv};
 
 /// A painted W.
 fn getwp(p: &mut Process, l: &mut Line) -> Result<Mri, Stop> {
@@ -171,6 +173,127 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
             putreg(l, &cp);
             region_clear(&mut cp);
             putreg(l, &cp);
+        }
+        // -- §42
+        "cov" | "mpca" => {
+            let a = getwp(p, l)?;
+            let mk = null_or_wp(p, l)?;
+            if c == "cov" {
+                let m = p.mri_covariance_matrix(&a, mk.as_ref())?;
+                p.flush();
+                l.putm(m.as_ref());
+            } else {
+                let (r, out) = p.mri_pca(&a, mk.as_ref())?;
+                p.flush();
+                l.puti(i64::from(r));
+                match out {
+                    Some((u, s, v)) => {
+                        l.putm(Some(&u));
+                        l.putm(Some(&s));
+                        putv(l, Some(&v));
+                    }
+                    None => {
+                        l.putm(None);
+                        l.putm(None);
+                        putv(l, None);
+                    }
+                }
+            }
+        }
+        "pcast" => {
+            let n = l.geti();
+            let mut s = Matrix::zeros(1, n.max(0), MATRIX_REAL);
+            for i in 1..=n {
+                let x = l.getf();
+                s.set(1, i, x);
+            }
+            let mode = l.geti();
+            let _ = std::fs::remove_file("pca.dat");
+            let r = match mode {
+                0 => p.print_pca_stats(&s),
+                2 => p.write_pca_stats(b"no-such-folder/pca.dat", &s),
+                _ => p.write_pca_stats(b"pca.dat", &s),
+            };
+            p.flush();
+            l.puti(i64::from(r));
+            let f = std::fs::read("pca.dat").unwrap_or_default();
+            l.out(hexbytes(&f));
+            let _ = std::fs::remove_file("pca.dat");
+        }
+        "fdr" => {
+            let n = l.geti();
+            let mut vols = Vec::new();
+            let mut frames = Vec::new();
+            let mut masks = Vec::new();
+            let mut outs = Vec::new();
+            for _ in 0..n.max(0) {
+                vols.push(getwp(p, l)?);
+                frames.push(l.geti());
+                masks.push(null_or_wp(p, l)?);
+                outs.push(if l.take("new") {
+                    FdrOut::None
+                } else if l.take("self") {
+                    FdrOut::Itself
+                } else {
+                    FdrOut::Vol(getw(p, l)?)
+                });
+            }
+            let fdr = l.getd();
+            let (sign, lg, dbg, pm, po) = (l.geti(), l.geti(), l.geti(), l.geti(), l.geti());
+            let mut vwth = 7.0f64;
+            let r = p.mri_fdr2vwth(
+                &mut vols,
+                &frames,
+                fdr,
+                sign,
+                lg != 0,
+                if pm != 0 {
+                    Some(masks.as_slice())
+                } else {
+                    None
+                },
+                &mut vwth,
+                if po != 0 {
+                    Some(outs.as_mut_slice())
+                } else {
+                    None
+                },
+                dbg != 0,
+            )?;
+            p.flush();
+            l.puti(i64::from(r));
+            l.putd(vwth);
+            if po != 0 {
+                for (i, o) in outs.iter().enumerate() {
+                    match o {
+                        FdrOut::None => {}
+                        FdrOut::Itself => putv(l, Some(&vols[i])),
+                        FdrOut::Vol(m) => putv(l, Some(m)),
+                    }
+                }
+            }
+        }
+        // -- §44
+        "vxn" => {
+            let m = getwp(p, l)?;
+            let n = l.geti();
+            for _ in 0..n.max(0) {
+                let (x, y, z, w, f) = (l.geti(), l.geti(), l.geti(), l.geti(), l.geti());
+                p.flush();
+                let dx = p.mri_voxel_dx(&m, x, y, z)?;
+                l.putf(dx);
+                let dy = p.mri_voxel_dy(&m, x, y, z)?;
+                l.putf(dy);
+                let dz = p.mri_voxel_dz(&m, x, y, z)?;
+                l.putf(dz);
+                let mean = p.mri_voxel_mean(&m, (x, y, z), w, f)?;
+                l.putf(mean);
+                let dir = p.mri_voxel_direction(&m, (x, y, z), w)?;
+                l.putf(dir);
+                let d2 = p.mri_voxel_gradient_dir_2nd_derivative(&m, (x, y, z), w)?;
+                l.putf(d2);
+                p.flush();
+            }
         }
         _ => return Ok(false),
     }

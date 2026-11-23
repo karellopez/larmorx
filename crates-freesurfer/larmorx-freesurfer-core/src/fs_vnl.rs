@@ -96,10 +96,13 @@ pub struct FsCostFunction<'a> {
     pub dim: i32,
     p: Vec<f32>,
     /// A subclass's own `f(const vnl_vector<double>&)` ([`FsCostFunction::with_double`]).
-    double_f: Option<&'a mut dyn FnMut(&[f64]) -> Option<f64>>,
+    double_f: Option<&'a mut DoubleCost<'a>>,
     /// The override ended the program inside an evaluation (it returned `None`).
     stop: bool,
 }
+
+/// A subclass's own `f` in `double` ([`FsCostFunction::with_double`]): `None` ends the program.
+pub type DoubleCost<'a> = dyn FnMut(&[f64]) -> Option<f64> + 'a;
 
 /// No function pointers: a subclass of `fs_cost_function` built with `fs_cost_function(NULL)`
 /// that overrides `f` ([`FsCostFunction::with_double`]); `fs_powell` reaches only its no-op
@@ -129,11 +132,7 @@ impl<'a> FsCostFunction<'a> {
     /// parameters reach it in `double`, with no conversion to `float`. `None` from `f`: the
     /// program ends inside that evaluation (an `exit` in FreeSurfer's cost function): the
     /// minimizer returns at once, printing nothing more ([`FsCostFunction::stopped`]).
-    pub fn with_double(
-        funcs: &'a mut NoFsFunctions,
-        dim: i32,
-        f: &'a mut dyn FnMut(&[f64]) -> Option<f64>,
-    ) -> Self {
+    pub fn with_double(funcs: &'a mut NoFsFunctions, dim: i32, f: &'a mut DoubleCost<'a>) -> Self {
         FsCostFunction {
             funcs,
             dim,

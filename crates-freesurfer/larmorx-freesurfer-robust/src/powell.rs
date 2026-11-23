@@ -8,8 +8,8 @@
 //!
 //! Each level (or the whole images with `--nomulti`): both images as bytes (`MRISeqchangeType(...,
 //! MRI_UCHAR, 0, 0.999, FALSE)`, printed as `changing data type from <t> to 0 (noscale = 0)...`,
-//! or a copy of a byte image) stretched to 0..255 (`MyMRI::MRInorm255`: `(v - min) * (255 / (max
-//! - min))`, the factor in `float`), their outside values kept; the initial transform (the one
+//! or a copy of a byte image) stretched to 0..255 (`MyMRI::MRInorm255`: `(v - min) * (255 /
+//! (max - min))`, the factor in `float`), their outside values kept; the initial transform (the one
 //! passed, else `Minit` resampled, else `initializeTransform` of the byte images); with symmetry
 //! its square root `mh1` and `mh2 = (mh1 * M^-1)^-1`, so that `M = mh2 * mh1`; Powell's method
 //! (`fs_powell`, the model's steps as the initial directions, `0.02` for the intensity's log)

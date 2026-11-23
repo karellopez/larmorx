@@ -2978,15 +2978,33 @@ def test_lta_convert_replica_needs_no_more_memory_than_freesurfer(tmp_path, name
         assert (r_dir / "out.lta").read_bytes() == (o_dir / "out.lta").read_bytes(), name
 
 
-#: ``mri_robust_register``'s call (track C relay 44): fMRIPrep's (sMRIPrep's ``RobustRegister``:
+#: ``mri_robust_register``'s calls (track C relay 44): fMRIPrep's (sMRIPrep's ``RobustRegister``:
 #: ``--satit --iscale``), the subject's ``T1.mgz`` onto its T1w (``rawavg.mgz``) of ds000228
-#: pixar008 (the quickest of the six recorded heads: about 20 s in FreeSurfer).
+#: pixar008 (the quickest of the six recorded heads: about 20 s in FreeSurfer); and (relay 48) the
+#: Powell registration on the same images (``--cost LS``, Powell's tolerance 0.1: 17 s in
+#: FreeSurfer, 86 s in the port; the default tolerance takes 2 min in FreeSurfer, peak the same:
+#: 459 MiB, the port 464 MiB).
 MRI_ROBUST_REGISTER_CASES = [
     (
         "fmriprep",
         [
             "--satit",
             "--iscale",
+            "--mov",
+            "{mri}/T1.mgz",
+            "--dst",
+            "{mri}/rawavg.mgz",
+            "--lta",
+            "reg.lta",
+        ],
+    ),
+    (
+        "powell",
+        [
+            "--cost",
+            "LS",
+            "--powelltol",
+            "0.1",
             "--mov",
             "{mri}/T1.mgz",
             "--dst",

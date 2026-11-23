@@ -38,6 +38,7 @@ pub mod ltaread;
 pub mod moves;
 pub mod nbhd;
 pub mod pvlabel;
+pub mod region;
 pub mod regrid;
 pub mod resample;
 pub mod sample;
@@ -45,6 +46,7 @@ pub mod segs;
 pub mod seqops;
 pub mod skull;
 pub mod stats;
+pub mod v2v;
 pub mod vgcopy;
 pub mod voxelwise;
 

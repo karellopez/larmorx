@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Segmentations onto another grid and SPM warps (spec §55): `MRIaseg2vol` with its tissue-type
-//! vote (FS-267, FS-509, FS-510), `MRIaseg2volMU` without upsampling (`USF` -1), `MRIapplySpmWarp`
-//! (FS-511) and the codes of the interpolation and float-to-integer names.
+//! vote (FS-267, FS-509, FS-510), `MRIaseg2volMU` (FS-270), `MRIapplySpmWarp` (FS-511) and the
+//! codes of the interpolation and float-to-integer names.
 
-use larmorx_core::defects::{FS_267, FS_509, FS_510, FS_511};
+use larmorx_core::defects::{FS_267, FS_270, FS_509, FS_510, FS_511};
 
 use super::ltachain::LtaInto;
 use super::sample::cvtt;
@@ -380,57 +380,79 @@ impl Process {
         Ok(Some((labels, hits)))
     }
 
-    /// `MRIaseg2volMU(aseg, aseg2vol, fthresh, &volhit, USF, ct)` (§55) with `USF` -1: the
+    /// `MRIaseg2volMU(aseg, aseg2vol, fthresh, &volhit, USF, ct)` (§55). `USF` -1: the
     /// segmentation itself and a copy of the array (its inverse when the segmentation is not its
-    /// source), inverted when the segmentation is then its source, made `REGISTER_DAT`;
-    /// `MRIaseg2vol` onto a header of its source (`int`, the segmentation's pulse parameters).
-    /// Other factors take `MRImaskAndUpsample` (§41, part 9): not yet in larmorx.
+    /// source); any other factor: `MRImaskAndUpsample(aseg, none, USF, 2, 0)` (§41) and the
+    /// inverse of its array concatenated before the caller's and reduced (FS-270: a segmentation
+    /// at neither end ends the program). The result inverted when the segmentation used is its
+    /// source, made `REGISTER_DAT`; `MRIaseg2vol` onto a header (`int`, one frame, the
+    /// segmentation's pulse parameters) of the caller's first transform's destination when the
+    /// segmentation equals its source, else its source.
     pub fn mri_aseg2vol_mu(
         &mut self,
-        aseg: &Mri,
+        aseg: &mut Mri,
         lta: &mut Lta,
         fthresh: f64,
         usf: i32,
         ct: Option<&ColorTable>,
     ) -> Result<Option<(Mri, Mri)>, Stop> {
-        if usf != -1 {
-            self.error_exit(
-                codes::BAD_PARM,
-                format!("MRIaseg2volMU(): upsampling by {usf} is not yet in larmorx (MRImaskAndUpsample)\n")
-                    .as_bytes(),
-            )?;
-            return Ok(None);
-        }
-        let mut l = if self.lta_mri_is_source(lta, aseg)? != 0 {
-            match self.lta_copy(lta, None)? {
-                Returned::New(x) => x,
-                _ => return Ok(None),
-            }
+        let (cut, mut l) = if usf == -1 {
+            let l = if self.lta_mri_is_source(lta, aseg)? != 0 {
+                match self.lta_copy(lta, None)? {
+                    Returned::New(x) => x,
+                    _ => return Ok(None),
+                }
+            } else {
+                match self.lta_invert(lta, LtaInto::New)? {
+                    Returned::New(x) => x,
+                    _ => return Ok(None),
+                }
+            };
+            (None, l)
         } else {
-            match self.lta_invert(lta, LtaInto::New)? {
+            let Some((cut, mut to_cut)) = self.mri_mask_and_upsample(aseg, None, usf, 2, false)?
+            else {
+                return Ok(None);
+            };
+            let mut back = match self.lta_invert(&mut to_cut, LtaInto::New)? {
                 Returned::New(x) => x,
                 _ => return Ok(None),
-            }
+            };
+            let Some(r) = self.lta_concat2(&mut back, lta, true)? else {
+                self.note(
+                    &FS_270,
+                    "MRIaseg2volMU: a segmentation at neither end of the registration: the program ended (FreeSurfer crashes)",
+                );
+                self.error_exit(
+                    codes::BAD_PARM,
+                    b"MRIaseg2volMU: the segmentation is at neither end of the registration (FreeSurfer crashes here)\n",
+                )?;
+                return Ok(None);
+            };
+            (Some(cut), r)
         };
-        if self.lta_mri_is_source(&l, aseg)? != 0 {
+        let used: &Mri = cut.as_ref().unwrap_or(&*aseg);
+        if self.lta_mri_is_source(&l, used)? != 0 {
             self.lta_invert(&mut l, LtaInto::Itself)?;
         }
         self.lta_change_type(&mut l, lta_type::REGISTER_DAT)?;
-        let at_dst = self.lta_mri_is_target(&l, aseg)? != 0;
-        let Some(first) = l.xforms.first() else {
+        let m = l.xforms.first().and_then(|x| x.m_l.clone());
+        // the template: the caller's first transform's destination when the segmentation
+        // equals its source, else its source
+        let at_src = self.lta_mri_is_source(lta, aseg)? != 0;
+        let Some(first) = lta.xforms.first() else {
             return Ok(None);
         };
-        // the array's other geometry: its source when the segmentation is its destination
-        let g = if at_dst {
-            first.src.clone()
-        } else {
+        let g = if at_src {
             first.dst.clone()
+        } else {
+            first.src.clone()
         };
-        let m = first.m_l.clone();
+        let used: &Mri = cut.as_ref().unwrap_or(&*aseg);
         let mut t = self.mri_alloc_header(g.width, g.height, g.depth, types::INT, 1)?;
         self.use_vol_geom(&g, &mut t)?;
-        self.copy_pulse_parameters(aseg, &mut t);
-        self.mri_aseg2vol(aseg, m.as_ref(), &t, fthresh, ct)
+        self.copy_pulse_parameters(used, &mut t);
+        self.mri_aseg2vol(used, m.as_ref(), &t, fthresh, ct)
     }
 
     /// `VGgetVoxelToRasXform(vg, base)` (§55): direction cosines times sizes, the translation

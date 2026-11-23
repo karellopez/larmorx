@@ -53,12 +53,12 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
             }
         }
         "a2vmu" => {
-            let a = getwp(p, l)?;
+            let mut a = getwp(p, l)?;
             let mut lta = getlta(p, l)?;
             let ft = l.getd();
             let usf = l.geti();
             let ct = l.getct(false);
-            let r = p.mri_aseg2vol_mu(&a, &mut lta, ft, usf, ct.as_ref())?;
+            let r = p.mri_aseg2vol_mu(&mut a, &mut lta, ft, usf, ct.as_ref())?;
             p.flush();
             putv(l, r.as_ref().map(|x| &x.0));
             putv(l, r.as_ref().map(|x| &x.1));

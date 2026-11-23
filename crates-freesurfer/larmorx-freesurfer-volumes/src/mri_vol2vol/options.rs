@@ -243,9 +243,7 @@ impl Options {
 
     /// `subject` as `printf`'s `%s` shows it (`(null)` for `NULL`).
     pub fn subject_text(&self) -> Vec<u8> {
-        self.subject
-            .clone()
-            .unwrap_or_else(|| b"(null)".to_vec())
+        self.subject.clone().unwrap_or_else(|| b"(null)".to_vec())
     }
 }
 
@@ -335,7 +333,12 @@ pub fn print_matrix(g: &mut Globals, r: &mut Run, m: Option<&Matrix>) {
 
 /// `regio_read_register(regfile, &subject, &ipr, &bpr, &intensity, &R, &float2int)` into the
 /// options (each set only where the reader sets it); its status.
-fn read_register(g: &mut Globals, r: &mut Run, o: &mut Options, regfile: &str) -> Result<i32, Fatal> {
+fn read_register(
+    g: &mut Globals,
+    r: &mut Run,
+    o: &mut Options,
+    regfile: &str,
+) -> Result<i32, Fatal> {
     let mut reg = Register {
         subject: o.subject.take(),
         inplaneres: o.ipr,
@@ -414,7 +417,12 @@ fn load_rfsl(g: &mut Globals, r: &mut Run, fname: &str) -> Result<Option<Matrix>
 /// `LoadRtal(talres)`: the registration of `$FREESURFER_HOME/average/mni305.cor.subfov<res>.reg`
 /// (`regio_read_register`, which also sets the program's `subject`); a file that does not read
 /// ends the program (`exit(1)`).
-pub fn load_rtal(g: &mut Globals, r: &mut Run, o: &mut Options, talres: i32) -> Result<Matrix, Fatal> {
+pub fn load_rtal(
+    g: &mut Globals,
+    r: &mut Run,
+    o: &mut Options,
+    talres: i32,
+) -> Result<Matrix, Fatal> {
     let rtalfile = format!("{}/average/mni305.cor.subfov{talres}.reg", o.fsh);
     let mut reg = Register {
         subject: o.subject.take(),
@@ -525,8 +533,8 @@ pub fn parse_commandline(
             if nargc < 3 {
                 return Err(argnerr(r, option, 3));
             }
-            for k in 0..3 {
-                scan_d_into(g, &rest[k], &mut o.down_sample[k]);
+            for (word, v) in rest.iter().zip(o.down_sample.iter_mut()) {
+                scan_d_into(g, word, v);
             }
             o.do_fill = true;
             o.do_fill_conserve = false;
@@ -559,10 +567,7 @@ pub fn parse_commandline(
             if o.r.is_none() {
                 o.r = Some(identity(g, r)?);
             }
-            let _ = writeln!(
-                r.out,
-                "Using the m3z file as it is; no assumed location."
-            );
+            let _ = writeln!(r.out, "Using the m3z file as it is; no assumed location.");
         } else if istringnmatch(option, "--mov", 0) {
             if nargc < 1 {
                 return Err(argnerr(r, option, 1));
@@ -669,7 +674,10 @@ pub fn parse_commandline(
             nargsused = 1;
         } else if istringnmatch(option, "--mni152reg", 0) {
             o.targ_mni152 = true;
-            let fsldir = r.env.get("FSLDIR").map(|v| v.to_string_lossy().into_owned());
+            let fsldir = r
+                .env
+                .get("FSLDIR")
+                .map(|v| v.to_string_lossy().into_owned());
             let tmp = format!(
                 "{}/data/standard/MNI152_T1_2mm.nii.gz",
                 or_null(fsldir.as_deref())
@@ -856,8 +864,8 @@ pub fn parse_commandline(
             if nargc < 3 {
                 return Err(argnerr(r, option, 3));
             }
-            for k in 0..3 {
-                scan_lf_into(g, &rest[k], &mut o.angles[k]);
+            for (word, v) in rest.iter().zip(o.angles.iter_mut()) {
+                scan_lf_into(g, word, v);
             }
             for k in 0..3 {
                 o.angles[k] *= std::f64::consts::PI / 180.0;
@@ -868,8 +876,8 @@ pub fn parse_commandline(
             if nargc < 3 {
                 return Err(argnerr(r, option, 3));
             }
-            for k in 0..3 {
-                scan_lf_into(g, &rest[k], &mut o.xyztrans[k]);
+            for (word, v) in rest.iter().zip(o.xyztrans.iter_mut()) {
+                scan_lf_into(g, word, v);
             }
             let mut m = identity(g, r)?;
             for k in 0..3 {
@@ -881,8 +889,8 @@ pub fn parse_commandline(
             if nargc < 3 {
                 return Err(argnerr(r, option, 3));
             }
-            for k in 0..3 {
-                scan_lf_into(g, &rest[k], &mut o.shear[k]);
+            for (word, v) in rest.iter().zip(o.shear.iter_mut()) {
+                scan_lf_into(g, word, v);
             }
             let mut m = identity(g, r)?;
             m.set_relt(1, 2, o.shear[0] as f32);
@@ -937,10 +945,7 @@ pub fn parse_commandline(
             || istringnmatch(option, "--map-point-inv-lta", 0)
         {
             if nargc < 7 {
-                let _ = writeln!(
-                    r.out,
-                    "  --map-point a b c incoords lta outcoords outfile"
-                );
+                let _ = writeln!(r.out, "  --map-point a b c incoords lta outcoords outfile");
                 let _ = writeln!(r.out, "  coords: 1=tkras, 2=scannerras, 3=vox");
                 return Err(argnerr(r, option, 7));
             }
@@ -1044,8 +1049,14 @@ pub fn check_options(g: &mut Globals, r: &mut Run, o: &mut Options) -> Result<()
     if o.targvolfile.is_none() {
         if o.lta.is_some() && !o.invert {
             let _ = writeln!(r.out, "Getting target volume geom from lta destination");
-            let vg = o.lta.as_ref().map(|l| l.xforms[0].dst.clone()).unwrap_or_default();
-            o.targ = Some(mri_alloc_from_vol_geom(g, r.out, r.err, &vg, MRI_UCHAR, 1, true)?);
+            let vg = o
+                .lta
+                .as_ref()
+                .map(|l| l.xforms[0].dst.clone())
+                .unwrap_or_default();
+            o.targ = Some(mri_alloc_from_vol_geom(
+                g, r.out, r.err, &vg, MRI_UCHAR, 1, true,
+            )?);
         } else if o.down_sample[0] == 0 {
             // FS-1177: --crop makes its own target
             if o.do_crop {
@@ -1118,7 +1129,10 @@ pub fn check_options(g: &mut Globals, r: &mut Run, o: &mut Options) -> Result<()
             let mut io = RegLta { env: &env };
             let q = regio_read_registermat(g, r.out, r.err, r.dir, &tmp, &mut io)?;
             let Some(q) = q else {
-                let _ = writeln!(r.out, "Run mni152reg --s {subj} to create reg.mni152.2mm.dat");
+                let _ = writeln!(
+                    r.out,
+                    "Run mni152reg --s {subj} to create reg.mni152.2mm.dat"
+                );
                 return Err(Fatal::Exit(1));
             };
             let invq = matrix_inverse(g, r.out, r.err, Some(&q), None)?.into_new();
@@ -1132,12 +1146,14 @@ pub fn check_options(g: &mut Globals, r: &mut Run, o: &mut Options) -> Result<()
     }
     // FS-1183: the transform array read from a register.dat has no geometry, which the change of
     // type below refuses
-    let from_dat = o.lta.as_ref().is_some_and(|l| {
-        l.xforms[0].src.valid == 0 || l.xforms[0].dst.valid == 0
-    }) && o.regfile.as_deref().is_some_and(|f| {
-        let ext = file_name_extension(g, f);
-        stricmp(g, &ext, "LTA") != 0
-    });
+    let from_dat = o
+        .lta
+        .as_ref()
+        .is_some_and(|l| l.xforms[0].src.valid == 0 || l.xforms[0].dst.valid == 0)
+        && o.regfile.as_deref().is_some_and(|f| {
+            let ext = file_name_extension(g, f);
+            stricmp(g, &ext, "LTA") != 0
+        });
     if from_dat && !o.fstal && o.targvolfile.is_some() {
         g.notices.add(
             &FS_1183,
@@ -1163,7 +1179,14 @@ pub fn check_options(g: &mut Globals, r: &mut Run, o: &mut Options) -> Result<()
         let env = r.env.clone();
         let mut lta = o.lta.take().unwrap_or_else(|| unreachable!("checked"));
         lta_change_type(g, r.out, r.err, &env, &mut lta, LINEAR_RAS_TO_RAS)?;
-        lta_modify_src_dst_geom(g, r.out, r.err, &mut lta, Some(&mrimovtmp), Some(&mritrgtmp));
+        lta_modify_src_dst_geom(
+            g,
+            r.out,
+            r.err,
+            &mut lta,
+            Some(&mrimovtmp),
+            Some(&mritrgtmp),
+        );
         o.r = transform_lta2_reg_dat(g, r.out, r.err, &mut lta)?;
         o.ipr = lta.xforms[0].src.xsize;
         o.bpr = lta.xforms[0].src.zsize;

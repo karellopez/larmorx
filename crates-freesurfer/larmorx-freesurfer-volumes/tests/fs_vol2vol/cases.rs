@@ -149,7 +149,11 @@ fn lta_file(src: &Mri, dst: &Mri, ty: i32, m: &[f32; 16], valid: [i32; 2]) -> Ve
 
 /// A tkregister `register.dat` of `m` for `subject`.
 fn reg_dat(subject: &str, m: &[f32; 16], method: &str) -> Vec<u8> {
-    format!("{subject}\n1.000000\n1.500000\n0.150000\n{}{method}", rows(m)).into_bytes()
+    format!(
+        "{subject}\n1.000000\n1.500000\n0.150000\n{}{method}",
+        rows(m)
+    )
+    .into_bytes()
 }
 
 /// The inputs a case may name.
@@ -176,7 +180,8 @@ fn padded(g: &mut Gen, s: &Spec, pad: i32, zero: bool) -> Mri {
                         || y >= h - pad
                         || z >= d - pad;
                     if zero || border {
-                        mri_set_vox_val(&mut fs, &mut e, &mut m, x, y, z, f, 0.0, 0).expect("a voxel");
+                        mri_set_vox_val(&mut fs, &mut e, &mut m, x, y, z, f, 0.0, 0)
+                            .expect("a voxel");
                     }
                 }
             }
@@ -203,47 +208,101 @@ fn base_inputs() -> Inputs {
         files.extend(write_as(m, name));
     };
     // the moving volumes
-    let sm = spec(MRI_FLOAT, [8, 9, 10, 1], [1.0, 1.5, 2.0], CORONAL, [1.0, -2.0, 3.0]);
+    let sm = spec(
+        MRI_FLOAT,
+        [8, 9, 10, 1],
+        [1.0, 1.5, 2.0],
+        CORONAL,
+        [1.0, -2.0, 3.0],
+    );
     let mut m = build(&mut g, &sm);
     put(&mut files, "m.mgz", &mut m);
     put(&mut files, "m.nii.gz", &mut m);
     let mut m4 = build(
         &mut g,
-        &spec(MRI_FLOAT, [6, 5, 4, 3], [1.0, 1.0, 1.0], IDENT, [0.0, 0.0, 0.0]),
+        &spec(
+            MRI_FLOAT,
+            [6, 5, 4, 3],
+            [1.0, 1.0, 1.0],
+            IDENT,
+            [0.0, 0.0, 0.0],
+        ),
     );
     put(&mut files, "m4.mgz", &mut m4);
     let mut mu = build(
         &mut g,
-        &spec(MRI_UCHAR, [7, 6, 5, 1], [1.1, 0.9, 1.3], OBLIQUE, [0.5, 1.5, -2.5]),
+        &spec(
+            MRI_UCHAR,
+            [7, 6, 5, 1],
+            [1.1, 0.9, 1.3],
+            OBLIQUE,
+            [0.5, 1.5, -2.5],
+        ),
     );
     put(&mut files, "mu.mgz", &mut mu);
     let mut ms = build(
         &mut g,
-        &spec(MRI_SHORT, [6, 7, 5, 1], [1.0, 1.0, 1.0], IDENT, [2.0, 0.0, -1.0]),
+        &spec(
+            MRI_SHORT,
+            [6, 7, 5, 1],
+            [1.0, 1.0, 1.0],
+            IDENT,
+            [2.0, 0.0, -1.0],
+        ),
     );
     put(&mut files, "ms.nii.gz", &mut ms);
-    let mut sseg = spec(MRI_INT, [6, 6, 6, 1], [1.0, 1.0, 1.0], CORONAL, [0.0, 0.0, 0.0]);
+    let mut sseg = spec(
+        MRI_INT,
+        [6, 6, 6, 1],
+        [1.0, 1.0, 1.0],
+        CORONAL,
+        [0.0, 0.0, 0.0],
+    );
     sseg.seg = true;
     sseg.ctab = true;
     let mut seg = build(&mut g, &sseg);
     put(&mut files, "seg.mgz", &mut seg);
     let mut thin = build(
         &mut g,
-        &spec(MRI_FLOAT, [6, 7, 1, 1], [1.0, 1.0, 3.0], IDENT, [0.0, 0.0, 0.0]),
+        &spec(
+            MRI_FLOAT,
+            [6, 7, 1, 1],
+            [1.0, 1.0, 3.0],
+            IDENT,
+            [0.0, 0.0, 0.0],
+        ),
     );
     put(&mut files, "thin.mgz", &mut thin);
-    let sbox = spec(MRI_FLOAT, [7, 6, 8, 1], [1.0, 1.0, 1.0], CORONAL, [0.0, 1.0, 0.0]);
+    let sbox = spec(
+        MRI_FLOAT,
+        [7, 6, 8, 1],
+        [1.0, 1.0, 1.0],
+        CORONAL,
+        [0.0, 1.0, 0.0],
+    );
     let mut bx = padded(&mut g, &sbox, 1, false);
     put(&mut files, "box.mgz", &mut bx);
     let mut zero = padded(&mut g, &sbox, 0, true);
     put(&mut files, "zero.mgz", &mut zero);
     // the targets
-    let st = spec(MRI_UCHAR, [5, 6, 4, 1], [1.2, 1.0, 1.3], IDENT, [0.5, -1.0, 2.0]);
+    let st = spec(
+        MRI_UCHAR,
+        [5, 6, 4, 1],
+        [1.2, 1.0, 1.3],
+        IDENT,
+        [0.5, -1.0, 2.0],
+    );
     let mut t = build(&mut g, &st);
     put(&mut files, "t.mgz", &mut t);
     let mut t2 = build(
         &mut g,
-        &spec(MRI_FLOAT, [6, 5, 6, 1], [0.8, 1.0, 1.1], OBLIQUE, [-1.0, 0.5, 1.0]),
+        &spec(
+            MRI_FLOAT,
+            [6, 5, 6, 1],
+            [0.8, 1.0, 1.1],
+            OBLIQUE,
+            [-1.0, 0.5, 1.0],
+        ),
     );
     put(&mut files, "t2.nii.gz", &mut t2);
     // a voxel shift map of the moving volume's size, small shifts, a zero row
@@ -266,13 +325,34 @@ fn base_inputs() -> Inputs {
     }
     put(&mut files, "vsm.mgz", &mut vsm);
     // the transforms
-    files.push(("r.lta".into(), lta_file(&m, &t, LINEAR_RAS_TO_RAS, &ROT, [1, 1])));
-    files.push(("v.lta".into(), lta_file(&m, &t, LINEAR_VOX_TO_VOX, &ROT, [1, 1])));
-    files.push(("rt.lta".into(), lta_file(&t, &m, LINEAR_RAS_TO_RAS, &ROT, [1, 1])));
-    files.push(("nos.lta".into(), lta_file(&m, &t, LINEAR_RAS_TO_RAS, &ROT, [0, 1])));
-    files.push(("nod.lta".into(), lta_file(&m, &t, LINEAR_RAS_TO_RAS, &ROT, [1, 0])));
-    files.push(("seg.lta".into(), lta_file(&seg, &t2, LINEAR_RAS_TO_RAS, &ROT, [1, 1])));
-    files.push(("lta.txt".into(), lta_file(&m, &t, LINEAR_RAS_TO_RAS, &ROT, [1, 1])));
+    files.push((
+        "r.lta".into(),
+        lta_file(&m, &t, LINEAR_RAS_TO_RAS, &ROT, [1, 1]),
+    ));
+    files.push((
+        "v.lta".into(),
+        lta_file(&m, &t, LINEAR_VOX_TO_VOX, &ROT, [1, 1]),
+    ));
+    files.push((
+        "rt.lta".into(),
+        lta_file(&t, &m, LINEAR_RAS_TO_RAS, &ROT, [1, 1]),
+    ));
+    files.push((
+        "nos.lta".into(),
+        lta_file(&m, &t, LINEAR_RAS_TO_RAS, &ROT, [0, 1]),
+    ));
+    files.push((
+        "nod.lta".into(),
+        lta_file(&m, &t, LINEAR_RAS_TO_RAS, &ROT, [1, 0]),
+    ));
+    files.push((
+        "seg.lta".into(),
+        lta_file(&seg, &t2, LINEAR_RAS_TO_RAS, &ROT, [1, 1]),
+    ));
+    files.push((
+        "lta.txt".into(),
+        lta_file(&m, &t, LINEAR_RAS_TO_RAS, &ROT, [1, 1]),
+    ));
     files.push(("r.dat".into(), reg_dat("s1", &ROT, "round\n")));
     files.push(("rt.dat".into(), reg_dat("s1", &ROT, "tkregister\n")));
     files.push(("bad.dat".into(), b"s1\n1.0\n1.5\n".to_vec()));
@@ -298,7 +378,10 @@ fn base_inputs() -> Inputs {
     // a subject and FreeSurfer's and FSL's own folders
     put(&mut files, "subjects/s1/mri/orig.mgz", &mut t);
     put(&mut files, "subjects/s1/mri/brain.mgz", &mut t2);
-    files.push(("subjects/s1/mri/transforms/talairach.xfm".into(), XFM.to_vec()));
+    files.push((
+        "subjects/s1/mri/transforms/talairach.xfm".into(),
+        XFM.to_vec(),
+    ));
     files.push((
         "subjects/s1/mri/transforms/reg.mni152.2mm.dat".into(),
         reg_dat("s1", &ROT, "round\n"),
@@ -311,12 +394,24 @@ fn base_inputs() -> Inputs {
     ];
     let mut tal = build(
         &mut g,
-        &spec(MRI_UCHAR, [6, 7, 6, 1], [2.0, 2.0, 2.0], CORONAL, [0.0, -18.0, 18.0]),
+        &spec(
+            MRI_UCHAR,
+            [6, 7, 6, 1],
+            [2.0, 2.0, 2.0],
+            CORONAL,
+            [0.0, -18.0, 18.0],
+        ),
     );
     put(&mut files, "fsh/average/mni305.cor.subfov2.mgz", &mut tal);
     let mut tal1 = build(
         &mut g,
-        &spec(MRI_UCHAR, [8, 9, 8, 1], [1.0, 1.0, 1.0], CORONAL, [0.0, -18.0, 18.0]),
+        &spec(
+            MRI_UCHAR,
+            [8, 9, 8, 1],
+            [1.0, 1.0, 1.0],
+            CORONAL,
+            [0.0, -18.0, 18.0],
+        ),
     );
     put(&mut files, "fsh/average/mni305.cor.subfov1.mgz", &mut tal1);
     files.push((
@@ -333,9 +428,19 @@ fn base_inputs() -> Inputs {
     ));
     let mut mni = build(
         &mut g,
-        &spec(MRI_FLOAT, [7, 8, 7, 1], [2.0, 2.0, 2.0], IDENT, [0.0, -17.0, 18.0]),
+        &spec(
+            MRI_FLOAT,
+            [7, 8, 7, 1],
+            [2.0, 2.0, 2.0],
+            IDENT,
+            [0.0, -17.0, 18.0],
+        ),
     );
-    put(&mut files, "fsl/data/standard/MNI152_T1_2mm.nii.gz", &mut mni);
+    put(
+        &mut files,
+        "fsl/data/standard/MNI152_T1_2mm.nii.gz",
+        &mut mni,
+    );
     Inputs {
         files,
         dirs: vec!["outdir".to_owned()],
@@ -375,18 +480,24 @@ pub fn line(env: &[&str], i: &Inputs, args: &[String]) -> String {
         .files
         .iter()
         .filter(|(f, _)| {
-            args.iter().any(|a| names(a, f))
-                || (folders && ALWAYS.iter().any(|p| f.starts_with(p)))
+            args.iter().any(|a| names(a, f)) || (folders && ALWAYS.iter().any(|p| f.starts_with(p)))
         })
         .collect();
     let dirs: Vec<&String> = i
         .dirs
         .iter()
-        .filter(|d| args.iter().any(|a| names(a, d) || a.starts_with(&format!("{d}/"))))
+        .filter(|d| {
+            args.iter()
+                .any(|a| names(a, d) || a.starts_with(&format!("{d}/")))
+        })
         .collect();
     let mut all: Vec<&str> = BASE_ENV.to_vec();
     all.extend_from_slice(env);
-    let mut t = vec!["v2v".to_owned(), hex(all.join(";").as_bytes()), files.len().to_string()];
+    let mut t = vec![
+        "v2v".to_owned(),
+        hex(all.join(";").as_bytes()),
+        files.len().to_string(),
+    ];
     for (f, c) in files {
         t.push(f.clone());
         t.push(hex(c));
@@ -428,15 +539,54 @@ fn prelude() -> Vec<String> {
     add(&[], &["--foo"]);
     add(&[], &["-foo"]);
     add(&[], &["x"]);
-    add(&[], &["--debug", "--mov", "m.mgz", "--targ", "t.mgz", "--regheader", "--o", "o.mgz"]);
+    add(
+        &[],
+        &[
+            "--debug",
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "o.mgz",
+        ],
+    );
     add(&["-FREESURFER_HOME"], &with(&["--regheader"]));
     add(&["-SUBJECTS_DIR"], &with(&["--regheader"]));
     for opt in [
-        "--mov", "--targ", "--o", "--out", "--reg", "--lta", "--lta-inv", "--fsl", "--xfm",
-        "--talxfm", "--disp", "--talres", "--crop", "--mul", "--slice-bias", "--interp",
-        "--precision", "--seed", "--sd", "--ctab", "--vsm", "--vsm-reg", "--vsm-pedir",
-        "--reg-final", "--s", "--subject", "--cost", "--m3z", "--fill-upsample",
-        "--no-resample-scale", "--vg-thresh", "--gdiagno",
+        "--mov",
+        "--targ",
+        "--o",
+        "--out",
+        "--reg",
+        "--lta",
+        "--lta-inv",
+        "--fsl",
+        "--xfm",
+        "--talxfm",
+        "--disp",
+        "--talres",
+        "--crop",
+        "--mul",
+        "--slice-bias",
+        "--interp",
+        "--precision",
+        "--seed",
+        "--sd",
+        "--ctab",
+        "--vsm",
+        "--vsm-reg",
+        "--vsm-pedir",
+        "--reg-final",
+        "--s",
+        "--subject",
+        "--cost",
+        "--m3z",
+        "--fill-upsample",
+        "--no-resample-scale",
+        "--vg-thresh",
+        "--gdiagno",
     ] {
         add(&[], &["--regheader", opt]);
     }
@@ -455,12 +605,53 @@ fn prelude() -> Vec<String> {
     add(&[], &["--mov", "m.mgz", "--regheader", "--o", "o.mgz"]);
     add(&[], &with(&["--fstarg", "--reg", "r.dat"]));
     add(&[], &with(&["--tal", "--reg", "r.dat"]));
-    add(&[], &["--mov", "m.mgz", "--tal", "--fstarg", "--reg", "r.dat", "--o", "o.mgz"]);
+    add(
+        &[],
+        &[
+            "--mov", "m.mgz", "--tal", "--fstarg", "--reg", "r.dat", "--o", "o.mgz",
+        ],
+    );
     add(&[], &with(&["--downsample", "2", "2", "2"]));
-    add(&[], &["--mov", "m.mgz", "--targ", "t.mgz", "--regheader", "--o", "nodir/sub/o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--targ", "t.mgz", "--regheader", "--o", "outdir/o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--targ", "t.mgz", "--regheader", "--o", "newdir/o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--tal", "--regheader", "--o", "o.mgz"]);
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "nodir/sub/o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "outdir/o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "newdir/o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &["--mov", "m.mgz", "--tal", "--regheader", "--o", "o.mgz"],
+    );
     add(&[], &with(&["--xfm", "x.xfm", "--reg", "r.dat"]));
     add(&[], &with(&["--regheader", "--reg", "r.dat"]));
     add(&[], &["--mov", "m.mgz", "--fstarg", "--o", "o.mgz"]);
@@ -485,18 +676,50 @@ fn prelude() -> Vec<String> {
     add(&[], &with(&["--lta", "r.lta"]));
     add(&[], &with(&["--lta", "v.lta"]));
     add(&[], &["--mov", "m.mgz", "--lta", "r.lta", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--lta", "v.lta", "--o", "o.mgz", "--save-reg"]);
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--lta",
+            "v.lta",
+            "--o",
+            "o.mgz",
+            "--save-reg",
+        ],
+    );
     add(&[], &with(&["--lta-inv", "rt.lta"]));
-    add(&[], &["--mov", "m.mgz", "--lta-inv", "rt.lta", "--o", "o.mgz"]);
+    add(
+        &[],
+        &["--mov", "m.mgz", "--lta-inv", "rt.lta", "--o", "o.mgz"],
+    );
     add(&[], &with(&["--lta", "nos.lta"]));
     add(&[], &with(&["--lta", "nod.lta"]));
     add(&[], &with(&["--lta", "lta.txt"]));
     add(&[], &with(&["--lta", "identity.nofile"]));
     add(&[], &with(&["--lta", "none.lta"]));
-    add(&[], &["--inv", "--lta", "r.lta", "--targ", "t.mgz", "--o", "o.mgz"]);
-    add(&[], &["--inv", "--lta", "r.lta", "--keep-precision", "--o", "o.mgz"]);
+    add(
+        &[],
+        &["--inv", "--lta", "r.lta", "--targ", "t.mgz", "--o", "o.mgz"],
+    );
+    add(
+        &[],
+        &[
+            "--inv",
+            "--lta",
+            "r.lta",
+            "--keep-precision",
+            "--o",
+            "o.mgz",
+        ],
+    );
     add(&[], &["--inv", "--lta", "r.lta", "--o", "o.mgz"]);
-    add(&[], &["--inv", "--lta", "r.lta", "--mov", "m.mgz", "--targ", "t.mgz", "--o", "o.mgz"]);
+    add(
+        &[],
+        &[
+            "--inv", "--lta", "r.lta", "--mov", "m.mgz", "--targ", "t.mgz", "--o", "o.mgz",
+        ],
+    );
     add(&[], &with(&["--fsl", "f.mat"]));
     add(&[], &with(&["--fsl", "f.mat", "f2.mat"]));
     add(&[], &with(&["--fslreg", "f.mat", "--nearest"]));
@@ -528,17 +751,131 @@ fn prelude() -> Vec<String> {
     }
     add(&[], &with(&["--regheader", "--inv"]));
     add(&[], &with(&["--reg", "r.dat", "--inv", "--cubic"]));
-    add(&[], &["--mov", "m4.mgz", "--targ", "t2.nii.gz", "--regheader", "--o", "o.nii.gz"]);
-    add(&[], &["--mov", "m4.mgz", "--targ", "t.mgz", "--regheader", "--o", "o.mgz", "--cubic"]);
-    add(&[], &["--mov", "mu.mgz", "--targ", "t.mgz", "--regheader", "--o", "o.mgz", "--keep-precision"]);
-    add(&[], &["--mov", "ms.nii.gz", "--targ", "t2.nii.gz", "--regheader", "--o", "o.nii", "--keep-precision"]);
-    add(&[], &["--mov", "thin.mgz", "--targ", "t.mgz", "--regheader", "--o", "o.mgz"]);
-    add(&[], &["--mov", "seg.mgz", "--targ", "t2.nii.gz", "--lta", "seg.lta", "--interp", "nearest", "--o", "seg.nii.gz"]);
-    add(&[], &["--mov", "seg.mgz", "--targ", "t.mgz", "--regheader", "--nearest", "--o", "seg.mgz"]);
-    add(&[], &["--mov", "seg.mgz", "--targ", "t.mgz", "--regheader", "--nearest", "--o", "o.mgz", "--ctab", "lut.txt"]);
+    add(
+        &[],
+        &[
+            "--mov",
+            "m4.mgz",
+            "--targ",
+            "t2.nii.gz",
+            "--regheader",
+            "--o",
+            "o.nii.gz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m4.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "o.mgz",
+            "--cubic",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "mu.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "o.mgz",
+            "--keep-precision",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "ms.nii.gz",
+            "--targ",
+            "t2.nii.gz",
+            "--regheader",
+            "--o",
+            "o.nii",
+            "--keep-precision",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "thin.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "seg.mgz",
+            "--targ",
+            "t2.nii.gz",
+            "--lta",
+            "seg.lta",
+            "--interp",
+            "nearest",
+            "--o",
+            "seg.nii.gz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "seg.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--nearest",
+            "--o",
+            "seg.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "seg.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--nearest",
+            "--o",
+            "o.mgz",
+            "--ctab",
+            "lut.txt",
+        ],
+    );
     add(&[], &with(&["--regheader", "--ctab", "badlut.txt"]));
-    add(&[], &with(&["--regheader", "--ctab", "lut.txt", "--copy-ctab"]));
-    add(&[], &["--mov", "seg.mgz", "--targ", "t.mgz", "--regheader", "--nearest", "--o", "o.mgz", "--inv"]);
+    add(
+        &[],
+        &with(&["--regheader", "--ctab", "lut.txt", "--copy-ctab"]),
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "seg.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--nearest",
+            "--o",
+            "o.mgz",
+            "--inv",
+        ],
+    );
     for p in ["uchar", "short", "int", "long", "float", "UCHAR"] {
         add(&[], &with(&["--regheader", "--precision", p]));
     }
@@ -550,24 +887,139 @@ fn prelude() -> Vec<String> {
     add(&[], &with(&["--reg", "r.dat", "--delta", "--inv"]));
     add(&[], &with(&["--regheader", "--fill-average"]));
     add(&[], &with(&["--regheader", "--fill-conserve"]));
-    add(&[], &with(&["--reg", "r.dat", "--fill-conserve", "--fill-upsample", "3"]));
+    add(
+        &[],
+        &with(&["--reg", "r.dat", "--fill-conserve", "--fill-upsample", "3"]),
+    );
     add(&[], &with(&["--regheader", "--fill-average", "--inv"]));
-    add(&[], &["--mov", "m.mgz", "--downsample", "2", "2", "2", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--downsample", "3", "1", "2", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--downsample", "2", "0", "2", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--downsample", "2", "2", "0", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--downsample", "2", "-1", "2", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--downsample", "0", "2", "2", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--downsample", "-2", "2", "2", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m4.mgz", "--downsample", "2", "2", "2", "--o", "o.mgz", "--save-reg"]);
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--downsample",
+            "2",
+            "2",
+            "2",
+            "--o",
+            "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--downsample",
+            "3",
+            "1",
+            "2",
+            "--o",
+            "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--downsample",
+            "2",
+            "0",
+            "2",
+            "--o",
+            "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--downsample",
+            "2",
+            "2",
+            "0",
+            "--o",
+            "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--downsample",
+            "2",
+            "-1",
+            "2",
+            "--o",
+            "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--downsample",
+            "0",
+            "2",
+            "2",
+            "--o",
+            "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--downsample",
+            "-2",
+            "2",
+            "2",
+            "--o",
+            "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m4.mgz",
+            "--downsample",
+            "2",
+            "2",
+            "2",
+            "--o",
+            "o.mgz",
+            "--save-reg",
+        ],
+    );
     add(&[], &with(&["--regheader", "--vsm", "vsm.mgz"]));
     add(&[], &with(&["--regheader", "--vsm", "vsm.mgz", "1"]));
     add(&[], &with(&["--regheader", "--vsm", "vsm.mgz", "-2"]));
-    add(&[], &with(&["--regheader", "--vsm", "vsm.mgz", "3", "--cubic"]));
-    add(&[], &with(&["--regheader", "--vsm", "vsm.mgz", "--vsm-pedir", "-1"]));
-    add(&[], &with(&["--regheader", "--vsm", "vsm.mgz", "--vsm-pedir", "5"]));
-    add(&[], &with(&["--regheader", "--vsm", "vsm.mgz", "--vsm-reg", "v.lta"]));
-    add(&[], &with(&["--regheader", "--vsm", "vsm.mgz", "--vsm-reg", "r.lta"]));
+    add(
+        &[],
+        &with(&["--regheader", "--vsm", "vsm.mgz", "3", "--cubic"]),
+    );
+    add(
+        &[],
+        &with(&["--regheader", "--vsm", "vsm.mgz", "--vsm-pedir", "-1"]),
+    );
+    add(
+        &[],
+        &with(&["--regheader", "--vsm", "vsm.mgz", "--vsm-pedir", "5"]),
+    );
+    add(
+        &[],
+        &with(&["--regheader", "--vsm", "vsm.mgz", "--vsm-reg", "v.lta"]),
+    );
+    add(
+        &[],
+        &with(&["--regheader", "--vsm", "vsm.mgz", "--vsm-reg", "r.lta"]),
+    );
     add(&[], &with(&["--regheader", "--vsm", "none.mgz"]));
     add(&[], &with(&["--regheader", "--vsm", "t.mgz"]));
     add(&[], &with(&["--regheader", "--new"]));
@@ -578,96 +1030,477 @@ fn prelude() -> Vec<String> {
     add(&[], &with(&["--reg", "r.dat", "--no-resample"]));
     add(&[], &with(&["--reg", "r.dat", "--no-resample", "--inv"]));
     add(&[], &with(&["--reg", "r.dat", "--no-resample-scale", "1"]));
-    add(&[], &with(&["--reg", "r.dat", "--no-resample", "--slice-crop", "2", "6"]));
-    add(&[], &with(&["--reg", "r.dat", "--no-resample", "--slice-crop", "2", "12"]));
-    add(&[], &with(&["--reg", "r.dat", "--no-resample", "--slice-reverse"]));
-    add(&[], &with(&["--reg", "r.dat", "--no-resample", "--slice-bias", "0.5"]));
-    add(&[], &with(&["--reg", "r.dat", "--no-resample", "--slice-bias", "2", "--slice-reverse", "--slice-crop", "1", "8"]));
-    add(&[], &["--mov", "m4.mgz", "--targ", "t.mgz", "--regheader", "--o", "o.mgz", "--no-resample", "--slice-reverse"]);
+    add(
+        &[],
+        &with(&["--reg", "r.dat", "--no-resample", "--slice-crop", "2", "6"]),
+    );
+    add(
+        &[],
+        &with(&["--reg", "r.dat", "--no-resample", "--slice-crop", "2", "12"]),
+    );
+    add(
+        &[],
+        &with(&["--reg", "r.dat", "--no-resample", "--slice-reverse"]),
+    );
+    add(
+        &[],
+        &with(&["--reg", "r.dat", "--no-resample", "--slice-bias", "0.5"]),
+    );
+    add(
+        &[],
+        &with(&[
+            "--reg",
+            "r.dat",
+            "--no-resample",
+            "--slice-bias",
+            "2",
+            "--slice-reverse",
+            "--slice-crop",
+            "1",
+            "8",
+        ]),
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m4.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "o.mgz",
+            "--no-resample",
+            "--slice-reverse",
+        ],
+    );
     // after the resampling
     add(&[], &with(&["--regheader", "--slice-crop", "1", "2"]));
     add(&[], &with(&["--regheader", "--slice-crop", "1", "9"]));
     add(&[], &with(&["--regheader", "--slice-crop", "3", "1"]));
     add(&[], &with(&["--regheader", "--mul", "2.5"]));
-    add(&[], &with(&["--regheader", "--mul", "-0.5", "--precision", "short"]));
+    add(
+        &[],
+        &with(&["--regheader", "--mul", "-0.5", "--precision", "short"]),
+    );
     add(&[], &with(&["--regheader", "--mul", ".25e1"]));
     add(&[], &with(&["--regheader", "--save-reg"]));
     add(&[], &with(&["--reg", "r.dat", "--save-reg"]));
-    add(&[], &with(&["--reg", "r.dat", "--save-reg", "--no-save-reg"]));
-    add(&[], &["--mov", "m.mgz", "--targ", "t.mgz", "--regheader", "--o", "outdir/o.nii.gz", "--save-reg"]);
+    add(
+        &[],
+        &with(&["--reg", "r.dat", "--save-reg", "--no-save-reg"]),
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "outdir/o.nii.gz",
+            "--save-reg",
+        ],
+    );
     add(&[], &with(&["--reg", "r.dat", "--reg-final", "final.dat"]));
-    add(&[], &with(&["--regheader", "--reg-final", "final.dat", "--inv"]));
-    add(&[], &with(&["--regheader", "--reg-final", "nodir/final.dat"]));
+    add(
+        &[],
+        &with(&["--regheader", "--reg-final", "final.dat", "--inv"]),
+    );
+    add(
+        &[],
+        &with(&["--regheader", "--reg-final", "nodir/final.dat"]),
+    );
     add(&[], &with(&["--regheader", "--rot", "10", "-5", "3"]));
     add(&[], &with(&["--regheader", "--trans", "1.5", "-2", "0.25"]));
     add(&[], &with(&["--regheader", "--shear", "0.1", "0", "-0.2"]));
-    add(&[], &with(&["--reg", "r.dat", "--rot", "1", "2", "3", "--trans", "4", "5", "6", "--shear", "0.01", "0.02", "0.03", "--reg-final", "final.dat"]));
+    add(
+        &[],
+        &with(&[
+            "--reg",
+            "r.dat",
+            "--rot",
+            "1",
+            "2",
+            "3",
+            "--trans",
+            "4",
+            "5",
+            "6",
+            "--shear",
+            "0.01",
+            "0.02",
+            "0.03",
+            "--reg-final",
+            "final.dat",
+        ]),
+    );
     add(&[], &with(&["--regheader", "--rot", "a", "b", "c"]));
     // NaN: in the output, in the registration
     add(&[], &with(&["--regheader", "--mul", "+nan"]));
-    add(&[], &with(&["--regheader", "--mul", "-nan", "--precision", "short"]));
+    add(
+        &[],
+        &with(&["--regheader", "--mul", "-nan", "--precision", "short"]),
+    );
     add(&[], &with(&["--regheader", "--trans", "nan", "0", "0"]));
-    add(&[], &with(&["--regheader", "--rot", "0", "nan", "0", "--cubic"]));
-    add(&[], &with(&["--reg", "r.lta", "--shear", "inf", "0", "0", "--nearest"]));
+    add(
+        &[],
+        &with(&["--regheader", "--rot", "0", "nan", "0", "--cubic"]),
+    );
+    add(
+        &[],
+        &with(&["--reg", "r.lta", "--shear", "inf", "0", "0", "--nearest"]),
+    );
     add(&[], &with(&["--regheader", "--seed", "5"]));
-    add(&[], &with(&["--regheader", "--seed", "7", "--synth", "--nearest"]));
-    add(&[], &["--mov", "m4.mgz", "--targ", "t.mgz", "--regheader", "--o", "o.mgz", "--seed", "3"]);
-    add(&[], &["--mov", "mu.mgz", "--targ", "t.mgz", "--regheader", "--o", "o.mgz", "--seed", "3"]);
+    add(
+        &[],
+        &with(&["--regheader", "--seed", "7", "--synth", "--nearest"]),
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m4.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "o.mgz",
+            "--seed",
+            "3",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "mu.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "o.mgz",
+            "--seed",
+            "3",
+        ],
+    );
     add(&[], &with(&["--regheader", "--vg-thresh", "0.5"]));
     add(&[], &with(&["--regheader", "--gdiagno", "0"]));
     add(&[], &with(&["--regheader", "--gdiagno", "-1"]));
     add(&[], &with(&["--regheader", "--filter"]));
-    add(&[], &with(&["--regheader", "--subject", "s9", "--save-reg"]));
+    add(
+        &[],
+        &with(&["--regheader", "--subject", "s9", "--save-reg"]),
+    );
     add(&[], &with(&["--regheader", "--sd", "nowhere"]));
     add(&[], &with(&["--regheader", "--SD", "nowhere"]));
     add(&[], &with(&["--regheader", "--ctabx", "lut.txt"]));
     add(&[], &with(&["--regheader", "--cropx", "2"]));
     // the subject's target, Talairach, MNI152
-    add(&[], &["--mov", "m.mgz", "--reg", "r.dat", "--fstarg", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--reg", "r.dat", "--fstarg", "brain.mgz", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--reg", "r.dat", "--fstarg", "nothere.mgz", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--s", "s1", "--fstarg", "--o", "o.mgz", "--save-reg"]);
-    add(&[], &["--mov", "m.mgz", "--reg", "r.dat", "--fstarg", "--o", "o.mgz", "--inv", "--save-reg"]);
-    add(&[], &["--mov", "m.mgz", "--reg", "r.dat", "--fstarg", "--o", "o.mgz", "--no-resample"]);
-    add(&[], &["--mov", "m.mgz", "--reg", "r.dat", "--tal", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--reg", "r.dat", "--tal", "--talres", "1", "--o", "o.mgz", "--save-reg"]);
-    add(&[], &["--mov", "m.mgz", "--reg", "r.dat", "--tal", "--o", "o.mgz", "--save-reg"]);
-    add(&[], &["--mov", "m.mgz", "--reg", "r.dat", "--talxfm", "talairach.xfm", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--reg", "r.dat", "--talxfm", "none.xfm", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--s", "s1", "--tal", "--o", "o.mgz"]);
+    add(
+        &[],
+        &[
+            "--mov", "m.mgz", "--reg", "r.dat", "--fstarg", "--o", "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--reg",
+            "r.dat",
+            "--fstarg",
+            "brain.mgz",
+            "--o",
+            "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--reg",
+            "r.dat",
+            "--fstarg",
+            "nothere.mgz",
+            "--o",
+            "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--s",
+            "s1",
+            "--fstarg",
+            "--o",
+            "o.mgz",
+            "--save-reg",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--reg",
+            "r.dat",
+            "--fstarg",
+            "--o",
+            "o.mgz",
+            "--inv",
+            "--save-reg",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--reg",
+            "r.dat",
+            "--fstarg",
+            "--o",
+            "o.mgz",
+            "--no-resample",
+        ],
+    );
+    add(
+        &[],
+        &["--mov", "m.mgz", "--reg", "r.dat", "--tal", "--o", "o.mgz"],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--reg",
+            "r.dat",
+            "--tal",
+            "--talres",
+            "1",
+            "--o",
+            "o.mgz",
+            "--save-reg",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--reg",
+            "r.dat",
+            "--tal",
+            "--o",
+            "o.mgz",
+            "--save-reg",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--reg",
+            "r.dat",
+            "--talxfm",
+            "talairach.xfm",
+            "--o",
+            "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov", "m.mgz", "--reg", "r.dat", "--talxfm", "none.xfm", "--o", "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &["--mov", "m.mgz", "--s", "s1", "--tal", "--o", "o.mgz"],
+    );
     add(&[], &["--mov", "m.mgz", "--tal", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--reg", "r.dat", "--tal", "--inv", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--reg", "r.lta", "--tal", "--o", "o.mgz"]);
-    add(&["FSLDIR=@DIR@/fsl"], &["--mov", "m.mgz", "--mni152reg", "--o", "o.mgz"]);
-    add(&["FSLDIR=@DIR@/fsl"], &["--mov", "m.mgz", "--mni152reg", "--reg", "r.dat", "--o", "o.mgz"]);
-    add(&["FSLDIR=@DIR@/fsl"], &["--mov", "m.mgz", "--mni152reg", "--reg", "r.lta", "--o", "o.mgz"]);
+    add(
+        &[],
+        &[
+            "--mov", "m.mgz", "--reg", "r.dat", "--tal", "--inv", "--o", "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &["--mov", "m.mgz", "--reg", "r.lta", "--tal", "--o", "o.mgz"],
+    );
+    add(
+        &["FSLDIR=@DIR@/fsl"],
+        &["--mov", "m.mgz", "--mni152reg", "--o", "o.mgz"],
+    );
+    add(
+        &["FSLDIR=@DIR@/fsl"],
+        &[
+            "--mov",
+            "m.mgz",
+            "--mni152reg",
+            "--reg",
+            "r.dat",
+            "--o",
+            "o.mgz",
+        ],
+    );
+    add(
+        &["FSLDIR=@DIR@/fsl"],
+        &[
+            "--mov",
+            "m.mgz",
+            "--mni152reg",
+            "--reg",
+            "r.lta",
+            "--o",
+            "o.mgz",
+        ],
+    );
     add(&[], &["--mov", "m.mgz", "--mni152reg", "--o", "o.mgz"]);
-    add(&["FSLDIR=@DIR@/fsl"], &["--mov", "m.mgz", "--mni152reg", "--s", "s2", "--reg", "r.dat", "--o", "o.mgz"]);
+    add(
+        &["FSLDIR=@DIR@/fsl"],
+        &[
+            "--mov",
+            "m.mgz",
+            "--mni152reg",
+            "--s",
+            "s2",
+            "--reg",
+            "r.dat",
+            "--o",
+            "o.mgz",
+        ],
+    );
     // --crop
-    add(&[], &["--mov", "box.mgz", "--crop", "2", "--lta", "r.lta", "--o", "c.mgz"]);
-    add(&[], &["--mov", "box.mgz", "--crop", "1", "--downsample", "2", "2", "2", "--o", "c.mgz"]);
+    add(
+        &[],
+        &[
+            "--mov", "box.mgz", "--crop", "2", "--lta", "r.lta", "--o", "c.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "box.mgz",
+            "--crop",
+            "1",
+            "--downsample",
+            "2",
+            "2",
+            "2",
+            "--o",
+            "c.mgz",
+        ],
+    );
     add(&[], &["--mov", "box.mgz", "--crop", "0.5", "--o", "c.mgz"]);
     add(&[], &["--mov", "box.mgz", "--crop", "2", "--o", "c.nii.gz"]);
-    add(&[], &["--mov", "m.mgz", "--crop", "2", "--lta", "r.lta", "--o", "c.mgz"]);
-    add(&[], &["--mov", "zero.mgz", "--crop", "2", "--lta", "r.lta", "--o", "c.mgz"]);
-    add(&[], &["--mov", "box.mgz", "--crop", "0", "--lta", "r.lta", "--o", "c.mgz"]);
-    add(&[], &["--mov", "box.mgz", "--crop", "0.05", "--lta", "r.lta", "--o", "c.mgz"]);
-    add(&[], &["--mov", "box.mgz", "--crop", "-1", "--lta", "r.lta", "--o", "c.mgz"]);
-    add(&[], &["--mov", "box.mgz", "--cropscale", "3", "--lta", "r.lta", "--o", "c.mgz"]);
-    add(&[], &["--mov", "seg.mgz", "--crop", "1.5", "--lta", "r.lta", "--o", "c.mgz"]);
+    add(
+        &[],
+        &[
+            "--mov", "m.mgz", "--crop", "2", "--lta", "r.lta", "--o", "c.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov", "zero.mgz", "--crop", "2", "--lta", "r.lta", "--o", "c.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov", "box.mgz", "--crop", "0", "--lta", "r.lta", "--o", "c.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov", "box.mgz", "--crop", "0.05", "--lta", "r.lta", "--o", "c.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov", "box.mgz", "--crop", "-1", "--lta", "r.lta", "--o", "c.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "box.mgz",
+            "--cropscale",
+            "3",
+            "--lta",
+            "r.lta",
+            "--o",
+            "c.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov", "seg.mgz", "--crop", "1.5", "--lta", "r.lta", "--o", "c.mgz",
+        ],
+    );
     // --soap
     add(&[], &with(&["--regheader", "--soap", "box.mgz", "2"]));
-    add(&[], &["--mov", "box.mgz", "--targ", "t.mgz", "--regheader", "--o", "o.mgz", "--soap", "box.mgz", "0"]);
+    add(
+        &[],
+        &[
+            "--mov",
+            "box.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "o.mgz",
+            "--soap",
+            "box.mgz",
+            "0",
+        ],
+    );
     add(&[], &with(&["--regheader", "--soap", "none.mgz", "2"]));
     // paths not ported yet (relay 53)
     add(&[], &with(&["--regheader", "--disp", "d.mgz"]));
     add(&[], &with(&["--regheader", "--cost", "cost.txt"]));
-    add(&[], &["--mov", "m.mgz", "--s", "s1", "--morph", "--o", "o.mgz"]);
-    add(&[], &["--mov", "m.mgz", "--s", "s1", "--inv-morph", "--o", "o.mgz", "--targ", "t.mgz"]);
+    add(
+        &[],
+        &["--mov", "m.mgz", "--s", "s1", "--morph", "--o", "o.mgz"],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--s",
+            "s1",
+            "--inv-morph",
+            "--o",
+            "o.mgz",
+            "--targ",
+            "t.mgz",
+        ],
+    );
     add(&[], &with(&["--regheader", "--m3z", "x.m3z"]));
-    add(&[], &["--gcam", "m.mgz", "0", "0", "r.lta", "0", "1", "o.mgz"]);
+    add(
+        &[],
+        &["--gcam", "m.mgz", "0", "0", "r.lta", "0", "1", "o.mgz"],
+    );
     add(&[], &["--spm-warp", "m.mgz", "0", "w.nii", "1", "o.mgz"]);
-    add(&[], &["--map-point", "1", "2", "3", "1", "r.lta", "2", "nofile"]);
+    add(
+        &[],
+        &["--map-point", "1", "2", "3", "1", "r.lta", "2", "nofile"],
+    );
     out
 }
 
@@ -685,7 +1518,16 @@ const REGS: &[&[&str]] = &[
     &["--s", "s1"],
 ];
 
-const MOVS: &[&str] = &["m.mgz", "m.nii.gz", "m4.mgz", "mu.mgz", "ms.nii.gz", "seg.mgz", "thin.mgz", "box.mgz"];
+const MOVS: &[&str] = &[
+    "m.mgz",
+    "m.nii.gz",
+    "m4.mgz",
+    "mu.mgz",
+    "ms.nii.gz",
+    "seg.mgz",
+    "thin.mgz",
+    "box.mgz",
+];
 const TARGS: &[&str] = &["t.mgz", "t2.nii.gz", "m.mgz", "mu.mgz"];
 const OUTS: &[&str] = &["o.mgz", "o.nii.gz", "o.nii", "o.mgh", "outdir/o.mgz"];
 
@@ -781,7 +1623,13 @@ pub fn golden_cases() -> Vec<String> {
     // a moving volume with NaN voxels (FreeSurfer's resampling of them)
     {
         let mut g = Gen::new(0x9a9);
-        let sm = spec(MRI_FLOAT, [8, 9, 10, 1], [1.0, 1.5, 2.0], CORONAL, [1.0, -2.0, 3.0]);
+        let sm = spec(
+            MRI_FLOAT,
+            [8, 9, 10, 1],
+            [1.0, 1.5, 2.0],
+            CORONAL,
+            [1.0, -2.0, 3.0],
+        );
         let mut m = build(&mut g, &sm);
         let mut fs = Globals::new(UpstreamDefects::Fix);
         let mut e = Vec::new();
@@ -792,16 +1640,99 @@ pub fn golden_cases() -> Vec<String> {
     }
     let mut out = Vec::new();
     for a in [
-        &["--regheader", "--mov", "m.mgz", "--targ", "t2.nii.gz", "--o", "o.nii.gz"][..],
+        &[
+            "--regheader",
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t2.nii.gz",
+            "--o",
+            "o.nii.gz",
+        ][..],
         &["--reg", "r.lta", "--mov", "m.mgz", "--o", "o.nii.gz"],
-        &["--regheader", "--interp", "nearest", "--mov", "seg.mgz", "--targ", "t.mgz", "--o", "o.mgz"],
-        &["--mov", "m.mgz", "--lta", "r.lta", "--targ", "t.mgz", "--o", "o.mgz"],
-        &["--mov", "seg.mgz", "--targ", "t2.nii.gz", "--lta", "seg.lta", "--interp", "nearest", "--o", "seg.nii.gz"],
-        &["--mov", "m.mgz", "--targ", "t.mgz", "--reg", "r.dat", "--o", "o.mgz", "--no-resample", "--save-reg"],
-        &["--mov", "nan.mgz", "--targ", "t.mgz", "--regheader", "--o", "o.mgz"],
-        &["--mov", "nan.mgz", "--targ", "t2.nii.gz", "--lta", "r.lta", "--o", "o.mgz", "--cubic"],
-        &["--mov", "m.mgz", "--targ", "t.mgz", "--regheader", "--o", "o.mgz", "--mul", "+nan"],
-        &["--mov", "m.mgz", "--targ", "t2.nii.gz", "--reg", "r.lta", "--o", "o.mgz", "--trans", "nan", "0", "0"],
+        &[
+            "--regheader",
+            "--interp",
+            "nearest",
+            "--mov",
+            "seg.mgz",
+            "--targ",
+            "t.mgz",
+            "--o",
+            "o.mgz",
+        ],
+        &[
+            "--mov", "m.mgz", "--lta", "r.lta", "--targ", "t.mgz", "--o", "o.mgz",
+        ],
+        &[
+            "--mov",
+            "seg.mgz",
+            "--targ",
+            "t2.nii.gz",
+            "--lta",
+            "seg.lta",
+            "--interp",
+            "nearest",
+            "--o",
+            "seg.nii.gz",
+        ],
+        &[
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t.mgz",
+            "--reg",
+            "r.dat",
+            "--o",
+            "o.mgz",
+            "--no-resample",
+            "--save-reg",
+        ],
+        &[
+            "--mov",
+            "nan.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "o.mgz",
+        ],
+        &[
+            "--mov",
+            "nan.mgz",
+            "--targ",
+            "t2.nii.gz",
+            "--lta",
+            "r.lta",
+            "--o",
+            "o.mgz",
+            "--cubic",
+        ],
+        &[
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "o.mgz",
+            "--mul",
+            "+nan",
+        ],
+        &[
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t2.nii.gz",
+            "--reg",
+            "r.lta",
+            "--o",
+            "o.mgz",
+            "--trans",
+            "nan",
+            "0",
+            "0",
+        ],
     ] {
         out.push(line(&[], &i, &s(a)));
     }

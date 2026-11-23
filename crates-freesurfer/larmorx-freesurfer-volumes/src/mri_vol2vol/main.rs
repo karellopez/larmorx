@@ -152,7 +152,9 @@ pub fn fixed_buffer(g: &mut Globals, text: &str, room: usize, what: &str) -> boo
 
 /// The fortified `sprintf`'s abort (FS-1178, `reproduce`).
 pub fn overflow_abort(r: &mut Run) -> Fatal {
-    let _ = r.err.write_all(b"*** buffer overflow detected ***: terminated\n");
+    let _ = r
+        .err
+        .write_all(b"*** buffer overflow detected ***: terminated\n");
     Fatal::Exit(134)
 }
 
@@ -180,8 +182,14 @@ fn mul_into(
     match x {
         None => mul(g, r, a, b),
         Some(mut x) => {
-            let ret =
-                larmorx_freesurfer_core::matrix::matrix_multiply(g, r.out, r.err, a, b, Some(&mut x))?;
+            let ret = larmorx_freesurfer_core::matrix::matrix_multiply(
+                g,
+                r.out,
+                r.err,
+                a,
+                b,
+                Some(&mut x),
+            )?;
             Ok(match ret {
                 Ret::Null => None,
                 _ => Some(x),
@@ -201,7 +209,14 @@ fn mul_left_in_place(
     let a = x.clone();
     match x {
         Some(m) => {
-            larmorx_freesurfer_core::matrix::matrix_multiply(g, r.out, r.err, a.as_ref(), b, Some(m))?;
+            larmorx_freesurfer_core::matrix::matrix_multiply(
+                g,
+                r.out,
+                r.err,
+                a.as_ref(),
+                b,
+                Some(m),
+            )?;
         }
         None => {
             // MatrixMultiply(NULL, ...) ends the program
@@ -219,7 +234,17 @@ fn inverse(g: &mut Globals, r: &mut Run, m: Option<&Matrix>) -> Result<Option<Ma
 /// `MRIwrite(m, name)`'s status.
 fn write_volume(g: &mut Globals, r: &mut Run, m: &mut Mri, name: &str) -> Result<i32, Fatal> {
     let env = r.env.clone();
-    mri_write(g, r.out, r.err, &env, r.dir, m, name, None, MGZ_INTENT_UNKNOWN)
+    mri_write(
+        g,
+        r.out,
+        r.err,
+        &env,
+        r.dir,
+        m,
+        name,
+        None,
+        MGZ_INTENT_UNKNOWN,
+    )
 }
 
 /// `%lf` / `%f` of a `double`.
@@ -246,7 +271,11 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     }
     g.progname = NAME.to_owned();
     diag_init(g, &env, r.out);
-    let Some(fsh) = r.env.get("FREESURFER_HOME").map(|v| v.to_string_lossy().into_owned()) else {
+    let Some(fsh) = r
+        .env
+        .get("FREESURFER_HOME")
+        .map(|v| v.to_string_lossy().into_owned())
+    else {
         let _ = writeln!(r.out, "ERROR: FREESURFER_HOME undefined.");
         return Err(Fatal::Exit(1));
     };
@@ -383,7 +412,16 @@ fn crop(g: &mut Globals, r: &mut Run, o: &mut Options) -> Result<(), Fatal> {
         n.zsize = (f64::from(c.zsize) / s) as f32;
     }
     let _ = writeln!(r.out, "vol2vol");
-    let err = mri_vol2vol(g, r.out, r.err, &crop, &mut cropnew, None, SAMPLE_NEAREST, 0.0)?;
+    let err = mri_vol2vol(
+        g,
+        r.out,
+        r.err,
+        &crop,
+        &mut cropnew,
+        None,
+        SAMPLE_NEAREST,
+        0.0,
+    )?;
     if err != 0 {
         return Err(Fatal::Exit(1));
     }
@@ -418,7 +456,11 @@ fn resample(
         if let Some(tv) = o.targvolfile.clone() {
             targ = read_header(g, r, &tv)?;
         } else if o.lta.is_some() && !o.fstal {
-            let dst = o.lta.as_ref().map(|l| l.xforms[0].dst.clone()).unwrap_or_default();
+            let dst = o
+                .lta
+                .as_ref()
+                .map(|l| l.xforms[0].dst.clone())
+                .unwrap_or_default();
             match targ.as_mut() {
                 Some(t) => {
                     mri_clone(g, r.out, r.err, &m, Some(t))?;
@@ -453,7 +495,11 @@ fn resample(
         if let Some(mv) = o.movvolfile.clone() {
             m = read_header(g, r, &mv)?;
         } else if o.lta.is_some() && !o.fstal {
-            let src = o.lta.as_ref().map(|l| l.xforms[0].src.clone()).unwrap_or_default();
+            let src = o
+                .lta
+                .as_ref()
+                .map(|l| l.xforms[0].src.clone())
+                .unwrap_or_default();
             m = mri_clone(g, r.out, r.err, &t, None)?.into_new();
             if let Some(mm) = m.as_mut() {
                 mri_copy_vol_geom_to_mri(mm, &src);
@@ -488,7 +534,15 @@ fn resample(
             0.0,
             CONTROL_MARKED as f32,
         )?;
-        let soap = mri_soap_bubble(g, r.out, r.err, Pair::New(movv!()), &ctrl, o.soap_bubble_iters, 0.0)?;
+        let soap = mri_soap_bubble(
+            g,
+            r.out,
+            r.err,
+            Pair::New(movv!()),
+            &ctrl,
+            o.soap_bubble_iters,
+            0.0,
+        )?;
         if let Ret::New(mut s) = soap {
             let outname = o.outvolfile.clone().unwrap_or_default();
             write_volume(g, r, &mut s, &outname)?;
@@ -680,7 +734,8 @@ fn resample(
         if o.slice_reverse {
             let _ = writeln!(r.out, "Reversing slices, updating vox2ras");
             let env = r.env.clone();
-            let Some(m) = mri_reverse_slices(g, r.out, r.err, &env, &input, None)?.into_new() else {
+            let Some(m) = mri_reverse_slices(g, r.out, r.err, &env, &input, None)?.into_new()
+            else {
                 return Err(Fatal::Exit(1));
             };
             input = m;

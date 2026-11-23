@@ -2933,10 +2933,8 @@ defects! {
         "the frame PCA of a volume without frames (MRIpca) crashes in the singular value decomposition of its empty covariance";
     FS_485 = "FS-485", "FreeSurfer", true,
         "the gradient-direction measure of a voxel (MRIvoxelDirection) cuts its window at the volume's far faces but reads it back as a full cube: the gradients pair with the wrong offsets and the last entries were never written (memory contents)";
-    FS_486 = "FS-486", "FreeSurfer", true,
-        "not reached (withdrawn 2026-11-23): the second derivative along the gradient (MRIvoxelGradientDir2ndDerivative) of a volume whose type the trilinear sampler refuses was thought to subtract a sample never written, but its first sample is the nearest one, which always sets the value (0 for such a type), so every later refused sample repeats a written value";
     FS_487 = "FS-487", "FreeSurfer", true,
-        "the Talairach point conversions (MRIvoxelToTalairachEx and its siblings) use a matrix that could not be made (a singular voxel-to-RAS matrix or transform) and crash; and the Talairach-to-voxel matrix of a transform file that holds no transform reads past it: memory contents";
+        "the Talairach point conversions (MRIvoxelToTalairachEx and its siblings) crash on the point when their matrix could not be made without ending the program (a transform matrix that is not 4 x 4); and the Talairach-to-voxel matrix of a transform array that holds no transform is read past the array: memory contents";
     FS_488 = "FS-488", "FreeSurfer", true,
         "the resampling of a volume out of Talairach space (MRIfromTalairachEx) without a target volume uses the target before its own check and crashes";
     FS_489 = "FS-489", "FreeSurfer", true,

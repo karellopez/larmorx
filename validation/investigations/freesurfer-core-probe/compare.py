@@ -658,7 +658,9 @@ class Gen:
             lines.append(f"fileexists {xs(f'{d}/{name}' if name else '')}")
         return [self.batch("files", "files", lines, never="reads a directory tree outside the key")]
 
-    # -- diagnostics from the environment (§4)
+    # -- diagnostics from the environment (§4). DIAG_NO sets a diagnostic level, at which FreeSurfer's
+    # licence check prints the licence file's lines: the probe holds no licence check (not linked in:
+    # ../freesurfer-volume-probe/licence_reach.py on the prebuilt probe), so no call here reaches it
     def init(self) -> list[Case]:
         envs: list[dict[str, str]] = [
             {},

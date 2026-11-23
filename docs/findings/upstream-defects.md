@@ -337,8 +337,8 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FS-483 | FreeSurfer 8.2.0 `MRIcovarianceMatrix`, `MRIpca` | with a mask, the voxels whose mask value is above 0.5 are counted but those not below 0.5 are summed: a mask voxel of exactly 0.5 (or NaN) enters the sums and not the count | c | none known (mri_glmfit's masks are binary) | the count takes the voxels the sums use (rule A, 2026-11-14), named; `reproduce` FreeSurfer's count | – |
 | FS-484 | FreeSurfer 8.2.0 `MRIpca` | the PCA of a volume without frames crashes in the singular value decomposition of its empty covariance | a (crash) | none known | an error in both modes, named | – |
 | FS-485 | FreeSurfer 8.2.0 `MRIvoxelDirection` | within half a window of the volume's last column, row or slice, the window stops at the face but is read back as a full cube: gradients pair with the wrong offsets and the last entries were never written | a (memory: never written) | possible (mri_segment's direction test at voxels near the volume's far faces, which are background in recon-all's volumes) | the window not cut (the index tables clamp it, as on the near faces) (rule A, 2026-11-14), named; `reproduce` FreeSurfer's pairing with 0 for the entries never written | – |
-| FS-486 | FreeSurfer 8.2.0 `MRIvoxelGradientDir2ndDerivative` | for a volume whose type the trilinear sampler refuses, the first sample subtracted is a value never written | a (memory: never written) | none known (mri_segment passes byte volumes) | 0 there in both modes, named | – |
-| FS-487 | FreeSurfer 8.2.0 `MRIvoxelToTalairachEx`, `MRIvoxelToTalairachVoxelEx`, `MRItalairachToVoxelEx`, `MRItalairachVoxelToVoxelEx`, `MvoxelFromTalairach` | a point through a matrix that could not be made (a singular voxel-to-RAS matrix or transform) dereferences `NULL`; the Talairach-to-voxel matrix of a transform array that holds no transform reads the first transform past the array | a (crash; memory contents) | none known (recon-all's Talairach transforms hold one invertible transform) | the point: an error in both modes; the empty array: no matrix in both modes (what FreeSurfer's read gave on the probe's runs), named | – |
+| FS-486 | FreeSurfer 8.2.0 `MRIvoxelGradientDir2ndDerivative` | a volume whose type the trilinear sampler refuses: thought to subtract a sample never written | – (a until 2026-11-23) | none | withdrawn 2026-11-23: the first sample, the nearest one, always sets the value (0 for such a type), so every sample is written; not a defect | – |
+| FS-487 | FreeSurfer 8.2.0 `MRIvoxelToTalairachEx`, `MRIvoxelToTalairachVoxelEx`, `MRItalairachToVoxelEx`, `MRItalairachVoxelToVoxelEx`, `MvoxelFromTalairach` | a point through a matrix that could not be made without ending the program (a transform matrix that is not 4 x 4: the product's size error returns none; a singular matrix ends the program in the products instead) dereferences `NULL`; the Talairach-to-voxel matrix of a transform array that holds no transform reads the first transform past the array | a (crash; memory contents) | none known (recon-all's Talairach transforms hold one invertible transform) | the point: an error in both modes; the empty array: no matrix in both modes (what FreeSurfer's read gave on the probe's runs), named | – |
 | FS-488 | FreeSurfer 8.2.0 `MRIfromTalairachEx` | without a target volume it uses the target before its own check | a (crash) | none known | that check's error in both modes, named | – |
 | FS-489 | FreeSurfer 8.2.0 `MRImatchSegs` | made in the segmentation itself (documented as possible), each voxel is cleared before its label is read: every voxel is matched as label 0 | c | none known (FreeSurfer's callers pass another mask) | the label read first (rule A, 2026-11-14), named; `reproduce` FreeSurfer's order | – |
 | FS-490 | FreeSurfer 8.2.0 `HISTOseg` | with a bin count of 0 (`bmax = bmin - bdelta`) each matching voxel is counted in the bin before the first | a (memory) | none known | counted nowhere in both modes, named | – |
@@ -4344,22 +4344,24 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
 - **What:** the resampling with a voxel-shift map takes, for a map of a type the sampler refuses, a shift never
   written (FS-482); the masked frame covariance and PCA count the mask voxels above 0.5 but sum those not below
   0.5 (FS-483); the PCA of a volume without frames crashes (FS-484); the gradient-direction measure near the far
-  faces reads a window it filled only partly (FS-485); the second derivative along the gradient of a refused type
-  subtracts a sample never written (FS-486).
+  faces reads a window it filled only partly (FS-485). FS-486 withdrawn (not reached, 2026-11-23): the second
+  derivative along the gradient of a refused type was thought to subtract a sample never written, but its first
+  sample is the nearest one, which always sets the value.
 - **Evidence:** verified (`validation/probes/fs-volume`, part 11: FreeSurfer 8.2.0's functions from the unit
   oracle's build against the port; seeds 7 and 13, 16,000 cases of the new commands, every comparable line
   identical with `reproduce`, `fix` different only with its notices). The mechanisms:
   `docs/findings/freesurfer-volume.md` §15 and §16 (closed to FreeSurfer's clean-room implementers).
 - **fMRIPrep:** none. **FreeSurfer:** FS-485 possible in mri_segment near the volume's far faces (background in
   recon-all's volumes); the others none known.
-- **larmorx:** FS-483 and FS-485 corrected by default (rule A); FS-482, FS-486 defined in both modes (0); FS-484
+- **larmorx:** FS-483 and FS-485 corrected by default (rule A); FS-482 defined in both modes (0); FS-484
   an error in both modes; `reproduce` gives the official build's result wherever it is defined. Found
   2026-11-14.
 - **D13 / gap:** none.
 
 ### FS-487 to FS-490 FreeSurfer 8.2.0's fs.volume: the Talairach helpers, the segment mask and histogram — (a, crash, memory; c, rule A)
-- **What:** the Talairach point conversions transform a point with a matrix their helper could not make (a
-  singular voxel-to-RAS matrix or transform: `NULL`) and crash; the Talairach-to-voxel matrix of a transform array
+- **What:** the Talairach point conversions transform a point with a matrix their helper could not make without
+  ending the program (a transform matrix that is not 4 x 4: `NULL`; a singular one ends the program in the products)
+  and crash; the Talairach-to-voxel matrix of a transform array
   that holds no transform reads past the array (FS-487); the resampling out of Talairach space without a target
   volume uses it before its own check and crashes (FS-488); the mask of listed labels made in the segmentation
   itself clears each voxel before reading it (FS-489); the histogram of a segment with 0 bins counts before the array

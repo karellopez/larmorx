@@ -17,6 +17,13 @@ mask() {
 run() {
   local name=$1
   shift
+  # never a diagnostic level on the official program: its licence check (every volume read) prints
+  # the licence file's lines at any level above 0
+  for a in "$@"; do
+    case $a in
+      DIAG_NO=*) echo "official.sh: case $name sets DIAG_NO (the licence check would print the licence file)" >&2; exit 1 ;;
+    esac
+  done
   env -i PATH=/usr/bin:/bin LC_ALL=C FREESURFER_HOME="$FS" "$@" > "$T/out" 2> "$T/err"
   local status=$?
   echo "== $name: exit $status"

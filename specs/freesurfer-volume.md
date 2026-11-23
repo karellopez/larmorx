@@ -2703,11 +2703,15 @@ its voxels are read or written: FS-58.
   1) is outside) becomes 0, and one on a near face only becomes the smaller of 0 and the inside values after its
   first outside offset (**(observed)**: `vmorph`; `vrules22`, a slice of negative values with each neighbourhood, edges
   eroded or not: eroded, every voxel 0).
-- `MRIerode(src, dst)`: clone without `dst`; `dst == src` works into a clone copied back (`MRIcopy`) at the end. Two
+- `MRIerode(src, dst)`: first `MRIcheckVolDims(src, dst)` (a given `dst` of another extent ends the program with its
+  message, status 252; frames are not compared); clone without `dst`; `dst == src` works into a clone copied back
+  (`MRIcopy`) at the end. Two
   byte volumes: bytes, the smallest of the 27 neighbourhood bytes starting from 255. Otherwise for each frame of `src`
   the smallest of the voxel's value and its 27 neighbours' (`float`, `<`), as values.
-- `MRIerode2D(src, dst)`: as `MRIerode`'s destinations; frame 0, the smallest of the 3 x 3 in-slice neighbourhood
-  (`double`, starting from the voxel), as values.
+- `MRIerode2D(src, dst)`: as `MRIerode`'s check and destinations; frame 0, the smallest of the 3 x 3 in-slice
+  neighbourhood (`double`, starting from the voxel), as values (**(observed)**, both: `vmorph`; `vrules23`, a 3 x 3 x 1
+  source into destinations of 2 x 3 x 1 and 3 x 3 x 2: `ERROR: <program>-MRIcheckVolDims: volume1 width=3 != volume2
+  width=2.`, resp. `... depth=1 != volume2 depth=2.`, status 252).
 - `MRIerodeSegmentation(seg, out, n, thresh)` and `MRIdilateSegmentation(seg, out, n, mask, frame, mthresh,
   &nchanges)`: `seg == out`: `ERROR: <name>(): cannot be done in-place` (standard output, as the other messages of
   these two), none. Without `out` one frame of `seg`'s extent and type; one of other dimensions (frames not
@@ -2723,7 +2727,14 @@ its voxels are read or written: FS-58.
   a value: a float label 2.5 becomes 2); `seg`'s colour table deep-copied into `out` when both have one (each step's
   own, the last step's kept). Dilation: a voxel of label 0 inside the mask
   (`mask`'s `frame` value not below `mthresh`; all without a mask) whose face neighbours in the volume (order -c, +c,
-  -r, +r, -s, +s) carry nonzero labels takes the most frequent (the smallest of a tie); `nchanges` the number changed.
+  -r, +r, -s, +s) carry nonzero labels takes the most frequent (the smallest of a tie), written with `MRIsetVoxVal`
+  (into a byte `out` a label below 0 becomes 0, fs.mri §5); `nchanges` the number changed. A step writes only the
+  voxels it changes: every other voxel of `out` keeps what it held, which is at first `out = MRIcopy(seg, out)`'s
+  value (fs.mri §13's change of type, FS-162 included: a float label -1 copied into a byte `out` is 255 with
+  `reproduce`) and later the earlier steps' results; the working copy `seg2` keeps `seg`'s type and takes `out`'s
+  values through the change of type between steps (**(observed)**: `vmorph`; `vrules23`, a float source of labels -1,
+  0 and 2 into a byte `out` of 9s, one step (5 changes: the copied -1s stay 255, a written -1 is 0) and two (3 changes
+  in the second, from the working copy's 255s), and into a new float `out`).
   FS-497: with `n == -1`, a step that changes voxels without changing the working copy repeats forever in FreeSurfer:
   a complex volume, whose copy FreeSurfer makes of the first `width` bytes of each row only (an eighth of a float
   complex row, fs.mri §13's FS-161), so that a label in the first voxel's real part reaches the working copy and the
@@ -2745,11 +2756,16 @@ its voxels are read or written: FS-58.
   (**(observed)**: `vmorph`; `vrules22`, a row of eight bytes whose label moves one voxel further at each of three
   steps through the raised bound, no steps, a label of 386, thresholds equal to and above the values).
 - `MRIdilateLabelUchar(src, dst, label, niter)`: check (src, dst) with `dst`; `dst = MRIcopy(src, dst)`; `niter` steps
-  on bytes over the box of `src`'s `label` (fixed bounds): a voxel becomes `label` when it or a neighbourhood byte of
-  `tmp` is `label` (search in z, y, x order, stopping at the first). `MRIdilateLabel(src, dst, label, niter)`: check;
-  byte sources go to `MRIdilateLabelUchar`; otherwise the same on values for every frame, the box made from `tmp`'s
-  values of any frame equal to `label` (`double`). Both print `MRIfree: null pointer` with `niter` 0 or below
-  (**(observed)**: `vmorph`; `vrules22`, as for the threshold dilations, and two frames of floats).
+  on bytes, each from a copy of `dst` (`tmp`), over the box of `src`'s bytes equal to `label` (section 48's rule), found
+  again at each step from `src` (not from `tmp`): it widens between steps only when `dst` is `src` (whose bytes the
+  steps change), and a pass never raises its bounds; in it each voxel of `dst` becomes `label` when its own byte or a
+  neighbourhood byte of `tmp` is `label` (search in z, y, x order, stopping at the first), else its `tmp` byte.
+  `MRIdilateLabel(src, dst, label, niter)`: check; byte sources go to `MRIdilateLabelUchar`; otherwise the same on values
+  for every frame, the box found at each step from `tmp`'s values of any frame equal to `label` (`double`), so it
+  widens with every step. Both print `MRIfree: null pointer` with `niter` 0 or below (**(observed)**: `vmorph`;
+  `vrules22`, as for the threshold dilations, and two frames of floats; `vrules23`, a row of eight voxels with the label
+  in the first, three steps: bytes into a new volume label 2 voxels, in place 4; ints (values) 4 either way;
+  `MRIdilateLabelUchar` of the ints reads their rows as bytes).
 - `MRIopenN(src, dst, order)`: `order` erosions (the first into a new volume, the others in place), then `order`
   dilations (`MRIdilate`, the first into `dst`, the others in place); an `order` below 1 still makes one of each.
   `MRIopen`: one erosion, one dilation; `MRIclose`: one dilation, one erosion (**(observed)**: `vmorph`; `vrules22`,
@@ -2768,9 +2784,12 @@ its voxels are read or written: FS-58.
   (byte) nint(in), (byte) nint(out))` (section 31); else each value of each frame (z, y, x, frame innermost) with
   `|(float)(v - in)| < FLT_EPSILON` becomes `out`; others are not written.
 - `MRImaskDifferentGeometry(src, mask, dst, m, out)`: the voxel-to-voxel matrix `src` to `mask`
-  (`MRIgetVoxelToVoxelXform`); clone without `dst`; columns outermost: the voxel times the matrix (`float`), rounded
-  (`nint`); outside the mask's extent the mask value is `m`, else `nint` of the mask's frame-0 value; every frame of
-  `dst` gets `out` where the mask value is `m`, else `src`'s value.
+  (`MRIgetVoxelToVoxelXform`); clone without `dst`; over `dst`'s extent (columns outermost; no volume is checked): the
+  voxel times the matrix (`float`), rounded (`nint`); outside the mask's extent the mask value is `m`, else `nint` of
+  the mask's frame-0 value; every frame of `dst` (its own frame count) gets `out` where the mask value is `m`, else
+  `src`'s value at the same voxel and frame (read as the voxel functions read, outside `src` too: fs.mri §5, FS-52,
+  FS-53) (**(observed)**: `vmask`; `vrules23`, a source of 4 x 4 x 1 voxels and two frames into a new volume, a given
+  one of 2 x 2 x 1 (its four voxels written, one frame) and of 4 x 4 x 1 with one frame).
 - `MRImask(src, mask, dst, m, out)`: the environment's `FS_MRIMASK_ALLOW_DIFF_GEOM` read as `%d` (`sscanf`: leading
   blanks, a sign and digits; 1 without the variable or when no number starts it, an empty value or `x`; `2abc` gives
   2, `-1` gives -1: any number but 0 allows another geometry); with any bit of `Gdiag` set, `MRImask(): AllowDiffGeom

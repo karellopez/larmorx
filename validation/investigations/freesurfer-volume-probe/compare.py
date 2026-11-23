@@ -5853,6 +5853,30 @@ class Gen19(Gen18):
             z = self.lab(P(dims), [0] * 4, t=0)
             d7 = self.lab(P(dims), [7] * 4, t=0)
             L.append(f"dilu {z} 0 {d7}")
+        # item 121: (a) the erosions' destination of another extent ends the program; (b) the
+        # segmentation dilation writes only the voxels a step changes (a float label -1 copied into
+        # a byte output); (c) the label dilations' box: from the source's bytes at each step
+        # (MRIdilateLabelUchar: grows between steps only in place), from the working copy's values
+        # (MRIdilateLabel); (d) MRImaskDifferentGeometry walks the destination's extent and frames
+        f9 = self.lab(P((3, 3, 1)), [float(i) for i in range(9)], t=3)
+        for cmd in ("erode", "erode2d"):
+            L.append(f"{cmd} {f9} 0 {self.lab(P((2, 3, 1)), [0.0], t=3)}")
+            L.append(f"{cmd} {f9} 0 {self.lab(P((3, 3, 2)), [0.0], t=3)}")
+        sgm = self.lab(P((4, 2, 1)), [-1.0, 0.0, 0.0, 2.0, 0.0, -1.0, 0.0, 0.0], t=3)
+        for n in (1, 2):
+            L.append(f"dilseg {sgm} 0 {self.lab(P((4, 2, 1)), [9] * 8, t=0)} {n} null 0 {f64(0.5)}")
+            L.append(f"dilseg {sgm} 0 new {n} null 0 {f64(0.5)}")
+        brow = self.lab(P((8, 1, 1)), [130, 0, 0, 0, 0, 0, 0, 0], t=0)
+        irow = self.lab(P((8, 1, 1)), [130, 0, 0, 0, 0, 0, 0, 0], t=1)
+        for k in (0, 1):
+            for dst in ("new", "self"):
+                L.append(f"dlab {k} {brow} 0 {dst} 130 3")
+            L.append(f"dlab {k} {irow} 0 new 130 3")
+        L.append(f"dlab 0 {irow} 0 self 130 3")
+        src2 = self.lab(P((4, 4, 1)), [float(i + 1) for i in range(32)], t=3, nf=2)
+        msk = self.lab(P((4, 4, 1)), [0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0], t=1) + " 0"
+        for dst in ("new", self.lab(P((2, 2, 1)), [5.0], t=3), self.lab(P((4, 4, 1)), [5.0], t=3)):
+            L.append(f"mmask 1 {src2} 0 {msk} {dst} 1 {f32(-3.0)}")
         return [Batch("vrules23", "vrules23", L)]
 
 

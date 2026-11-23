@@ -189,14 +189,15 @@ def main(argv: list[str] | None = None) -> int:
         "",
         "## Golden cases",
         "",
-        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_mask_golden.rs`: thirteen cases "
+        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_mask_golden.rs`: fourteen cases "
         "on 32^3 inputs made with integer arithmetic and a 16 x 16 x 32 pair (recon-all's `-T 5`, "
         "`-invert`, a transform with a threshold and a dilation, `-transfer` with the deletion "
         "edits kept, `-BB`, `-BBEQ`, a crop to a field of view, a mask with NaNs and infinities "
         "with `-oval nan`, a NaN threshold, `-lh -no_cerebellum`, `-samseg`, an erosion with "
-        "background noise, `-BBEQ` without a box), on every platform: `reproduce` "
+        "background noise, `-BBEQ` without a box, recon-all's spelling `-bb 0`), on every "
+        "platform: `reproduce` "
         f"`{a.golden}`, the official program's value on the same inputs (`prog.py --golden`); the "
-        f"default `{a.golden_fix}` (FS-01, FS-1133).",
+        f"default `{a.golden_fix}` (FS-01, FS-1133, FS-269).",
         "",
         "## Memory",
         "",

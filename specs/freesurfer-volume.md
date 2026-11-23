@@ -2358,7 +2358,8 @@ as decided, by its relay 17: the group `vrules18` and `models.py region`.)
   precision), times `1.0f / 27000.0f` (the `float` 0x381B5837); a negative `h` gives no window and 0. The official
   build's operand orders per element of a row (a row of four or more: the first four as `t1 = (y g0y + x g0x) + z
   g0z`, `t2 = (gx g0x + gy g0y) + gz g0z`, `t1 * t2`; then the fifth `t2 * t1` with `t1 = (x g0x + y g0y) + z g0z`;
-  the sixth `t1 * (gz g0z + (gx g0x + gy g0y))`; the seventh as the first four; a row of three or fewer takes the
+  the sixth `t1 * t2` with the fifth's `t1 = (x g0x + y g0y) + z g0z` and `t2 = gz g0z + (gx g0x + gy g0y)`; the
+  seventh as the first four; a row of three or fewer takes the
   fifth, sixth, seventh patterns), each product's NaN its first factor's. **FS-485:** where the window reaches past
   the volume's last column, row or slice (`c + h > extent - 1` on some axis, `h >= 0`), FreeSurfer stores the cut
   window but reads back a full cube: the stored gradients pair with the wrong offsets and the entries past those

@@ -47,14 +47,15 @@ reading and checks and every linear path; part 2 (relay 54), the morphs and thei
   through `--gcam`, the morphed `norm.mgz` (made by the official program) back onto the head.
 - `record.py`: `docs/validation/freesurfer-mri-vol2vol.{json,md}`.
 
-## Results (relay 53)
+## Results (relay 54: the whole program; the record `docs/validation/freesurfer-mri-vol2vol.md`)
 
-Seed 1, 400 cases: 387 identical with `reproduce`, 13 `SKIP` (5 crashes, 8 paths of part 2), 0
-different; `fix` differs on 91, each with a notice. Seed 2, 1,500 cases: 1,487 identical, 13
-`SKIP`, 0 different; `fix` differs on 208, each with a notice. The recorded calls and fMRIPrep's:
-72 on 6 heads, all identical in both modes. Recorded test: `tests/fs_vol2vol_official.rs` (seed 1,
-400 cases, 13 `SKIP`, `481398e5...`; debug 1.8 s on Linux, release 4.8 s on the Windows laptop).
-Golden: 10 cases, `6ab5f3d7...` (official and `reproduce`), `2bb70a5b...` (`fix`).
+Seed 1, 600 cases: 567 identical with `reproduce`, 33 `SKIP` (16 crashes, 17 memory contents), 0
+different; `fix` differs on 138, each with a notice. Seed 2, 1,500 cases: 1,444 identical, 56
+`SKIP` (23, 33), 0 different; `fix` differs on 279, each with a notice. The recorded calls,
+fMRIPrep's and the classic heads' morphs: 96 on 12 runs, all identical in both modes. Recorded
+test: `tests/fs_vol2vol_official.rs` (seed 1, 600 cases, 33 `SKIP`, `9742f37a...`; debug 3.3 s on
+Linux, release 14.8 s on the Windows laptop). Golden: 19 cases, `b0853d29...` (official and
+`reproduce`), `218b7910...` (`fix`).
 
     scripts/orchestration/boxed.sh 20 python -P validation/probes/fs-vol2vol/check.py --seed 1 --n 400
     scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-vol2vol/check.py --golden

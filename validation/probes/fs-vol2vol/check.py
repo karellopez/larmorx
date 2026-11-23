@@ -53,7 +53,7 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # FreeSurfer's result is undefined: CRASH (the port's status is one FreeSurfer's build reaches by
 # a signal: an abort, a division by 0, a crash; the official run's unflushed standard output is
 # lost); NOTPORTED (a path not ported yet); MEMORY (FreeSurfer's result comes from memory contents:
-# FS-1184, FS-1185, FS-1187, FS-1192)
+# FS-931, FS-1184, FS-1185, FS-1187, FS-1192)
 SKIP = ("CRASH", "NOTPORTED", "MEMORY")
 
 #: mri_vol2vol prints a seed it takes from the clock (``SynthSeed``, PDFtodSeed) unless --seed is

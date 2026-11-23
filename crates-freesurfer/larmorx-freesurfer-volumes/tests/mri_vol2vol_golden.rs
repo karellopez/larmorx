@@ -7,7 +7,10 @@
 //! segmentation into a NIfTI), the voxel-to-RAS rewrite with `--save-reg` from a register.dat
 //! (FS-1183: the official program stops, the default applies it), a moving volume with NaN voxels
 //! by trilinear and cubic B-spline resampling, and NaN in the output (`--mul +nan`) and in the
-//! registration (`--trans nan 0 0`), on volumes up to 32^3
+//! registration (`--trans nan 0 0`), and part 2's paths (a morph onto its atlas and back, a
+//! segmentation morphed by nearest neighbour and mode-filtered, `--gcam` with a voxel shift map,
+//! `--gcam0` by cubic B-spline, an SPM warp through an LTA, `--map-point` into a file, `--disp`,
+//! `--cost`), on volumes up to 32^3
 //! (`tests/fs_vol2vol/cases.rs`' `golden_cases`). Each case's line (exit status, both streams and
 //! every file the run wrote, masked as the probe masks them) is hashed; the official program's
 //! value was recorded by `validation/probes/fs-vol2vol/check.py --golden` on Linux x64, and every
@@ -19,11 +22,12 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-23 by `check.py --golden` from the official program on Linux x64: 10 cases.
-const OFFICIAL_SHA256: &str = "6ab5f3d76da7c98596f6325ab70e7c56942c53671c1012bf550f4cf7d01a0ff0";
+/// Recorded 2026-11-23 by `check.py --golden` from the official program on Linux x64: 19 cases
+/// (relay 54: part 2's nine added).
+const OFFICIAL_SHA256: &str = "b0853d2919b51a9d5703e8da2373fa22e6310676208b6c470116bd9f1ed597b5";
 /// The port's default on Linux x64 (FS-1183 applied, FS-01's NUL bytes removed, the noise seed
 /// fixed: FS-29).
-const FIX_SHA256: &str = "2bb70a5b9c79fd08c0a19ead628bd29c24e7e7303083bf4068334a2042f68d98";
+const FIX_SHA256: &str = "218b79104ffcbdf86d16833875c95306853956637a49d7a3e78b9c9f99fffc9d";
 
 fn cases_digest(mode: UpstreamDefects) -> String {
     let mut h = Sha256::new();

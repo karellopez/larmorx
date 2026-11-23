@@ -15,7 +15,7 @@
 //! the transforms written (user and date). Pseudo-notices, which `check.py` counts, not compares:
 //! `CRASH` (a status FreeSurfer's build reaches by a signal: 134, 136, 139; its unflushed standard
 //! output is lost), `NOTPORTED` (a path not ported yet) and `MEMORY` (a result FreeSurfer takes
-//! from memory contents: FS-1184, FS-1185, FS-1187, FS-1192).
+//! from memory contents: FS-931, FS-1184, FS-1185, FS-1187, FS-1192).
 #![allow(dead_code)]
 
 #[path = "../fs_info/cases.rs"]
@@ -2533,6 +2533,75 @@ pub fn golden_cases() -> Vec<String> {
             "0",
             "0",
         ],
+        // part 2 (relay 54): the morphs, --filter, --gcam, --gcam0, --spm-warp, --map-point,
+        // --disp, --cost
+        &[
+            "--mov",
+            "m.mgz",
+            "--s",
+            "s1",
+            "--morph",
+            "--regheader",
+            "--o",
+            "o.mgz",
+        ],
+        &[
+            "--mov",
+            "seg.mgz",
+            "--s",
+            "s1",
+            "--morph",
+            "--regheader",
+            "--nearest",
+            "--filter",
+            "--o",
+            "o.mgz",
+        ],
+        &[
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t.mgz",
+            "--s",
+            "s1",
+            "--inv-morph",
+            "--regheader",
+            "--o",
+            "o.mgz",
+        ],
+        &[
+            "--gcam", "m.mgz", "ta.lta", "a.m3z", "d.lta", "vsm.mgz", "1", "o.mgz",
+        ],
+        &[
+            "--gcam0", "m.mgz", "ta.lta", "a.m3z", "c.lta", "0", "5", "o.mgz",
+        ],
+        &["--spm-warp", "m.mgz", "r.lta", "w.nii", "1", "o.mgz"],
+        &[
+            "--map-point",
+            "1.5",
+            "-2",
+            "3.25",
+            "3",
+            "r.lta",
+            "1",
+            "pt.txt",
+        ],
+        &[
+            "--mov", "m.mgz", "--targ", "t.mgz", "--lta", "r.lta", "--disp", "d.mgz",
+        ],
+        &[
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "o.mgz",
+            "--s",
+            "s1",
+            "--cost",
+            "cost.txt",
+        ],
     ] {
         out.push(line(&[], &i, &s(a)));
     }
@@ -2679,7 +2748,7 @@ pub fn mask_stdout(text: &str, args: &[String]) -> String {
 /// The defects whose official result depends on memory contents (FreeSurfer reads memory it
 /// never wrote or does not own: `reproduce` fills it deterministically): the pseudo-notice
 /// `MEMORY`.
-const MEMORY: [&str; 4] = ["FS-1184", "FS-1185", "FS-1187", "FS-1192"];
+const MEMORY: [&str; 5] = ["FS-931", "FS-1184", "FS-1185", "FS-1187", "FS-1192"];
 
 /// The port's line for a case line and the defects it noted (`dir`: an empty folder), with the
 /// pseudo-notices `CRASH`, `NOTPORTED` and `MEMORY`.

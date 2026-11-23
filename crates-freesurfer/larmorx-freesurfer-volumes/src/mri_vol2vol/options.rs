@@ -60,15 +60,6 @@ pub const USAGE: &str = include_str!("usage.txt");
 /// `print_help()`'s text after the usage and the version.
 pub const HELP: &str = include_str!("help.txt");
 
-/// A path not ported yet (relay 53): its message on standard error, status 1.
-pub fn not_ported(r: &mut Run, what: &str) -> Fatal {
-    let _ = writeln!(
-        r.err,
-        "larmorx-freesurfer: mri_vol2vol: {what} is not ported yet"
-    );
-    Fatal::Exit(1)
-}
-
 /// `mri_vol2vol`'s settings (its file-scope variables), FreeSurfer's defaults.
 pub struct Options {
     pub debug: bool,

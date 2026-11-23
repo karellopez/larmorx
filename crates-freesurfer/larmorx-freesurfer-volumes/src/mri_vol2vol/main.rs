@@ -30,6 +30,11 @@
 //!   voxel shift map or `--new`, `MRIvol2VolVSM`); `--slice-crop`, `--mul`; the colour table
 //!   (`--ctab`, else the input's); written; `--save-reg` (`<out>.lta` and `<out>.reg`, the identity
 //!   or with `--tal` the subfov registration); `mri_vol2vol done`.
+//! - Part 2 (relay 54): `--disp` after the final matrix (the affine displacement, written; without
+//!   `--o` the program ends there); the morphs in place of the resampling (`morph`: `--morph`,
+//!   `--inv-morph`, `--m3z`, `--filter`); `--cost` after the resampling (`seg_reg_cost_line`).
+//!   `--spm-warp`, `--gcam` and `--map-point` run while the options are read
+//!   ([`super::standalone`]).
 //!
 //! Defects (`larmorx_core::defects`; the mechanisms in `docs/findings/freesurfer-mri-vol2vol.md`):
 //! - **FS-1177**: `--crop` without an LTA or `--downsample` stops with `ERROR: No target volume
@@ -45,6 +50,7 @@
 //! - **FS-1182**: `--crop` with a scale that leaves no voxel (0 or below, or so small that a size
 //!   rounds to 0): FreeSurfer writes an empty volume (status 0) or stops at the allocation; by
 //!   default an error (rule B).
+//! - **FS-1186**, **FS-1187**, **FS-1193**: `seg_reg_cost_line`. **FS-1191**: `morph`.
 
 use std::io::Write;
 

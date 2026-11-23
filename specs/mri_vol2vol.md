@@ -1,14 +1,14 @@
 # `mri_vol2vol` (FreeSurfer 8.2.0): behaviour spec
 
-Status: part 1 (queue item 3.2-38, track A relay 53): the command line, every check, every
-registration and every linear path (resampling, the voxel-to-RAS rewrite, the trilinear kernel,
-the displacement, the fills and downsampling, the voxel shift map, the crop, the soap-bubble
+Status: complete (queue item 3.2-38: part 1, track A relay 53, the command line, every check,
+every registration and every linear path (resampling, the voxel-to-RAS rewrite, the trilinear
+kernel, the displacement, the fills and downsampling, the voxel shift map, the crop, the soap-bubble
 smoothing, the noise, the slice operations, the multiplication, the colour table, the saved
-registration), every message, the exit statuses and the defects with their switches; §10 lists
-the paths of part 2 (the non-linear morphs, `--gcam`, `--spm-warp`, `--map-point`, `--disp`,
-`--cost`). Written by the replica's author as the spec writer: behaviour, conventions and
-messages, for the clean room (`larmorx-fs-volumes`), which works from this file, the library
-modules' specs it names and black-box runs of the official program only.
+registration); part 2, track A relay 54, §10: the morphs and their inverse, the mode filter,
+`--gcam`/`--gcam0`, `--spm-warp`, `--map-point`, `--disp`, `--cost`), every message, the exit
+statuses and the defects with their switches. Written by the replica's author as the spec writer:
+behaviour, conventions and messages, for the clean room (`larmorx-fs-volumes`), which works from
+this file, the library modules' specs it names and black-box runs of the official program only.
 
 Conventions: "standard output" unless said otherwise. An **error** is FreeSurfer's library error
 (`specs/freesurfer-core.md`: `error: ` and the text, then a NUL byte and a new line on standard
@@ -284,8 +284,10 @@ run:`, an empty line, `  tkregister2 --mov <out> --targ <targ> --reg <out>.reg `
 
 ## 7. Exit statuses
 
-0 done; 1 the checks and failures named; 252 a library error with `ERROR_BADPARM`; 255 the command
-line's errors; FreeSurfer's crashes (FS-1178 134, FS-1179 136, FS-1180 and FS-1181 139).
+0 done (and `--disp` without `--o`, `--cost-only`, `--spm-warp`, `--gcam`, `--map-point`); 1 the
+checks and failures named; 252 a library error with `ERROR_BADPARM`; 255 the command line's
+errors; FreeSurfer's crashes (FS-1178 and FS-1191 134, FS-1179 136, FS-1180, FS-1181, FS-1186,
+FS-1189, FS-1190 and FS-1193 139; FS-1192 may abort, 134).
 
 ## 8. The defects (`larmorx_core::defects`)
 
@@ -311,6 +313,47 @@ line's errors; FreeSurfer's crashes (FS-1178 134, FS-1179 136, FS-1180 and FS-11
   from it has no geometry and §3.12's change of type stops (`LTAchangeType: src geometry must be
   valid`, status 252); by default §3.12 is skipped and the register.dat's matrix is the
   registration.
+- **FS-1184**: `--map-point` with a coordinate (`a`, `b`, `c`: `%lf`) or a kind (`%d`) that does not
+  read as a number: FreeSurfer uses the variable's memory contents (observed: kinds such as
+  246765545); by default `ERROR: --map-point: <word> is not a number`, status 1, at the word's
+  place in the order of §10.7 (the output kind after the LTA is read); with `reproduce` 0.
+- **FS-1185**: `--cost` with a `regseg` smaller than the resampled volume on any axis: FreeSurfer
+  reads past the segmentation (memory contents); by default `ERROR: SegRegCost(): regseg and f
+  differ in size` and FS-1187's end; with `reproduce` the voxels past it read as label 0.
+- **FS-1186**: `--cost` with a file that does not open for appending (a missing folder, a folder
+  that cannot be written): FreeSurfer crashes (139); by default `ERROR: could not open <file>`,
+  status 1.
+- **FS-1187**: `--cost` when the cost is refused (§10.4's two type messages): FreeSurfer still
+  appends the line, its eight numbers memory contents (observed: values such as 0.6932, 0.3343);
+  by default status 1 with no line written (and no output volume: the cost comes before the
+  write); with `reproduce` the eight numbers 0.
+- **FS-1188**: `--gcam` without a morph but with a source LTA: the destination LTA is accepted only
+  when its source is the source LTA's source (then inverted); one whose destination is that source
+  (the case the check is written for) is refused with §10.5's message. By default it is used as it
+  is (not inverted).
+- **FS-1189**: `--gcam` with a voxel shift map and a phase-encoding direction (`--vsm-pedir` before
+  `--gcam`) other than 1, 2, 3: FreeSurfer crashes (139) at the first shifted voxel for -1, -2, -3,
+  0 and 5 or more, and 4 has no effect. By default -1, -2, -3 shift by minus the map's value along
+  axis 1, 2, 3, and any other direction ends with `ERROR: MRIvol2volGCAM: pedir=<p>, must be +/-1,
+  +/-2, +/-3`, status 1 (after the output's allocation, before the loop).
+- **FS-1190**: `--gcam0` (or `--gcam` with `MY_MORPHS_DO_NOT_CONFORM_DEAL_WITH_IT` set) without a
+  destination LTA (`0`, or a name that does not read): FreeSurfer crashes (139) after the source
+  LTA's messages; by default `ERROR: MRIvol2volGCAM0(): a destination LTA is needed`, status 1.
+- **FS-1191**: the morph's name (`$SUBJECTS_DIR/<subject>/mri/transforms/<m3z>`, or with
+  `--noDefM3zPath` the `--m3z` word) of 1,000 bytes or more: FreeSurfer aborts (`*** buffer
+  overflow detected ***: terminated`, status 134) after `Reading gcam`; by default the whole name.
+- **FS-1192**: `--filter` on a morphed volume holding values below -0.5 or not a number: FreeSurfer
+  counts them outside its histogram (memory contents; observed: other labels, or an abort when
+  the memory it wrote is freed); by default the mode is taken over every value (negative ones in
+  bins of their own, a value that is not a number counted as 0); with `reproduce` those counts are
+  lost (and a bin outside reads 0).
+- **FS-1193**: `--cost` without a segmentation `$SUBJECTS_DIR/<subject>/mri/regseg` of any of the
+  names §10.4 tries: FreeSurfer crashes (139); by default `ERROR: --cost: cannot find the
+  segmentation <stem> (.nii, .nii.gz, .mgh, .mgz, ...)`, status 1.
+- **FS-482**, **FS-930**, **FS-931** (`specs/freesurfer-volume.md`, `specs/freesurfer-io.md` §157):
+  in `--gcam`'s resampling the voxel shift a refused map type never wrote, and a sample that failed
+  (sinc) keeping the previous voxel's value (the first: memory contents; observed non-zero for the
+  inverse morph by sinc).
 
 ## 9. Validation plan (for the clean room)
 
@@ -348,9 +391,191 @@ line's errors; FreeSurfer's crashes (FS-1178 134, FS-1179 136, FS-1180 and FS-11
 10. The recorded runs: the v8 stream's nine calls per head and fMRIPrep's (`--mov aseg.mgz --targ
     <T1w> --lta <lta> --interp nearest --o seg.nii.gz`) on the recorded heads.
 
-## 10. Part 2 (not yet in the replica)
+## 10. Part 2: the non-linear paths
 
-The non-linear morphs (`--morph`, `--inv-morph`, `--m3z`, `--noDefM3zPath`'s morph, `--filter`),
-`--gcam`/`--gcam0` (`MRIvol2volGCAM`), `--spm-warp`, `--map-point`/`--map-point-inv-lta`, `--disp`
-and `--cost`/`--cost-only`: the replica ends them with `larmorx-freesurfer: mri_vol2vol: <what> is
-not ported yet` (standard error), status 1, where FreeSurfer would do the work.
+### 10.1 The displacement (`--disp <f>`)
+
+After the final matrix (§4): `Computing affine displacment`; a one-frame `float` volume with the
+input's extent and header (the input: the moving volume, or with `--inv` the target), each voxel
+the distance between its tkregister RAS point `T v` and `R T v` (`R` the final tkregister matrix, `T`
+the input's voxel-to-tkregister matrix; `R T` and each point a single-precision product summed left
+to right; each coordinate's difference in single precision, then squared and summed in double
+precision, `sqrt`, stored as single precision), written to `<f>` (a failed write is not checked).
+Without `--o`: `No other output specified, so exiting now`, `#VMPC# mri_vol2vol VmPeak <kB>`,
+status 0; with `--o` the program goes on (§6).
+
+### 10.2 The morph onto its atlas (`--morph`, `--m3z`)
+
+`--morph` implies `--fstarg` (the target: the subject's `orig.mgz`, §3); `--m3z <name>` names the
+morph (`talairach.m3z` by default) and implies the morph. After §6's `Vox2Vox Matrix is:` block and
+the template's type and pulse parameters, instead of §6's resampling: `Reading gcam`; the morph read
+(`specs/freesurfer-io.md` §142: its messages, such as `setting orig areas to linear transform
+determinant scaled <a>`) from `$SUBJECTS_DIR/<subject>/mri/transforms/<name>` (`(null)` for no
+subject), or with `--noDefM3zPath` from `<name>` itself; a morph that does not read: status 1 (its
+reader's messages). `Applying morph to input`; the input resampled onto the morph's atlas grid
+(`specs/freesurfer-io.md` §157 item 1, the interpolation of §1.4, every frame): the output is that
+volume, its type the input's (not the template's), its geometry the atlas's. The registration `R`
+is not used by the resampling. Then `--filter` (§10.3), and §6's end: `--cost`, `--slice-crop`,
+`--mul`, the colour table, the write, the output registration (the template's geometry),
+`--save-reg`.
+
+### 10.3 The inverse morph (`--inv-morph`) and the mode filter (`--filter`)
+
+`--inv-morph` implies the morph and `--inv`: the input is the target (an atlas-space volume), the
+template the moving volume. The morph is read as in §10.2; its inverse is made on a `float` volume
+of the morph's image extent and geometry (`specs/freesurfer-io.md` §157's inverse: the index volumes,
+the Voronoi diagram and 50 soap-bubble passes); `Applying reg to gcam`: every node's current and
+original position moved through the voxel-to-voxel transform made from the template, the moving
+volume and `R` (§63's `TransformRegDat2LTA`; each position narrowed to single precision): this has
+no effect on the inverse already made, nor on the output. `Applying inverse morph to input`; the
+output (the morph's image extent and geometry, the input's type and frames): each voxel `(x, y, z)`
+(x slowest) mapped through the inverse's index volumes (sampled trilinearly at the voxel, clamped
+into them, times the spacing, single precision), then into a grid of the input's extent with the
+default coronal geometry (direction cosines (-1, 0, 0), (0, 0, -1), (0, 1, 0), centre 0, 1 mm; the
+map from that grid's voxels to itself, single precision) and clamped into it (below 0: 0; the
+extent or more: the extent - 1): every voxel is written, each frame sampled with the interpolation
+(`specs/freesurfer-volume.md`'s `MRIsampleVolumeFrameType`: whole coordinates nearest, trilinear,
+others nearest; sinc refused with its error line per voxel, FS-930/931).
+
+`--filter` (after either morph): `filtering labeled volume...`; one pass of a mode filter on frame 0:
+the values counted are 0 to `ceil(max)` of the volume (every frame; a maximum within 1e-15 of 0:
+the volume unchanged); each voxel (slices slowest, then rows, then columns) takes, among the
+rounded values (`nint`) of its 3 x 3 x 3 neighbourhood (the edges repeated), the most frequent: the
+voxel's own value (truncated) wins unless a value has a strictly higher count, the values compared
+in increasing order (the first of the highest counts above the own value's). The result is a new
+volume of the morph output's type with its other frames 0. FS-1192.
+
+### 10.4 The cost (`--cost <file>`, `--cost-only`)
+
+After the resampling (or the morph): the segmentation's name built from `$SUBJECTS_DIR/<subject>/
+mri/regseg` (FS-1178's 2,000-byte rule), the first readable of `.nii`, `.nii.gz`, `.mgh`, `.mgz`,
+`.img`, `.bhdr`, `_000.bfloat`, `_000.bshort`, `.w` appended (none: FS-1193), read whole (one that
+does not read: status 1). The cost: the segmentation must be `int`, `uchar` or `float` (`ERROR:
+SegRegCost(): regseg type must be int, uchar, or float`) and the output `float` (`ERROR:
+SegRegCost(): f type must be float`, as with `--precision` other than `float`): FS-1187. Each voxel of
+the output's frame 0 that is not 0 (columns slowest, then rows, then slices) whose label (frame 0,
+FS-1185) is 2 or 41 adds its value and square to the white matter's sums (double precision), 3 or
+42 to the cortex's; the means, the standard deviations (`sum2stddev`: `sqrt((sum2 - 2 mean sum + n
+mean^2) / (n - 1))`, left to right), `t = |ctxmean - wmmean| / sqrt(ctxstd^2 + wmstd^2)` and the
+cost `1 / t` (an empty class gives 0 / 0's NaN, printed `-nan`). The file opened to append
+(FS-1186), one line: `--trans`'s three numbers (`%7.3lf `), `--rot`'s three in degrees
+(radians times 180 / pi, `%5.1lf `), the white matter's count, mean and standard deviation (`%7d
+%10.4lf %8.4lf `), the cortex's, `t` and the cost (`%8.4lf %8.4lf `), a new line. `--cost-only`: status
+0 here (the output is not written).
+
+### 10.5 `--gcam mov srclta gcam dstlta vsm interp out` and `--gcam0`
+
+Run when the option is read (the options before it apply: `--vsm-pedir`, `--vg-thresh`, `--debug`;
+those after it are not read); `0` for `srclta`, `gcam`, `dstlta` or `vsm`: none. `Loading mov <mov>`
+and the volume (status 1 when it does not read), `Loading source LTA <srclta>` (status 1), `Loading
+GCAM <gcam>` and the morph (§142; status 1), `Loading destination LTA <dstlta>` (one that does not
+read is taken as none), the voxel shift map (no message; status 1), the interpolation (`%d`, kept
+when the word is not a number), then `--gcam0` or `MY_MORPHS_DO_NOT_CONFORM_DEAL_WITH_IT` set: the
+older form, else:
+1. `MRIvol2volGCAM(): ---------+++++++++++++++++++----------------------`; `MRIvol2volGCAM(): VSM not
+   used`, `... GCAM not used`, `... Source LTA not used` for each missing; `MRIvol2volGCAM():
+   interpolation type is <n> <name>` (`nearest`, `trilinear`, `sinc`, `cubic` for 0, 1, 2, 5;
+   `(null)` otherwise). A map whose extent differs from the volume's: `ERROR: MRIvol2volGCAM():
+   src-vsm dim mismatch`, status 1.
+2. No destination LTA: with no morph, `ERROR: MRIvol2volGCAM(): both dstlta and gcam are NULL`,
+   status 1; else `Dst LTA is null, so just using gcam atas as output target` and the voxel-to-voxel
+   identity of the morph's atlas (§63's transform from the atlas to itself).
+3. The source LTA (a copy): when the volume is its source (`specs/freesurfer-volume.md` §54's
+   geometry match) `MRIvol2volGCAM(): Inverting Source LTA` and inverted; else when the volume is not
+   its destination: `ERROR: MRIvol2volGCAM(): neither src nor dst of Source LTA matches the mov vol
+   geom`, `mov vol geom ======================`, the volume's geometry (`volume geometry:` block),
+   `Source LTA ======================`, the LTA printed (§54's `LTAprint`), the error line again,
+   status 1. With a morph whose image geometry differs from the LTA's source (`vg_isEqual` with the
+   program's tolerance): `ERROR: MRIvol2volGCAM(): gcam image vol geom does not match Source LTA src
+   vol geom`, `gcam image vol geom ======================`, the morph's image geometry, `Source LTA
+   ======================`, the LTA, the error line again, status 1. Then `MRIvol2volGCAM():
+   Chaning Source LTA type to vox2vox` when it is not voxel-to-voxel.
+4. The destination LTA: with a morph, its destination the morph's atlas (as is) or its source
+   (inverted), else `ERROR: MRIvol2volGCAM(): neither src nor dst of Dest LTA matches the atlas vol
+   geom in the GCAM` with the atlas's geometry and the LTA (as in 3); without a morph but with a
+   source LTA: its source the source LTA's source (inverted), else `ERROR: MRIvol2volGCAM(): neither
+   src nor dst of Dest LTA matches the src vol geom of the Source LTA` (FS-1188) with the source
+   LTA's source geometry and the LTA; with neither: its destination the volume (as is) or its source
+   (inverted), else `ERROR: MRIvol2volGCAM(): neither src nor dst of Dest LTA matches the mov/src vol
+   geom` with the volume's geometry and the LTA. `MRIvol2volGCAM(): Inverting Dest LTA` when
+   inverted, `MRIvol2volGCAM(): Chaning Destination LTA type to vox2vox` when not voxel-to-voxel.
+5. The output: a `float` volume of the destination LTA's (inverted) source geometry, the volume's
+   frames and pulse parameters, 0 where not written. Each output voxel (columns slowest): through
+   the destination matrix (double-precision sums, stored single), the morph (`specs/freesurfer-io.md`
+   §157's node sampling: a point outside the nodes or among invalid ones is skipped), the source
+   matrix (single precision); with a map: the four map voxels at the column and row `floor`s and the
+   slice's `nint` must lie inside (column + 1 and row + 1 and slice + 1 below the extent) and be
+   non-zero (`|v| < FLT_MIN` skips), the map sampled trilinearly at the point (0 skips) and added to
+   the coordinate of the phase-encoding axis (FS-1189); a point outside `[0, extent)` of the volume
+   is skipped; the sample: trilinear for all frames at once, the cubic B-spline (interpolation 5),
+   else `MRIsampleVolumeFrameType` per frame (FS-930/931). Then `MRIvol2volGCAM: t=<seconds>`
+   (`%6.4f`).
+6. `Writing to <out>`, the volume written (status 1 when it fails), `mri_vol2vol gcam done`,
+   `#VMPC# mri_vol2vol VmPeak <kB>`, status 0.
+
+The older form (`MRIvol2volGCAM0`): `MRIvol2volGCAM0(): ===========================================================`,
+`MY_MORPHS_DO_NOT_CONFORM_DEAL_WITH_IT is set` or `... is NOT set`, the three `not used` lines and the
+interpolation line as above, the map's extent check; the source LTA changed to voxel-to-voxel in
+place (`MRIvol2volGCAM(): Chaning Source LTA type to vox2vox`) and its matrix inverted when the
+volume is its source (`MRIvol2volGCAM(): Inverting Source LTA`); no destination LTA: FS-1190; the
+destination LTA: its source conformed (256^3 voxels of 1 mm): `MRIvol2volGCAM(): NOT inverting
+Destination LTA`; else its destination conformed: `MRIvol2volGCAM(): Inverting Destination LTA` (in
+place); neither: `ERROR: MRIvol2volGCAM(): neither src nor dst VG of Dest LTA is conformed`, status 1
+(with the variable set: `WARN: ...` and on); changed to voxel-to-voxel (`... Chaning Destination
+LTA type to vox2vox`), its matrix inverted for the loop; the output of its destination's geometry;
+the loop as in 5, the map's shift always along the rows.
+
+### 10.6 `--spm-warp mov movlta warp interp out`
+
+Run when the option is read: the volume (status 1), `Loading source LTA <movlta>` and the LTA unless
+`0` (status 1), the warp volume (status 1), the interpolation (`%d`, kept otherwise), `Running
+MRIapplySpmVbmWarp() interp = <n>`, the resampling of `specs/freesurfer-volume.md`'s `MRIapplySpmWarp`
+(no left-right reversal; its refusal: status 1), `Writing to <out>` and the write (status 1), `mri_vol2vol
+spm-vbm done`, `#VMPC# mri_vol2vol VmPeak <kB>`, status 0.
+
+### 10.7 `--map-point a b c incoords lta outcoords outfile` and `--map-point-inv-lta`
+
+Run when the option is read; `SUBJECTS_DIR` need not be set. In order: `a`, `b`, `c` (`%lf`), the input
+kind (`%d`), the LTA (§2's reader; status 1 when it does not read), inverted in place for
+`--map-point-inv-lta`, the output kind (`%d`) (FS-1184 for a word that is not a number). The matrix
+from the input kind to the output kind (1 tkregister RAS, 2 scanner RAS, 3 voxels; of the LTA's source
+and destination respectively), from a copy of the LTA: more than one transform: `ERROR: LTA::GetMatrix:
+num_xforms > 1`, status 1; another kind: `ERROR: LTA::GetMatrix: intype=<i>, outtype=<o> not
+recognized`, status 1. The copy is changed (§54, with its messages and failures) to `LINEAR_RAS_TO_RAS`
+for scanner to scanner, scanner to voxels, scanner to tkregister, voxels to scanner and tkregister to
+scanner; to `LINEAR_VOX_TO_VOX` for voxels to voxels, voxels to tkregister and tkregister to voxels;
+to `REGISTER_DAT` for tkregister to tkregister. The matrix (double-precision sums, stored single):
+scanner to scanner and voxels to voxels the LTA's own; scanner to voxels the destination's
+RAS-to-voxel matrix (the inverse of its voxel-to-RAS) times it, and both printed (`MatrixPrint`, the
+RAS-to-voxel first); scanner to tkregister the destination's RAS-to-tkregister times it; voxels to
+scanner it times the source's voxel-to-RAS; voxels to tkregister the destination's
+voxel-to-tkregister times it; tkregister to scanner it times the source's tkregister-to-RAS;
+tkregister to voxels it times the source's tkregister-to-voxel; tkregister to tkregister its inverse.
+The point `(a, b, c, 1)` (stored single) times the matrix (double-precision sums), printed `%8.4f
+%8.4f %8.4f ` and a new line; unless `outfile` is `nofile`, the file opened for writing (`ERROR:
+could not open <outfile>`, status 1), `writing to <outfile>`, the same line written; status 0.
+
+### 10.8 Validation plan of part 2 (adds to §9)
+
+11. `--disp` with and without `--o`, with `--lta`, `--inv`, `--rot`, into a missing folder.
+12. `--cost` (and `--cost-only`) with a segmentation of the output's grid, a smaller one, one of a
+    refused type, none, no subject, `--precision uchar`, `--trans` and `--rot`, a file in a missing
+    folder, after a morph.
+13. `--morph` with every registration form, method (`--nearest`, `--cubic`, sinc), `--precision`,
+    `--save-reg`, `--m3z` (another morph, a missing one, a damaged one), `--noDefM3zPath` in both
+    orders, a multi-frame input, `--filter` on labels and on intensities (negative values: FS-1192),
+    a subject without a morph; the morph's nodes partly outside the image and an invalid node.
+14. `--inv-morph` with the same forms and `--filter`.
+15. `--gcam` with every combination of present and missing LTAs, morph and map, inverted and direct
+    LTAs, every interpolation (0, 1, 2, 3, 5, not a number), each failure of steps 1-4 and of the
+    reads, `--vsm-pedir` -3 to 5, `--vg-thresh`, `--debug`, `--GCAM`; `--gcam0` with conformed,
+    inverted and unconformed destination LTAs, none, and with `MY_MORPHS_DO_NOT_CONFORM_DEAL_WITH_IT`.
+16. `--spm-warp` with every interpolation, a source LTA in both directions, each read failing, a
+    multi-frame volume.
+17. `--map-point` and `--map-point-inv-lta` with the nine kind pairs, kinds out of range, words that
+    are not numbers, an LTA of two transforms, LTAs without valid geometries, an FSL matrix and a
+    register.dat as the LTA, an output file (made, in a missing folder).
+18. The recorded classic runs: `--morph` of `norm.mgz` and of `aseg.mgz` (`--nearest`), `--gcam` of
+    `norm.mgz` through `talairach.m3z`, `--inv-morph` of the morphed `norm.mgz`.
+    The `MRIvol2volGCAM: t=` line (a time) is masked like `VmPeak`; FS-931, FS-1184, FS-1185,
+    FS-1187 and FS-1192 depend on FreeSurfer's memory contents: counted, not compared.

@@ -299,6 +299,30 @@ slices in place of the stream's pointers). Its licence:
      being the original software.
   3. This notice may not be removed or altered from any source distribution.
 
+The SGI STL (std::sort's introsort and std::nth_element's introselect, as GCC's libstdc++ keeps
+them), written in Rust from their description in crates/larmorx-core/src/stdsort.rs (since
+2026-11-23; until then in the FSL family's crates-nc/larmorx-nc-core/src/stdsort.rs), modified:
+the pivot step as libstdc++ refines it (the median of the second, middle and last elements moved
+to the first place, the rest partitioned), and a form with every index checked against the
+vector's ends (std::sort of values that may be NaN). Their notices:
+
+  Copyright (c) 1994 Hewlett-Packard Company
+
+  Permission to use, copy, modify, distribute and sell this software and its documentation for
+  any purpose is hereby granted without fee, provided that the above copyright notice appear in
+  all copies and that both that copyright notice and this permission notice appear in
+  supporting documentation. Hewlett-Packard Company makes no representations about the
+  suitability of this software for any purpose. It is provided "as is" without express or
+  implied warranty.
+
+  Copyright (c) 1996 Silicon Graphics Computer Systems, Inc.
+
+  Permission to use, copy, modify, distribute and sell this software and its documentation for
+  any purpose is hereby granted without fee, provided that the above copyright notice appear in
+  all copies and that both that copyright notice and this permission notice appear in
+  supporting documentation. Silicon Graphics makes no representations about the suitability of
+  this software for any purpose. It is provided "as is" without express or implied warranty.
+
 SciPy 1.15.2 (scipy/ndimage: map_coordinates, spline_filter, spline_filter1d) and SciPy 1.18.1
 (scipy/ndimage; since 2026-11-08 also scipy/sparse: kron, hstack, the CSR and CSC products;
 scipy/sparse/linalg: cg; scipy/interpolate: BSpline's de Boor evaluation; scipy/stats: mode, in

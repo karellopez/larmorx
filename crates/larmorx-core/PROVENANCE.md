@@ -885,3 +885,20 @@ VXL (BSD-3-Clause). 2026-11-22: `vnl_matlab_print` of a `vnl_diag_matrix<double>
 (`matlab_print_long_diag`: `<name> = diag([ `, the elements, ` ])`; `vnl_matlab_print.hxx`). 2026-11-23:
 `vnl_matlab_print` of a `vnl_vector<double>` in the long format (`matlab_print_long_vector`: `<name> = [ `,
 the elements, ` ]`; `vnl_matlab_print.hxx`).
+
+## libstdc++'s `std::sort` and `std::nth_element` (`src/stdsort.rs`; moved here 2026-11-23)
+
+**Written** from the algorithms' published description (Apache-2.0, under the SGI STL's permission
+notice, in full in `../../NOTICE`): the SGI STL's introsort and introselect (Copyright (c) 1994
+Hewlett-Packard Company, Copyright (c) 1996 Silicon Graphics Computer Systems, Inc.), which GCC's
+libstdc++ keeps; no libstdc++ text used. It differs from the SGI STL where libstdc++ does: the pivot
+step moves the median of the second, middle and last elements to the first place and partitions the
+rest (the SGI STL partitions around a copy of the median of the first, middle and last). `sort_by`
+(any comparator), `sort_checked` (`operator<` on values that may be NaN: every index checked against
+the slice's ends, `Outside` where C++ would leave the vector), `nth_element_f64` (introselect on
+doubles, stopped at the ends). Written 2026-10-26 in the FSL family's crate
+(`crates-nc/larmorx-nc-core/src/stdsort.rs`, which now re-exports it) and moved here unchanged, so
+every family's replicas share one emulation (the user's decision, 2026-11-23). Its results equal
+libstdc++'s `std::sort` on 768 seeded vectors with and without NaN values (GCC 11.4's and 14.3's
+libstdc++: `validation/probes/libstdcxx-sort/sort_probe.cc`, the unit test
+`checked_sort_gives_libstdcxx_order_with_nan`, hash `63bfd9ba2c340dd2` again on 2026-11-23).

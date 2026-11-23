@@ -71,6 +71,8 @@ ported file is audited for third-party code first).
 | `mri_vol2vol/mri_vol2vol.cpp` 640-1310 (3.2-38, part 1; part 2, track A relay 54: the morphs, `--filter`, `--disp`, `--cost`) | `main` (FS-1178, FS-1179, FS-1181, FS-1182; FS-1186, FS-1187, FS-1191, FS-1193) | `src/mri_vol2vol/main.rs` |
 | `mri_vol2vol/mri_vol2vol.cpp` 1570-1683 (3.2-38 part 2, relay 54) | `parse_commandline`'s `--spm-warp`, `--gcam`/`--gcam0` and `--map-point` bodies (FS-1184) | `src/mri_vol2vol/standalone.rs` |
 | `mri_vol2vol/mri_vol2vol.cpp` 2413-2655, 2660-2841 (3.2-38 part 2, relay 54) | `MRIvol2volGCAM` (FS-1188, FS-1189; FS-482, FS-930, FS-931), `MRIvol2volGCAM0` (FS-1190) | `src/mri_vol2vol/gcam.rs` |
+| `mri_concat/mri_concat.cpp` 60-130, 777-1366 (queue item 3.2-39, track A relay 55) | the file statics (`Options`), `parse_commandline` (FS-1194 to FS-1198, FS-1247: the list files' table and buffer, `--zconcat`), `usage_exit`, `print_usage`, `print_help`, `print_version`, `argnerr`, `check_options` | `src/mri_concat/options.rs` |
+| `mri_concat/mri_concat.cpp` 131-773, 1374-1393, 1468-1498 (3.2-39) | `main` (FS-1200, FS-1241 to FS-1246, FS-1248), `GroupedMeanMatrix`, `MRIfirstNonZero`; `MRImultiplyConst`, `MRIaddConst`, `MRIsqrt` and `fMRIcumSum` in place (`utils/mri2.cpp`, `fmriutils.cpp`: the loops of fs.volume's and fs.filter's functions with their source as their destination, without the copy); the program `mri_concat` of `larmorx-freesurfer` | `src/mri_concat/main.rs` |
 
 Third-party code: none in `mri_normalize.cpp` (FreeSurfer's own file, MGH's notice). Its library
 calls are the other crates' (`larmorx-freesurfer-filter`'s normalisation, `-volume`, `-surf`,
@@ -97,6 +99,18 @@ MGH's notice). Their library calls are the other crates' (`larmorx-freesurfer-io
 `MRIreadInfo`, `MRIread`, `MRIwrite` and FreeSurfer's `.xfm` reader on `larmorx_io::xfm`, MINC's
 volume_io: MNI's notice; `-mri`'s transform matrices; `-volume`'s slice direction; `-core`'s
 version, help and error messages).
+
+Third-party code: none in `mri_concat.cpp` (FreeSurfer's own, MGH's notice; Bruce Fischl's). Its
+library calls are the other crates' (`larmorx-freesurfer-io`'s `MRIread`, `MRIreadHeader`,
+`MRIwrite`, `CTABreadASCII`, `IDstemFromName`, `fio_basename`; `-filter`'s `fMRImatrixMultiply`,
+`fMRIcovariance`, `fMRItemporalAR1`, `fMRIextractFrames`, `MRIvolMax`, `MRIvolMin`, `MRIconjunct`,
+`MRIvolMaxIndex`, `MRIframeMean`, `MRIframeMedian`, `MRIframeSum`, `MRIframeNorm`,
+`ASLinterpMatrix`, `fMRIspatialCorMatrix`; `-volume`'s `MRIzconcat`, `MRIabs`, `MRIpos`,
+`MRIneg`, `MRIcloneBySpace`, `MRInormalizeFramesMean`, `MRInormalizeFramesFirst`, `MRIsort`,
+`MRIvote`, `MRIframeBinarize`, `MRInMask`, `MRImask`, `MRIrms`, `MRIpca`, `WritePCAStats`; `-mri`'s
+`MRIallocSequence`, `MRIcopyHeader`, `CTABdeepCopy`, the voxel accesses; `-core`'s matrices'
+text files, `MatrixPrint`, the version options, `PrintRUsage`, `WriteRUsage`, the C-style
+`sscanf`) and `larmorx-core`'s `log10` (`--max-bonfcor`: glibc's with `reproduce`).
 
 Third-party code: none in `mri_vol2vol.cpp` (FreeSurfer's own, MGH's notice; Doug Greve's). Its
 library calls are the other crates' (`larmorx-freesurfer-io`'s `MRIread`, `MRIreadHeader`,

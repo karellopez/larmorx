@@ -14,6 +14,7 @@
 
 pub mod costs;
 pub mod entropy;
+pub mod jointhisto;
 pub mod mymatrix;
 pub mod mymri;
 pub mod powell;

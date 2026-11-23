@@ -84,9 +84,20 @@ stream's precision `cout_precision`) and `MyMRI::MRInorm255` (`MyMRI.cpp` 42-47)
 the one-thread order of their OpenMP sums. `registration.rs`: the level images passed mutably (the
 change of type), the multiresolution lines at the stream's precision.
 
+Relay 47 of track C (queue 3.2-13): `src/jointhisto.rs` from `mri_robust_register/JointHisto.cpp`
+(the class's state, `normalize` and `computeRCsums` from `JointHisto.h` 43-121; `create(MRI*, MRI*,
+Msi, Mti, d1, d2, d3)` 132-282, `smooth` 615-673, `computeMI` 675-703, `computeECC` 705-743,
+`computeNMI` 745-778, `computeSCR` 822-963); `src/costs.rs` gains `CostFunctions::SBCost`
+(`CostFunctions.cpp` 1183-1293; its `std::sort` is the project's emulation of libstdc++'s,
+`larmorx_core::stdsort::sort_by`, Apache-2.0 since 2026-11-23); `src/powell.rs`: `costFunction`'s
+histogram branch (`RegPowell.cpp` 183-243; `--debug`'s report after it, 221-239, is not ported) and the `SB`
+case, and the cost function's lines written among Powell's in their order (one shared stream).
+`log2` (`computeMI`, `ECC`, `NMI`) and `exp` (`smooth`) through `larmorx_core::math::Libm`: glibc
+2.35's bits with `reproduce` (`log2_glibc`, relay 47), correctly rounded by default; `sqrt(8 *
+log(2))` is the constant GCC folds.
+
 Not yet: `testRobust` and `constructAb2` (`--test`) and the `debug > 0` paths (with `mri_robust_register`,
-3.2-13); `JointHisto.cpp` (`MI`, `NMI`, `ECC`, `SCR`), `CostFunctions::SBCost` (`SB`, libstdc++'s
-`std::sort`); not reached by either program: `flipInputs`, `init_scaling`, `buildGaussianPyramid`, `setSource`,
+3.2-13); not reached by either program: `flipInputs`, `init_scaling`, `buildGaussianPyramid`, `setSource`,
 `setTarget`, `RegRobust::estimateIScale`; the functions only one program reaches (their items).
 
 ## Changes from the originals

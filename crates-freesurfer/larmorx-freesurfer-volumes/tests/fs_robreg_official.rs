@@ -19,12 +19,13 @@ use sha2::{Digest, Sha256};
 /// again 2026-11-23 (relay 46: the Powell registration's `LS`, `NCC`, `TB`, `LNCC` and `SAD`
 /// ported) from the official program with the decided `cabs` and `csqrt` preloaded (`check.py
 /// --preload`, `decided_complex.sh`: the user's D4 decision, which the port's matrix square roots
-/// follow). 120 cases, 105 lines identical, 8 hashed as `SKIP`, 7 as `NOTPORTED` (`MI`, `NMI`,
-/// `ECC`, `SCR`, `SB`, `--debug` and `--test`). The Powell family: `fs_robreg_powell_official.rs`.
+/// follow); and again 2026-11-23 (relay 47: `MI`, `NMI`, `ECC`, `SCR` and `SB` ported, the same
+/// preload). 120 cases, 110 lines identical, 8 hashed as `SKIP`, 2 as `NOTPORTED` (`--debug` and
+/// `--test`). The Powell families: `fs_robreg_powell_official.rs`, `fs_robreg_histo_official.rs`.
 const N: usize = 120;
-const OFFICIAL_SHA256: &str = "7676ef6d88cffd44c6f1e86668f136f31e2cb1a14ea964e49f17a7af010c2bb4";
+const OFFICIAL_SHA256: &str = "70ea2e644455db29d5a7e2b5332748ad3bb816bc9d8add6410f59e819678a0d2";
 const SKIPPED: usize = 8;
-const NOT_PORTED: usize = 7;
+const NOT_PORTED: usize = 2;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 22] = [

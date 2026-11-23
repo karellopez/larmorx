@@ -202,10 +202,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", type=Path)
     ap.add_argument(
         "--family",
-        choices=("seeded", "powell"),
+        choices=("seeded", "powell", "histo"),
         default="seeded",
-        help="the cases: the prelude, the entropy images and seeded ones (--seed, --n), or the "
-        "Powell registration's 40 (relay 46)",
+        help="the cases: the prelude, the entropy images and seeded ones (--seed, --n), the "
+        "Powell registration's 40 (relay 46), or its joint-histogram and SB costs' 32 (relay 47)",
     )
     ap.add_argument(
         "--preload",
@@ -235,15 +235,15 @@ def main(argv: list[str] | None = None) -> int:
     inputs.mkdir(parents=True, exist_ok=True)
     global PRELOAD
     PRELOAD = str(a.preload.resolve()) if a.preload else ""
-    tag = ("golden" if a.golden else "powell" if a.family == "powell" else f"{a.seed}-{a.n}") + (
+    tag = ("golden" if a.golden else a.family if a.family != "seeded" else f"{a.seed}-{a.n}") + (
         "-preload" if a.preload else ""
     )
     cases_path = inputs / f"cases-{tag}.txt"
     gen = (
         ["golden-cases"]
         if a.golden
-        else ["powell-cases"]
-        if a.family == "powell"
+        else [f"{a.family}-cases"]
+        if a.family != "seeded"
         else ["cases", str(a.seed), str(a.n)]
     )
     text = subprocess.run([EXAMPLE, *gen], check=True, capture_output=True, text=True).stdout

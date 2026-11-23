@@ -119,11 +119,7 @@ The `cout`/`printf` lines share stdout's buffer (`sync_with_stdio`); each option
 
 ## 4. Not ported yet (each ends with its message, status 1)
 
-- `RegPowell`'s joint-histogram costs (`MI`, `NMI`, `ECC`, `SCR`: `JointHisto.cpp`) and `SB`
-  (`CostFunctions::SBCost`, which sorts with libstdc++'s `std::sort`: the project's emulation,
-  `larmorx_nc_core::stdsort`, lives in the FSL family's crate and would have to move to the main
-  package first): the program ends at the first cost (`RegPowell: the cost function <n> is not
-  ported yet`). Relay 46 ported the others (section 6).
+- (Ported in relay 47, section 7: `RegPowell`'s joint-histogram costs and `SB`.)
 - The Powell registration's half-way outputs: `RegPowell::getHalfWayGeom` returns its static copy of
   the target, which `computeIterativeRegistrationFull` has freed by then (`MRIfree(&mriT)` on the
   pointer the static shares): FreeSurfer reads a freed image's header for the half-way geometry (a
@@ -216,3 +212,36 @@ took <s> seconds.`) and the target, with the mask passed in (no `MRImask` then).
   or `--ignored`) hold the decided oracle's hashes.
 - Not measured yet: the Powell registration on the recorded heads (neither recon-all nor fMRIPrep
   runs it), its speed (sequential sums, one thread) and memory.
+
+## 7. The joint-histogram costs and `SB` (`--cost` `MI`, `NMI`, `ECC`, `SCR`, `SB`; relay 47)
+
+- **`JointHisto`** (`fs.robust`'s `jointhisto.rs`): 256 x 256 bins filled from the half-way samples
+  (the source first; its -1 skips the target's sample), the weights split between four bins,
+  smoothed by a 19-tap Gaussian (`sigma = 7 / sqrt(8 ln 2)`: `log(2)` and the root are a constant
+  GCC folds; the taps through `exp`), normalised; `computeMI`, `computeNMI`, `computeECC` take
+  `log2` (65,536 calls per evaluation), `computeSCR` none. `create` sets both byte images' outside
+  value to -1 and leaves it.
+- **`log2`**: glibc 2.35's x86-64 `log2` (`log2@@GLIBC_2.29`, which the official program binds) has
+  one build, without fused multiply-adds: Arm's Optimized Routines v19.11 `log2.c` without
+  `HAVE_FAST_FMA` built with GCC 11.4 equals it on 402,653,199 arguments (NaN bits included), the
+  `HAVE_FAST_FMA` form with FMA code differs on 175,963 (measured as a black box; glibc's code not
+  read). `larmorx_core::math::log2_glibc` translates that form (`reproduce`), `log2` is CORE-MATH's
+  correctly rounded one (the default): `validation/probes/coremath-log2/`, 2,147,552,192 arguments.
+  glibc's `log2` is not correctly rounded on 0.0005 to 0.1 % of them by family (the default's
+  results may then differ in their last bits: GLIBC-07, not named, the cost is iterative).
+- **`SB`** (`CostFunctions::SBCost`): sorts the voxel indices by their keys with libstdc++'s
+  `std::sort` (`larmorx_core::stdsort::sort_by`, moved from the FSL family's crate on the user's
+  decision of 2026-11-23); ties are common (the background), so the sort's own order of equal keys
+  decides the cumulative sums. A zero norm (a constant mapped image) gives NaN keys everywhere,
+  which the comparison leaves in place (no step outside the vector) and the cost 0.
+- **The order of the lines**: `costFunction`'s lines (the empty histogram's warning, a cost's error
+  lines) go to `std::cout` among `fs_powell`'s iteration lines; relay 46 buffered the cost's apart
+  and wrote them after Powell's. Now one shared stream (`powell.rs`'s `Shared`): the probe's case 19
+  (`MI --satit --verbose 2`, a warning after iteration 0) found it.
+- **The probe** (`check.py --family histo --preload`, 32 cases of the five costs with the Powell
+  family's random options): 29 identical, 0 different, 3 not compared (FS-1063); seed 1's 120 cases
+  with the preload: 110 identical, 0 different, 8 not compared, 2 not ported (`--debug`, `--test`).
+  The recorded tests (`fs_robreg_histo_official.rs`, ignored in a debug build like the Powell
+  family's; `fs_robreg_official.rs`) and the golden cases (`--cost MI`, `--cost SB` on 16^3 byte
+  images: 7.6 s and 1.8 s in a debug build) hold the decided oracle's hashes.
+

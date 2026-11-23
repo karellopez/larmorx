@@ -1,0 +1,104 @@
+{
+ "name": "freesurfer-mri-vol2vol",
+ "tool": "mri_vol2vol (FreeSurfer 8.2.0), part 1: the linear paths",
+ "status": "experimental",
+ "larmorx_commit": "bb93f6d424ed",
+ "generated": "2026-11-23",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_vol2vol/), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mri_vol2vol) and its recon-all runs (oracles/freesurfer-8.2.0/runs/: the v8 stream's scripts' calls)",
+ "probe": [
+  {
+   "set": "seed 1",
+   "cases": 400,
+   "identical": 387,
+   "different": 0,
+   "skipped": 13,
+   "skipped_why": {
+    "CRASH": 5,
+    "NOTPORTED": 8
+   },
+   "fix_different_with_notice": 91,
+   "fix_different_without_notice": 0
+  },
+  {
+   "set": "seed 2",
+   "cases": 1500,
+   "identical": 1487,
+   "different": 0,
+   "skipped": 13,
+   "skipped_why": {
+    "CRASH": 5,
+    "NOTPORTED": 8
+   },
+   "fix_different_with_notice": 208,
+   "fix_different_without_notice": 0
+  }
+ ],
+ "real": {
+  "calls": 72,
+  "reproduce_identical": 72,
+  "fix_identical": 72,
+  "runs": [
+   "ds000005-sub-01-v8",
+   "ds000228-sub-pixar008-v8",
+   "ds002422-sub-02-v8",
+   "ds004173-sub-603309-v8",
+   "ds005003-sub-RS001-v8",
+   "ds005454-sub-16-v8"
+  ],
+  "kinds": {
+   "synthmorph-check": 6,
+   "vsinus-prior": 6,
+   "vsinus-back": 6,
+   "fmriprep-aseg": 6,
+   "mcadura-prior": 12,
+   "mcadura-invol": 12,
+   "mcadura-aseg-crop": 12,
+   "mcadura-uncrop": 12
+  }
+ },
+ "golden_sha256": {
+  "official_and_reproduce": "6ab5f3d76da7c98596f6325ab70e7c56942c53671c1012bf550f4cf7d01a0ff0",
+  "fix": "2bb70a5b9c79fd08c0a19ead628bd29c24e7e7303083bf4068334a2042f68d98"
+ },
+ "memory": [
+  {
+   "case": "vsinus-prior",
+   "mode": "reproduce",
+   "larmorx_mib": 70.5,
+   "freesurfer_mib": 70.5
+  },
+  {
+   "case": "vsinus-prior",
+   "mode": "fix",
+   "larmorx_mib": 70.2,
+   "freesurfer_mib": 70.5
+  },
+  {
+   "case": "aseg-nearest",
+   "mode": "reproduce",
+   "larmorx_mib": 92.5,
+   "freesurfer_mib": 97.2
+  },
+  {
+   "case": "aseg-nearest",
+   "mode": "fix",
+   "larmorx_mib": 92.5,
+   "freesurfer_mib": 97.2
+  },
+  {
+   "case": "cubic",
+   "mode": "reproduce",
+   "larmorx_mib": 108.2,
+   "freesurfer_mib": 109.2
+  },
+  {
+   "case": "cubic",
+   "mode": "fix",
+   "larmorx_mib": 108.5,
+   "freesurfer_mib": 109.2
+  }
+ ],
+ "not_ported_yet": "the morphs (--morph, --inv-morph, --m3z), --gcam, --spm-warp, --map-point, --disp, --cost: part 2 (relay 54)"
+}

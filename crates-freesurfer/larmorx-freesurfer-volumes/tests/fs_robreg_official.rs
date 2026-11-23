@@ -24,6 +24,12 @@ use sha2::{Digest, Sha256};
 /// `--test`). The Powell families: `fs_robreg_powell_official.rs`, `fs_robreg_histo_official.rs`.
 const N: usize = 120;
 const OFFICIAL_SHA256: &str = "70ea2e644455db29d5a7e2b5332748ad3bb816bc9d8add6410f59e819678a0d2";
+/// In a debug build (CI's) the five cases of a joint histogram's cost or SB are hashed as `SLOW`,
+/// not run (about 270 s at one thread in a debug build; `cases::histogram_or_sb_cost`): the same
+/// official lines with those five so (`check.py`'s `official_sha256_skip_debug`). A release build
+/// compares them too, and `fs_robreg_histo_official.rs` holds 32 more.
+const OFFICIAL_SHA256_DEBUG: &str = "f9f10b84d937b70438d4c4d5cde4247a5cb6cd98e4ee0c4d03b54766e34bfb4c";
+const SLOW_IN_DEBUG: usize = 5;
 const SKIPPED: usize = 8;
 const NOT_PORTED: usize = 2;
 
@@ -47,6 +53,9 @@ fn both_modes() -> Vec<(String, Vec<&'static str>, String, Vec<&'static str>)> {
                     chunk
                         .iter()
                         .map(|line| {
+                            if cfg!(debug_assertions) && cases::histogram_or_sb_cost(line) {
+                                return ("SLOW".to_owned(), vec![], "SLOW".to_owned(), vec![]);
+                            }
                             let (r, rids) = cases::run_line(line, UpstreamDefects::Reproduce);
                             let (f, fids) = cases::run_line(line, UpstreamDefects::Fix);
                             (r, rids, f, fids)
@@ -67,9 +76,12 @@ fn both_modes() -> Vec<(String, Vec<&'static str>, String, Vec<&'static str>)> {
 #[test]
 fn reproduce_gives_the_official_outputs_and_fix_differs_only_with_a_notice() {
     let mut h = Sha256::new();
-    let (mut skipped, mut not_ported) = (0, 0);
+    let (mut skipped, mut not_ported, mut slow) = (0, 0, 0);
     for (out, ids, f, fids) in both_modes() {
-        if out.contains("not ported yet") {
+        if out == "SLOW" {
+            slow += 1;
+            h.update(b"SLOW\n");
+        } else if out.contains("not ported yet") {
             not_ported += 1;
             h.update(b"NOTPORTED\n");
         } else if ids.iter().any(|x| SKIP.contains(x)) {
@@ -86,8 +98,13 @@ fn reproduce_gives_the_official_outputs_and_fix_differs_only_with_a_notice() {
         );
     }
     let hex: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    let (want_slow, want) = if cfg!(debug_assertions) {
+        (SLOW_IN_DEBUG, OFFICIAL_SHA256_DEBUG)
+    } else {
+        (0, OFFICIAL_SHA256)
+    };
     assert_eq!(
-        (skipped, not_ported, hex.as_str()),
-        (SKIPPED, NOT_PORTED, OFFICIAL_SHA256)
+        (skipped, not_ported, slow, hex.as_str()),
+        (SKIPPED, NOT_PORTED, want_slow, want)
     );
 }

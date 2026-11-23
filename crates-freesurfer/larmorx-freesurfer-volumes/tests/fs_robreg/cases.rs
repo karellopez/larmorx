@@ -1085,6 +1085,30 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
     (text, ids)
 }
 
+/// Whether a case runs the Powell registration with a joint histogram's cost or SB (`--cost` `MI`,
+/// `NMI`, `ECC`, `SCR`, `SB` in any case), whose evaluations take seconds each in a debug build
+/// (relay 47: the recorded test hashes them as `SLOW` there; `check.py` applies the same rule).
+#[allow(dead_code)]
+pub fn histogram_or_sb_cost(line: &str) -> bool {
+    let unhex = |h: &str| -> Option<String> {
+        let b: Option<Vec<u8>> = (0..h.len())
+            .step_by(2)
+            .map(|i| h.get(i..i + 2).and_then(|x| u8::from_str_radix(x, 16).ok()))
+            .collect();
+        b.and_then(|b| String::from_utf8(b).ok())
+    };
+    let t: Vec<&str> = line.split_whitespace().collect();
+    t.windows(2).any(|w| {
+        w[0] == "2d2d636f7374"
+            && unhex(w[1]).is_some_and(|c| {
+                matches!(
+                    c.to_ascii_uppercase().as_str(),
+                    "MI" | "NMI" | "ECC" | "SCR" | "SB"
+                )
+            })
+    })
+}
+
 /// [`run_line_in`] in a fresh temporary folder.
 pub fn run_line(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str>) {
     let dir = tempfile::tempdir().expect("a temporary folder");

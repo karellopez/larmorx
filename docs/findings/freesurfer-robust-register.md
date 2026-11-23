@@ -243,5 +243,8 @@ took <s> seconds.`) and the target, with the mask passed in (no `MRImask` then).
   with the preload: 110 identical, 0 different, 8 not compared, 2 not ported (`--debug`, `--test`).
   The recorded tests (`fs_robreg_histo_official.rs`, ignored in a debug build like the Powell
   family's; `fs_robreg_official.rs`) and the golden cases (`--cost MI`, `--cost SB` on 16^3 byte
-  images: 7.6 s and 1.8 s in a debug build) hold the decided oracle's hashes.
+  images: 7.6 s and 1.8 s in a debug build) hold the decided oracle's hashes. In a debug build (CI's)
+  the seeded test hashes its five cases of these costs as `SLOW`, not run (about 270 s at one thread
+  in a debug build, 620 s for the test under the NaN trap; a second recorded hash,
+  `check.py`'s `official_sha256_skip_debug`); a release build compares them.
 

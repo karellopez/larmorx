@@ -48,6 +48,8 @@ plan is in `specs/mri_robust_register.md` §7.
   found the order of the cost function's lines among Powell's (an empty histogram's warning; case
   19), now kept. `--seed 1 --n 120 --preload`: 110 identical, 0 different, 8 not compared, 2 not
   ported (`--debug`, `--test`). The golden cases gained `--cost MI` and `--cost SB` (16^3 images).
+  The summary's `official_sha256_skip_debug` is the hash the recorded test's debug build checks (the
+  cases of these costs as `SLOW`: `slow_in_debug`, `cases::histogram_or_sb_cost`).
 - `record.py`: the validation record `docs/validation/freesurfer-mri-robust-register.{json,md}`
   from the summaries above (from a clean commit).
 

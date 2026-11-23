@@ -96,11 +96,22 @@ The `cout`/`printf` lines share stdout's buffer (`sync_with_stdio`); each option
   identical. Standard output identical on five; on ds004173-sub-603309 the final voxel transform
   printed by `getFinalVox2Vox` (`Rtrg * Mfinal * vnl_inverse(Rsrc)`) differs in its x and z
   translations' last two printed digits (210.6943714626283 against ...285; the half-way maps on
-  standard error likewise). `v2v.py` computes VNL's source arithmetic (zero-started product sums,
-  `vnl_inverse`'s adjugate, `vnl_det`) on the port's three matrices and gives the port's numbers:
-  either `Mfinal`'s last bits differ (its 13 printed decimals agree) or the official build computes
-  the inline `vnl_inverse`/product otherwise. **Open**: a `v2v` command in the fs-robust probe
-  (the matrices in, the official code's product out) settles it.
+  standard error likewise). **Settled (relay 45, rule 8): the project's decided `hypot`, not code
+  generation.** (1) The fs-robust probe's `v2v` command (`fsrobust.cpp`, built into
+  `oracles/freesurfer-8.2.0-probes/fs-robust-v2v/`; `v2v_official.py`) runs the official build's
+  `Registration::getFinalVox2Vox` (with VNL's `vnl_matrix` product and `vnl_inverse` as the official
+  program has them) on the port's three matrices: it gives the port's numbers bit for bit, so the
+  port computes the product as the official build does and the official run's `Mfinal` differed in
+  its last bits. (2) The official program takes `cabs` and `csqrt` from glibc (dynamic symbols
+  `cabs@GLIBC_2.2.5`, `csqrt@GLIBC_2.2.5`; the matrix square root of the symmetric half-way maps,
+  `MyMatrix::MatrixSqrt` on LAPACK's complex Schur form), where the project decided (the user's D4,
+  applied to them 2026-11-18) the correctly rounded `hypot` in both modes. With the decided `cabs` and
+  `csqrt` preloaded into the official program (`decided_complex.sh`: `complexrt.c` with CORE-MATH's
+  `hypot`; `real.py --preload`), all six heads are identical in every byte of standard output, error
+  and files, ds004173-sub-603309 included (log `oracles/logs/fs-found-c-r45-robreg-preload.log`). The
+  last bits of `Mfinal` on that head come from glibc's `hypot` not being correctly rounded on some
+  argument of the square roots: GLIBC-07's expected divergence of the decision; the transform file
+  (`float` values) is identical on every head.
 - Speed (one thread, the same machine): the port takes 41-98 s against FreeSurfer's 20-66 s
   (2.0-2.3x on 256^3 images): the registration step (fs.robust's open item, `freesurfer-robust.md`
   §6) and the B-spline resampling. Peak memory 3-11 % below FreeSurfer's on five heads, 0.4 %
@@ -111,9 +122,48 @@ The `cout`/`printf` lines share stdout's buffer (`sync_with_stdio`); each option
 - `RegPowell` (`--cost` `LS`, `MI`, `NMI`, `ECC`, `NCC`, `SCR`, `TB`, `LNCC`, `SAD`, `SB`):
   `RegPowell.cpp`, `CostFunctions.cpp`'s costs, `JointHisto.cpp`; the program ends before reading
   the images (FreeSurfer reads them first).
-- `MyMRI::entropyImage` (`--cost ROBENT`; `--entmov`, `--entdst`, `--entradius`, `--entball`,
-  `--entcorrection` are parsed): ends after the `Converting mov to entropy image` line.
 - `--test` (`RegRobust::testRobust`): ends after `--test: TEST-MODE`.
 - `--debug` (the library's intermediate images, `saveGaussianPyramid`, the key presses
   `std::cin >> ch`, the `-wcheck-est.txt` file, the debug means of the half-way images): the
   library ends with `Registration: the debug output (--debug) is not ported yet`.
+
+## 5. The entropy images (`--cost ROBENT`, relay 45)
+
+`MyMRI::entropyImage(mri, radius, ball, correction, mask)` (`MyMRI.cpp` 1177-1569) and
+`get3Dcorrection` (1571-1631), ported in `larmorx-freesurfer-robust/src/entropy.rs` (fs.robust), called
+from `initRegistration` (`mri_robust_register.cpp` 1588-1673) for the source (timed: ` Entropy computation
+took <s> seconds.`) and the target, with the mask passed in (no `MRImask` then).
+- **The arithmetic as compiled**: the weights' `sigma = ssize / (4 * sqrt(2 * log(2)))` with
+  `-fno-builtin` (a runtime `log`); `exp(-xs - ys - zs)` left to right; the histogram's sum and the
+  entropy's `entropy -= etmp * log(etmp)` in bin order (no reassociation without `-ffast-math`); in
+  `get3Dcorrection`, `3.0f / a` is a `float` division (a `float` constant over an `unsigned`), then
+  widened for the `double` products; the three pieces overwrite their shared end bins in order. The
+  OpenMP loop (`schedule(static,1)` over the slices, `firstprivate` histogram) computes each voxel alone:
+  the port's slices go round-robin to its threads; the result does not depend on them.
+- **The mask**: `MRIlinearTransformInterp(mask, MRIcopy(mri), MRIgetVoxelToVoxelXform(mask, mri),
+  SAMPLE_NEAREST)`, then `(int)` of each value (`cvttss2si`: NaN and 2^31 or more give `INT_MIN`,
+  outside).
+- **FS-1074** (a, crash; rule B): `int ssize = 2*radius+1; int gsize = ssize*ssize*zssize; new
+  double[gsize]`: a negative radius in 3-D gives a negative count: `std::bad_array_new_length`,
+  uncaught (`terminate` and SIGABRT); in 2-D `zssize = 1` and the count is positive, the weights' loops do
+  nothing (their sum 0, the uninitialised weights divided by it, never read), and every voxel's box loop
+  is empty: an image of zeros, then the registration of two zero images. A radius of 645 or more makes
+  `gsize` overflow `int` (negative: the same abort; positive and smaller: the loops write past the
+  weights). By default an error (status 1); `reproduce` the abort (status 134, compared with the official
+  child's SIGABRT in the probe) or the 2-D zeros; the error in both modes where FreeSurfer writes past its
+  weights.
+- `entropy < 0 || isnan(entropy)` never holds (positive weights; `p <= 1` in floating point since the
+  sum of positive terms is at least each term): the message is ported but unreachable.
+- **Validation**: the probe's 17 entropy cases (byte, short and float images, masks on both sides, 2-D
+  18 x 16 x 1 images, radius 0, 1, 2, 9 and -1 / -2, the ball, the correction with and without the
+  warning, both, the written images, the Sobel image first, an affine model with the intensity scale)
+  and the prelude's `--cost robent`: identical with `reproduce` in all three seeds (900 cases of seeds 1,
+  7, 13: 839 identical, 0 different, 25 undefined, 36 not ported). The golden cases gain a ROBENT case
+  (its default equals the official value). The recorded heads (`real.py --extra '--cost ROBENT --entmov
+  em.mgz --entdst ed.mgz'`, the default radius 5): ds000228-sub-pixar008 and ds004173-sub-603309 identical
+  in every byte in both modes (both entropy images, the transform, both streams with the times masked);
+  the port 128 s and 179 s against FreeSurfer's 92 s and 134 s (one thread), peak memory 1,122 MiB
+  against 1,087 (ds000228, +3 %) and 1,272 against 1,400 (ds004173). The log and exp: correctly rounded
+  by default, glibc's with `reproduce`; on these cases both give the same images.
+- The time line ` Entropy computation took <s> seconds.` is masked in the probe's and `real.py`'s
+  comparisons (the port's debug build takes seconds where FreeSurfer's takes none).

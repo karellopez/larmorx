@@ -862,6 +862,18 @@ void run_case()
     else rstep<float>();
   } else if (cmd == "rreg") {
     rreg();
+  } else if (cmd == "v2v") {
+    // v2v <Rtrg 16> <Mfinal 16> <Rsrc 16> (relay 45 of track C): the official build's
+    // Registration::getFinalVox2Vox on the given matrices (resampling on), then its pieces as
+    // separate expressions: vnl_inverse(Rsrc), Rtrg * Mfinal
+    RegRobust R;
+    R.Rtrg = vnl_matrix<double>(get_m4().as_ref());
+    R.Mfinal = vnl_matrix<double>(get_m4().as_ref());
+    R.Rsrc = vnl_matrix<double>(get_m4().as_ref());
+    R.resample = true;
+    put_m4(R.getFinalVox2Vox());
+    put_vm4(vnl_inverse(R.Rsrc));
+    put_vm4(R.Rtrg * R.Mfinal);
   } else {
     fail("unknown command");
   }

@@ -9,7 +9,10 @@ prints the final voxel transform's x and z translations 2e-13 below the port's (
 against 210.6943714626285); this script, on the port's Rtrg, Mfinal and Rsrc (hex, dumped from
 the port's get_final_vox2vox for that run; ``DUMP`` below), gives the port's numbers: the port
 follows the source's operation order, so the official binary differs in Mfinal's last bits or in
-how it compiles the product. Open (docs/findings/freesurfer-robust-register.md).
+how it compiles the product. Settled in relay 45 (``v2v_official.py``: the official build's product
+on these matrices is the port's; ``decided_complex.sh``: the official program with the decided
+``cabs`` and ``csqrt`` prints the port's numbers): glibc's ``hypot``
+(docs/findings/freesurfer-robust-register.md).
 
     python3 -P validation/probes/fs-robust-register/v2v.py [<file with LXDBG lines>]
 """

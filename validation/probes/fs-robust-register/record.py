@@ -37,6 +37,35 @@ def commit() -> str:
     return git("rev-parse", "--short=12", "HEAD") + ("-dirty" if dirty else "")
 
 
+def summary_rows(path: Path | None) -> list[dict]:
+    """A real.py summary's verdicts, times and peaks (never its paths)."""
+    if path is None:
+        return []
+    d = json.loads(path.read_text(encoding="utf-8"))
+    return [
+        {
+            "head": r["head"],
+            "reproduce": r["reproduce_identical"],
+            "fix": r["fix_identical"],
+            "seconds": r["seconds"],
+            "peak_mib": r["peak_mib"],
+        }
+        for r in d["rows"]
+    ]
+
+
+def with_times(rows: list[dict], path: Path | None) -> list[dict]:
+    """``rows`` with the official seconds of ``path``'s rows whose official run was not served."""
+    if path is None:
+        return rows
+    d = json.loads(path.read_text(encoding="utf-8"))
+    t = {r["head"]: r["seconds"]["official"] for r in d["rows"] if not r.get("served")}
+    for r in rows:
+        if r["head"] in t:
+            r["seconds"] = r["seconds"] | {"official": t[r["head"]]}
+    return rows
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--probe", type=Path, nargs="+", required=True)
@@ -48,6 +77,22 @@ def main(argv: list[str] | None = None) -> int:
         nargs="*",
         default=[],
         help="earlier real.py summaries whose official runs were not served (their times)",
+    )
+    ap.add_argument(
+        "--preload",
+        type=Path,
+        help="real.py --preload's summary (relay 45: the official program with the decided cabs "
+        "and csqrt)",
+    )
+    ap.add_argument(
+        "--robent",
+        type=Path,
+        help="real.py --extra '--cost ROBENT ...''s summary (relay 45: the entropy images)",
+    )
+    ap.add_argument(
+        "--robent-times",
+        type=Path,
+        help="an earlier --robent summary whose official runs were not served (their times)",
     )
     ap.add_argument("--golden", required=True)
     ap.add_argument("--golden-fix", required=True)
@@ -118,6 +163,8 @@ def main(argv: list[str] | None = None) -> int:
             for p in probes
         ],
         "golden_sha256": {"official_and_reproduce": a.golden, "fix": a.golden_fix},
+        "decided_complex": summary_rows(a.preload),
+        "entropy_images": with_times(summary_rows(a.robent), a.robent_times),
         "memory": memory,
     }
     a.out.mkdir(parents=True, exist_ok=True)
@@ -161,8 +208,37 @@ def main(argv: list[str] | None = None) -> int:
         "",
         "ds004173-sub-603309's standard output (and its half-way maps on standard error) differ "
         "in the last two printed digits of the final voxel transform's translations (2e-13 of "
-        "210): the transform files are identical; the port computes the source's operation order "
-        "(`v2v.py`); open (`docs/findings/freesurfer-robust-register.md`).",
+        "210); the transform files are identical. The cause is the project's decided `hypot` "
+        "(the user's D4: correctly rounded in both modes, also inside the complex `cabs` and "
+        "`csqrt` of the matrix square roots), where the official program takes glibc's: the "
+        "official build's own product on the port's matrices gives the port's numbers "
+        "(`v2v_official.py`), and the official program with the decided `cabs` and `csqrt` "
+        "preloaded (`decided_complex.sh`, `real.py --preload`) gives the port's output:",
+        "",
+    ]
+    for r in payload["decided_complex"]:
+        same = all(r["reproduce"].values())
+        lines.append(
+            f"- {r['head']} (the decided `cabs` and `csqrt` preloaded): "
+            f"{'identical in every byte' if same else 'DIFFERS'} with `reproduce`"
+            f"{' and `fix`' if all(r['fix'].values()) else ''}."
+        )
+    if payload["entropy_images"]:
+        lines += [
+            "",
+            "The entropy images (`--cost ROBENT --entmov em.mgz --entdst ed.mgz`, the default "
+            "radius 5, after fMRIPrep's arguments; `real.py --extra`):",
+            "",
+        ]
+    for r in payload["entropy_images"]:
+        same = all(r["reproduce"].values())
+        lines.append(
+            f"- {r['head']}: `reproduce` {'identical in every byte' if same else 'DIFFERS'}"
+            f"{', the same with `fix`' if all(r['fix'].values()) else ''}; "
+            f"{r['seconds']['reproduce']} s against FreeSurfer's {r['seconds']['official']} s; "
+            f"peak {r['peak_mib']['reproduce']} MiB against {r['peak_mib']['official']:.1f}."
+        )
+    lines += [
         "",
         "## The whole program against the official one",
         "",
@@ -175,11 +251,13 @@ def main(argv: list[str] | None = None) -> int:
         "iteration and resolution option, double precision, float images, no symmetry, "
         "`--uchar`, white backgrounds, Sobel images, every output (LTA, MINC and register.dat "
         "transforms, `--vox2vox`, the mapped and header-moved images, the weights, the half-way "
-        "outputs, the intensity scale's file, outputs that cannot be written); then seeded pairs "
+        "outputs, the intensity scale's file, outputs that cannot be written), the entropy "
+        "images (`--cost ROBENT`: byte, short and float images, masks, 2-D images, every "
+        "entropy option, a radius below 0, FS-1074); then seeded pairs "
         "of head-like images of every type, extent and orientation with random options. Exit "
         "status, both streams and every file written, case by case; counted apart: the cases "
         "whose result in FreeSurfer is undefined (`check.py`'s `SKIP`) and the paths not ported "
-        "yet (the Powell costs, the entropy images, `--debug`):",
+        "yet (the Powell costs, `--debug`, `--test`):",
         "",
     ]
     for p in payload["probe"]:
@@ -193,10 +271,11 @@ def main(argv: list[str] | None = None) -> int:
         "",
         "## Golden cases",
         "",
-        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_robust_register_golden.rs`: 3 "
+        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_robust_register_golden.rs`: 4 "
         "cases on 32^3 images made with integer arithmetic (fMRIPrep's call with every output, "
         "an affine registration with its half-way outputs, a short source onto a float target "
-        "of anisotropic voxels), on every platform: `reproduce` "
+        "of anisotropic voxels, the entropy images of a short source and a byte target), on "
+        "every platform: `reproduce` "
         f"`{a.golden}` (the official program's value on the same inputs, `check.py --golden`), "
         f"`fix` `{a.golden_fix}`.",
         "",

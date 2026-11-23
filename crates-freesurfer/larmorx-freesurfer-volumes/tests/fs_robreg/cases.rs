@@ -589,9 +589,134 @@ fn seeded(g: &mut Gen) -> String {
     line(None, &files, &[], &args)
 }
 
-/// `n` cases of `seed`: the prelude, then seeded ones.
+/// The entropy images' cases (relay 45, `--cost ROBENT`): byte, short and float sources, a mask
+/// on each side, 2-D images, every entropy option (the radius 0, 1, 2, 9 and below 0, the ball,
+/// the correction and both, the written images), the Sobel image and the intensity scale first.
+pub fn entropy_cases() -> Vec<String> {
+    let mut g = Gen::new(0x0065_6e74);
+    let (a, b) = pair(&mut g, 16, MRI_UCHAR);
+    let mov = write_as(&mut image(&mut g, &a), "mov.mgz");
+    let dst = write_as(&mut image(&mut g, &b), "dst.mgz");
+    let (mut fa, mut sb) = (a, b);
+    fa.ty = MRI_FLOAT;
+    sb.ty = MRI_SHORT;
+    let fmov = write_as(&mut image(&mut g, &fa), "fmov.mgz");
+    let sdst = write_as(&mut image(&mut g, &sb), "sdst.mgz");
+    let mut m = a;
+    m.mask = true;
+    let mask = write_as(&mut image(&mut g, &m), "mask.mgz");
+    let (mut a2, mut b2) = (a, b);
+    a2.dims = [18, 16, 1];
+    b2.dims = [18, 16, 1];
+    let flat_mov = write_as(&mut image(&mut g, &a2), "flatmov.mgz");
+    let flat_dst = write_as(&mut image(&mut g, &b2), "flatdst.mgz");
+    let files = vec![
+        ("mov.mgz".to_owned(), mov),
+        ("dst.mgz".to_owned(), dst),
+        ("fmov.mgz".to_owned(), fmov),
+        ("sdst.mgz".to_owned(), sdst),
+        ("mask.mgz".to_owned(), mask),
+        ("flatmov.mgz".to_owned(), flat_mov),
+        ("flatdst.mgz".to_owned(), flat_dst),
+    ];
+    let base = [
+        "--mov", "mov.mgz", "--dst", "dst.mgz", "--lta", "out.lta", "--cost", "robent",
+    ];
+    let with = |extra: &[&str]| {
+        let mut v = s(&base);
+        v.extend(s(extra));
+        v
+    };
+    let flat = |extra: &[&str]| {
+        let mut v = s(&[
+            "--mov",
+            "flatmov.mgz",
+            "--dst",
+            "flatdst.mgz",
+            "--lta",
+            "out.lta",
+            "--cost",
+            "ROBENT",
+        ]);
+        v.extend(s(extra));
+        v
+    };
+    let cases: Vec<Vec<String>> = vec![
+        with(&["--satit"]),
+        with(&["--sat", "4", "--entradius", "1"]),
+        with(&["--sat", "4", "--entradius", "2", "--entball"]),
+        with(&["--sat", "4", "--entradius", "1", "--entcorrection"]),
+        with(&["--sat", "4", "--entradius", "2", "--entcorrection"]),
+        with(&[
+            "--sat",
+            "4",
+            "--entradius",
+            "1",
+            "--entball",
+            "--entcorrection",
+        ]),
+        with(&[
+            "--sat",
+            "4",
+            "--entradius",
+            "2",
+            "--entmov",
+            "e1.mgz",
+            "--entdst",
+            "e2.mgz",
+        ]),
+        s(&[
+            "--mov",
+            "fmov.mgz",
+            "--dst",
+            "sdst.mgz",
+            "--lta",
+            "out.lta",
+            "--cost",
+            "robent",
+            "--sat",
+            "4",
+            "--entradius",
+            "2",
+            "--entmov",
+            "e1.mgz",
+        ]),
+        with(&[
+            "--sat",
+            "4",
+            "--entradius",
+            "2",
+            "--maskmov",
+            "mask.mgz",
+            "--maskdst",
+            "mask.mgz",
+            "--entdst",
+            "e2.mgz",
+        ]),
+        with(&["--sat", "4", "--entradius", "0"]),
+        with(&["--sat", "4", "--entradius", "-1"]),
+        with(&["--sat", "4", "--entradius", "9"]),
+        with(&["--sat", "4", "--entradius", "1", "--sobel"]),
+        with(&["--satit", "--iscale", "--entradius", "2", "--affine"]),
+        flat(&["--sat", "4", "--entradius", "2", "--entmov", "e1.mgz"]),
+        flat(&[
+            "--sat",
+            "4",
+            "--entradius",
+            "1",
+            "--entcorrection",
+            "--entdst",
+            "e2.mgz",
+        ]),
+        flat(&["--sat", "4", "--entradius", "-2", "--entmov", "e1.mgz"]),
+    ];
+    cases.iter().map(|a| line(None, &files, &[], a)).collect()
+}
+
+/// `n` cases of `seed`: the prelude, the entropy cases, then seeded ones.
 pub fn generate(seed: u64, n: usize) -> Vec<String> {
     let mut out = prelude();
+    out.extend(entropy_cases());
     let mut g = Gen::new(seed);
     while out.len() < n {
         out.push(seeded(&mut g));
@@ -601,8 +726,9 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
 }
 
 /// The golden cases (`tests/mri_robust_register_golden.rs`): 32^3 images (integer arithmetic),
-/// fMRIPrep's call with every output, an affine registration with its half-way outputs, and one
-/// of a short source onto a float target with anisotropic voxels.
+/// fMRIPrep's call with every output, an affine registration with its half-way outputs, one of a
+/// short source onto a float target with anisotropic voxels, and the entropy images of a short
+/// source and a byte target (`--cost ROBENT`, both written).
 pub fn golden_cases() -> Vec<String> {
     let mut g = Gen::new(32);
     let mut a = Img::base(32, MRI_UCHAR);
@@ -666,6 +792,11 @@ pub fn golden_cases() -> Vec<String> {
             "--mov", "smov.mgz", "--dst", "fdst.mgz", "--lta", "reg.lta", "--satit", "--iscale",
             "--mapmov", "mm.mgz",
         ]),
+        // relay 45: the entropy images (the default radius 5 on the short source)
+        s(&[
+            "--mov", "smov.mgz", "--dst", "dst.mgz", "--lta", "reg.lta", "--cost", "ROBENT",
+            "--sat", "4", "--entmov", "em.mgz", "--entdst", "ed.mgz",
+        ]),
     ]
     .iter()
     .map(|args| line(None, &files, &[], args))
@@ -726,21 +857,31 @@ fn collect_all(dir: &Path, prefix: &str) -> Vec<(String, Option<Vec<u8>>)> {
     out
 }
 
-/// The line of the time taken, masked: `Registration took <T> minutes and <T> seconds.`.
+/// The lines of the time taken, masked: `Registration took <T> minutes and <T> seconds.` and the
+/// entropy image's ` Entropy computation took <T> seconds.` (the first of each).
 pub fn mask_time(s: &str) -> String {
-    const HEAD: &str = "Registration took ";
-    let Some(at) = s.find(HEAD) else {
+    let s = mask_one(
+        s,
+        " Entropy computation took ",
+        " Entropy computation took <T> seconds.",
+    );
+    mask_one(
+        &s,
+        "Registration took ",
+        "Registration took <T> minutes and <T> seconds.",
+    )
+}
+
+/// The first `<head>...<n> seconds.` of `s` replaced by `masked`.
+fn mask_one(s: &str, head: &str, masked: &str) -> String {
+    let Some(at) = s.find(head) else {
         return s.to_owned();
     };
-    let rest = &s[at + HEAD.len()..];
+    let rest = &s[at + head.len()..];
     let Some(end) = rest.find(" seconds.") else {
         return s.to_owned();
     };
-    format!(
-        "{}{HEAD}<T> minutes and <T> seconds.{}",
-        &s[..at],
-        &rest[end + " seconds.".len()..]
-    )
+    format!("{}{masked}{}", &s[..at], &rest[end + " seconds.".len()..])
 }
 
 /// Builds a case's folder (`dir`: empty) and returns its arguments, environment and input names.
@@ -792,6 +933,12 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
             err: &mut terr,
             env: &environment,
             dir: Some(dir),
+            // the official side's OMP_NUM_THREADS (the probe's environment: 1)
+            threads: environment
+                .get("OMP_NUM_THREADS")
+                .and_then(|v| v.to_str())
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
         };
         match main(&mut g, &mut r, &args) {
             Ok(()) => 0,
@@ -802,7 +949,14 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
     let d = dir.to_string_lossy().into_owned();
     let mask = |b: &[u8]| mask_time(&escape(b).replace(&escape(d.as_bytes()), "<DIR>"));
     let files = written(dir, &inputs);
-    let text = format!("EXIT {status} | {} | {} | {files}", mask(&out), mask(&err));
+    // libstdc++'s terminate ends with abort (SIGABRT, the official child's `CRASH 6`); the port's
+    // status 134 stands for it
+    let end = if status == 134 {
+        "CRASH 6".to_owned()
+    } else {
+        format!("EXIT {status}")
+    };
+    let text = format!("{end} | {} | {} | {files}", mask(&out), mask(&err));
     let ids = g.notices.as_slice().iter().map(|n| n.defect.id).collect();
     (text, ids)
 }

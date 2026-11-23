@@ -16,7 +16,8 @@ and error, and every file written (byte for byte). The LTA's creation line is fi
 ``FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING`` and ``USER`` on both sides; ``FS_DISABLE_LANG=1``
 on the official side (``docs/findings/freesurfer-info.md``); no ``DIAG_NO``.
 
-    python -P validation/probes/fs-robust-register/real.py [--heads a,b] [--outputs] [--json out.json]
+    python -P validation/probes/fs-robust-register/real.py [--heads a,b] [--outputs] [--extra '<args>']
+        [--preload <lib>] [--json out.json]
 """
 
 from __future__ import annotations
@@ -52,6 +53,14 @@ HEADS = (
 MANIFEST = REPO / "crates-freesurfer" / "Cargo.toml"
 CLI = REPO / "crates-freesurfer" / "target" / "release" / "larmorx-freesurfer"
 TIME = re.compile(rb"Registration took \d+ minutes and \d+ seconds\.")
+# relay 45: the entropy image's time (masked in the comparison only; the cache's policy keeps TIME)
+ENTROPY_TIME = re.compile(rb" Entropy computation took \d+ seconds\.")
+
+
+def masked(b: bytes) -> bytes:
+    return ENTROPY_TIME.sub(b" Entropy computation took <TIME> seconds.", TIME.sub(b"<TIME>", b))
+
+
 FIXED = {
     "LC_ALL": "C",
     "LANG": "C",
@@ -79,18 +88,25 @@ def files(d: Path) -> dict[str, str]:
     }
 
 
+#: relay 45 of track C: arguments added after fMRIPrep's (``--extra``)
+EXTRA: list[str] = []
+
+
 def args_of(mri: Path, outputs: bool) -> list[str]:
     a = ["--mov", str(mri / "T1.mgz"), "--dst", str(mri / "rawavg.mgz"), "--lta", "reg.lta"]
-    a += ["--satit", "--iscale"]
+    a += ["--satit", "--iscale", *EXTRA]
     if outputs:
         for opt, name in OUTS:
             a += [opt, name]
     return a
 
 
-def official(exe: Path, mri: Path, d: Path, outputs: bool) -> dict:
+def official(exe: Path, mri: Path, d: Path, outputs: bool, preload: Path | None = None) -> dict:
     env = {"PATH": f"{exe.parent}:/usr/bin:/bin", "FS_DISABLE_LANG": "1", **FIXED,
            **freesurfer_env()}  # fmt: skip
+    if preload is not None:
+        # relay 45 of track C: the decided cabs and csqrt (decided_complex.sh)
+        env["LD_PRELOAD"] = str(preload)
     if any(k.startswith("DIAG") for k in env):
         raise SystemExit("DIAG_NO would print the licence file")
     if d.exists():
@@ -111,7 +127,7 @@ def official(exe: Path, mri: Path, d: Path, outputs: bool) -> dict:
     )
     return {
         "status": done.returncode,
-        "stdout": TIME.sub(b"<TIME>", done.stdout.encode("utf-8", "surrogateescape")).decode(),
+        "stdout": masked(done.stdout.encode("utf-8", "surrogateescape")).decode(),
         "stderr": done.stderr,
         "files": files(d),
         "seconds": round(time.monotonic() - t0, 1),
@@ -138,7 +154,7 @@ def port(mri: Path, d: Path, mode: str, outputs: bool) -> dict:
     err = "".join(x for x in err.splitlines(True) if not x.startswith("larmorx: "))
     return {
         "status": done.returncode,
-        "stdout": TIME.sub(b"<TIME>", done.stdout).decode("utf-8", "surrogateescape"),
+        "stdout": masked(done.stdout).decode("utf-8", "surrogateescape"),
         "stderr": err,
         "files": files(d),
         "seconds": round(time.monotonic() - t0, 1),
@@ -153,6 +169,18 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--parallel", type=int, default=6)
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--json", type=Path)
+    ap.add_argument(
+        "--extra",
+        default="",
+        help="arguments added after fMRIPrep's, space-separated (e.g. the entropy images: "
+        "'--cost ROBENT --entmov em.mgz --entdst ed.mgz'); outputs in real-extra/",
+    )
+    ap.add_argument(
+        "--preload",
+        type=Path,
+        help="a library for the official program's LD_PRELOAD (decided_complex.sh's: the decided "
+        "cabs and csqrt); its outputs in real-preload/",
+    )
     a = ap.parse_args(argv)
     ws = workspace()
     if ws is None:
@@ -167,13 +195,18 @@ def main(argv: list[str] | None = None) -> int:
     root = (
         ws / "oracles" / "inputs" / "fs-robust-register" / ("real-outputs" if a.outputs else "real")
     )
+    if a.preload is not None:
+        root = root.with_name(root.name + "-preload")
+    if a.extra:
+        EXTRA[:] = a.extra.split()
+        root = root.with_name(root.name + "-extra")
     heads = a.heads.split(",")
     runs = ws / "oracles" / "freesurfer-8.2.0" / "runs"
 
     def one(head: str) -> dict:
         sub = head.split("-", 1)[1]
         mri = runs / f"{head}-classic" / "subjects" / sub / "mri"
-        o = official(exe, mri, root / head / "official", a.outputs)
+        o = official(exe, mri, root / head / "official", a.outputs, a.preload)
         rep = port(mri, root / head / "reproduce", "reproduce", a.outputs)
         fix = port(mri, root / head / "fix", "fix", a.outputs)
         same = {

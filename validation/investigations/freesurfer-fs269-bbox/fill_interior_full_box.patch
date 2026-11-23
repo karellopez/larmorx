@@ -1,0 +1,11 @@
+--- a/crates-freesurfer/larmorx-freesurfer-surf/src/mriflood.rs
++++ b/crates-freesurfer/larmorx-freesurfer-surf/src/mriflood.rs
+@@ -144,7 +144,7 @@ fn shell_box(shell: &[u8], w: i32, h: i32, d: i32, npad: i32) -> MriRegion {
+     let (x, y, z) = (start(lo[0]), start(lo[1]), start(lo[2]));
+     let size = |l: i32, u: i32, extent: i32, st: i32| {
+         u.wrapping_sub(l)
+-            .wrapping_add(two)
++            .wrapping_add(two + 1)
+             .min(extent.wrapping_sub(st))
+     };
+     MriRegion {

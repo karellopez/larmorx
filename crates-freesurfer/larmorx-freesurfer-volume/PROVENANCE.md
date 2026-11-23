@@ -257,3 +257,9 @@ here); `include/macros.h`'s `MAX`; the official build's operand orders from the 
   `MRIvol2Vol` and `MRIvol2VolVSM` (`vol2vol.rs`), `MRIresampleFill` (`resample.rs`) and fs.gca's
   `GCAMmorphToAtlas` (track A's `larmorx-freesurfer-gca/src/morph.rs`) now sample cubic B-splines through it.
 - `src/mrihisto.rs`, relay 39: FS-965 (memory: an automatic bin count above 2^26 an error in both modes).
+- Relay 45 of track C (track E's R16.5; `docs/findings/freesurfer-volume.md` §32): `src/mri2ops.rs`
+  `MRIcropAroundRAS` FS-268 (rule A: each voxel axis takes the field of view its letter names; `reproduce`
+  FreeSurfer's assignment) and FS-515's `reproduce` (FreeSurfer's assignment, the unset field 0); `src/region.rs`
+  FS-269 (measured: rule A where the box ends before the mask's last voxel, a pad after it of 0 or less, rule C
+  otherwise; `REGIONgetBoundingBox` and `REGIONgetBoundingBoxM` share `padded_box`); `src/aseg2vol.rs`
+  `MRIaseg2volMU` FS-270 (rule B: the program ends after `LTAconcat`'s refusal in both modes).

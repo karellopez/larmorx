@@ -4,7 +4,7 @@
 //! `mri_robust_register`'s golden cases on every platform: the program on 32^3 images made with
 //! integer arithmetic (`fs_robreg/cases.rs`' `golden_cases`: fMRIPrep's call with every output, an
 //! affine registration with its half-way outputs, a short source onto a float target of
-//! anisotropic voxels), the SHA-256 of each case's line (exit status, standard output and error,
+//! anisotropic voxels, the entropy images), the SHA-256 of each case's line (exit status, standard output and error,
 //! every file written; the time taken masked), against the value FreeSurfer 8.2.0's official
 //! program gives on the same inputs (`validation/probes/fs-robust-register/check.py --golden`,
 //! Linux x64) with `reproduce`, and against the port's own Linux x64 value with the default.
@@ -15,10 +15,11 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-22 by `check.py --golden` from the official program on Linux x64: 3 cases.
-const OFFICIAL_SHA256: &str = "069de7ceeaff8f3826ba76ef4333a0bfd0c233ed57a2b45a138683492badd6c7";
+/// Recorded 2026-11-22 by `check.py --golden` from the official program on Linux x64: 3 cases;
+/// re-recorded 2026-11-23 (relay 45): 4 cases, the entropy images added.
+const OFFICIAL_SHA256: &str = "f2ea31fe966f1da9e8974416edb219442818e06f9d2a412ff47b1ba6e0cea2a1";
 /// The port's default on Linux x64.
-const FIX_SHA256: &str = "069de7ceeaff8f3826ba76ef4333a0bfd0c233ed57a2b45a138683492badd6c7";
+const FIX_SHA256: &str = "f2ea31fe966f1da9e8974416edb219442818e06f9d2a412ff47b1ba6e0cea2a1";
 
 fn cases_digest(mode: UpstreamDefects) -> String {
     let mut h = Sha256::new();

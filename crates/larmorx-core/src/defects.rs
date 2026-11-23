@@ -1393,8 +1393,8 @@ defects! {
         "mapping a segmentation onto another grid with a tissue-type vote (MRIaseg2vol with a colour table) whose tissue-type table has no places takes, as the vote's tissue type, the one an earlier vote of the same program chose (0 in its first): a later call's labels depend on the earlier calls";
     FS_268 = "FS-268", "FreeSurfer", true,
         "cropping around an RAS point (MRIcropAroundRAS) gives the fields of view, which it documents in RAS order (left-right, front-back, up-down), to the voxel axes the other way round: for an orientation that moves all three axes (SRA, ASR, PIL, ASL and the like) each axis gets another axis's field of view";
-    FS_269 = "FS-269", "FreeSurfer", false,
-        "the bounding box of a mask (REGIONgetBoundingBox, REGIONgetBoundingBoxM) is one voxel smaller on each axis than the voxels it should bound: without a pad it leaves out the mask's last voxel, with a pad the far side's pad is one voxel short (being measured: both modes keep the original's size)";
+    FS_269 = "FS-269", "FreeSurfer", true,
+        "the bounding box of a mask (REGIONgetBoundingBox, REGIONgetBoundingBoxM) is one voxel smaller on each axis than the voxels it should bound: without a pad after the mask (or a negative one) it leaves out the mask's last voxels on that axis, corrected by default; with a pad of 1 or more only the far side's last padding voxel, outside the mask, is missing, kept in both modes (pipelines rely on it: recon-all's SynthMorph crop)";
     FS_270 = "FS-270", "FreeSurfer", true,
         "mapping a segmentation onto another grid with upsampling (MRIaseg2volMU with an upsampling factor) when the segmentation is at neither end of the registration crashes the program after the concatenation's refusal";
     FS_331 = "FS-331", "FreeSurfer", true,
@@ -3235,6 +3235,8 @@ defects! {
         "the robust registration in double precision with an intensity scale (`--doubleprec --iscale`) of a rigid 3-D, affine 2-D or 3-D, isotropic-scale 2-D or translation 2-D model builds each step's transformation with its first two parameters replaced by memory contents (with glibc's allocator: a tiny positive number and 0: the step's translation along x and y lost); by default the step's solution";
     FS_1072 = "FS-1072", "FreeSurfer", true,
         "mri_robust_register given a non-linear initial transform (--ixform of a morph) reads the morph as a linear transform array: memory it does not own; an error in both modes";
+    FS_1074 = "FS-1074", "FreeSurfer", true,
+        "mri_robust_register's entropy images (--cost ROBENT) with an --entradius below 0 abort (an uncaught std::bad_array_new_length, status 134) for a 3-D image and give an image of zeros for a 2-D one; a radius whose box of weights holds 2^31 or more entries aborts or writes past its weights; by default an error, status 1";
 }
 
 /// The register entry with ID `id`.

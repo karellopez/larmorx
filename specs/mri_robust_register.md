@@ -2,8 +2,8 @@
 
 Status: the robust cost complete (queue item 3.2-13, part 1: the command line, every message of
 the robust registration's path, its outputs, the exit statuses, the defects with their switches,
-the validation plan, §7); not yet specified: the Powell registration's costs, the entropy images,
-the test mode and the debug output (§6). Written by the replica's author (track C, relay 44) as the
+the validation plan, §7); the entropy images (`--cost ROBENT`, §2.1; relay 45); not yet specified:
+the Powell registration's costs, the test mode and the debug output (§6). Written by the replica's author (track C, relay 44) as the
 spec writer: behaviour, conventions and messages, for the clean room (`larmorx-fs-volumes`), which
 works from this file, the library modules' specs (`specs/freesurfer-robust.md` §16 for the
 registration itself, `freesurfer-volume.md` for the transforms' reading, conversion, writing and
@@ -105,8 +105,73 @@ than one frame: `<progname>: only pass single frame MRI source <mov>.\n`, likewi
 is kept for the outputs. Its mask (`reading source mask '<mask>'...`; not read: `<progname>: could not
 open mask volume <mask>.\n`, `ERROR_NOFILE`). With `--sobel`: `Converting mov to sobel magnitute
 image ...` and the image replaced by its Sobel magnitude (a `float` image with the source's header).
-The mask applied (voxels where the mask is 0 set to 0). The same for the target (`reading target
-'<dst>'...`, `MRI target`, `reading target mask`, `Converting dst to sobel magnitute image ...`).
+With `--cost ROBENT` the image is replaced by its entropy image (§2.1: `Converting mov to entropy
+image (radius <r> ) ... (can take 1-2 min)`, the mask passed to it, not applied); written to
+`--entmov`'s name when given (FreeSurfer's volume writer); then ` Entropy computation took <s>
+seconds.` (the seconds from the clock, rounded to the nearest whole second). Otherwise the mask
+applied (voxels where the mask is 0 set to 0). The same for the target (`reading target
+'<dst>'...`, `MRI target`, `reading target mask`, `Converting dst to sobel magnitute image ...`,
+`Converting dst to entropy image ...`, `--entdst`; no time line for the target).
+
+### 2.1 The entropy images (`--cost ROBENT`; `--entradius`, `--entball`, `--entcorrection`)
+
+The radius `r` (`--entradius`, 5 by default), the ball (`--entball`), the correction
+(`--entcorrection`). In this order:
+1. An image of more than one frame: `MyMRI::entropyImage multiple frames not supported!` on standard
+   error, status 1 (unreachable here: the program refuses such images first).
+2. With the correction and `r > 1`: `WARNING: using correction mode with radius > 1 may take a very
+   long time !` and `         Correction usually allows small radis (e.g. 1 in 3D).` on standard output.
+3. With a mask: the mask resampled onto the image's grid (its voxel-to-voxel map from the mask to the
+   image, nearest neighbour; `specs/freesurfer-volume.md`'s linear transform of a volume); a voxel is
+   inside where that value truncated to `int` is above 0 (a NaN, or a value of 2^31 or more, is
+   outside).
+4. An image that is not bytes: `  - changing data type from <type> to 0 (noscale = 0)...` and the
+   image changed to bytes as FreeSurfer's change of type does with the histogram's 0 and 0.999 (no
+   result: `ERROR: MRISeqchangeType`, status 1). Each voxel's byte `I` (0 to 255) is the histogram
+   bin.
+5. The Gaussian: `ssize = 2 r + 1`; `sigma = ssize / (4 sqrt(2 log 2))` in `double`, printed as
+   `  - compute Gaussian cube( size: <ssize> )  sigma: <sigma>` (C++'s default format). Its weights over
+   the cube `x, y, z = 0..ssize-1` (in 2-D, an image of one slice, only `z` = 0 with its term 0), `z`
+   outermost, `x` innermost: with `s2 = (2 sigma) sigma`, `zs = (z - r)^2 / s2` (as `zs = z - r`, then
+   `zs * zs / s2`), likewise `ys`, `xs`, the weight `exp((-xs - ys) - zs)`, their sum added in that
+   order, then each weight divided by the sum. FS-1074: a cube of a negative count of weights (`r` below
+   0 in 3-D) or of `2^31` or more (as `int`) ends here; in 2-D a negative `r` gives a valid count
+   (`ssize^2`) and an image of zeros (step 7 finds no voxel of the box) in FreeSurfer.
+6. The result: a `float` image with the source's header (the image before step 4). `xmax = width - r -
+   1`, `ymax`, `zmax` likewise; with the correction each one less; in 2-D `zmax = 0`. Printed:
+   `  - compute entropy image now (threads=<n>)... ` (with the correction: `  - compute entropy image
+   now with correction (threads=<n>)... `), `<n>` OpenMP's thread count (`OMP_NUM_THREADS`, else every
+   logical CPU; at most 128).
+7. Each voxel `(x, y, z)`: 0 when `x < r`, `y < r` or `x > xmax`, `y > ymax` (in 3-D also `z < r`, `z >
+   zmax`), or outside the mask. Otherwise a histogram of 256 bins, all 0, then over the box `zz = -r..r`
+   (2-D: `zz = 0` only), `yy = -r..r`, `xx = -r..r` in that order with a running index `k` from 0: with
+   the ball, a box voxel with `zz^2 - r^2 + yy^2 + xx^2 > 0` (in `int`) is skipped (`k` still counts it);
+   without the correction `histo[I(x+xx, y+yy, z+zz)] += weight[k]` and `k` advances; with the
+   correction (`k` unused) the box voxel's cube adds tetrahedral densities (below). Then `sum` = the 256
+   bins added in order; `entropy = 0`, and for each bin in order whose value is above 0, `p = bin /
+   sum`, `entropy = entropy - p log p`; the voxel is the entropy as `float`. A negative or NaN entropy
+   prints ` ERROR in MyMRI::entropyImage: entropy is negative or nan ? ` on standard error (it never
+   happens: the weights are positive). The voxels are independent: the result does not depend on the
+   threads.
+8. The correction's densities: in 3-D the cube's corners `v1 = I(p)`, `v2 = I(p + x)`, `v3 = I(p + y)`,
+   `v4 = I(p + z)`, `v5 = I(p + x + y)`, `v6 = I(p + x + z)`, `v7 = I(p + y + z)`, `v8 = I(p + x + y + z)`
+   give five tetrahedra in this order: `(v1, v2, v3, v4)`, `(v5, v2, v3, v8)`, `(v7, v8, v3, v4)`, `(v6,
+   v2, v8, v4)`, `(v8, v2, v3, v4)`; in 2-D one: `(I(p), I(p + x), I(p + y), I(p + x + y))`. A
+   tetrahedron's density over the 256 bins: its four values sorted `I3 <= I2 <= I1 <= I0`, `c = I2 -
+   I3`, `b = I1 - I3`, `a = I0 - I3` (unsigned); all equal: 1 at `I3`. Otherwise a density `t` of 256
+   zeros; where `I3 != I2`, for the integers `i = I3..I2` the sample point `s = i` (the first `+ 0.25`,
+   the last `- 0.25`), `t[i] = ((((3 / a) (s - I3)) / b) (s - I3)) / c` with `3 / a` computed in `float`
+   (single precision, then widened), the first and last halved; where `I2 != I1`, for `i = I2..I1`
+   (sampled likewise, replacing `t[I2]`), `t[i] = (3 / a) (((I1 - s) / (b - c)) ((s - I3) / b) + ((I0 -
+   s) / (a - c)) ((s - I2) / (b - c)))`, the ends halved; where `I1 != I0`, for `i = I1..I0` (replacing
+   `t[I1]`), `t[i] = (3 / a) (((I0 - s) / (a - c)) ((I0 - s) / (a - b)))`, the ends halved; then `t`
+   divided by its sum (the 256 values added in order). The density is added to the histogram bin by bin.
+9. With the correction the image is then moved by half a voxel: resampled by the translation `(0.5,
+   0.5, 0.5)` (a `float` matrix) with cubic B-splines (`specs/freesurfer-volume.md`, `specs/freesurfer-
+   bspline.md`).
+
+`log` and `exp` are the C library's: correctly rounded by default, glibc 2.35's with `reproduce`
+(nothing is named for them).
 
 The initial transform (`--ixform`): an empty line, `reading initial transform '<name>'...`, the file
 read as FreeSurfer's transform reader reads it (`specs/freesurfer-volume.md`); none:
@@ -186,8 +251,8 @@ registration (`--maxit`, `--epsit`).
 
 0; 1 (the help, an unknown option or cost, a failed check, the `--mapmovhdr` write, `--uchar`'s
 change of type, FS-1070 by default, the paths of §6); 251, 252, 255 (`ErrorExit` above, and the
-library's: the registration's own, `specs/freesurfer-robust.md` §16); 134 (FS-1070 and FS-1071 with
-`reproduce`).
+library's: the registration's own, `specs/freesurfer-robust.md` §16); 134 (FS-1070, FS-1071 and
+FS-1074 with `reproduce`); FS-1074 by default 1.
 
 ## 5. The defects (`larmorx_core::defects`)
 
@@ -204,16 +269,22 @@ library's: the registration's own, `specs/freesurfer-robust.md` §16); 134 (FS-1
 - **FS-1072** (memory): `--ixform` of a non-linear transform (a morph): read as an LTA. An error in
   both modes (`<progname>: <name> is not a linear transform (FreeSurfer reads the morph as one here)`,
   `ERROR_BADFILE`), noted.
+- **FS-1074** (crash; rule B): `--cost ROBENT` with `--entradius` below 0: FreeSurfer prints the
+  Gaussian line (a negative size and sigma), then aborts for a 3-D image (`terminate called after
+  throwing an instance of 'std::bad_array_new_length'` and `  what():  std::bad_array_new_length` on
+  standard error, status 134) and for a 2-D image registers images of zeros; a radius whose cube of
+  weights holds `2^31` or more (as `int`) aborts or writes past its weights. By default
+  `MyMRI::entropyImage: the entropy radius <r> gives no box of voxels (FreeSurfer fails here)` on
+  standard error, status 1; `reproduce` the abort's two lines and 134 where the count is negative,
+  the zeros in 2-D, the error otherwise; noted.
 - The library's: FS-1063, FS-1073 (double precision with the intensity scale), FS-1062, FS-1067,
   FS-1068, FS-1069 (`specs/freesurfer-robust.md` §14 and §16).
 
 ## 6. Not specified yet (the replica ends each with its own message and status 1)
 
 The Powell registration (every `--cost` but `ROB` and `ROBENT`: the replica ends before reading the
-images; FreeSurfer reads them, registers and writes as above), the entropy images (`--cost ROBENT`:
-after `Converting mov to entropy image (radius <r> ) ... (can take 1-2 min)`), the test mode
-(`--test`: after its line) and the debug output (`--debug`: the library's intermediate images and key
-presses).
+images; FreeSurfer reads them, registers and writes as above), the test mode (`--test`: after its
+line) and the debug output (`--debug`: the library's intermediate images and key presses).
 
 ## 7. Validation plan (for the clean room)
 
@@ -222,7 +293,11 @@ presses).
   subjects/<subject>/mri/`), against the official program at one thread: the transform byte for byte,
   standard output with the time taken masked (**(observed)**: identical on five heads; on
   ds004173-sub-603309 the final voxel transform's x and z translations differ in their last two
-  printed digits, 2e-13 of 210, an open item of the replica); with every output (`--mapmov`,
+  printed digits, 2e-13 of 210: the official program takes the complex absolute value and square root
+  of its matrix square roots from glibc, whose `hypot` is not correctly rounded, where the project
+  decided the correctly rounded `hypot` in both modes (`specs/freesurfer-robust.md`); with those two
+  functions given the correctly rounded `hypot` (a preload) the official program's output is
+  identical on all six heads (**(observed)**)); with every output (`--mapmov`,
   `--weights`, the half-way outputs) on two heads: every file byte for byte (**(observed)**).
 - Synthetic cases (small head-like images of every type, extent and orientation; every option and
   output, the failures of §1-§3), case by case against the official program in a folder of its own
@@ -231,3 +306,9 @@ presses).
   exit status, both streams (the time taken masked) and every file written; with `reproduce`
   identical but FS-1063's, FS-1067's to FS-1072's and the library's crash cases; the default differs
   only where a defect it corrects is noted.
+- The entropy images (`--cost ROBENT`): 16^3 byte images and a float source onto a short target, a mask
+  on each side, 2-D images (18 x 16 x 1), the radius 0, 1, 2, 9 (every voxel on the border) and below
+  0, the ball, the correction (with the warning at a radius of 2) and both, `--entmov` and `--entdst`,
+  the Sobel image first, the intensity scale with an affine model: every case identical with
+  `reproduce`, FS-1074's abort included (its status 134 compared with the official child's SIGABRT)
+  (**(observed)**: 17 cases).

@@ -12,7 +12,11 @@
 //! (`reading source '<mov>'...`; not read: `<progname>: could not open MRI source <mov>.`, more than
 //! one frame `<progname>: only pass single frame MRI source <mov>.`, both `ERROR_NOFILE`), kept as
 //! read; its mask read (`reading source mask '<mask>'...`) and applied (`MRImask`), or the Sobel
-//! magnitude taken first (`--sobel`); the same for the target. The initial transform (`--ixform`,
+//! magnitude taken first (`--sobel`); with `--cost ROBENT` the image made its local entropy
+//! instead of being masked (`Converting <mov|dst> to entropy image (radius <r> ) ... (can take 1-2
+//! min)`, `MyMRI::entropyImage` with the mask: [`larmorx_freesurfer_robust::entropy`]; written
+//! with `--entmov` / `--entdst`; the source's ` Entropy computation took <s> seconds.`, from the
+//! clock); the same for the target. The initial transform (`--ixform`,
 //! `TransformRead`: an LTA's first transform, its missing geometries taken from the images with a
 //! warning, made RAS to RAS, its geometries replaced by the images' where they differ
 //! (`LTAmodifySrcDstGeom`), made voxel to voxel); the initial intensity scale (`--iscalein`, the
@@ -36,9 +40,8 @@
 //!
 //! Not ported yet (each ends with its message and status 1): the Powell registration of the other
 //! costs (`--cost` `LS`, `MI`, `NMI`, `ECC`, `NCC`, `SCR`, `TB`, `LNCC`, `SAD`, `SB`:
-//! `RegPowell`, `CostFunctions`, `JointHisto`), the entropy images (`--cost ROBENT`:
-//! `MyMRI::entropyImage`), the test mode (`--test`) and the debug output of `--debug` (the
-//! library's intermediate images and its key presses).
+//! `RegPowell`, `CostFunctions`, `JointHisto`), the test mode (`--test`) and the debug output of
+//! `--debug` (the library's intermediate images and its key presses).
 //!
 //! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-robust-register.md`):
 //! - FS-1070: [`super::options`].
@@ -76,6 +79,7 @@ use larmorx_freesurfer_mri::mri::{
 };
 use larmorx_freesurfer_mri::vol_geom::extract_i_to_r;
 use larmorx_freesurfer_mri::voxel::mri_get_vox_val;
+use larmorx_freesurfer_robust::entropy::{EntropyParams, entropy_image};
 use larmorx_freesurfer_robust::mymatrix::{
     convert_matrix2vnl, convert_vnl2matrix, polar2_decomposition,
 };
@@ -112,6 +116,7 @@ pub fn run(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut 
             err: &mut terr,
             env: &settings.env,
             dir: settings.dir.as_deref(),
+            threads: settings.threads,
         };
         match main(&mut g, &mut r, args) {
             Ok(()) => 0,
@@ -674,17 +679,42 @@ fn read_image(
         mri_sobel(g, r.out, r.err, &temp, None, Some(&mut m))?;
     }
     if p.entropy {
+        // the source's conversion is timed (the target's is not)
+        let mut start = Timer::new();
+        start.reset();
         let _ = writeln!(
             r.out,
             "Converting {short} to entropy image (radius {} ) ... (can take 1-2 min)",
             p.entroradius
         );
-        let _ = r.out.flush();
-        let _ = writeln!(
-            r.err,
-            "mri_robust_register: the entropy images (--cost ROBENT, MyMRI::entropyImage) are not ported yet"
-        );
-        return Err(Fatal::Exit(1));
+        let params = EntropyParams {
+            radius: p.entroradius,
+            ball: p.entball,
+            correction: p.entcorrection,
+            threads: r.threads,
+        };
+        let mut temp = m;
+        m = entropy_image(g, r.out, r.err, r.env, &mut temp, params, mask_vol.as_ref())?;
+        drop(temp);
+        let name = if short == "mov" { &p.entmov } else { &p.entdst };
+        if !name.is_empty() {
+            mri_write(
+                g,
+                r.out,
+                r.err,
+                r.env,
+                r.dir,
+                &mut m,
+                name,
+                None,
+                MGZ_INTENT_UNKNOWN,
+            )?;
+        }
+        if short == "mov" {
+            let msec = start.milliseconds();
+            let seconds = nint(g, (msec as f32 / 1000.0) as f64);
+            let _ = writeln!(r.out, " Entropy computation took {seconds} seconds.");
+        }
     } else if let Some(mk) = mask_vol.as_ref() {
         mri_mask(g, r.out, r.err, r.env, Pair::Same(&mut m), mk, 0, 0.0)?;
     }

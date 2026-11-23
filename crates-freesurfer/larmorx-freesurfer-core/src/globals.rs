@@ -97,6 +97,9 @@ pub struct Globals {
     /// `vg_isEqual_Threshold` (`transform.h`): the tolerance of `VOL_GEOM::operator==` and
     /// `vg_isEqual`, `FLT_EPSILON` until a program sets it (several set 1e-3).
     pub vg_is_equal_threshold: f64,
+    /// `chklc`'s `chklc_done`: whether the licence check ran in this run (its first call clears
+    /// `errno`).
+    pub chklc_done: bool,
     /// `MRIIO_Strip_Pound` (`mri.h`: 1): `MRIgetVolumeName` also removes what follows a name's
     /// last `#`.
     pub mriio_strip_pound: i32,
@@ -231,6 +234,7 @@ impl Globals {
             matrix_alloc_old: false,
             drand48: Drand48::default(),
             vg_is_equal_threshold: f64::from(f32::EPSILON),
+            chklc_done: false,
             mriio_strip_pound: 1,
             n_zero_pad_input: -1,
             n_zero_pad_output: -1,

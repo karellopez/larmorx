@@ -920,7 +920,7 @@ pub fn parse_commandline(
             nargsused = 1;
         } else if istringnmatch(option, "--spm-warp", 0) {
             if nargc < 5 {
-                let _ = writeln!(r.out, "  --spm-warp mov movlta warp interp output");
+                let _ = writeln!(r.out, "  --spm-warp mov movlta warp interp out");
                 return Err(argnerr(r, option, 6));
             }
             return Err(not_ported(

@@ -83,7 +83,7 @@ use larmorx_freesurfer_volume::ltaops::lta_change_type;
 use larmorx_freesurfer_volume::ltawrite::lta_write;
 use larmorx_freesurfer_volume::orient::mri_set_voxel_to_ras_xform;
 use larmorx_freesurfer_volume::vol2vol::{
-    mri_vol2vol, mri_vol2vol_delta, mri_vol2vol_fill, mri_vol2vol_tl_kernel, mri_vol2vol_vsm,
+    mri_vol2vol, mri_vol2vol_delta, mri_vol2vol_fill, mri_vol2vol_tl_kernel, mri_vol2vol_vsm_env,
     transform_reg_dat2_lta,
 };
 use larmorx_freesurfer_volume::voxops::{
@@ -799,7 +799,8 @@ fn resample(
             if o.vsmlta.is_some() {
                 let _ = writeln!(r.out, "Using vsmlta");
             }
-            mri_vol2vol_vsm(
+            let env = r.env.clone();
+            mri_vol2vol_vsm_env(
                 g,
                 r.out,
                 r.err,
@@ -811,6 +812,7 @@ fn resample(
                 vsm.as_ref(),
                 o.vsmlta.as_ref(),
                 o.pedir,
+                &env,
             )?;
         }
     }

@@ -343,7 +343,9 @@ pub fn mri_vol2vol_tl_kernel(
 /// Messages: `ERROR: MRIvol2volVSM(): source and target have different number of frames` (1);
 /// `ERROR: MRIvol2volVSM: pedir=<p>, must be +/-1, +/-2, +/-3` with a map, then `exit(1)`; with
 /// `DIAG_VERBOSE`, `Using MRIvol2VolVSM` and `MRIvol2VolVSM interp=<i>, param=<p>, pedir=<d>`
-/// first; with `Gdiag_no > 0` the matrix as [`mri_vol2vol`]. 0 otherwise. FS-482.
+/// first; with `Gdiag_no > 0` the matrix as [`mri_vol2vol`]. 0 otherwise. FS-482. A `vsmlta` of
+/// another type is changed to voxel-to-voxel on a copy (`LTAchangeType`; [`mri_vol2vol_vsm_env`]
+/// with an empty environment: the FSL type's conversion would read `FSLOUTPUTTYPE`).
 #[allow(clippy::too_many_arguments)]
 pub fn mri_vol2vol_vsm(
     g: &mut Globals,
@@ -357,6 +359,29 @@ pub fn mri_vol2vol_vsm(
     vsm: Option<&Mri>,
     vsmlta: Option<&Lta>,
     pedir: i32,
+) -> Result<i32, Fatal> {
+    let env = Environment::default();
+    mri_vol2vol_vsm_env(
+        g, out, err, src, targ, vt2s, interp, param, vsm, vsmlta, pedir, &env,
+    )
+}
+
+/// [`mri_vol2vol_vsm`] with the program's environment for `LTAchangeType` (track A's relay 53,
+/// for `mri_vol2vol --vsm-reg`: FreeSurfer changes the transform's copy to voxel-to-voxel).
+#[allow(clippy::too_many_arguments)]
+pub fn mri_vol2vol_vsm_env(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    src: &Mri,
+    targ: &mut Mri,
+    vt2s: Option<&Matrix>,
+    interp: i32,
+    param: f32,
+    vsm: Option<&Mri>,
+    vsmlta: Option<&Lta>,
+    pedir: i32,
+    env: &Environment,
 ) -> Result<i32, Fatal> {
     if g.gdiag & DIAG_VERBOSE != 0 {
         let _ = writeln!(out, "Using MRIvol2VolVSM");
@@ -384,17 +409,10 @@ pub fn mri_vol2vol_vsm(
             return Err(Fatal::Exit(1));
         }
         if let Some(l) = vsmlta {
-            let copy = lta_copy(g, out, err, l, None)?
+            let mut copy = lta_copy(g, out, err, l, None)?
                 .into_new()
                 .expect("LTAcopy makes a new transform");
-            if copy.ltype != LINEAR_VOX_TO_VOX {
-                log::error_exit(
-                    g,
-                    err,
-                    ERROR_UNSUPPORTED,
-                    "MRIvol2VolVSM: a voxel-shift transform that is not voxel-to-voxel needs LTAchangeType (3.1-39, not yet ported)\n",
-                )?;
-            }
+            lta_change_type(g, out, err, env, &mut copy, LINEAR_VOX_TO_VOX)?;
             let m = copy.xforms.first().and_then(|x| x.m_l.as_ref());
             vsm_v2v = matrix_copy(g, out, err, m, None)?.into_new();
         }

@@ -2,8 +2,10 @@
 
 Status: the robust cost complete (queue item 3.2-13, part 1: the command line, every message of
 the robust registration's path, its outputs, the exit statuses, the defects with their switches,
-the validation plan, §7); the entropy images (`--cost ROBENT`, §2.1; relay 45); not yet specified:
-the Powell registration's costs, the test mode and the debug output (§6). Written by the replica's author (track C, relay 44) as the
+the validation plan, §7); the entropy images (`--cost ROBENT`, §2.1; relay 45); the Powell
+registration with `--cost` `LS`, `NCC`, `TB`, `LNCC` and `SAD` (§2.2; relay 46); not yet specified:
+the joint-histogram costs, `SB`, the Powell registration's half-way outputs, the test mode and the
+debug output (§6). Written by the replica's author (track C, relay 44) as the
 spec writer: behaviour, conventions and messages, for the clean room (`larmorx-fs-volumes`), which
 works from this file, the library modules' specs (`specs/freesurfer-robust.md` §16 for the
 registration itself, `freesurfer-volume.md` for the transforms' reading, conversion, writing and
@@ -197,6 +199,80 @@ unless `--floattype`), and: with `--satit`, the saturation search (§16.6) and t
 registration; with `--nomulti`, the iterations on the full images; otherwise the multiresolution
 registration (`--maxit`, `--epsit`).
 
+### 2.2 The Powell registration (`--cost` `LS`, `NCC`, `TB`, `LNCC`, `SAD`; `--powelltol`)
+
+Every cost but `ROB` (and `ROBENT`) registers by Powell's method instead of the robust iterations.
+The images may then change type (as with `--floattype`: `setSourceAndTarget` with `keeptype =
+FALSE`), the saturation and weight limit are not used, `--satit` runs no saturation search (only the multiresolution registration), and the
+models are each model's "second type" (`specs/freesurfer-robust.md` §15: translation, rigid,
+isotropic scale and affine of the second parametrisation; `--iscaleonly` gives the affine model).
+The tolerance is `--powelltol`'s (default 1e-5) for both the parameters and the value.
+
+At each level of the multiresolution registration (or once on the full images with `--nomulti`):
+1. `RegPowell::computeIterativeRegistrationFull`, ` sym: <1|0>` (symmetry); a 2-D image with a 3-D
+   one: `ERROR: both source and target need to be 2D or 3D`, status 1.
+2. Each image as bytes: unless it is bytes already, `changing data type from <t> to 0 (noscale =
+   0)...` and the change of type with the 0 to 99.9 % histogram range (`MRISeqchangeType(…, 0, 0.999,
+   no scaling FALSE)`; a failure `ERROR: MRISeqchangeType`, status 1); then stretched to 0..255:
+   every voxel `v` of every frame becomes `(v - min) * (255 / (max - min))` (the factor a `float`
+   division of the `float` extremes over all frames; the byte rules of `specs/freesurfer-robust.md`
+   §2.1's scaling); each keeps its image's outside value.
+3. The start: the level's transform passed in (verbose 2: `     initial M passed ... `), else the
+   initial transform (`--ixform`, resampled; `     initial M from resample ... `), else §16's initial
+   alignment of the two byte images (`     initialize transform M ... `). The intensity's start: the
+   level's scale when it is not 1, else `--iscalein`'s; its natural log `s0`. Verbose 2: `   - initial
+   iscale: <i>`, `   - initial transform:` and the matrix as C++ prints a VNL fixed matrix (each row's
+   four numbers separated by one blank, one row per line) and an empty line.
+4. With symmetry `mh1` is the start's matrix square root and `mh2 = (mh1 * M0^-1)^-1` (so `M0 = mh2 *
+   mh1`); without, `mh1 = M0` and `mh2 = I`.
+5. The parameters: the model's (its identity) and, with the intensity scale, one more starting at
+   `s0`. Subsampling: when the subsampling size is not above 0 it becomes 150 (for the rest of the
+   run); when all three of the target's extents exceed it, `   - subsampling this resolution ... ` and
+   every second voxel. `   - compute new registration ( <n> params )`.
+6. The cost of parameters `p` (`T(p)` the model's matrix; with the intensity scale the last parameter
+   `s`, otherwise 0): `M = (mh2 * T(p)) * mh1`; with symmetry `mti = sqrt(M)` and `msi = M^-1 * mti`,
+   otherwise `msi = M^-1`, `mti = I`. The source is sampled at `msi * (x, y, z)` and the target at
+   `mti * (x, y, z)` (trilinear, frames by number; outside the volume -1, which skips the pair) for the
+   target's voxels from 0 below `extent - d + 1` in steps of `d` (the subsampling, 1 or 2), each frame,
+   in slice, row, column order; every sum in that order from 0:
+   - `LS`: `sum ((si vs) - (sii vt))^2` with `si = sqrt(exp(s))`, `sii = 1 / si` (both 1 without the
+     intensity scale);
+   - `SAD`: `sum |(si vs) - (sii vt)|`;
+   - `TB`: the differences `vs - vt` stored as `float` (slice `z / d` from `(z / d) ((width + 1) / d)
+     ((height + 1) / d) frames`, the unused entries 0), then `sum rho(e)` over all of them in order,
+     `rho(e) = c^2 / 2` beyond `|e| > c`, else `(c^2 / 2) (1 - (1 - (e / c)^2)^3)`, `c = 4.6851`;
+   - `NCC`: both images first resampled onto grids of `((extent - 1) / d) + 1` voxels per axis of their
+     own extents (voxel `(i, j, k)` the sample at the map times `(i d, j d, k d)`, stored as `float`),
+     each frame's mean over its voxels that are not -1; then over the target grid's voxels and frames
+     where neither is -1: `-|sum ds dt| / (sqrt(sum ds^2) sqrt(sum dt^2))`, `ds = vs - mean_s`, `dt = vt
+     - mean_t` (a source grid smaller than the target's is read as the volume reader reads outside a
+     volume);
+   - `LNCC`: both resampled at every voxel as for `NCC`; for the block centres `(x, y, z)` from 2 below
+     `extent - 7` in steps of 5 on each axis of the target, each frame: the 5 x 5 x 5 block's means,
+     then `|sum (vt - mt)(vs - ms)| / (sqrt(sum (vt - mt)^2) sqrt(sum (vs - ms)^2))` added to a total;
+     a block holding a -1 in either image ends that centre (its later frames too), a block of no
+     variance in either adds nothing; the cost is `-total / count` (the count of blocks added; 0
+     blocks give NaN). A NaN total prints `d is nan <dd> <svar> <tvar>` and ends (status 1).
+7. ` - initial cost: <c>` (with three leading blanks, C++), ` START POWELL`, then Powell's method
+   (`specs/freesurfer-maths.md`'s `fs_powell`, its lines: `fs_powell::minimize`, `  nparams <n>`,
+   `  maxfev 2000`, `  ftol   <ftol %f>`, `  linmin_xtol_   0.000100`, one `  powell nthiter <i>:
+   fret = <f %f>` per iteration) along the model's initial steps (`specs/freesurfer-robust.md` §15) and
+   0.02 for the intensity's log, the parameters in `double` (no conversion to `float`). An error inside
+   a cost (a matrix square root's internal error, `specs/freesurfer-robust.md` §4.4) ends the program at
+   once (nothing more printed). Powell's other returns: ` iter: <n>`, ` final e = <e>` with 14
+   significant digits, which stays the precision of every later number the program prints with C++
+   (the final determinant and scale, later levels' lines), `p = [ <the parameters in long format> ]`
+   and an empty line.
+8. The result: `M = (mh2 * T(p)) * mh1` with symmetry (verbose 2: `     -- adjusting half-way maps `;
+   the half-way maps `sqrt(M)` and `sqrt(M) M^-1`), else `T(p) * M0`; the intensity scale `exp(s)`;
+   an empty line and ` DONE `.
+
+The rest as §3, with these differences: no weights (`--weights`: the warning of §3.7); the half-way
+outputs §6; with `SB` a second citation after the first (` And for the segmentation based cost
+function:`, ` Multimodal image registration through simultaneous segmentation,`, ` I. Aganj and B.
+Fischl. IEEE Signal Processing Letters 24(11):1661-1665, 2017.`, ` https://doi.org/10.1109/LSP.2017.2754263`
+and an empty line).
+
 ## 3. The results
 
 1. An empty line, `Final Transform:`, the final voxel transform (§16.7, with its message when the
@@ -277,17 +353,29 @@ FS-1074 with `reproduce`); FS-1074 by default 1.
   `MyMRI::entropyImage: the entropy radius <r> gives no box of voxels (FreeSurfer fails here)` on
   standard error, status 1; `reproduce` the abort's two lines and 134 where the count is negative,
   the zeros in 2-D, the error otherwise; noted.
-- The library's: FS-1063, FS-1073 (double precision with the intensity scale), FS-1062, FS-1067,
-  FS-1068, FS-1069 (`specs/freesurfer-robust.md` §14 and §16).
+- The library's: FS-1063, FS-1073 (double precision with the intensity scale; and every Powell
+  cost with the intensity scale, whose parameters always hold one more than the model's: for the
+  same models as there, FS-1073, the model's first two parameters FreeSurfer's allocator's words
+  with `reproduce`, the parameters by default; for the others, FS-1063, the parameters in both
+  modes),
+  FS-1062, FS-1067, FS-1068, FS-1069 (`specs/freesurfer-robust.md` §14 and §16).
 
 ## 6. Not specified yet (the replica ends each with its own message and status 1)
 
-The Powell registration (every `--cost` but `ROB` and `ROBENT`: the replica ends before reading the
-images; FreeSurfer reads them, registers and writes as above), the test mode (`--test`: after its
-line) and the debug output (`--debug`: the library's intermediate images and key presses).
+The Powell registration's joint-histogram costs (`MI`, `NMI`, `ECC`, `SCR`) and `SB` (the replica
+ends at the first cost: `RegPowell: the cost function <n> is not ported yet`), its half-way outputs
+(FreeSurfer's half-way space is then its byte copy of the target, freed by then: `mri_robust_register:
+the half-way outputs of the Powell registration are not ported yet`), the test mode (`--test`: after
+its line) and the debug output (`--debug`: the library's intermediate images and key presses).
 
 ## 7. Validation plan (for the clean room)
 
+- The Powell registration: the open probe's family of 40 Powell cases (each cost, models,
+  intensity scale, symmetry or not, full images, tolerances, subsampling, 2-D pairs, outputs) and
+  one case of each cost in the prelude, against the official program at one thread with the decided
+  `cabs` and `csqrt` preloaded (the project's matrix square roots; without them 4 of the 40 cases
+  differ in their last printed digits, **(observed)**): every compared case identical
+  **(observed)**; the cases of FS-1063 (translation with the intensity scale) not compared.
 - fMRIPrep's call (`--satit --iscale --mov T1.mgz --dst <T1w> --lta <out>`) on the six recorded
   heads' `T1.mgz` onto their `rawavg.mgz` (`<workspace>/oracles/freesurfer-8.2.0/runs/<head>-classic/
   subjects/<subject>/mri/`), against the official program at one thread: the transform byte for byte,

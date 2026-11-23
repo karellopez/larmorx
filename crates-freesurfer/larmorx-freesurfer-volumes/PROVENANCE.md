@@ -59,7 +59,7 @@ ported file is audited for third-party code first).
 | `io/fs_temp_file.help.xml` (3.2-11) | the help text, copied unchanged (`ArgumentParser`'s help renders it) | `src/fs_temp_file/fs_temp_file.help.xml` |
 | `scripts/getfullpath` 21-42 (queue item 3.2-12, track A relay 52) | the script (FS-1173 to FS-1176): the default by the name as given, `reproduce` as tcsh runs it; the program `getfullpath` of `larmorx-freesurfer` | `src/getfullpath/main.rs` |
 | tcsh 6.21.00 (Ubuntu 22.04's build) and GNU coreutils 8.32's `dirname`, `basename`, `pwd`: behaviour measured on the official script and test scripts (no tcsh or coreutils code) | the word splitting, braces, `~`, `=N`, patterns, command substitution, `echo`, the options and messages the scripts meet | `src/csh.rs` |
-| `mri_robust_register/mri_robust_register.cpp` 71-142, 592-1360, 1424-1827, 1838-2370 (queue item 3.2-13, track C relay 44) | `Parameters`, `main` (FS-1071), `printUsage`, `initRegistration` (FS-1072), `parseNextCommand` (FS-1070), `parseCommandLine`; the robust cost's path, with the entropy images (`--cost ROBENT`, relay 45: fs.robust's `entropy.rs`, FS-1074) (the Powell costs, `--test`, `--debug`: "not ported yet"); the program `mri_robust_register` of `larmorx-freesurfer` | `src/mri_robust_register/main.rs`, `options.rs` |
+| `mri_robust_register/mri_robust_register.cpp` 71-142, 592-1360, 1424-1827, 1838-2370 (queue item 3.2-13, track C relay 44) | `Parameters`, `main` (FS-1071), `printUsage`, `initRegistration` (FS-1072), `parseNextCommand` (FS-1070), `parseCommandLine`; the robust cost's path, with the entropy images (`--cost ROBENT`, relay 45: fs.robust's `entropy.rs`, FS-1074) ; the Powell registration of `LS`, `NCC`, `TB`, `LNCC`, `SAD` (relay 46: fs.robust's `powell.rs`; `MI`, `NMI`, `ECC`, `SCR`, `SB`, the Powell half-way outputs, `--test`, `--debug`: "not ported yet"); the program `mri_robust_register` of `larmorx-freesurfer` | `src/mri_robust_register/main.rs`, `options.rs` |
 | `mri_robust_register/MyMRI.cpp` 580-612 (3.2-13) | `MyMRI::setTypeUCHAR`, `MyMRI::setMaxOutsideVal` | `src/mri_robust_register/main.rs` |
 | `mri_robust_register/mri_robust_register.help.xml` (3.2-13) | the help text, copied unchanged (`printUsage` renders it) | `src/mri_robust_register/mri_robust_register.help.xml` |
 
@@ -179,8 +179,8 @@ version, help and errors) and `larmorx-core`'s VNL ports (`vnl_matlab_print` of 
 added for `Scale`, BSD-3-Clause (VXL)).
 
 - `mri_robust_register` (relay 44): `Parameters` is `Options` (owned strings; the images are the
-  values `initRegistration` returns); `RegPowell` is not built (the robust cost only), so the
-  program ends with "not ported yet" where FreeSurfer would make one; the `--iscalein` file is read
+  values `initRegistration` returns); `RegPowell` is fs.robust's `RegRobust` with `powell` set
+  (relay 46; its joint-histogram costs, `SB` and its half-way outputs end with "not ported yet"); the `--iscalein` file is read
   whole and C++'s `>> double` applied (a folder: nothing read, as libstdc++'s stream opens it), the
   `--iscaleout` file written whole (both as their streams write them; `errno` set from a failed
   open); FS-1070 and FS-1071 with `reproduce` print the C++ runtime's and the C library's lines and

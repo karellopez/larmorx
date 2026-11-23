@@ -263,11 +263,19 @@ const GOLDEN: &[(&str, &str)] = &[
     ),
     (
         "segs57.fix",
-        "047348cde3ce21f1408a2a87ca4123e853b3faf5c416414985e068daf01199ef",
+        "178c5e4e37fbda6bbda8b3819c5e13695af0b50d9685fe9e2e4694d91a0f2392",
     ),
     (
         "segs57.reproduce",
-        "9604a9930481e8e48bef51a8a3fcbcaec25e116385ca9f1c11cee985e0d1fb17",
+        "e89796efaca01f7295f895553d65559d74726c9ba4dba75af0497539498d1568",
+    ),
+    (
+        "part9.fix",
+        "5f4f7b5c791b57e172ab378bad0f1d6e0a172a71a6761eb7f779de89030cfa50",
+    ),
+    (
+        "part9.reproduce",
+        "4812be080c938fff62a644c69092d9e347faa3f47ad11d771d862440275baf13",
     ),
 ];
 
@@ -3418,4 +3426,230 @@ const SEGS57: &[(&str, Make)] = &[
 #[test]
 fn segmentations_segments_and_crops() {
     group("segs57", SEGS57, 6);
+}
+
+/// A target-to-source matrix: none, a pool's or one of `mat4`'s.
+fn v2v_mat(g: &mut G) -> String {
+    match g.int(0, 2) {
+        0 => "null".to_owned(),
+        1 => pool_mat(g),
+        _ => g.mat4(),
+    }
+}
+
+/// A shift map of the extent (`W P od`) or `null`.
+fn vsm_of(g: &mut G, e: (i64, i64, i64)) -> String {
+    if g.one_in(4) {
+        return "null".to_owned();
+    }
+    let m = seg_w(g, e, 3, 1, &[0, 1, -1, 2]);
+    format!("{m} 0 0000000000000000")
+}
+
+/// Part 9 (§41 to §44, §55's upsampling and §56's `MRIvol2VolTkRegVSM`).
+const PART9: &[(&str, Make)] = &[
+    ("vv", |g| {
+        let e = ext(g, 1, 3);
+        let nf = g.int(1, 2);
+        let kind = pi(g, &[0, 1, 3]);
+        let s = seg_w(g, e, kind, nf, &[0, 1, 2, 5, -3]);
+        let te = ext(g, 1, 3);
+        let t = seg_w(g, te, 3, nf, &[0]);
+        let m = v2v_mat(g);
+        let interp = g.pick(&["0", "1", "2", "5"]);
+        let od = g.pick(&["0000000000000000", "4014000000000000"]);
+        let param = g.pick(&["3f800000", "40000000"]);
+        format!("{s} 0 {od} {t} 0 {m} {interp} {param}")
+    }),
+    ("+gdiagno=1 vv", |g| {
+        let e = ext(g, 1, 3);
+        let s = seg_w(g, e, 3, 1, &[0, 1, 2]);
+        let t = seg_w(g, e, 3, 1, &[0]);
+        let m = pool_mat(g);
+        format!("{s} 0 0000000000000000 {t} 0 {m} 1 3f800000")
+    }),
+    ("vvsm", |g| {
+        let e = ext(g, 2, 3);
+        let s = seg_w(g, e, 3, 1, &[0, 1, 2, 3]);
+        let te = ext(g, 1, 3);
+        let t = seg_w(g, te, 3, 1, &[0]);
+        let m = v2v_mat(g);
+        let interp = g.pick(&["0", "1"]);
+        let vsm = vsm_of(g, e);
+        format!(
+            "{s} 0 0000000000000000 {t} 0 {m} {interp} 3f800000 {vsm} null {}",
+            g.int(-3, 3)
+        )
+    }),
+    ("+gdiag=10000000 vvtk", |g| {
+        let e = ext(g, 2, 3);
+        let s = seg_w(g, e, 3, 1, &[0, 1, 2, 3]);
+        let t = seg_w(g, e, 3, 1, &[0]);
+        let m = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            pool_mat(g)
+        };
+        let vsm = vsm_of(g, e);
+        format!(
+            "{s} 0 0000000000000000 {t} 0 {m} 1 3f800000 {vsm} null {}",
+            g.int(-3, 3)
+        )
+    }),
+    ("vvk", |g| {
+        let e = ext(g, 1, 3);
+        let s = seg_w(g, e, 3, 1, &[0, 1, 2]);
+        let te = ext(g, 1, 2);
+        let nf = g.pick(&["8", "8", "2"]);
+        let t = seg_w(g, te, 3, nf.parse().unwrap_or(8), &[0]);
+        let m = v2v_mat(g);
+        format!("{s} 0 {t} 0 {m}")
+    }),
+    ("vvd", |g| {
+        let e = ext(g, 1, 3);
+        let mv = seg_w(g, e, 1, 1, &[0]);
+        let te = ext(g, 1, 3);
+        let t = seg_w(g, te, 1, 1, &[0]);
+        let m = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            pool_mat(g)
+        };
+        format!("{mv} 0 {t} 0 {m}")
+    }),
+    ("rd2lta", |g| {
+        let e = ext(g, 1, 3);
+        let t = seg_w(g, e, 1, 1, &[0]);
+        let me = ext(g, 1, 3);
+        let mv = seg_w(g, me, 1, 1, &[0]);
+        let m = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            pool_mat(g)
+        };
+        format!("{t} {mv} {m}")
+    }),
+    ("maskup", |g| {
+        let e = ext(g, 2, 4);
+        let s = seg_w(g, e, 3, 1, &[0, 0, 1, 2]);
+        let mk = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            format!("{} 0", seg_w(g, e, 3, 1, &[0, 0, 1]))
+        };
+        format!(
+            "{s} 0 {mk} {} {} {}",
+            g.int(-1, 3),
+            g.int(-1, 2),
+            g.int(0, 1)
+        )
+    }),
+    ("rgbb", |g| {
+        let e = ext(g, 1, 5);
+        let m = seg_w(g, e, 3, 1, &[0, 0, 0, 1]);
+        match g.int(0, 2) {
+            1 => {
+                let p: Vec<String> = (0..6).map(|_| g.int(-1, 2).to_string()).collect();
+                format!("{m} 0 1 {}", p.join(" "))
+            }
+            k => format!("{m} 0 {k} {}", g.int(-1, 2)),
+        }
+    }),
+    ("rgprt", |g| {
+        let v: Vec<String> = (0..6).map(|_| g.int(-9, 99).to_string()).collect();
+        v.join(" ")
+    }),
+    ("cov", |g| {
+        let e = ext(g, 1, 3);
+        let nf = g.int(1, 3);
+        let a = seg_w(g, e, 3, nf, &[0, 1, 2, -1]);
+        let mk = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            format!("{} 0", seg_w(g, e, 3, 1, &[0, 1, 1]))
+        };
+        format!("{a} 0 {mk}")
+    }),
+    ("mpca", |g| {
+        let e = ext(g, 1, 3);
+        let nf = g.int(1, 3);
+        let a = seg_w(g, e, 3, nf, &[0, 1, 2, -1, 3]);
+        let mk = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            format!("{} 0", seg_w(g, e, 3, 1, &[0, 1, 1]))
+        };
+        format!("{a} 0 {mk}")
+    }),
+    ("pcast", |g| {
+        let n = g.int(0, 4);
+        let v: Vec<&str> = (0..n)
+            .map(|_| g.pick(&["00000000", "3f800000", "40490fdb", "7fc00000", "7f800000"]))
+            .collect();
+        let sep = if v.is_empty() { "" } else { " " };
+        format!("{n} {}{sep}{}", v.join(" "), g.pick(&["0", "2"]))
+    }),
+    ("fdr", |g| {
+        let n = g.int(1, 2);
+        let mut s = n.to_string();
+        for _ in 0..n {
+            let e = ext(g, 1, 3);
+            let nf = g.int(1, 2);
+            let v = seg_w(g, e, 3, nf, &[0, 1, 2, -1, 3]);
+            let mk = if g.one_in(2) {
+                "null".to_owned()
+            } else {
+                format!("{} 0", seg_w(g, e, 3, 1, &[0, 1, 1]))
+            };
+            let out = g.pick(&["new", "self"]);
+            s.push_str(&format!(" {v} 0 {} {mk} {out}", g.int(0, 1)));
+        }
+        let fdr = g.pick(&["3fa999999999999a", "3fe0000000000000"]);
+        format!(
+            "{s} {fdr} {} {} {} {} {}",
+            g.int(-1, 1),
+            g.int(0, 1),
+            g.int(0, 1),
+            g.int(0, 1),
+            g.int(0, 1)
+        )
+    }),
+    ("vxn", |g| {
+        let e = ext(g, 1, 4);
+        let nf = g.int(1, 2);
+        let m = seg_w(g, e, 3, nf, &[0, 1, 2, 3, 7]);
+        let mut s = format!("{m} 0 3");
+        for _ in 0..3 {
+            s.push_str(&format!(
+                " {} {} {} {} {}",
+                g.int(0, e.0 - 1),
+                g.int(0, e.1 - 1),
+                g.int(0, e.2 - 1),
+                g.int(-1, 8),
+                g.int(0, 1)
+            ));
+        }
+        s
+    }),
+    ("a2vmu", |g| {
+        let pool = lta_pool(g);
+        let ty = g.pick(&["1", "0"]);
+        let (lta, s, d) = pool_lta(g, &pool, ty, 1, true, None);
+        let k = [s, d, s, d, 0][g.int(0, 4) as usize];
+        let shape = format!("{} 0 1 0", pool[k].0);
+        let w = pool_w(&pool, k);
+        let ct = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            tissue_ct(g, 6, 2)
+        };
+        let p = lpaint(g, &shape);
+        let usf = g.pick(&["1", "2"]);
+        format!("{w} {p} {lta} 0000000000000000 {usf} {ct}")
+    }),
+];
+
+#[test]
+fn part9_resampling_regions_covariance_and_neighbourhoods() {
+    group("part9", PART9, 4);
 }

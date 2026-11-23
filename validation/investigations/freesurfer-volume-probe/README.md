@@ -1,4 +1,4 @@
-# FreeSurfer 8.2.0's volume functions and B-splines, as a black box (fs.volume parts 1 to 8, fs.bspline)
+# FreeSurfer 8.2.0's volume functions and B-splines, as a black box (fs.volume parts 1 to 10a and §54 to §57, fs.bspline)
 
 The probe behind the **(observed)** marks and the validation plan (§69) of
 [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 8 (§1 to §35, §37 to §39, and §54's changes of a transform array between the voxel, RAS-to-RAS and physical-voxel types:
@@ -24,8 +24,8 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
 | `licence_reach.py` | which of a prebuilt probe's commands can reach FreeSurfer's licence check ("The licence check" below): `licence_reach.py <probe> <source.cpp> [--expect a,b]` (the same step after each build, not the implementer's: it reads the probe binary) |
-| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 37 groups of seeded cases and eighteen of fixed cases (`vrules`, `vrules4` to `vrules19`, `vbsrules`; 18,023 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
-| `models.py` | statements of the spec checked as models of the probe's printed results (`region` and `cov` also a candidate's, in both modes): `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `region` (§43's boxes, FS-269 as decided: every `rgbb` line of `vregion`, `vrules17` and `vrules18`, on the probe and, with `--candidate`, a candidate's lines in both modes), `cov` (§42's `MRIcovarianceMatrix`, FS-483's count as decided: every `cov` line of `vcov` and `vrules19` whose mask has the volume's extent) |
+| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 39 groups of seeded cases and nineteen of fixed cases (`vrules`, `vrules4` to `vrules20`, `vbsrules`; 18,639 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `models.py` | statements of the spec checked as models of the probe's printed results (`region` and `cov` also a candidate's, in both modes): `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `region` (§43's boxes, FS-269 as decided: every `rgbb` line of `vregion`, `vrules17`, `vrules18` and `vrules20`, on the probe and, with `--candidate`, a candidate's lines in both modes), `cov` (§42's `MRIcovarianceMatrix`, FS-483's count as decided: every `cov` line of `vcov` and `vrules19` whose mask has the volume's extent) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
 runs use the fs.maths probe's guard allocator, `guard_malloc.so` beside it
@@ -256,6 +256,14 @@ The spec's sections in brackets.
 | `rgbb W P kind pads` | kind 0 `REGIONgetBoundingBox` (one pad), 1 `REGIONgetBoundingBoxM` (six pads), 2 `REGIONgetBoundingBoxEqOdd` (one pad) [§43] | the region's x y z dx dy dz, or `null` |
 | `rgprt x y z dx dy dz` | `REGIONprint` to standard output, then `REGIONcopy` into a new region and `REGIONclear` of the copy [§43] | the copy's six fields, then the cleared copy's |
 | `vxn W P n (x y z w f)×n` | for each point `MRIvoxelDx`, `MRIvoxelDy`, `MRIvoxelDz`, `MRIvoxelMean` (the window, the frame), `MRIvoxelDirection` and `MRIvoxelGradientDir2ndDerivative` (the window) [§44] | six floats per point |
+| `talcras W P LTA` | `ModifyTalairachCRAS` of the volume with the array (`null`: none) [§46] | the status, then the volume |
+| `talmat k W P LTA` | k 0 `MtalairachFromVoxel`, 1 `MtalVoxelFromVoxel`, 2 `MvoxelFromTalairach`, 3 `MvoxelFromTalVoxel` of the volume and the array (`null`: none) [§46] | the matrix (M, `null` for none) |
+| `talpt k W P LTA n (x y z)×n`, `talpt 4 M n (x y z)×n` | for each point (doubles) k 0 `MRIvoxelToTalairachEx`, 1 `MRIvoxelToTalairachVoxelEx`, 2 `MRItalairachToVoxelEx`, 3 `MRItalairachVoxelToVoxelEx` (the volume, the array or `null`), 4 `TransformWithMatrix` of the matrix [§46] | per point the status (0 for k 4) and the three doubles (unset: 7) |
+| `talvol k W P (new\|W P) LTA [i]` | k 0 `MRItoTalairachExInterp` (the sampling type i), 1 `MRItoTalairachEx`, 2 `MRIfromTalairachEx` of the volume into the second volume (`new`: none) with the array or `null` [§46] | the result (`self` or `given` when it is that volume) |
+| `dilate W P D`, `dilu W P D` | `MRIdilate`, resp. `MRIdilateUchar` [§48] | the result |
+| `msegs W P D n i×n i` | `MRImatchSegs` (the label list, the mask's value) into D [§48] | the result |
+| `sstat W P W P i i` | `MRIsegStats` (the segmentation, the volume, the segment, the frame) [§48] | the count, then the five floats `min max range mean std` (unset: 7) |
+| `hseg W P W P i d d d` | `HISTOseg` (the segmentation, the volume, the segment, `bmin`, `bmax`, `bdelta`) [§48] | the histogram: `max_bins nbins`, `bin_size min max` (floats), then each bin's value and count (floats) |
 
 ## The models
 
@@ -270,7 +278,7 @@ many it leaves out (FreeSurfer crashed or read memory it does not own) and how m
 status 1 when one differs.
 
 `region` and `cov` also take the clean room's program. `region`: `models.py region --probe <the probe> --candidate <the candidate>
---scratch <scratch>/models` checks every `rgbb` line of `vregion`, `vrules17` and `vrules18` on the probe (FreeSurfer's
+--scratch <scratch>/models` checks every `rgbb` line of `vregion`, `vrules17`, `vrules18` and `vrules20` on the probe (FreeSurfer's
 box, §43), on the candidate with `reproduce` (FreeSurfer's box) and with `fix` (the box FS-269's decision gives:
 the loop allows those lines with their notice but does not check their values). The probe as its own candidate gives
 "differ" on exactly the lines where the decided box differs from FreeSurfer's (77), its own `fix` lines being
@@ -568,3 +576,13 @@ cached matrices as allocated, recomputed or dropped.
   `oracles/logs/fs-volume-probe-r17-final-2026-11-23.log`). FS-485's windows past the far faces are not in the probe:
   their entries never written change from process to process in ways the four runs do not always show (the two
   earlier forms of the groups: logs `-r17-final-first-vvoxel-2026-11-23.log`, `-r17-final-second-vrules19-2026-11-23.log`).
+- Relay 18 (2026-11-23): the licence-check guard (`licence_reach.py`, "The licence check"); `vrules15` allows FS-517 in
+  both modes (no hash changes: the allowance is not in the digest). Then part 10a: the prebuilt probe rebuilt from
+  commit `2a612716` (the commands `talcras`, `talmat`, `talpt`, `talvol`, `dilate`, `dilu`, `msegs`, `sstat`,
+  `hseg`; its build in `BUILD_INFO.txt`, the same bytes twice; the 39264dfc build kept in
+  `<workspace>/archive/2026-11-23-fs-volume-probe-39264dfc/`): every earlier group's hash unchanged (55); the new
+  groups `vtal` (240 calls, §46), `vdil` (270, §48) and `vrules20` (111, their fixed cases and the fs.volume clean
+  room's items 95 and 101) the same cold, warm and twice without the cache; the probe as its own candidate: no
+  unexplained difference in either mode; every model as before, none different; `models.py region` takes
+  `vrules20`'s `rgbb` line too (185 lines, the decided box differing on 78) (logs
+  `oracles/logs/fs-volume-probe-r18-final-2026-11-23.log`, `-r18-region-2026-11-23.log`).

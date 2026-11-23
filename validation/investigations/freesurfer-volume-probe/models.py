@@ -42,7 +42,7 @@ nothing else).
         ``vgr2i`` (the arrays: seeded, valid geometries, general 4 x 4 matrices).
 
     python -P models.py region --probe P --scratch DIR [--candidate C]
-        every ``rgbb`` line of the groups vregion, vrules17 and vrules18 against §43's statements:
+        every ``rgbb`` line of the groups vregion, vrules17, vrules18 and vrules20 against §43's statements:
         the mask's extremes (frame 0, magnitudes not below 1e-5, a NaN counted), FreeSurfer's box
         and REGIONgetBoundingBoxEqOdd's steps and lines; the probe must print FreeSurfer's box. With
         ``--candidate``, the candidate's lines too: with ``reproduce`` FreeSurfer's box, with ``fix``
@@ -1258,7 +1258,7 @@ def region_model(line: str, seen: set[str], decided: bool) -> tuple[str, str]:
 
 
 def region(runner, scratch: Path, candidate: Path | None = None) -> int:
-    gen = C.Gen16(7)
+    gen = C.Gen17(7)
     seen: set[str] = set()
     orig = C.Gen13.lab
 
@@ -1270,7 +1270,7 @@ def region(runner, scratch: Path, candidate: Path | None = None) -> int:
     gen.lab = lab
     tally: Counter[str] = Counter()
     bad = 0
-    for group in ("vregion", "vrules17", "vrules18"):
+    for group in ("vregion", "vrules17", "vrules18", "vrules20"):
         lines = [ln for b in getattr(gen, group)() for ln in b.lines if ln.startswith("rgbb ")]
         b = C.Batch(group, f"region-{group}", lines)
         path = C.write_batch(scratch, b)

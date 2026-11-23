@@ -301,7 +301,7 @@ FS-300 in `vsample` and `vresamp` (the cubic frame sampler's window points outsi
 the first that succeeds), FS-469 in `vpvlab` (a label's mean read outside the table, from the stack
 beside it, which every run fills the same way), FS-198, FS-504 and FS-508 in `vlta54` and `vrules14` (a freed
 matrix, or a transform the array does not hold, read: the same bytes in every run), FS-509 in `vrules15`, FS-517 in
-`vrules16`, and in both modes on the
+`vrules15` and `vrules16`, and in both modes on the
 `bvr` line without a cache that FreeSurfer ends at its licence check (`EXIT 255`, `FREESURFER_HOME is
 not defined`: LARMORX performs no licence check). Under `reproduce` a line where FreeSurfer aborted
 with the C++ runtime's lines (`CRASH 6`, standard error starting `terminate called after throwing`:

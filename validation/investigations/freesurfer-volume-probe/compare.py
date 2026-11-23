@@ -3962,8 +3962,10 @@ class Gen13(Gen12):
                 arr = self.arr1(r, 1, a, b, m=self.near(r, t=1.0))
                 L.append(f"crras {vv} 0 {valid} {c1} 2 2 1 0 {arr}")
         # FS-509: FreeSurfer counts a tissue type of 100 past its table (a value of its own memory,
-        # the same in every run): a line noting it may differ in both modes
-        return [Batch("vrules15", "vrules15", L, both="FS-509")]
+        # the same in every run): a line noting it may differ in both modes; FS-517: larmorx ends in
+        # both modes where FreeSurfer returns a volume of zeros (the centre at int's top with a field
+        # of view of 1): likewise
+        return [Batch("vrules15", "vrules15", L, both="FS-509,FS-517")]
 
     def vcrops(self) -> list[Batch]:
         """§57: MRIcropToFoV (thresholds, fields of view inside and past the mask, NaN voxels),

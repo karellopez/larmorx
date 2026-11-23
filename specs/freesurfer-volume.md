@@ -3183,7 +3183,11 @@ read and written as the voxel functions do outside a volume (fs.mri §5, FS-52, 
   and returns zeros otherwise, the rows and slices with that error printed first when the others are inside; exactly
   the maximum returns zeros but on the slices with the others inside, a crash before any line is written; a NaN centre
   with a FoV of 0 crashes with the others inside and returns a volume of no voxels otherwise; `vrules15`, a centre of
-  2147483647 with a FoV of 3, and a NaN centre with a FoV of 0: crashes).
+  2147483647 with a FoV of 3, and a NaN centre with a FoV of 0: crashes; a centre of `(2147483647, 1, 0)` with the
+  fields of view `(1, 1, 1)` on a 4 x 4 x 2 volume, whose last column is exactly `int`'s maximum with the rows and
+  slices inside: FreeSurfer prints `limits 2147483647 2147483647   1 1   0 0`, `P0 2.14748e+09 -1 -1` and `c_ras of new
+  volume 2.14748e+09 -0.5 -0.5` and returns a 1 x 1 x 1 volume of zeros, where both modes end after those lines, as
+  above; the loop allows FS-517 there in both modes, as in `vrules16`).
 - **`MRIcropAroundRAS(vol, rasCenter, voxFoVRAS, lta, iKeep)`**: the RAS centre's voxel by the inverse vox2ras (with an
   LTA: a copy, oriented and made RAS to RAS, `Chaning Source LTA type to ras2ras`, applied first: `ras2vox * M`; the
   matrices printed: `Input RAS2VOX`, `LTA RAS2RAS`, then `final ras2vox matrix`, the matrix and a line of dashes). The
@@ -4081,7 +4085,7 @@ standard error) are taken out and their IDs kept. Every line must be identical, 
   that succeeds); likewise FS-469 in `vpvlab` (§37: a label's mean read outside the table, from the
   stack beside it), FS-198, FS-504 and FS-508 in `vlta54` and `vrules14` (§54: a freed matrix, or a
   transform the array does not hold, read), FS-509 in `vrules15` (§55: a tissue type of 100 counted past
-  FreeSurfer's array, a value of its memory), FS-517 in `vrules16` (§57: larmorx ends where FreeSurfer, as its
+  FreeSurfer's array, a value of its memory), FS-517 in `vrules15` and `vrules16` (§57: larmorx ends where FreeSurfer, as its
   build compiles the overflow, returns a crop of zeros);
 - in both modes, the `bvr` line without a cache that FreeSurfer ends at its licence check (§23:
   `EXIT 255` with the licence message; LARMORX performs none).

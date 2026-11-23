@@ -1,6 +1,6 @@
 # Validation: FreeSurfer's `mri_binarize` (replica)
 
-Status `experimental`. Generated 2026-11-21 on Linux x86_64 from commit `e19d329d159c` with `validation/probes/fs-binarize/record.py` (queue item 3.2-19).
+Status `experimental`. Generated 2026-11-23 on Linux x86_64 from commit `d84bebf77797` with `validation/probes/fs-binarize/record.py` (queue item 3.2-19).
 
 - **Replica:** crates-freesurfer/larmorx-freesurfer-volumes (src/mri_binarize/) and larmorx-freesurfer-deform (src/tess.rs), the larmorx-freesurfer program (`larmorx-freesurfer [--upstream-defects reproduce|fix] freesurfer mri_binarize ...`).
 - **Reference:** FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mri_binarize) and its recon-all runs' files (oracles/freesurfer-8.2.0/runs/).
@@ -12,18 +12,18 @@ Status `experimental`. Generated 2026-11-21 on Linux x86_64 from commit `e19d329
 - 81 calls (15 kinds: the white matter's mask of the segmentation, the counts of `wm.mgz`'s edits, the background in place, `mri_nu_correct.mni`'s ones and mask, the cortex and its inverse, the crop around the centre, the corpus callosum, `label-cortex`'s entorhinal labels and the white matter of the v8 stream's segmentation, a hippocampus's surface and its topology fix).
 - `reproduce`: **78 identical**, 0 different, 3 counted (the topology fix of a hippocampus that is already correct: FreeSurfer writes a volume it has freed, FS-1021).
 - `fix`: 77 identical, 1 different with a notice (FS-1022), 0 without.
-- Time (the calls not served from the cache): official 2 s (those run), port 207 s (`reproduce`).
+- Time (the calls not served from the cache): official 2 s (those run), port 212 s (`reproduce`).
 
 ## The whole program against the official binary
 
 `validation/probes/fs-binarize/prog.py` (the open probe's command lines, `validation/investigations/freesurfer-mri-binarize-probe/`): every option, the three stand-alone options, the failures; exit status, standard output and error, and every file written compared:
 
-- seed 1: 130 cases; `reproduce` 122 identical, 0 different, 8 counted (FreeSurfer reads memory it does not own, writes past its lists, crashes there or runs out of address space: FS-53, FS-1020, FS-1021, FS-1023, FS-1025, FS-1026, FS-1027); `fix` 107 identical, 15 different with a notice, 0 without.
-- seed 2: 130 cases; `reproduce` 122 identical, 0 different, 8 counted (FreeSurfer reads memory it does not own, writes past its lists, crashes there or runs out of address space: FS-53, FS-1020, FS-1021, FS-1023, FS-1025, FS-1026, FS-1027); `fix` 107 identical, 15 different with a notice, 0 without.
+- seed 1: 133 cases; `reproduce` 125 identical, 0 different, 8 counted (FreeSurfer reads memory it does not own, writes past its lists, crashes there or runs out of address space: FS-53, FS-1020, FS-1021, FS-1023, FS-1025, FS-1026, FS-1027); `fix` 106 identical, 19 different with a notice, 0 without.
+- seed 2: 133 cases; `reproduce` 125 identical, 0 different, 8 counted (FreeSurfer reads memory it does not own, writes past its lists, crashes there or runs out of address space: FS-53, FS-1020, FS-1021, FS-1023, FS-1025, FS-1026, FS-1027); `fix` 106 identical, 19 different with a notice, 0 without.
 
 ## Golden cases
 
-`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_binarize_golden.rs`: six cases on 32^3 inputs made with integer arithmetic (a match with its count file, a threshold in a mask merged as `uchar`, replacements, a dilation, an erosion and the bounding box, a smoothed surface, the topology fix of a shape with a handle), on every platform: `reproduce` `42a367a2dc0faa347eb31e6a315b95ac3098e1dd3f50a5b8c25691cf04d7a5d5`, the official program's value on the same inputs (`prog.py --golden`); the default `e2cb236f9a1c5c592df596f988a37c38adea2a1b8fc919aa52268badc6da55a8` (the topology fix keeps its first voxel, FS-1022).
+`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_binarize_golden.rs`: seven cases on 32^3 inputs made with integer arithmetic (a match with its count file, a threshold in a mask merged as `uchar`, replacements, a dilation, an erosion and the bounding box, a smoothed surface, the topology fix of a shape with a handle, the bounding box without a pad), on every platform: `reproduce` `76bdf3d94f233cad211f17a0e4ca5b0122fe6fc798a292543122ba4d163f0897`, the official program's value on the same inputs (`prog.py --golden`); the default `be04301f13838bbdf18d4ed1d06209755228937f1be1f748ddf8bb3606698216` (the topology fix keeps its first voxel, FS-1022; the box without a pad keeps the mask's last voxels, FS-269).
 
 ## Memory
 
@@ -35,5 +35,5 @@ Status `experimental`. Generated 2026-11-21 on Linux x86_64 from commit `e19d329
 - ones (fix): 86 MiB, FreeSurfer 88 MiB.
 - wm255 (reproduce): 86 MiB, FreeSurfer 88 MiB.
 - wm255 (fix): 86 MiB, FreeSurfer 88 MiB.
-- surf (reproduce): 141 MiB, FreeSurfer 145 MiB.
-- surf (fix): 140 MiB, FreeSurfer 145 MiB.
+- surf (reproduce): 140 MiB, FreeSurfer 145 MiB.
+- surf (fix): 141 MiB, FreeSurfer 145 MiB.

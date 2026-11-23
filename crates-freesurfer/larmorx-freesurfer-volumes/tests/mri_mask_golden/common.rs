@@ -27,8 +27,9 @@ pub const N: i32 = 32;
 /// box and its square form; a crop to a field of view; a mask with NaNs and infinities (their
 /// voxels, `-oval nan`); a threshold of NaN; the left hemisphere of a segmentation without the
 /// cerebellum and samseg's labels; erosion with background noise; `-BBEQ` that finds no box
-/// (FS-1133: a crash, an error by default).
-pub const CASES: [&[&str]; 13] = [
+/// (FS-1133: a crash, an error by default); recon-all's spelling `-bb` without a pad (FS-269:
+/// FreeSurfer's box leaves out the mask's last voxels, kept by default).
+pub const CASES: [&[&str]; 14] = [
     &["-T", "5", "vf.mgz", "mk.mgz", "out.mgz"],
     &["-invert", "vf.mgz", "mk.mgz", "out.mgz"],
     &[
@@ -63,10 +64,12 @@ pub const CASES: [&[&str]; 13] = [
         "-erode", "1", "-bgnoise", "5", "1", "vf.mgz", "mk.mgz", "out.mgz",
     ],
     &["-BBEQ", "1", "nz.mgz", "nzm.mgz", "out.mgz"],
+    &["-bb", "0", "vf.mgz", "mk.mgz", "out.mgz"],
 ];
 
 /// The files each case writes (compared by digest).
-pub const OUTPUTS: [&[&str]; 13] = [
+pub const OUTPUTS: [&[&str]; 14] = [
+    &["out.mgz"],
     &["out.mgz"],
     &["out.mgz"],
     &["out.mgz"],

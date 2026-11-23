@@ -151,13 +151,14 @@ def main(argv: list[str] | None = None) -> int:
         "",
         "## Golden cases",
         "",
-        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_binarize_golden.rs`: six cases "
+        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_binarize_golden.rs`: seven cases "
         "on 32^3 inputs made with integer arithmetic (a match with its count file, a threshold "
         "in a mask merged as `uchar`, replacements, a dilation, an erosion and the bounding box, a "
-        "smoothed surface, the topology fix of a shape with a handle), on every platform: "
+        "smoothed surface, the topology fix of a shape with a handle, the bounding box without a "
+        "pad), on every platform: "
         f"`reproduce` `{a.golden}`, the official program's value on the same inputs (`prog.py "
         f"--golden`); the default `{a.golden_fix}` (the topology fix keeps its first voxel, "
-        "FS-1022).",
+        "FS-1022; the box without a pad keeps the mask's last voxels, FS-269).",
         "",
         "## Memory",
         "",

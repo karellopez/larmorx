@@ -2047,6 +2047,14 @@ defects! {
         "mri_mask -xform with a transform file of several transforms that do not chain (each one's source or destination the previous one's destination) prints 'ERROR: LTAreduce(): LTs <n> and <n+1> do not match' and crashes (signal 11): larmorx ends with an error, status 1";
     FS_1135 = "FS-1135", "FreeSurfer", true,
         "mri_mask -xform with a transform that inverts but whose voxel-to-voxel form for the two volumes is singular in single precision prints 'MRIlinearTransform: xform is singular' and goes on without a mask: it crashes (signal 11) with -T, -threshold, -invert, -samseg, -lh, -rh, the crops or -dilate, else ends with 'must have a valid MRI (src)' (status 252): larmorx ends with an error at once, status 1";
+    FS_1201 = "FS-1201", "FreeSurfer", true,
+        "mri_cc on an aseg whose hemispheres' white matter spans more than 500 columns between them (a volume about 500 voxels wide or more) writes past its table of slices: larmorx ends with an error in both modes";
+    FS_1202 = "FS-1202", "FreeSurfer", true,
+        "mri_cc removing the fornix from a sagittal slice in which it finds no fornix (it prints 'WARNING: min_x_fornix not set') computes the callosum's maximum thickness from no measurement and can shave callosum voxels of the slice's last columns: larmorx shaves nothing there";
+    FS_1203 = "FS-1203", "FreeSurfer", true,
+        "mri_cc given an option that takes a value (-sdir, -DEBUG_VOXEL, -aseg, -norm, -lta, -m, -d, -s, -a, -o, -t) as its last argument, without its value, reads past its arguments and crashes (signal 11): larmorx prints that the option needs its values and the help, status 1";
+    FS_1204 = "FS-1204", "FreeSurfer", true,
+        "mri_cc ends with status 0 when its output aseg or the transform of -lta cannot be written: larmorx ends with status 1 after the writer's messages";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

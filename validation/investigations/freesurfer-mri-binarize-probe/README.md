@@ -25,7 +25,8 @@ the spec's.
 three-frame `uchar` one; a signed significance map; a random mask and merge volume; a 40 x 36 x 28
 segmentation with other voxel sizes; a 16^3 volume of small labels; a 20^3 block with a tunnel
 through it (a handle) and a 16^3 block (topologically correct); a small colour table; an
-octahedron surface and a measure on its six vertices; a linear transform) and runs 130 command
+octahedron surface and a measure on its six vertices; a linear transform; the intensity volume in
+an orientation that moves all three axes, `SRA`) and runs 133 command
 lines: no arguments, `--help`, `--version`, `--all-info`, unknown options (with one dash),
 options short of their arguments; every check of the options; thresholds (`--min`, `--max`,
 `nan` and unreadable numbers, `--rmin`, `--rmax`, `--pct` with and without a mask, `--mask` with
@@ -44,7 +45,9 @@ an `int` input; `--noverbose`, `--no-count` before and after `--count`, an unope
 off again); the stand-alone options `--ohe`, `--crop-around-ras` (a centre, `cras`, a transform,
 values kept, too few arguments, an unreadable number) and `--dilate-vertex(-sum)` (a radius, the
 areas, a measure, no measure, a target out of reach, too few arguments, a vertex outside the
-surface); missing input, output folder, mask and merge files.
+surface); missing input, output folder, mask and merge files; and (cases 130 to 132, added
+2026-11-23) `--bb 0`, `--bb -2` and `--crop-around-ras` of the `SRA` volume with three different
+fields of view (FS-269 and FS-268: the default differs there with a notice).
 
 Compared for each case and mode: the exit status; standard output and standard error (the
 report's `cwd` line, which names each side's folder, `--all-info`'s `TimeStamp` and the
@@ -66,6 +69,12 @@ crashes, or runs out of the address space it never releases there: their texts a
 It exits with 1 when a compared case differs in `reproduce`, or differs in `fix` without a notice.
 Run it in a memory box (every case needs less than 200 MiB; FreeSurfer's topology fix of an empty
 binarisation runs until the address space or the box's limit ends it).
+
+## Results (observed, relay 53 of track D, 2026-11-23)
+
+The replica as the candidate, seeds 1 and 2, 133 cases each: 125 identical in `reproduce`, 8
+counted (as below), 0 different; `fix` identical on 106, explained by a notice on 19 (FS-269 on
+`--crop 0`, `--bb 0` and `--bb -2`, FS-268 on the `SRA` crop, the others as below).
 
 ## Results (observed, relay 48 of track D, 2026-11-21)
 

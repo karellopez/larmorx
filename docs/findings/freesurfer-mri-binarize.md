@@ -73,6 +73,22 @@ first.
   after 55 dilations under the oracle-output cache's runner, a crash after 865 in a 4 GiB box.
   larmorx's lists grow with what they hold and are released; FS-1027 is noted from the 32nd
   tessellation of a fix (so the probe counts such runs, not compares them).
+- **FS-269 and FS-268, the library's** (decided by track C's relay 45, batch 93; the measurement in
+  `validation/investigations/freesurfer-fs269-bbox/`): `--bb`/`--crop` crops to
+  `REGIONgetBoundingBox(OutVol, npad)`, whose size `max - min + 2 npad` is one voxel short on each
+  axis. With `--bb 0` (or a negative pad) the box ends before the mask's last voxels: by default
+  fs.volume's `region.rs` gives that axis one more voxel and notes FS-269 (`reproduce`
+  FreeSurfer's); with a pad of 1 or more both modes keep FreeSurfer's box (rule C: it holds every
+  mask voxel). `--crop-around-ras` calls `MRIcropAroundRAS`, whose fields of view go to the voxel
+  axes the other way round for orientations that move all three axes (FS-268): by default each
+  voxel axis takes the field of view of its own RAS direction (`mri2ops.rs`), noted. The program
+  itself is unchanged. Checked here (relay 53, 2026-11-23): the open probe's three new cases
+  (`--bb 0`, `--bb -2`, an `SRA` volume cropped with fields of view 10, 12, 14) identical to the
+  official program in `reproduce`, the default differing with the notice (the `SRA` crop 14 x 10 x
+  12 voxels by default, FreeSurfer's 12 x 14 x 10; `--bb -2` of a small label fails in FreeSurfer,
+  status 1 in both programs' `reproduce`, as the box's size reaches 0, and succeeds by default);
+  the golden cases gain `--bb 0`; recon-all's calls (none with `--bb`; `mri_vsinus_seg`'s crop of a
+  conformed volume) unchanged.
 - `--copy <volume>` (no ID: rule C, documentation only): the volume is read and its dimensions
   checked (with the merge volume's message), then never used; the help says it copies values.
   Kept in both modes.
@@ -106,7 +122,7 @@ first.
 
 ## 4. Validation
 
-`docs/validation/freesurfer-mri-binarize.md`: the open probe's 130 command lines (seeds 1 and 2),
+`docs/validation/freesurfer-mri-binarize.md`: the open probe's 133 command lines (seeds 1 and 2),
 the real calls on the recorded heads (`validation/probes/fs-binarize/real.py`: 81 calls on 6 runs),
 the golden cases and the memory entry. Speed (`real.py`'s first run, nothing served from the
 cache, one thread): the 81 calls took FreeSurfer 177 s, the port 204 s (`reproduce`) and 212 s

@@ -162,6 +162,13 @@ def inputs(ws: Path, seed: int) -> dict[str, Path]:
         encoding="utf-8",
     )
     f["lta"] = d / "shift.lta"
+    # the intensity volume again in an orientation that moves all three axes (columns to
+    # superior, rows to right, slices to anterior: SRA), for --crop-around-ras's fields of view
+    sra = np.zeros((4, 4))
+    sra[:3, :3] = [[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]]
+    sra[:3, 3] = [-16.0, -16.0, -16.0]
+    sra[3, 3] = 1.0
+    f["sra"] = save(d / "t1_u8_32_sra.mgz", np.clip(np.rint(t), 0, 255).astype(np.uint8), sra)
     return f
 
 
@@ -334,6 +341,11 @@ def cases(f: dict[str, Path], fs_home: Path) -> list[list[str]]:
         ["--i", "@seg", "--min", "1", "--mask", "/nonexistent/m.mgz", *o],
         ["--i", "@seg", "--min", "1", "--merge", "/nonexistent/m.mgz", *o],
         ["--i", "@seg", "--match", "2", "--min"],
+        # added 2026-11-23 (after the first 130): the bounding box without a pad and with a
+        # negative one; the fields of view of an orientation that moves all three axes
+        ["--i", "@seg", "--match", "2", "41", "--bb", "0", *o],
+        ["--i", "@seg", "--match", "17", "--bb", "-2", *o],
+        ["--crop-around-ras", "crop.mgz", "@sra", "nolta", "0", "0", "0", "10", "12", "14"],
     ]
     return [[str(f[a[1:]]) if a.startswith("@") else a for a in x] for x in c]
 

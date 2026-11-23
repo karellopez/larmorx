@@ -23,6 +23,15 @@
     scripts/orchestration/boxed.sh 16 python -P validation/probes/fs-mask/prog.py --golden
     scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-mask/real.py --json real.json
 
+## Results (relay 53 of track D, 2026-11-23: after FS-269's default)
+
+From the clean commit of `docs/validation/freesurfer-mri-mask.md`: the 24 recorded steps reproduced
+in both modes; the open probe's seeds 1 and 2 (195 cases each): 194 identical in `reproduce`, 1
+counted (FS-309), 0 different; `fix` 113 identical, 81 explained by a notice (FS-269 on the nine
+crops with a pad after the mask of 0 or less); `real.py` 12 calls identical in both modes (recon-all's
+v8 `-bb 3` unchanged); golden (fourteen cases) `e3ec07a6...` (the official value) and `20be6598...`
+(the default); memory 165.8 vs 167.7 MiB.
+
 ## Results (relay 52 of track D, 2026-11-22)
 
 From the clean cdd2cada (`docs/validation/freesurfer-mri-mask.md`): the 24 recorded steps (12 runs)

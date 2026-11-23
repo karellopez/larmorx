@@ -95,8 +95,13 @@ and end the program with the status of their write (0 when written):
   read; `lta` read as a linear transform unless it is `nolta` (unread: status 1); the centre: with
   `rc` `cras`, `Getting cras from <ac>` and that volume's centre (`c_r`, `c_a`, `c_s`; `sc` ignored),
   else the three numbers; the field of view three integers; the values to keep every following
-  argument that does not start with `--`; `MRIcropAroundRAS` (`specs/freesurfer-volume.md`) written
-  to `out` (none: status 1).
+  argument that does not start with `--`; `MRIcropAroundRAS` (`specs/freesurfer-volume.md` §57) written
+  to `out` (none: status 1). FS-268: the three fields of view are given in RAS order (left-right,
+  front-back, up-down); by default each voxel axis takes the one of the RAS direction it runs along,
+  and where an orientation moves all three axes (`SRA`, `ASR`, `PIL`, ...) FreeSurfer gives each
+  voxel axis another axis's field of view: larmorx notes FS-268 there, and `reproduce` gives
+  FreeSurfer's crop. Orientations that keep the axes in place or swap two of them (`RAS`, `LIA`, the
+  conformed volumes recon-all crops: `mri_vsinus_seg`'s 96^3 call) are cropped alike in both modes.
 - `--dilate-vertex-sum vno surf measure|nofile|area target outmask` (fewer than five: `USAGE:
   --dilate-vertex-sum vno surf measure target outmask`, status 1) and `--dilate-vertex vno surf
   radius outmask` (fewer than four: the usage line, status 1; FS-1024: FreeSurfer prints
@@ -211,8 +216,15 @@ voxels made 0); unread: its message, status 1.
     voxels in final mask`. Otherwise the count is 0.
 16. `--bincol`: `Filling mask with column number`, `MRIbinMaskToCol`.
 17. `--bb`/`--crop`: `Computing bounding box, npad = <n>`, the bounding box of the nonzero voxels
-    padded (`REGIONgetBoundingBox`), printed as `specs/freesurfer-volume.md`'s region report, and
-    the output cropped to it (none: status 1).
+    padded (`REGIONgetBoundingBox`, `specs/freesurfer-volume.md` §43), printed as that spec's
+    region report, and the output cropped to it (none: status 1). FS-269: FreeSurfer's box is one
+    voxel smaller on each axis than the voxels from the first nonzero one minus the pad to the last
+    plus the pad. With a pad of 0 or less it ends before the mask's last voxels on every axis; by
+    default the box is one voxel larger on each such axis (the start unchanged: with a pad of 0 it
+    then holds every nonzero voxel, with a negative pad `-p` it ends `p` voxels before the last as
+    it starts `p` after the first), and FS-269 is noted; `reproduce` gives FreeSurfer's box. With a pad of 1 or more
+    both modes give FreeSurfer's box (it holds every nonzero voxel; only the last padding voxel on
+    the far side is missing). An output with no nonzero voxel gets FreeSurfer's box in both modes.
 18. `--remove-islands`: `Removing Volume Islands` (flushed), `MRIremoveVolumeIslands` with the
     threshold `binval - 0.5` and `binval` clusters kept. `--fill-holes`: `Removing Volume Holes`
     (flushed), `MRIremoveVolumeHoles` with the threshold `binval - 0.5`, `binval` kept and the fill
@@ -325,12 +337,15 @@ any two different values). Voxels outside the volume are never compared.
 ## 6. Validation plan
 
 The open probe `validation/investigations/freesurfer-mri-binarize-probe/` (its README) runs the
-official program and a candidate on 130 command lines over seeded synthetic inputs (every option,
+official program and a candidate on 133 command lines over seeded synthetic inputs (every option,
 the stand-alone options, the failures, the topology fix on a shape with a handle, an already
-correct one and an empty one) and compares exit status, messages and every file written;
+correct one and an empty one, the bounding box without a pad and with a negative one, a crop around
+an RAS point of a volume whose orientation moves all three axes) and compares exit status, messages and every file written;
 `reproduce` must give FreeSurfer's on every case but those noting FS-53, FS-58, FS-1020, FS-1021,
 FS-1023, FS-1025, FS-1026 or FS-1027 (counted); `fix` may differ only with a notice. The replica
-(observed, 2026-11-21): seed 1, 122 of 130 identical in `reproduce`, 8 counted, 0 different. A clean
+(observed, 2026-11-23): seeds 1 and 2, 125 of 133 identical in `reproduce`, 8 counted, 0 different;
+`fix` explained by a notice wherever it differs (FS-268 and FS-269 among them). A clean
 room is also checked against the real calls of recon-all, `mri_nu_correct.mni`, `mri_mcadura_seg`,
 `mri_vsinus_seg`, `label-cortex` and `seg2cc` on the recorded heads (the replica's record,
-`docs/validation/freesurfer-mri-binarize.md`), and its golden cases (32^3, both modes).
+`docs/validation/freesurfer-mri-binarize.md`), and its golden cases (seven on 32^3 inputs, `--bb 0`
+among them, both modes).

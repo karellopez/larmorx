@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-FreeSurfer
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
-//! Voxel lists (`utils/voxlist.cpp`, 3.1-40): `VLSTcreate` (98), `VLSTsort` (217) with its
-//! comparison, `VLSTfree` (254), `VLSTcomputeStats` (419), `VLSTalloc` (588), `VLSTcopy` (610),
-//! `VLSTcopyInto` (649), `VLSTaddUnique` (688), `VLSTaddWithValue` (695), `VLSTadd` (709) and
-//! `VLSTinList` (723).
+//! Voxel lists (`utils/voxlist.cpp`, 3.1-40): `VLSTcreateInRegion` (29; added by track D for
+//! `mri_cc`, 3.2-27), `VLSTcreate` (98), `VLSTsort` (217) with its comparison, `VLSTfree` (254),
+//! `VLSTcomputeStats` (419), `VLSTalloc` (588), `VLSTcopy` (610), `VLSTcopyInto` (649),
+//! `VLSTaddUnique` (688), `VLSTaddWithValue` (695), `VLSTadd` (709) and `VLSTinList` (723).
 //!
 //! A list's nine arrays are vectors of the length FreeSurfer allocated (`calloc`); `nvox` and
 //! `max_vox` are kept as FreeSurfer keeps them, apart from the arrays' lengths. The volume a list
@@ -38,10 +38,10 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_NOMEMORY, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::sse;
-use larmorx_freesurfer_mri::mri::Mri;
+use larmorx_freesurfer_mri::mri::{Mri, MriRegion};
 use larmorx_freesurfer_mri::voxel::mri_get_vox_val;
 
-use crate::deriv::neighbors_in_range;
+use crate::deriv::{neighbors, neighbors_in_range};
 
 /// `errno`'s `ENOMEM` on Linux (a failed `calloc`).
 const ENOMEM: i32 = 12;
@@ -244,6 +244,121 @@ pub fn vlst_create<'a>(
                             g,
                             err,
                             "VLSTcreate",
+                            format!("voxel {i} of an array of {}", vl.xi.len()),
+                        )?;
+                    }
+                    let i = i as usize;
+                    vl.xi[i] = x;
+                    vl.yi[i] = y;
+                    vl.zi[i] = z;
+                    vl.fi[i] = f;
+                    vl.vsrc[i] = val as f32;
+                }
+            }
+        }
+    }
+    vl.mri = Some(mri);
+    Ok(vl)
+}
+
+/// `VLSTcreateInRegion(mri, low_val, hi_val, vl, skip, border_only, box)`: the voxels of the box
+/// (columns `box.x` to `box.x + box.dx - 1`, then rows, then slices, every `skip + 1`-th) whose
+/// value lies in `[low_val, hi_val]` (`MRIgetVoxVal` in `double`, outside the volume as it reads
+/// there: FS-52, FS-53), in the order frame, column, row, slice (columns outermost); with
+/// `border_only` only those with a face neighbour whose value rounds to the frame's number
+/// (`MRIneighbors(mri, x, y, z, f)`: the frame passed as the value, as FreeSurfer does). The count
+/// that sizes the arrays is frame 0's alone (without the `border_only` test); a list is allocated
+/// (arrays of the count, possibly empty) when none is given or the given one's `max_vox` is below
+/// the count. `allocating <n> voxel indices...` under `DIAG_SHOW` and `DIAG_VERBOSE`. A volume of
+/// several frames writes past the arrays: FS-890 (an error in both modes). FS-889 for a negative
+/// `skip`.
+#[allow(clippy::too_many_arguments)]
+pub fn vlst_create_in_region<'a>(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    mri: &'a Mri,
+    low_val: f32,
+    hi_val: f32,
+    vl: Option<VoxelList<'a>>,
+    skip: i32,
+    border_only: bool,
+    region: &MriRegion,
+) -> Result<VoxelList<'a>, Fatal> {
+    if skip < 0 {
+        g.notices.add(
+            &FS_889,
+            format!(
+                "VLSTcreateInRegion with skip {skip} (FreeSurfer never ends or reads before the box)"
+            ),
+        );
+        log::error_exit(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!("VLSTcreateInRegion: skip {skip} is negative (FreeSurfer never ends here)\n"),
+        )?;
+    }
+    let step = (skip + 1) as usize;
+    let lo = f64::from(low_val);
+    let hi = f64::from(hi_val);
+    let in_range = |v: f64| v >= lo && v <= hi;
+    let width = region.x.wrapping_add(region.dx);
+    let height = region.y.wrapping_add(region.dy);
+    let depth = region.z.wrapping_add(region.dz);
+    let span = |from: i32, to: i32| {
+        (i64::from(from)..i64::from(to))
+            .step_by(step)
+            .map(|v| v as i32)
+    };
+    let mut nvox = 0i32;
+    for x in span(region.x, width) {
+        for y in span(region.y, height) {
+            for z in span(region.z, depth) {
+                let val = f64::from(mri_get_vox_val(g, err, mri, x, y, z, 0, 0)?);
+                if in_range(val) {
+                    nvox = nvox.wrapping_add(1);
+                }
+            }
+        }
+    }
+    if g.gdiag & DIAG_SHOW != 0 && g.gdiag & DIAG_VERBOSE != 0 {
+        let _ = writeln!(out, "allocating {nvox} voxel indices...");
+    }
+    let given = vl.is_some();
+    let mut vl = vl.unwrap_or_default();
+    if !given || vl.max_vox < nvox {
+        vl.allocate(nvox.max(0) as usize);
+    }
+    vl.nvox = nvox;
+    let mut n = 0i64;
+    for f in 0..mri.nframes.max(0) {
+        for x in span(region.x, width) {
+            for y in span(region.y, height) {
+                for z in span(region.z, depth) {
+                    let val = f64::from(mri_get_vox_val(g, err, mri, x, y, z, f, 0)?);
+                    if !in_range(val) {
+                        continue;
+                    }
+                    if border_only && neighbors(g, err, mri, x, y, z, f)? <= 0 {
+                        continue;
+                    }
+                    let i = n;
+                    n += 1;
+                    if !within(
+                        i,
+                        &[
+                            vl.xi.len(),
+                            vl.yi.len(),
+                            vl.zi.len(),
+                            vl.fi.len(),
+                            vl.vsrc.len(),
+                        ],
+                    ) {
+                        past(
+                            g,
+                            err,
+                            "VLSTcreateInRegion",
                             format!("voxel {i} of an array of {}", vl.xi.len()),
                         )?;
                     }

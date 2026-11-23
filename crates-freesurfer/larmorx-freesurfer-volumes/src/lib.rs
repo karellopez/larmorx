@@ -25,6 +25,7 @@ pub mod getfullpath;
 pub mod lta_convert;
 pub mod mri_add_xform_to_header;
 pub mod mri_binarize;
+pub mod mri_cc;
 pub mod mri_convert;
 pub mod mri_info;
 pub mod mri_make_uchar;
@@ -54,6 +55,10 @@ pub const PROGRAMS: &[Program] = &[
     Program {
         name: mri_binarize::main::NAME,
         run: mri_binarize::main::run,
+    },
+    Program {
+        name: mri_cc::main::NAME,
+        run: mri_cc::main::run,
     },
     Program {
         name: mri_convert::main::NAME,

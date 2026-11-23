@@ -714,7 +714,8 @@ static MRI *getw()
   if (ct) m->ct = ct;
   return m;
 }
-// a volume as putv prints it, but its voxels as the FNV-1a 64 hash of their bytes (h and 16 hex digits)
+// a volume as putv prints it, but its voxels as a 64-bit FNV-1a hash of their bytes (h and 16 hex digits):
+// the start state 1469598103934665603 (FNV's usual offset basis without its last digit), the usual prime
 static void putvh(const MRI *m)
 {
   if (!m) {

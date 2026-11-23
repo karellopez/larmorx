@@ -2834,7 +2834,7 @@ its voxels are read or written: FS-58.
 ## 51. Validation plan (sections 49 and 50)
 Made ready by the spec finisher's relay 19: §69's groups `vconf`, `vset`, `vmorph`, `vmask` (seeded) and `vrules22`
 (fixed cases), on the open probe's commands (README.md says what each takes and prints): `conform` (`MRIconform`,
-whose 256^3 result's voxels are printed as their FNV-1a 64 hash, `MRIgetConformMatrix`, `MRIconformedTemplate`; the
+whose 256^3 result's voxels are printed as a 64-bit FNV-1a hash (the start state 1469598103934665603, not FNV's usual offset basis; README.md defines it), `MRIgetConformMatrix`, `MRIconformedTemplate`; the
 input printed afterwards the same way), `union`, `isect`, `mand`, `mxor`, `compl`, `edges`, `mnot`, `b2c`, `cntv`
 (`MRItotalVoxelsOn`, `MRIvoxelsInLabel`, `MRIlabelInVolume`, `MRInMask`), `cent`, `cnbhd`, `pthr`, `rlist`, `rvonly`,
 `cplab`, `cplv`, `slv`, `erodenn`, `erode`, `erode2d`, `erodeseg`, `dilseg`, `dtl` (both threshold dilations), `dlab`

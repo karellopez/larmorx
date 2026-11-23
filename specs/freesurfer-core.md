@@ -555,7 +555,12 @@ is a failed assertion (§3: `line < 1000000`, at `<BUILD_ROOT>/utils/utils.cpp:1
 - **A temporary file** `<base>/tmp.XXXXXX<suffix>` (new, empty) or **directory** `<base>/tmp.XXXXXX`;
   failure: `error: Could not create temporary file in <base>` (or `directory`), exit status 1 (a
   suffix holding a `/` fails so). The six characters are unpredictable; their choice never reaches a
-  result.
+  result. The file is made with the mode 0600 (read and write for its owner only) and the directory
+  with 0700 (read, write and search for its owner only), each less the process's umask, as POSIX's
+  `mkstemp` and `mkdtemp` make them; the writability test's file is made with 0600 too before it is
+  removed. A umask takes away only owner bits (none of the usual ones, 000 to 077, changes them)
+  (**(observed)**: the probe's `mktempdir` and `tempfile` with `TMPDIR` set and the umasks 000, 022,
+  027 and 077: every folder 0700, every file 0600; `fs_temp_file`'s file, `specs/fs_temp_file.md` §2.4).
 
 ## 19. Threads, parallel loops, the debugging stack, HIPS and the licence check
 

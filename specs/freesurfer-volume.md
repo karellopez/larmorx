@@ -18,9 +18,10 @@ the clean room's questions on part 7a and fs.bspline), part 8 (§37-40) and §54
 the voxel, RAS-to-RAS and physical-voxel types by its relay 13 (2026-11-22, with the clean room's
 questions on part 7b), §54's rest by its relay 14, §55-57 by its relay 15, part 9's §41 and §43 by its relay 16
 (2026-11-22), part 9's §42 and §44, with FS-269 as decided, by its relay 17 (2026-11-23), part 10a (§46-48) by
-its relay 18 (2026-11-23, with the clean room's questions on part 9)**:
+its relay 18 (2026-11-23, with the clean room's questions on part 9), part 10b (§49-51) by its relay 19 (2026-11-23,
+with the clean room's questions on part 10a)**:
 the black-box validation plan (§69) with its open probe, a read-through as a clean-room reader, the
-defects' texts in `larmorx_core::defects` checked. The sections after §45 (but §46 to §48 and §54 to §57) are
+defects' texts in `larmorx_core::defects` checked. The sections after §45 (but §46 to §51 and §54 to §57) are
 not yet read through that way: their validation plans still name the replica's closed probe, which the implementer does
 not open (§69 says what to do meanwhile). What black-box runs confirmed is marked **(observed)**.
 
@@ -54,8 +55,8 @@ and voxel-to-RAS matrices; part 7b (§34-35) slices as 2-D images, neighbourhood
 difference lists and voxelwise operations. Then the rest of the module (§41-68), of which these are
 ready too: part 9 (§41-45: volume-to-volume resampling, frame covariance, PCA and the false discovery rate,
 regions, voxel neighbourhood measures); part 10a (§46-48: the Talairach helpers, dilation and the segment
-helpers); §54 (operations on a transform array) whole; §55 to §57 (segmentations onto another grid, SPM warps,
-segment statistics, crops), `MRIaseg2volMU`'s upsampling and `MRIvol2VolTkRegVSM` included. Not yet: §49 to §53,
+helpers); part 10b (§49-51: conforming; set operations, morphology, masks and counts); §54 (operations on a transform array) whole; §55 to §57 (segmentations onto another grid, SPM warps,
+segment statistics, crops), `MRIaseg2volMU`'s upsampling and `MRIvol2VolTkRegVSM` included. Not yet: §52 and §53,
 §59 to §68.
 
 ## 1. Conventions
@@ -2716,9 +2717,12 @@ its voxels are read or written: FS-58.
   own, the last step's kept). Dilation: a voxel of label 0 inside the mask
   (`mask`'s `frame` value not below `mthresh`; all without a mask) whose face neighbours in the volume (order -c, +c,
   -r, +r, -s, +s) carry nonzero labels takes the most frequent (the smallest of a tie); `nchanges` the number changed.
-  FS-497: with `n == -1`, a step that changes voxels without changing the working copy (a complex volume: FreeSurfer's
-  copy takes half of each row, FS-161) repeats forever in FreeSurfer; here an error in both modes
-  (`MRIdilateSegmentation: step <k> changes <n> voxels that the next step does not see`).
+  FS-497: with `n == -1`, a step that changes voxels without changing the working copy repeats forever in FreeSurfer:
+  a complex volume, whose copy FreeSurfer makes of the first `width` bytes of each row only (an eighth of a float
+  complex row, fs.mri §13's FS-161), so that a label in the first voxel's real part reaches the working copy and the
+  neighbours it gives never do; here an error in both modes (`MRIdilateSegmentation: step <k> changes <n> voxels
+  that the next step does not see`) (**(observed)**: `vrules22`, a complex volume whose first voxel holds the label:
+  `TIMEOUT` after the alarm; one whose second voxel holds it ends at once, the label never reaching the copy).
 - `MRIdilateThreshLabel` / `MRIdilateInvThreshLabel(src, val, dst, label, niter, thresh)` (bytes: the common rules'
   comparison, so a label outside 0 to 255 changes nothing): check (src, val);
   `dst = MRIcopy(src, dst)`; up to `niter` steps on bytes, each from a copy of `dst` (`tmp`): the bounding box of
@@ -3759,12 +3763,12 @@ both or none, into a new array, another array of 0 to 2 transforms or the source
 `reproduce` but where the original reads memory it does not own or crashes (FS-504, FS-957, the shared voxel defects),
 counted and not compared; the default differs only with a notice (FS-954, FS-956, FS-957 and the shared ones).
 
-## 69. Validation plan (black box), parts 1 to 9, part 10a and §54 to §57
+## 69. Validation plan (black box), parts 1 to 9, parts 10a and 10b and §54 to §57
 
 ### 69.1 The probe
 
 The open probe folder `validation/investigations/freesurfer-volume-probe/` holds the probe's source
-(calls of the functions of §2 to §35, §37 to §39, §41 to §44, §46, §48 and of §54 to §57 by name, and of fs.bspline's) and the
+(calls of the functions of §2 to §35, §37 to §39, §41 to §44, §46, §48 to §50 and of §54 to §57 by name, and of fs.bspline's) and the
 comparison loop; its README lists every
 command, its arguments and what it prints, and the encodings (every float and double as its bits;
 the volumes, geometries, matrices, colour tables and MINC transforms as the fs.mri probe encodes
@@ -3862,7 +3866,13 @@ for `vresamp` after its sources were given a good RAS in most cases, `fs-volume-
 | `vtal` | 46 | 240 | 1 | 39 | 0 | `8febf2484993ae9d154b7b0e8e874ce1e13a7585886d052abef05128ce3043cb` |
 | `vdil` | 48 | 270 | 0 | 1 | 0 | `66b95e1e50a1d2df3635d382eaf037fcce8da4b0a81f51d92e15aa62fb56e286` |
 | `vrules20` | 41, 43, 46, 48 | 111 | 5 | 26 | 0 | `659b9d40219b9a7b767025460389ddcfdb84866457ed658f201b8e20e320d379` |
-| all | | 18,158 | 1,616 | 904 | 13 | |
+| `vrules21` | 46, 48 | 71 | 6 | 4 | 0 | `87ab3fcae75df6d3c3ae42a1088ffba9aa39ce8d3bf317b870bce083c39d6329` |
+| `vconf` | 49 | 71 | 0 | 14 | 0 | `ab073ef3c0df43f7ccc66c0e2b296f789b304c1b7f2542a1b08d93c56fb6893a` |
+| `vset` | 50 | 500 | 12 | 11 | 0 | `5aa604a8dd7974f9b2f889a2b89dfc5e3f48f39881bb97b97741fff077898ed5` |
+| `vmorph` | 50 | 340 | 0 | 8 | 0 | `d6661c8c2733cefc3eb2a13865ffaa852e753cea4f30926b1b6750bfaf77fc3d` |
+| `vmask` | 50 | 110 | 2 | 4 | 0 | `f73d7388bbf105941a9fbe8e3b98720cbbb451d1211ebcf35e8507391ef6ffc9` |
+| `vrules22` | 49, 50 | 134 | 8 | 6 | 6 | `ab5206dbdcbb22959da4ace825fd2e8661a11d5c1443eaebb95f63696ac94cb9` |
+| all | | 19,384 | 1,644 | 951 | 19 | |
 
 The probe's groups `vbspline` and `vbsrules` are fs.bspline's (`specs/freesurfer-bspline.md` §9).
 
@@ -4232,6 +4242,37 @@ count before the array (FS-490); every group the same cold, warm and twice witho
 hashes unchanged with the rebuilt probe; `models.py region` also takes `vrules20`'s `rgbb` line (as the model; the
 decided box differs) (**(observed)**, log `oracles/logs/fs-volume-probe-r18-final-2026-11-23.log`).
 
+Part 10b (relay 19, the prebuilt probe rebuilt from 4d00c36e, which adds the commands `dilo`, `conform`, `union`,
+`isect`, `mand`, `mxor`, `compl`, `edges`, `mnot`, `b2c`, `cntv`, `cent`, `cnbhd`, `pthr`, `rlist`, `rvonly`, `cplab`,
+`cplv`, `slv`, `erodenn`, `erode`, `erode2d`, `erodeseg`, `dilseg`, `dtl`, `dlab`, `openn`, `dil6`, `grow`, `onfg`,
+`offbg`, `mmask` and `tmask`): `vrules21` (fixed cases of the fs.volume clean room's items 107 to 111 on §46 and
+§48: arrays of one type holding transforms of another, every matrix and point function on a volume whose cache is
+its allocation's or absent (FS-252's crashes where a header is copied), `MRIsegStats` with NaN values after the first
+and a single NaN voxel, `dilo` on floats, ints, shorts and bytes with outside values 5, 0, -1 and NaN, long volumes
+whose every sample the nearest sampler refuses), `vconf` (§49: 60 `MRIgetConformMatrix` and `MRIconformedTemplate`
+calls on volumes of bytes, ints, floats and shorts up to 5 x 5 x 4 of one or two frames, axis-aligned, oblique, nearly
+coronal and special geometries, a good RAS in 85 %, widths 0 to 256 and sizes 0.5 to 2, 0, -1, NaN and 1e10, `KeepDC`
+in two thirds; 8 `MRIconform` resamplings onto the grid; the grid itself in bytes and in floats), `vset` (§50: 140
+two-volume operations, 110 one-volume ones, 100 counts, centroids and neighbourhood counts, 50 percentiles, 100
+replacements and label copies), `vmorph` (§50: 170 erosions, dilations, openings and segmentation steps, 90
+threshold and label dilations, 80 grows and foreground and background turns), `vmask` (§50: 110 masks, their
+variable and diagnostic bit, other geometries, threshold masks) and `vrules22` (fixed cases: FS-491 with `???` and
+`RRS`, FS-492, widths 0 to -2, sizes 0, NaN and infinite, a header-only volume conformed (FS-58), `MRIerodeNN`'s
+offsets in order on negative values, the segmentation functions' ends, FS-493 and FS-497 (their 6 lines in a batch
+without the guard runs, ended by the alarm: the erosion's steps each keep a copy, and under the guard allocator a
+process runs out of mappings before the alarm, sooner or later from run to run), the threshold dilations' raised
+bound and no steps, `MRIopenN`'s orders, `MRIdilate6` on NaN, the replace list's byte targets, FS-494's bytes, FS-495
+and FS-496, `MRImask`'s variable, the grow's labels outside the byte range, `MRIturnOffBG`'s cube, `MRIreplaceValuesOnly`
+at `FLT_EPSILON`, a byte label of 258, two frames complemented into one (FS-53), edges of NaN and 1e40, centroids of
+NaN, zero and negative sums, window sizes 0 to -2). Their memory and crash lines: `vrules21`'s FS-252 crashes,
+`vset`'s and `vrules22`'s percentiles read past the list (FS-496) and destinations and outputs of another extent or
+fewer frames written outside (FS-53), `vmask`'s masks of one frame given as the destination of two, `vrules22`'s
+header-only volume conformed (FS-58); every group the same cold, warm and twice without the cache (`vrules22` in its
+final form; an earlier form, its FS-497 label in the second voxel and its hang lines with the guard runs, was not:
+log `oracles/logs/fs-volume-probe-r19-final-2026-11-23.log`); the earlier groups' hashes unchanged with the rebuilt
+probe (**(observed)**, logs `oracles/logs/fs-volume-probe-r19-final-2026-11-23.log` and
+`-r19-vrules22-2026-11-23.log`).
+
 `vrules` (relay 7, 2026-11-17: the prebuilt probe unchanged; log
 `oracles/logs/fs-volume-probe-r7-refs-2026-11-17.log`, the same hash from the cache and without it,
 the other groups' hashes unchanged) holds fixed cases of single statements: FS-291 with tensor
@@ -4326,9 +4367,14 @@ and `vrules15` identical in both modes; no unexplained difference in either mode
 both modes; no unexplained difference in either mode. Relay 17 (the prebuilt probe from 39264dfc unchanged): every
 earlier group's hash unchanged, every line of `vrules18` identical in both modes, `vcov`, `vvoxel` and `vrules19` all
 but their memory lines whose contents changed from process to process (0 or 1, 7 and 1); no unexplained difference
-in either mode (log `oracles/logs/fs-volume-probe-r17-final-2026-11-23.log`).
+in either mode (log `oracles/logs/fs-volume-probe-r17-final-2026-11-23.log`). Relay 18 (the prebuilt probe from 2a612716):
+every earlier group's hash unchanged, every line of `vtal`, `vdil` and `vrules20` identical in both modes; no
+unexplained difference in either mode. Relay 19 (the prebuilt probe from 4d00c36e): every earlier group's hash
+unchanged, every line of `vrules21`, `vconf`, `vmorph`, `vmask` and `vrules22` identical in both modes, `vset` all
+but its memory lines whose contents changed from process to process (1 to 3); no unexplained difference in either
+mode (logs `oracles/logs/fs-volume-probe-r19-final-2026-11-23.log`, `-r19-vrules22-2026-11-23.log`).
 
-### 69.4 The defects of parts 1 to 9, part 10a and §54 to §57 (index)
+### 69.4 The defects of parts 1 to 9, parts 10a and 10b and §54 to §57 (index)
 
 | Defect | § | Defect | § | Defect | § |
 |---|---|---|---|---|---|
@@ -4364,7 +4410,9 @@ in either mode (log `oracles/logs/fs-volume-probe-r17-final-2026-11-23.log`).
 | FS-270 | 55 | FS-482 | 41 | FS-483 | 42 |
 | FS-484 | 42 | FS-485 | 44 | FS-486 | 44 (not reached) |
 | FS-487 | 46 | FS-488 | 46 | FS-489 | 48 |
-| FS-490 | 48 | | | | |
+| FS-490 | 48 | FS-491 | 49 | FS-492 | 49 |
+| FS-493 | 50 | FS-494 | 50 | FS-495 | 50 |
+| FS-496 | 50 | FS-497 | 50 | | |
 
 Others' defects these parts meet: FS-12 (`nint`, `specs/freesurfer-core.md`), FS-52 (§35's second volumes), FS-53 and FS-58
 (`specs/freesurfer-mri.md`; FS-252, its header copy without cached matrices, in part 4), FS-47 and
@@ -4374,7 +4422,9 @@ cached matrices) and in part 8 (`vrules12`: a volume without its cached matrices
 FS-01's NUL (`MRIvoxelDirection`'s error), FS-323 (§44's index tables), FS-52 and FS-53 (masks and frames read
 outside), FS-47 and FS-48 (`MRIpca`'s decompositions) and GLIBC-07 (`pow`, `log10`); in part 10a, FS-12 (§48's
 conversions to `int`), FS-52 and FS-53 (destinations and masks of fewer frames or another extent) and FS-325 (the
-resamplings' samples).
+resamplings' samples); in relay 19's `vrules21`, FS-252 (a volume without its cached matrices copied into a
+Talairach volume); in part 10b, FS-12 (`(int)` labels), FS-52 and FS-53 (destinations, masks and second volumes
+unchecked, written and read outside), FS-58 (a volume without voxels conformed).
 
 ### 69.5 Beyond the probe, and the sections after §40
 
@@ -4385,7 +4435,8 @@ resamplings' samples).
 - **§49 to §68** (but §54, in `vltapv`, `vrules10`, `vlta54` and `vrules14`, and §55 to §57, in `vaseg`, `vsegs`,
   `vcrops`, `vrules15` and `vrules16`: relays 12 to 16; part 9, §41 to §44, is in `vv2v`, `vregion`, `vrules17`,
   `vrules18`, `vcov`, `vvoxel` and `vrules19`: relays 16 and 17; part 10a, §46 to §48, in `vtal`, `vdil` and
-  `vrules20`: relay 18) are not yet in the open probe's groups: until they
+  `vrules20`: relay 18, with `vrules21`: relay 19; part 10b, §49 to §51, in `vconf`, `vset`, `vmorph`, `vmask` and
+  `vrules22`: relay 19) are not yet in the open probe's groups: until they
   are, their clean room checks them against the
   official programs as black boxes and against the replays; their validation plans name the replica's
   probe, which the implementer does not open.

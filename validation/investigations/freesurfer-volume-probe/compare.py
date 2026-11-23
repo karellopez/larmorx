@@ -5619,15 +5619,24 @@ class Gen18(Gen17):
         L.append(f"dilseg {sg} 0 self 1 null 0 {f64(0.5)}")
         L.append(f"dilseg {sg} 0 {self.lab(P((4, 3, 3)), [0], t=1)} 1 null 0 {f64(0.5)}")
         L.append(f"dilseg {self.lab(P((4, 4, 3)), [1, 0] * 48, t=1, nf=2)} 0 new 1 null 0 {f64(0.5)}")
+        # the lines that never end (FS-493, FS-497: the alarm of 1 second ends them) run without the guard
+        # allocator: the erosion's steps each keep a copy, and under the guard allocator the process runs out
+        # of mappings before the alarm, sooner or later from run to run
+        H = []
         for n in (0, -1, -5):
-            L.append(f"@1 erodeseg {sg} 0 new {n} 0")
+            H.append(f"@1 erodeseg {sg} 0 new {n} 0")
         for n in (0, -2):
-            L.append(f"@1 dilseg {sg} 0 new {n} null 0 {f64(0.5)}")
-        L.append(f"@3 dilseg {sg} 0 new -1 null 0 {f64(0.5)}")
-        cx = self.lab(P((4, 2, 1)), [0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0] * 2, t=3).split(" ")
-        cx[3] = "7"  # a complex volume (pairs of floats)
-        L.append(f"@1 dilseg {' '.join(cx)} 0 new -1 null 0 {f64(0.5)}")
-        L.append(f"@3 dilseg {' '.join(cx)} 0 new 1 null 0 {f64(0.5)}")
+            H.append(f"@1 dilseg {sg} 0 new {n} null 0 {f64(0.5)}")
+        L.append(f"dilseg {sg} 0 new -1 null 0 {f64(0.5)}")
+        # complex volumes (pairs of floats): FreeSurfer's copy holds the first `width` bytes of each row, so a
+        # label in the first voxel's real part reaches the working copy and its new neighbours never do (FS-497,
+        # the alarm ends it), and a label in the second voxel never reaches it (the dilation ends at once)
+        for vals in ([2.0] + [0.0] * 7, [0.0, 0.0, 2.0] + [0.0] * 5):
+            cx = self.lab(P((4, 2, 1)), vals * 2, t=3).split(" ")
+            cx[3] = "7"
+            cxw = " ".join(cx)
+            (H if vals[0] else L).append(f"{'@1 ' if vals[0] else ''}dilseg {cxw} 0 new -1 null 0 {f64(0.5)}")
+            L.append(f"dilseg {cxw} 0 new 1 null 0 {f64(0.5)}")
         # masks of the dilation: a NaN mask value is inside; a frame of the mask
         mk = self.lab(P((4, 4, 3)), [1.0, QNAN, 0.0, 0.4] * 12, t=3) + " 0"
         L.append(f"dilseg {sg} 0 new 1 {mk} 0 {f64(0.5)}")
@@ -5724,7 +5733,7 @@ class Gen18(Gen17):
         for w in (0, -1, -2, 2, 1, 3):
             pts += [str(w), "0", "0", "0", "1"]
         L.append(f"cnbhd {cn} 0 6 {' '.join(pts)}")
-        return [Batch("vrules22", "vrules22", L)]
+        return [Batch("vrules22", "vrules22", L), Batch("vrules22", "vrules22-hang", H, guards=False)]
 
 
 GROUPS = [

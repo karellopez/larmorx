@@ -140,9 +140,10 @@ def main(argv: list[str] | None = None) -> int:
         "`--keep-precision`, `--kernel`, `--delta`, the fills and `--downsample`, the voxel shift "
         "map, `--no-resample` and the slice operations, `--mul`, `--save-reg`, `--reg-final`, "
         "`--rot`, `--trans`, `--shear`, `--seed`, `--fstarg`, `--tal`, `--mni152reg`, `--crop`, "
-        "`--soap`; then seeded command lines. Each case in one folder with its own FreeSurfer, "
-        "subjects and FSL folders; exit status, both streams and every file written, case by "
-        "case; counted apart: FreeSurfer's crashes and the paths of part 2:",
+        "`--soap`; then seeded command lines. Each case in one folder (with its own FreeSurfer, "
+        "subjects and FSL folders where an option reads them); exit status, both streams and "
+        "every file written, case by case; counted apart: FreeSurfer's crashes and the paths of "
+        "part 2:",
         "",
     ]
     for p in payload["probe"]:
@@ -157,10 +158,11 @@ def main(argv: list[str] | None = None) -> int:
         "",
         "## Golden cases",
         "",
-        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_vol2vol_golden.rs`: 8 cases on "
-        "volumes up to 32^3 (the v8 scripts' four forms, fMRIPrep's, the voxel-to-RAS rewrite "
+        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_vol2vol_golden.rs`: 10 cases "
+        "on volumes up to 32^3 (the v8 scripts' four forms, fMRIPrep's, the voxel-to-RAS rewrite "
         "with `--save-reg` from a register.dat, a moving volume with NaN voxels by trilinear and "
-        f"cubic resampling), on every platform: `reproduce` `{a.golden}` (the official program's "
+        "cubic resampling, NaN in the output and in the registration), on every platform: "
+        f"`reproduce` `{a.golden}` (the official program's "
         f"value on the same inputs, `check.py --golden`), `fix` `{a.golden_fix}`.",
         "",
         "## Memory",

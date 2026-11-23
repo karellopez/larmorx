@@ -2132,7 +2132,10 @@ statuses are not compared): the implementations' own tests, against these sectio
 - `MRIvol2VolTLKernel(src, targ, M)`: for each target voxel that maps inside, the eight trilinear weights of its
   source point (`MRItrilinKernel`, section 27) go into the target's frames 0 to 7 (as `float`; a target with fewer
   frames writes past them: memory, **(observed)**: `vv2v`, `vrules17`, a crash with two frames). Returns `NULL`
-  always (an 8-frame `float` work volume with the target's header is made and discarded) (**(observed)**: `vv2v`).
+  always (an 8-frame `float` work volume of the target's extent with the target's header is made and discarded:
+  made first, its allocation's messages included, before `M` when absent is made) (**(observed)**: `vv2v`;
+  `vrules20`, a target of width 0 and a singular source without `M`: the allocation's shape message, then
+  `MatrixMultiply(): m1 is null`).
 - `MRIvol2VolVSM(src, targ, M, interp, param, vsm, vsmlta, pedir)`: as `MRIvol2Vol` (messages `ERROR:
   MRIvol2volVSM(): source and target have different number of frames`, `ERROR: MRIvol2volVSM: interpolation
   method <m> unknown`; with `DIAG_VERBOSE` first `Using MRIvol2VolVSM` and `MRIvol2VolVSM interp=<i>,
@@ -2159,13 +2162,18 @@ statuses are not compared): the implementations' own tests, against these sectio
   corners at `FLT_MIN` (kept), `-FLT_MIN` (kept), the largest subnormal and 0 (skipped), arrays of types 0 and 1, a
   tensor map: every shift 0 in all four probe runs, so every voxel skipped).
 - `MRIvol2VolDelta(mov, targ, R)`: a new 3-frame `float` volume of the target's extent with its header
-  (`MRIcopyHeader`); `R` absent: `MRItkRegMtx(targ, mov)`. With `T` the target's tkregister voxel-to-RAS matrix and
-  `T2 = R T` (single-precision products), each voxel's frames are `(T x - T2 x)` component by component (`x = (ct,
+  (`MRIcopyHeader`), made first; then `R` when absent: `MRItkRegMtx(targ, mov)` (`specs/freesurfer-mri.md` §9: the
+  scanner matrices, then the tkregister ones, then the inverses and products); then `T`, the target's tkregister
+  voxel-to-RAS matrix, and `T2 = R T` (single-precision products; each tkregister matrix of an extent of 0 prints the
+  shape message, fs.mri §9, so the order shows: **(observed)**: `vrules20`, a target of width 0 with a moving volume
+  of a singular scanner matrix: three shape messages, the input's, the allocation's and the target's tkregister
+  matrix's inside `MRItkRegMtx`, then `MatrixMultiply(): m2 is null`; with an invertible one four, and the volume); each voxel's frames are `(T x - T2 x)` component by component (`x = (ct,
   rt, st, 1)`, products by `MatrixMultiply`, the difference in `float`).
 - `TransformRegDat2LTA(targ, mov, R)`: a one-transform LTA of type `LINEAR_VOX_TO_VOX` (0), both its type fields 0,
   source geometry the target's, destination the moving volume's (`getVolGeom`), matrix `(inv(Tmov) R) Ttarg`
   (`MatrixMultiply` twice); `R` absent: the identity with the scanner voxel-to-RAS matrices, given: with the
-  tkregister ones.
+  tkregister ones; the target's matrix is made before the moving volume's, then the inverse and the products
+  (**(observed)**: `vrules20`, targets and moving volumes of width 0, singular and not, with and without `R`).
 - `MRImaskAndUpsample(src, mask, factor, npad, conserve, &lta)`: the bounding box (`REGIONgetBoundingBox`,
   section 43) of the mask, or of the source when there is none, padded by `npad`; with `Gdiag_no > 0`, `
   mask-and-upsample bounding box <q> ` and the box (`REGIONprint`), `q` printed with `%g`: `q = n / m` in `float`,
@@ -3102,7 +3110,8 @@ and values past `int`'s range the `int` minimum). Volumes of other extents or fr
 read and written as the voxel functions do outside a volume (fs.mri §5, FS-52, FS-53).
 - **`MRIvol2VolTkRegVSM(mov, targ, R, interp, param, vsm, vsmlta, pedir)`**: `MRIvol2VolVSM` (section 41) with the vox2vox
   `(inv(Tmov) R) Ttarg` (`T` the tkregister vox2ras of each, section 13; `float` products, `specs/freesurfer-maths.md`
-  §8.1, the inverse first and then the two products, before anything of `MRIvol2VolVSM`), or none without `R` (then
+  §8.1; in order `Tmov`, its inverse, `Ttarg`, then the two products, before anything of `MRIvol2VolVSM`; each
+  tkregister matrix of an extent of 0 prints the shape message, fs.mri §9, **(observed)**: `vrules20`), or none without `R` (then
   `MRIvol2VolVSM` makes its own from the scanner vox2ras); `R` from the target's tkregister RAS to the moving volume's.
   Returns `MRIvol2VolVSM`'s status (**(observed)**: `vv2v`; `vrules17`, without a registration and with the
   identity).

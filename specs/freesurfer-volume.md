@@ -2168,7 +2168,10 @@ statuses are not compared): the implementations' own tests, against these sectio
   tkregister ones.
 - `MRImaskAndUpsample(src, mask, factor, npad, conserve, &lta)`: the bounding box (`REGIONgetBoundingBox`,
   section 43) of the mask, or of the source when there is none, padded by `npad`; with `Gdiag_no > 0`, `
-  mask-and-upsample bounding box <%g of (float) w h d / (dx dy dz)> ` and the box (`REGIONprint`); the box cut out
+  mask-and-upsample bounding box <q> ` and the box (`REGIONprint`), `q` printed with `%g`: `q = n / m` in `float`,
+  where `n` is the source's extent (never the mask's) multiplied in single precision (`(float)width * height`
+  rounded to `float`, then `* depth` rounded to `float`) and `m` the box's sizes multiplied as 32-bit integers
+  (`(dx * dy) * dz`, wrapping), converted to `float` (a size of 0 gives an infinity); the box cut out
   of the source (`MRIextractRegion`; its failure gives `NULL`); with a factor above 1 upsampled
   (`MRIupsampleNConserve` with `conserve`, else `MRIupsampleN`; a factor of 1 or below keeps the cut);
   `lta = TransformRegDat2LTA(src, result, NULL)` (from the source's voxels to the result's). A mask (or source)

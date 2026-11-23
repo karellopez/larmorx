@@ -2562,8 +2562,8 @@ value beyond the `int` range or NaN is FS-12 here too (clamped by default, NaN t
   + mean) * sum + sum2) / (n - 1))` (the `float` products left to right; 0 otherwise). Of two NaN operands the left
   one's survives in each operation as written here. The values are compared as `min > v` and `max < v` (the
   `float` widened), so a NaN value after the first never replaces them but enters the sums (`mean` and `std` NaN,
-  `min`, `max` and `range` those of the other values), and a NaN first value keeps both NaN to the end (all five
-  NaN) (**(observed)**: `vdil`; `vrules20`, one voxel, none, NaN values, among them a NaN first value; `vrules21`, a
+  `min`, `max` and `range` those of the other values), and a NaN first value keeps both NaN to the end (`range` and
+  `mean` NaN too, and `std` when there is more than one voxel) (**(observed)**: `vdil`; `vrules20`, one voxel, none, NaN values, among them a NaN first value; `vrules21`, a
   NaN third value after two of 1).
 - `HISTOseg(seg, segid, vol, bmin, bmax, bdelta)`: `nbins = (int)(round((bmax - bmin) / bdelta) + 1)` (`round` half away
   from zero; FS-12 for the conversion, so a NaN width gives 0 bins by default and -2147483648 with `reproduce`),

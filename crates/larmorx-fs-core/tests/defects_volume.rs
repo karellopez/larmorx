@@ -2015,10 +2015,14 @@ fn fs12_histoseg_a_nan_width_and_nan_values() {
 #[test]
 fn transform_with_matrix_nan_operands() {
     use larmorx_fs_core::maths::matrix::{MATRIX_REAL, Matrix};
+    use larmorx_fs_core::sse::widen;
     use larmorx_fs_core::volume::talairach::transform_with_matrix;
+    // The double coordinate is made by its bits (`widen`), not by `f64::from`: Rust leaves the
+    // payload of a NaN converted between float types to the compiler, and an optimised build
+    // folds `f64::from(<a NaN constant>)` to the preferred NaN `0x7ff8000000000000`.
     let (a, b) = (
         f32::from_bits(0x7fc0_1234),
-        f64::from(f32::from_bits(0x7fc0_5678)),
+        widen(f32::from_bits(0x7fc0_5678)),
     );
     let mut m = Matrix::zeros(4, 4, MATRIX_REAL);
     for k in 1..=4 {

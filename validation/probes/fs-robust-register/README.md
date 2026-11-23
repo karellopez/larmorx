@@ -50,6 +50,18 @@ plan is in `specs/mri_robust_register.md` §7.
   ported (`--debug`, `--test`). The golden cases gained `--cost MI` and `--cost SB` (16^3 images).
   The summary's `official_sha256_skip_debug` is the hash the recorded test's debug build checks (the
   cases of these costs as `SLOW`: `slow_in_debug`, `cases::histogram_or_sb_cost`).
+- `check.py --family halfway` (relay 48): the Powell registration's half-way outputs, 24 cases
+  (`cases::halfway_cases`: every Powell cost with the Powell family's random options, random half-way
+  outputs, two without symmetry, some with `--highit 0`); the official program is never served from
+  the cache here (FS-1075: its half-way geometry is memory it has freed, which may change from run
+  to run). FS-1075's cases are not compared as a whole; their defined parts are
+  (`defined_before_half_way`: standard output up to `Creating half way data ...`, standard error up
+  to the second map, every file but the half-way ones). Measured 2026-11-23 with `--preload`: 3
+  identical (no half-way space: no symmetry, no level registered), 21 of FS-1075: 19 with their
+  defined parts identical (2 more of FS-1063 not compared), 4 identical in every byte (the official
+  program's memory still held the target's geometry). The measurement of the official program
+  alone: `validation/investigations/freesurfer-fs1075-halfway/`. The golden cases'
+  `golden-halfway-cases` (two) hold the port's hash (both modes).
 - `record.py`: the validation record `docs/validation/freesurfer-mri-robust-register.{json,md}`
   from the summaries above (from a clean commit).
 

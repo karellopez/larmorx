@@ -38,17 +38,19 @@
 //! half-way space, the images resampled there); the time taken (`Registration took <m> minutes and
 //! <s> seconds.`, from the clock) and the citation. Status 0.
 //!
-//! The other costs (`--cost` `LS`, `NCC`, `TB`, `LNCC`, `SAD`): `RegPowell`
-//! ([`larmorx_freesurfer_robust::powell`]), the images allowed to change type
+//! The other costs (`--cost` `LS`, `MI`, `NMI`, `ECC`, `NCC`, `SCR`, `TB`, `LNCC`, `SAD`, `SB`):
+//! `RegPowell` ([`larmorx_freesurfer_robust::powell`]), the images allowed to change type
 //! (`P.floattype`), the tolerance of `--powelltol`, no saturation search, no weights (`Warning:
 //! no weights could be created! ...`); once Powell has printed its final error the program's
 //! numbers print with 14 digits (`setprecision(14)` stays on `std::cout`); `SB`'s second citation.
+//! Their half-way outputs take the geometry of the Powell registration's byte target of the last
+//! level it registered (FS-1075); `--halfweights` then prints `Warning: no weights have been
+//! computed! Maybe you ran with --leastsquares??`; with no level registered (the finest skipped,
+//! `--highit 0`, and no coarser one) `ERROR: no half way space created (not implemented for this
+//! cost function)!`.
 //!
-//! Not ported yet (each ends with its message and status 1): the joint-histogram costs (`MI`,
-//! `NMI`, `ECC`, `SCR`: `JointHisto`) and `SB` (`CostFunctions::SBCost`, which sorts with
-//! libstdc++'s `std::sort`) at their first evaluation, the half-way outputs of the Powell
-//! registration (FreeSurfer's half-way geometry is then a freed image), the test mode (`--test`)
-//! and the debug output of `--debug` (the library's intermediate images and its key presses).
+//! Not ported yet (each ends with its message and status 1): the test mode (`--test`) and the
+//! debug output of `--debug` (the library's intermediate images and its key presses).
 //!
 //! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-robust-register.md`):
 //! - FS-1070: [`super::options`].
@@ -59,11 +61,19 @@
 //! - **FS-1072** (memory): an initial transform that is not linear (a morph, `--ixform` of an
 //!   `.m3z`) is read as an LTA: FreeSurfer reads the morph's memory as a transform array. An error
 //!   in both modes.
+//! - **FS-1075** (memory: freed): `RegPowell::getHalfWayGeom` returns `tcf`, the byte copy of the
+//!   target that `computeIterativeRegistrationFull` has freed (`MRIfree(&mriT)`) by the time
+//!   `main` reads its header (`MRIvoxelXformToRasXform`, `getVolGeom`): the half-way LTAs'
+//!   target geometry and the half-way images' grids are memory contents (measured, relay 48:
+//!   garbage sizes and directions, runs that differ, an allocation that fails, status 1, or
+//!   exhausts the memory box). Both modes keep that image's header (the voxels released where
+//!   FreeSurfer frees the image) and use it, noted (rule A; the maps on standard error, the
+//!   defined part, as FreeSurfer prints them).
 
 use std::io::Write;
 
 use larmorx_core::cfmt::ostream;
-use larmorx_core::defects::{FS_1071, FS_1072};
+use larmorx_core::defects::{FS_1071, FS_1072, FS_1075};
 use larmorx_core::vnl_fixed;
 use larmorx_core::vnl_matrix::{VnlMatrix, matlab_print_long, matlab_print_long_diag};
 use larmorx_freesurfer_core::globals::Globals;
@@ -412,20 +422,30 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
                 "ERROR: no half way space created (symmetry was switched off)!"
             );
         } else if reg.powell {
-            // RegPowell's half-way geometry is its byte copy of the target, freed by then
-            let _ = r.out.flush();
-            let _ = writeln!(
-                r.err,
-                "mri_robust_register: the half-way outputs of the Powell registration are not ported yet"
-            );
-            return Err(Fatal::Exit(1));
-        } else if reg.mri_weights.is_none() {
+            // RegPowell's half-way geometry: its byte copy of the target of the last level
+            // registered (none before a first level: the message below)
+            match reg.powell_hw.take() {
+                None => {
+                    let _ = writeln!(
+                        r.out,
+                        "ERROR: no half way space created (not implemented for this cost function)!"
+                    );
+                }
+                Some(hw) => {
+                    let done = half_way(g, r, &mut reg, &p, &mov, &dst, &hw, true);
+                    reg.powell_hw = Some(hw);
+                    done?;
+                }
+            }
+        } else if let Some(hw) = reg.mri_weights.take() {
+            let done = half_way(g, r, &mut reg, &p, &mov, &dst, &hw, false);
+            reg.mri_weights = Some(hw);
+            done?;
+        } else {
             let _ = writeln!(
                 r.out,
                 "ERROR: no half way space created (not implemented for this cost function)!"
             );
-        } else {
-            half_way(g, r, &mut reg, &p, &mov, &dst)?;
         }
     }
 
@@ -472,7 +492,9 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
 }
 
 /// The half-way outputs (`main` 942-1129): the two maps on standard error, the transforms into
-/// the half-way space (the weights' geometry), and the images and weights resampled there.
+/// the half-way space (`hw`'s geometry: the robust registration's weights, or the Powell
+/// registration's byte target, `powell`), and the images and weights resampled there.
+#[allow(clippy::too_many_arguments)]
 fn half_way(
     g: &mut Globals,
     r: &mut Run,
@@ -480,6 +502,8 @@ fn half_way(
     p: &Options,
     mov: &Mri,
     dst: &Mri,
+    hw: &Mri,
+    powell: bool,
 ) -> Result<(), Fatal> {
     let _ = writeln!(r.out, "Creating half way data ...");
     let (m1, m2) = reg.get_half_way_maps(g, r.err)?;
@@ -493,13 +517,20 @@ fn half_way(
         "{}",
         matlab_print_long(&VnlMatrix::from_4x4(&m2), "dsthw")
     );
-    let hw = reg.mri_weights.take().expect("the weights' geometry");
-    let done = half_way_outputs(g, r, p, mov, dst, &m1, &m2, &hw);
-    reg.mri_weights = Some(hw);
-    done
+    if powell {
+        // FreeSurfer's half-way geometry is the byte target it has freed: memory contents
+        g.notices.add(
+            &FS_1075,
+            "the half-way geometry of the Powell registration (FreeSurfer reads its freed copy of the target); the registration's target",
+        );
+    }
+    // the weights (`R.getWeights()`): the robust registration's; none after the Powell one
+    let weights = (!powell).then_some(hw);
+    half_way_outputs(g, r, p, mov, dst, &m1, &m2, hw, weights)
 }
 
-/// [`half_way`]'s transforms and images, into the weights' geometry `hw`.
+/// [`half_way`]'s transforms and images, into the geometry `hw`; the weights resampled there
+/// when there are any.
 #[allow(clippy::too_many_arguments)]
 fn half_way_outputs(
     g: &mut Globals,
@@ -510,6 +541,7 @@ fn half_way_outputs(
     m1: &[[f64; 4]; 4],
     m2: &[[f64; 4]; 4],
     hw: &Mri,
+    weights: Option<&Mri>,
 ) -> Result<(), Fatal> {
     let mut m2hw = lta_alloc(g, r.out, r.err, 1, Some(mov))?;
     let mut d2hw = lta_alloc(g, r.out, r.err, 1, Some(dst))?;
@@ -587,16 +619,15 @@ fn half_way_outputs(
         resampled(g, r, dst, &mut d2hw, &p.halfdst, true, false)?;
     }
     if !p.halfweights.is_empty() {
-        let _ = writeln!(r.out, " saving half-way weights ...");
-        resampled(
-            g,
-            r,
-            hw,
-            &mut d2hw,
-            &p.halfweights,
-            false,
-            p.oneminusweights,
-        )?;
+        if let Some(w) = weights {
+            let _ = writeln!(r.out, " saving half-way weights ...");
+            resampled(g, r, w, &mut d2hw, &p.halfweights, false, p.oneminusweights)?;
+        } else {
+            let _ = writeln!(
+                r.out,
+                "Warning: no weights have been computed! Maybe you ran with --leastsquares??"
+            );
+        }
     }
     Ok(())
 }

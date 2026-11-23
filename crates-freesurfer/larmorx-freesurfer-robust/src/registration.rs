@@ -205,6 +205,10 @@ pub struct RegRobust {
     /// `RegPowell`'s `xtol`, `ftol` (`setTolerance`; 1e-5).
     pub xtol: f64,
     pub ftol: f64,
+    /// `RegPowell::getHalfWayGeom()` (`tcf`): the byte copy of the target of the last level
+    /// registered, its voxels released where FreeSurfer frees the whole image (FS-1075: FreeSurfer
+    /// then reads the half-way geometry from freed memory); its header is the half-way geometry.
+    pub powell_hw: Option<Mri>,
     /// The precision of the program's `std::cout` for numbers: 6, and 14 once `RegPowell` has
     /// printed its final error (`setprecision(14)` stays on the stream).
     pub cout_precision: usize,
@@ -276,6 +280,7 @@ impl RegRobust {
             powell: false,
             xtol: 1e-5,
             ftol: 1e-5,
+            powell_hw: None,
             cout_precision: 6,
         }
     }

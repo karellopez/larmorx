@@ -4,8 +4,9 @@ Status: the robust cost complete (queue item 3.2-13, part 1: the command line, e
 the robust registration's path, its outputs, the exit statuses, the defects with their switches,
 the validation plan, §7); the entropy images (`--cost ROBENT`, §2.1; relay 45); the Powell
 registration with `--cost` `LS`, `NCC`, `TB`, `LNCC` and `SAD` (§2.2; relay 46); its joint-histogram
-costs `MI`, `NMI`, `ECC`, `SCR` and the `SB` cost (§2.3; relay 47); not yet specified: the Powell
-registration's half-way outputs, the test mode and the debug output (§6). Written by the replica's author (track C, relay 44) as the
+costs `MI`, `NMI`, `ECC`, `SCR` and the `SB` cost (§2.3; relay 47); the Powell registration's
+half-way outputs (§2.2, FS-1075; relay 48); not yet specified: the test mode and the debug output
+(§6). Written by the replica's author (track C, relay 44) as the
 spec writer: behaviour, conventions and messages, for the clean room (`larmorx-fs-volumes`), which
 works from this file, the library modules' specs (`specs/freesurfer-robust.md` §16 for the
 registration itself, `freesurfer-volume.md` for the transforms' reading, conversion, writing and
@@ -199,7 +200,7 @@ unless `--floattype`), and: with `--satit`, the saturation search (§16.6) and t
 registration; with `--nomulti`, the iterations on the full images; otherwise the multiresolution
 registration (`--maxit`, `--epsit`).
 
-### 2.2 The Powell registration (`--cost` `LS`, `NCC`, `TB`, `LNCC`, `SAD`; `--powelltol`)
+### 2.2 The Powell registration (`--cost` `LS`, `NCC`, `TB`, `LNCC`, `SAD`; `--powelltol`; its half-way outputs)
 
 Every cost but `ROB` (and `ROBENT`) registers by Powell's method instead of the robust iterations.
 The images may then change type (as with `--floattype`: `setSourceAndTarget` with `keeptype =
@@ -268,7 +269,13 @@ At each level of the multiresolution registration (or once on the full images wi
    an empty line and ` DONE `.
 
 The rest as §3, with these differences: no weights (`--weights`: the warning of §3.7); the half-way
-outputs §6; with `SB` a second citation after the first (` And for the segmentation based cost
+outputs (§3.8) in the half-way space of the Powell registration: the grid of the target as the
+registration used it at the last level it registered (the destination as the registration resampled
+it; with the finest level skipped, `--highit 0`, that image's next coarser level, downsampled once;
+with `--nomulti` the full image), `--halfweights` then
+`Warning: no weights have been computed! Maybe you ran with --leastsquares??` (nothing written), and
+with no level registered (the finest skipped and no coarser one) `ERROR: no half way space created
+(not implemented for this cost function)!`; FS-1075 (§5); with `SB` a second citation after the first (` And for the segmentation based cost
 function:`, ` Multimodal image registration through simultaneous segmentation,`, ` I. Aganj and B.
 Fischl. IEEE Signal Processing Letters 24(11):1661-1665, 2017.`, ` https://doi.org/10.1109/LSP.2017.2754263`
 and an empty line).
@@ -413,6 +420,15 @@ FS-1074 with `reproduce`); FS-1074 by default 1.
   `MyMRI::entropyImage: the entropy radius <r> gives no box of voxels (FreeSurfer fails here)` on
   standard error, status 1; `reproduce` the abort's two lines and 134 where the count is negative,
   the zeros in 2-D, the error otherwise; noted.
+- **FS-1075** (memory: released; rule A): the half-way outputs after a Powell registration
+  (§2.2): FreeSurfer reads the half-way space's geometry from memory it has already released, so
+  the half-way transforms' target geometry and the half-way images' grids are memory contents
+  (measured on 24 cases, three runs each: garbage sizes, voxel sizes and directions; runs of the same
+  case that differ; `MRI::Shape::Shape(): volume size must be greater than 0 in every dimension` and
+  `error: could not allocate memory for slice ...`, status 1; a size that exhausts the memory; a
+  matrix error, status 252; on a few cases, where the memory still held them, the target's grid of
+  §2.2 **(observed)**). Both modes: `Creating half way data ...` and the two maps as FreeSurfer
+  prints them (the defined part), then everything in the half-way space of §2.2, noted.
 - The library's: FS-1063, FS-1073 (double precision with the intensity scale; and every Powell
   cost with the intensity scale, whose parameters always hold one more than the model's: for the
   same models as there, FS-1073, the model's first two parameters FreeSurfer's allocator's words
@@ -422,9 +438,7 @@ FS-1074 with `reproduce`); FS-1074 by default 1.
 
 ## 6. Not specified yet (the replica ends each with its own message and status 1)
 
-The Powell registration's half-way outputs
-(FreeSurfer's half-way space is then its byte copy of the target, freed by then: `mri_robust_register:
-the half-way outputs of the Powell registration are not ported yet`), the test mode (`--test`: after
+The test mode (`--test`: after
 its line) and the debug output (`--debug`: the library's intermediate images and key presses; with a
 joint-histogram cost the replica ends after the first cost: `RegPowell: the debug output (--debug)
 is not ported yet`).
@@ -441,6 +455,13 @@ is not ported yet`).
   `SB` with the Powell family's random options, the same preload: 29 identical, 3 of FS-1063 not
   compared (**(observed)**); an empty histogram's warning among Powell's lines in its place
   (**(observed)**: one case).
+- The Powell registration's half-way outputs (FS-1075): a family of 24 cases of every Powell cost
+  with the Powell family's random options and random half-way outputs (two without symmetry, some
+  with the finest level skipped), the same preload, the official program never served from a cache
+  (its result is memory contents): the cases without FS-1075 identical; in the 19 others (2 more of
+  FS-1063 not compared) standard output up to `Creating half way data ...`, standard error up to
+  the second map and every file but the half-way ones identical, and 4 identical in every byte (the
+  official program's memory still held the target's grid) **(observed)**.
 - fMRIPrep's call (`--satit --iscale --mov T1.mgz --dst <T1w> --lta <out>`) on the six recorded
   heads' `T1.mgz` onto their `rawavg.mgz` (`<workspace>/oracles/freesurfer-8.2.0/runs/<head>-classic/
   subjects/<subject>/mri/`), against the official program at one thread: the transform byte for byte,

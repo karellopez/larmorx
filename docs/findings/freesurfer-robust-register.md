@@ -79,6 +79,32 @@ The `cout`/`printf` lines share stdout's buffer (`sync_with_stdio`); each option
    (FS-1063's decision). Other models (rigid 2-D, translation 3-D, isotropic scale 3-D) get another
    block: FS-1063 as before (both modes the solution; `check.py` counts them apart). Probe: every
    seeded double-precision intensity case identical with `reproduce` (16 + 10 + 7 in seeds 1, 7, 13).
+6. **FS-1075** (class a: memory, released; rule A; relay 48). `RegPowell::getHalfWayGeom()` returns
+   the static `tcf`, set to the level's byte copy of the target (`mriT` after `MRISeqchangeType` or
+   `MRIcopy`, `RegPowell.cpp` 447-448), which `computeIterativeRegistrationFull` frees at its end
+   (`if (cleanupT) MRIfree(&mriT)`, 609-610: `cleanupT` is always true) without clearing `tcf`. `main`
+   (942-1129) tests the pointer (not `NULL` once a level ran), prints `Creating half way data ...` and
+   the maps, then reads the freed `MRI`'s header: `MRIvoxelXformToRasXform(P.mri_mov, mri_hwgeom,
+   ...)` (RAS to RAS) and `getVolGeom(mri_hwgeom, ...)`, and `LTAtransformInterp` allocates the
+   half-way images from that geometry. **Measured** (`validation/investigations/freesurfer-fs1075-
+   halfway/measure.py`, 24 cases of every Powell cost with random half-way outputs, three runs each,
+   never served from the cache; log `oracles/logs/fs-found-c-r48-fs1075-measure.log`, outputs
+   `<workspace>/oracles/inputs/fs1075-halfway/`): of the 21 cases that reach it (63 runs), 5 gave
+   the target's geometry in all three runs (the freed block not yet reused), the 16 others memory
+   contents: garbage sizes, voxel sizes and directions (some read as voxel values of a later image),
+   13 of them different from run to run (allocator addresses under address-space randomisation);
+   28 runs ended with status 1 (`MRI::Shape::Shape(): volume size must be greater than 0 in every
+   dimension`, `error: could not allocate memory for slice <k> out of <n>`), 3 with 252 (one case:
+   `MatrixMultiply(): m1 is null`), 8 (four cases) were killed by their 16 GiB memory box (sizes
+   of about 1.1e9 per axis: the box is the answer, not re-run), 3 cases wrote garbage geometry with
+   status 0. Rule A (the input makes sense, the
+   result is memory): both modes keep `tcf`'s header (`powell.rs`: the voxels released where
+   FreeSurfer frees the image, `RegRobust::powell_hw`) and use it, with the notice; FreeSurfer's
+   printed part (the message and the maps) as it is. `getWeights()` is `NULL` for `RegPowell`:
+   `--halfweights` prints `Warning: no weights have been computed! Maybe you ran with
+   --leastsquares??` (`main` 1149). With the finest level skipped (`--highit 0`) and no coarser one,
+   no level runs: `tcf` stays `NULL` and the program prints `ERROR: no half way space created (not
+   implemented for this cost function)!` (measured: case 10).
 5. The `--iscalein` file: `ifstream f(name); if (f.good()) f >> iscale; else ErrorExit(...)`.
    libstdc++'s `>>` (`num_get`, C locale): white space only leaves 1 (the sentry fails at the end),
    no number gives 0 (C++11), one too large `+-DBL_MAX`; a folder opens (`fopen` of a folder for
@@ -120,11 +146,7 @@ The `cout`/`printf` lines share stdout's buffer (`sync_with_stdio`); each option
 ## 4. Not ported yet (each ends with its message, status 1)
 
 - (Ported in relay 47, section 7: `RegPowell`'s joint-histogram costs and `SB`.)
-- The Powell registration's half-way outputs: `RegPowell::getHalfWayGeom` returns its static copy of
-  the target, which `computeIterativeRegistrationFull` has freed by then (`MRIfree(&mriT)` on the
-  pointer the static shares): FreeSurfer reads a freed image's header for the half-way geometry (a
-  memory defect to measure before a decision, the next ID FS-1075); the port ends with
-  `mri_robust_register: the half-way outputs of the Powell registration are not ported yet`.
+- (Ported in relay 48, §2 item 6: the Powell registration's half-way outputs, FS-1075.)
 - `--test` (`RegRobust::testRobust`): ends after `--test: TEST-MODE`.
 - `--debug` (the library's intermediate images, `saveGaussianPyramid`, the key presses
   `std::cin >> ch`, the `-wcheck-est.txt` file, the debug means of the half-way images): the

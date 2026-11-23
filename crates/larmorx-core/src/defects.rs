@@ -3299,6 +3299,8 @@ defects! {
         "mri_robust_register given a non-linear initial transform (--ixform of a morph) reads the morph as a linear transform array: memory it does not own; an error in both modes";
     FS_1074 = "FS-1074", "FreeSurfer", true,
         "mri_robust_register's entropy images (--cost ROBENT) with an --entradius below 0 abort (an uncaught std::bad_array_new_length, status 134) for a 3-D image and give an image of zeros for a 2-D one; a radius whose box of weights holds 2^31 or more entries aborts or writes past its weights; by default an error, status 1";
+    FS_1075 = "FS-1075", "FreeSurfer", true,
+        "mri_robust_register's half-way outputs (--halfmov, --halfdst, --halfmovlta, --halfdstlta, --halfweights) after a registration with a cost other than ROB and ROBENT take the half-way space's geometry from memory the program has already released: the half-way transforms' target geometry and the half-way images' grids are memory contents (garbage sizes, voxel sizes and directions, which may change from run to run; a size that cannot be allocated, status 1, or that exhausts the memory); larmorx uses the registration's target (the destination as the registration resampled it, at the last resolution it registered), in both modes";
 }
 
 /// The register entry with ID `id`.

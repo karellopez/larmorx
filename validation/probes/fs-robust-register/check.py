@@ -63,6 +63,9 @@ SKIP = (
     "FS-1067",
     "FS-1068",
     "FS-1069",
+    # relay 48: the Powell registration's half-way geometry, memory FreeSurfer has freed (its
+    # defined parts compared apart: DEFINED_BEFORE)
+    "FS-1075",
     "FS-167",
     "FS-58",
     "FS-288",
@@ -76,6 +79,14 @@ TIME = re.compile(r"Registration took \d+ minutes and \d+ seconds\.")
 # relay 45: the entropy image's time (the port's debug build takes seconds), masked in the lines
 # only (the cache's policy keeps TIME alone, so the recorded official runs stay its entries)
 ENTROPY_TIME = re.compile(r" Entropy computation took \d+ seconds\.")
+
+#: relay 48, ``--family halfway``: the official runs are never served from the cache (FS-1075: the
+#: half-way geometry is memory contents, which may change from run to run)
+NEVER = ""
+#: FS-1075's defined parts: standard output up to the line FreeSurfer prints before it reads the
+#: freed geometry, standard error up to the second half-way map, the files but the half-way ones
+HALF_WAY_LINE = "Creating half way data ...\\x0a"
+HALF_WAY_FILES = ("hm.lta", "hd.lta", "hm.mgz", "hd.mgz", "hw.mgz")
 
 #: ``--preload``: a library for the official program's ``LD_PRELOAD`` (``decided_complex.sh``'s
 #: decided ``cabs`` and ``csqrt``: the port's square roots of matrices under the user's D4); the
@@ -186,7 +197,7 @@ def official_line(exe: Path, line: str, root: Path, k: int) -> str:
         outputs=[d],
         policy=oracle_cache.Policy(
             threads=1, family="freesurfer", formats="freesurfer", volatile=(TIME.pattern,)
-        ),
+        ).but_never(NEVER),
         timeout=120,
         runner="fs-robust-register-probe",
         inputs=inputs,
@@ -211,6 +222,27 @@ def official_line(exe: Path, line: str, root: Path, k: int) -> str:
     return f"{status} | {mask(done.stdout)} | {mask(done.stderr)} | {files}"
 
 
+def defined_before_half_way(line: str) -> str:
+    """FS-1075's defined parts of a case's line (``<status> | <stdout> | <stderr> | <files>``):
+    standard output up to ``Creating half way data ...``, standard error up to the end of the
+    ``dsthw`` map, the files but the half-way ones (the exit status and the rest hang on the freed
+    geometry)."""
+    _, out, rest = line.split(" | ", 2)
+    err, _, files = rest.rpartition(" | ")
+    k = out.find(HALF_WAY_LINE)
+    out = out if k < 0 else out[: k + len(HALF_WAY_LINE)]
+    k = err.find("dsthw = [")
+    if k >= 0:
+        e = err.find("]", k)
+        err = err[: e + 1] if e >= 0 else err
+    kept = []
+    for f in re.split(r" (?=[FD] )", files):
+        name = f.split(" ", 2)[1] if f.count(" ") >= 1 else f
+        if name not in HALF_WAY_FILES:
+            kept.append(f)
+    return f"{out} | {err} | {' '.join(kept)}"
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--seed", type=int, default=1)
@@ -219,10 +251,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", type=Path)
     ap.add_argument(
         "--family",
-        choices=("seeded", "powell", "histo"),
+        choices=("seeded", "powell", "histo", "halfway"),
         default="seeded",
         help="the cases: the prelude, the entropy images and seeded ones (--seed, --n), the "
-        "Powell registration's 40 (relay 46), or its joint-histogram and SB costs' 32 (relay 47)",
+        "Powell registration's 40 (relay 46), its joint-histogram and SB costs' 32 (relay 47), or "
+        "its half-way outputs' 24 (relay 48: FS-1075, never served from the cache)",
     )
     ap.add_argument(
         "--preload",
@@ -250,8 +283,10 @@ def main(argv: list[str] | None = None) -> int:
     )  # fmt: skip
     inputs = ws / "oracles" / "inputs" / "fs-robust-register"
     inputs.mkdir(parents=True, exist_ok=True)
-    global PRELOAD
+    global PRELOAD, NEVER
     PRELOAD = str(a.preload.resolve()) if a.preload else ""
+    if a.family == "halfway":
+        NEVER = "FS-1075: the half-way geometry is read from a freed image (memory contents)"
     tag = ("golden" if a.golden else a.family if a.family != "seeded" else f"{a.seed}-{a.n}") + (
         "-preload" if a.preload else ""
     )
@@ -297,6 +332,8 @@ def main(argv: list[str] | None = None) -> int:
     # as SLOW (cases::histogram_or_sb_cost)
     hashed_debug = hashlib.sha256()
     first = []
+    # relay 48: FS-1075's cases, their defined parts compared
+    half_same = half_differ = 0
     for k, (case, c, (r, ids), (f, fids)) in enumerate(zip(cases, official, rep, fix, strict=True)):
         for x in ids:
             rep_ids[x] += 1
@@ -311,6 +348,16 @@ def main(argv: list[str] | None = None) -> int:
         if any(x in ids for x in SKIP):
             skipped += 1
             skipped_same += c == r
+            # FS-1075's defined parts, where no other undefined result came first
+            if "FS-1075" in ids and not any(x in ids for x in SKIP if x != "FS-1075"):
+                if defined_before_half_way(c) == defined_before_half_way(r):
+                    half_same += 1
+                else:
+                    half_differ += 1
+                    if len(first) < a.show:
+                        first.append(
+                            {"case": k, "fs1075_official": c[:1500], "fs1075_port": r[:1500]}
+                        )
             hashed.update(b"SKIP\n")
             if not slow_in_debug(case):
                 hashed_debug.update(b"SKIP\n")
@@ -344,6 +391,8 @@ def main(argv: list[str] | None = None) -> int:
         "reproduce_differ": differ,
         "skipped": skipped,
         "skipped_but_identical": skipped_same,
+        "fs1075_defined_identical": half_same,
+        "fs1075_defined_differ": half_differ,
         "not_ported": not_ported,
         "reproduce_notices": dict(rep_ids),
         "fix_differ": fix_differ,
@@ -356,7 +405,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(summary, indent=1))
     if a.json:
         a.json.write_text(json.dumps(summary, indent=1) + "\n", encoding="utf-8")
-    return 1 if differ or fix_unexplained else 0
+    return 1 if differ or fix_unexplained or half_differ else 0
 
 
 if __name__ == "__main__":

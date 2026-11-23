@@ -614,6 +614,12 @@ fn seeded_powell(g: &mut Gen) -> String {
 }
 
 fn seeded_powell_with(g: &mut Gen, costs: &[&str]) -> String {
+    let (files, args) = seeded_powell_parts(g, costs);
+    line(None, &files, &[], &args)
+}
+
+/// [`seeded_powell_with`]'s files and arguments.
+fn seeded_powell_parts(g: &mut Gen, costs: &[&str]) -> (Vec<(String, Vec<u8>)>, Vec<String>) {
     let flat = g.chance(8);
     let n = g.pick(&[16, 16, 17, 18]);
     let ty = g.pick(&[MRI_UCHAR, MRI_UCHAR, MRI_SHORT, MRI_FLOAT, MRI_INT]);
@@ -657,7 +663,42 @@ fn seeded_powell_with(g: &mut Gen, costs: &[&str]) -> String {
     opt(g, 8, &["--weights", "w.mgz"]);
     opt(g, 6, &["--verbose", "2"]);
     opt(g, 12, &["--iscaleout", "i.txt", "--iscale"]);
-    line(None, &files, &[], &args)
+    (files, args)
+}
+
+/// The Powell registration's half-way outputs (relay 48, FS-1075; `check.py --family halfway`):
+/// 24 cases of every Powell cost, the Powell family's random options with symmetry (its
+/// `--nosym` taken back but in the last two cases, which add it), each with a random set of the
+/// half-way outputs (`--halfmovlta` always), the highest resolution skipped (`--highit 0`), voxel
+/// transforms, the full images alone; a seed of their own.
+pub fn halfway_cases() -> Vec<String> {
+    let mut g = Gen::new(0x0068_616c);
+    let costs = [
+        "ls", "ncc", "tb", "lncc", "sad", "mi", "nmi", "ecc", "scr", "sb",
+    ];
+    (0..24)
+        .map(|k| {
+            let (files, mut args) = seeded_powell_parts(&mut g, &costs);
+            args.retain(|a| a != "--nosym");
+            args.extend(s(&["--halfmovlta", "hm.lta"]));
+            if k >= 22 {
+                args.push("--nosym".to_owned());
+            }
+            let mut opt = |g: &mut Gen, k: u64, a: &[&str]| {
+                if g.chance(k) {
+                    args.extend(s(a));
+                }
+            };
+            opt(&mut g, 2, &["--halfdstlta", "hd.lta"]);
+            opt(&mut g, 2, &["--halfmov", "hm.mgz"]);
+            opt(&mut g, 2, &["--halfdst", "hd.mgz"]);
+            opt(&mut g, 3, &["--halfweights", "hw.mgz"]);
+            opt(&mut g, 5, &["--highit", "0"]);
+            opt(&mut g, 6, &["--vox2vox"]);
+            opt(&mut g, 6, &["--nomulti"]);
+            line(None, &files, &[], &args)
+        })
+        .collect()
 }
 
 /// The entropy images' cases (relay 45, `--cost ROBENT`): byte, short and float sources, a mask
@@ -930,6 +971,67 @@ pub fn golden_cases() -> Vec<String> {
 // ------------------------------------------------------------------ the port's answer
 
 /// Text files listed with their bytes: transforms and the intensity scale.
+/// The golden cases of the Powell registration's half-way outputs (relay 48, FS-1075;
+/// `tests/mri_robust_register_golden.rs`' third test): on 16^3 byte images, `LS` with every
+/// half-way output, and with the finest level skipped and no coarser one (no half-way space).
+/// FreeSurfer's result is memory contents here: the hash is the port's (both modes).
+pub fn golden_halfway_cases() -> Vec<String> {
+    let mut g = Gen::new(48);
+    let c = Img::base(16, MRI_UCHAR);
+    let mut d = c;
+    d.shift = [3, -2, 1];
+    d.gain = 15;
+    let files = vec![
+        (
+            "mov.mgz".to_owned(),
+            write_as(&mut image(&mut g, &c), "mov.mgz"),
+        ),
+        (
+            "dst.mgz".to_owned(),
+            write_as(&mut image(&mut g, &d), "dst.mgz"),
+        ),
+    ];
+    [
+        s(&[
+            "--mov",
+            "mov.mgz",
+            "--dst",
+            "dst.mgz",
+            "--lta",
+            "reg.lta",
+            "--cost",
+            "LS",
+            "--halfmov",
+            "hm.mgz",
+            "--halfdst",
+            "hd.mgz",
+            "--halfweights",
+            "hw.mgz",
+            "--halfmovlta",
+            "hm.lta",
+            "--halfdstlta",
+            "hd.lta",
+        ]),
+        s(&[
+            "--mov",
+            "mov.mgz",
+            "--dst",
+            "dst.mgz",
+            "--lta",
+            "reg.lta",
+            "--cost",
+            "LS",
+            "--highit",
+            "0",
+            "--halfmovlta",
+            "hm.lta",
+        ]),
+    ]
+    .iter()
+    .map(|args| line(None, &files, &[], args))
+    .collect()
+}
+
 fn is_text(name: &str) -> bool {
     [".lta", ".xfm", ".dat", ".txt"]
         .iter()

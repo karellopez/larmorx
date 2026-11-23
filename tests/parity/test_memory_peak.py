@@ -3059,8 +3059,8 @@ MRI_VOL2VOL_CASES = [
         "cubic",
         ["--mov", "{mri}/nu.mgz", "--targ", "{mri}/rawavg.mgz", "--regheader", "--cubic",
          "--o", "out.mgz"],
-    ),  # fmt: skip
-]
+    ),
+]  # fmt: skip
 
 
 @pytest.mark.parametrize(("name", "args"), MRI_VOL2VOL_CASES)

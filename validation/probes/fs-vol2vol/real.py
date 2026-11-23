@@ -98,7 +98,8 @@ def main(argv: list[str] | None = None) -> int:
         inter.mkdir(parents=True)
         env["SUBJECTS_DIR"] = str(subj.parent)
 
-        def made(args: list[str], name: str, prog: Path = exe) -> Path:
+        def made(args: list[str], name: str, prog: Path = exe, inter: Path = inter,
+                 run: str = run) -> Path:  # fmt: skip
             done = official(prog, args, env, inter, f"fs-vol2vol-real-{name}")
             if done.returncode != 0:
                 raise SystemExit(f"{run}: the official {prog.name} {args}: {done.stderr}")
@@ -107,7 +108,10 @@ def main(argv: list[str] | None = None) -> int:
         # the scripts' intermediates the runs do not keep: made again by the official programs
         for h in ("lh", "rh"):
             prior = f"mca-dura.prior.warp.mni152.1.0mm.{h}.nii.gz"
-            made(["--reg", str(lta), "--mov", str(avg / prior), "--o", f"prior.{h}.nii.gz"], f"prior-{h}")
+            made(
+                ["--reg", str(lta), "--mov", str(avg / prior), "--o", f"prior.{h}.nii.gz"],
+                f"prior-{h}",
+            )
             made(["-T", ".001", "-crop-to-fov-mm", "80", "80", "80", nu,
                   str(inter / f"prior.{h}.nii.gz"), f"{h}.crop.nii.gz"], f"crop-{h}",
                  fsh / "bin" / "mri_mask")  # fmt: skip

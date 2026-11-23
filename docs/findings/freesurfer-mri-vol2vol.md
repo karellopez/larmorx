@@ -81,11 +81,15 @@ linear paths). The replica: `crates-freesurfer/larmorx-freesurfer-volumes/src/mr
   (measured with a gdb watchpoint on `errno` in the official `mri_vol2vol`: `mkdir(".")`'s `EEXIST`
   survives until the licence check's last `fscanf`, which leaves 0). So `check_options`' `EEXIST`
   never reaches `ErrorExit`'s `strerror` line in FreeSurfer, and did in the replica (3 probe cases
-  differed). fs.core's `chklc(g)` now clears `g.errno` on its first call (`Globals::chklc_done`);
-  its callers in fs.io (`mri_read_type`, `mri_read_ex_frames`, `mri_write`) and fs.surf
-  (`readwrite.rs`, track D's file: two calls) pass `g`. No other program's recorded result
-  changes (their probes start with `errno` 0, `FS_DISABLE_LANG=1`, and set none before the first
-  read).
+  differed). fs.core's `chklc_env(g, env)` now clears `g.errno` on the run's first check
+  (`Globals::chklc_done`), unless `SURFER_SIDEDOOR` is set: FreeSurfer then returns before reading
+  the file (`if (getenv("SURFER_SIDEDOOR") != NULL) return 1;`), and the fs.surfio probe's harness
+  sets it (`fssurfio.cpp`), so its errors keep the `errno` of earlier calls (the first form of this
+  change, which cleared `errno` always, made 22 of `fs_surfio_official`'s 1,980 cases differ). The
+  volume readers and writer of fs.io (`mri_read_type`, `mri_read_ex_frames`, `mri_write`) call
+  `chklc_env`; the surface readers of fs.surf (`readwrite.rs`, track D's file: two calls), which
+  only the side-door harness reaches first today, call `chklc(g)`, which marks the check as made
+  and leaves `errno`. No other program's recorded result changes.
 - **`MRIvol2VolVSM`'s transform**: `mri2.cpp` changes a copy of `vsmlta` to `LINEAR_VOX_TO_VOX`
   (`LTAchangeType`); fs.volume's replica ended with "needs LTAchangeType (3.1-39, not yet ported)"
   for any other type. Now `mri_vol2vol_vsm_env` (the program's environment, for the FSL type's

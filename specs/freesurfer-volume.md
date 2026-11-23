@@ -2535,12 +2535,19 @@ value beyond the `int` range or NaN is FS-12 here too (clamped by default, NaN t
 `reproduce`), as section 50's common rules say.
 - `MRIdilateUchar(src, dst)`: without `dst` a clone of `src` (voxels zero); a `dst` of another extent ends the program
   (`MRIcheckVolDims`'s message); `dst == src`: the dilation goes into a clone, copied back with `MRIcopy` at the end.
-  The bounding box of `src`'s nonzero bytes (frame 0, read as bytes), grown by one voxel and clipped to the volume
-  (starting from `[w-1, 0]` per axis, so an all-zero volume of extent 1 still visits its voxel); in it each voxel of
-  `dst` becomes the largest byte of the 3 x 3 x 3 neighbourhood (coordinates clamped to the volume), written as a byte
-  at the voxel's index of the row (whatever `dst`'s type). Other voxels of `dst` are not touched. The box is found
-  slices outermost, then rows, then columns; its voxels are visited slices, rows, columns (**(observed)**: `vdil`;
-  `vrules20`, an all-zero volume of one voxel and of two, a float volume's rows read as bytes).
+  The box (the same rule for every dilation of sections 48 and 50 that names "the box ... grown by one"): per axis of
+  extent `e`, a low bound that starts at `e - 1` and a high bound that starts at 0; each nonzero byte of `src` (frame 0,
+  read as bytes) at coordinate `c` lowers the low bound to `c - 1` and raises the high bound to `c + 1` where they are
+  not already beyond; then the low bound is raised to 0 when below it and the high bound lowered to `e - 1` when above
+  it. So with a nonzero byte the box is the nonzero bytes' bounding box grown by one voxel and clipped to the volume;
+  with none, every axis keeps `[e - 1, 0]`, which holds no coordinate unless `e` is 1: only a volume of 1 x 1 x 1
+  voxels visits a voxel then (its one voxel), and every other all-zero source leaves `dst` untouched. In the box each
+  voxel of `dst` becomes the largest byte of the 3 x 3 x 3 neighbourhood (coordinates clamped to the volume), written
+  as a byte at the voxel's index of the row (whatever `dst`'s type). Other voxels of `dst` are not touched. The box is
+  found slices outermost, then rows, then columns; its voxels are visited slices, rows, columns (**(observed)**:
+  `vdil`; `vrules20`, an all-zero volume of one voxel and of two, a float volume's rows read as bytes; `vrules23`,
+  all-zero sources of 1 x 1 x 1, 2 x 1 x 1, 4 x 1 x 1, 1 x 2 x 1, 1 x 1 x 2, 2 x 2 x 1 and 3 x 3 x 1 voxels into
+  destinations of 7: only the one voxel of 1 x 1 x 1 is written (0), the others untouched).
 - `MRIdilate(src, dst)`: a byte `src` is `MRIdilateUchar`. Otherwise the same destination rules; the bounding box of
   the voxels above 0 in any frame (nearest samples at whole coordinates, `MRIsampleVolumeFrameType`, section 18; the
   search runs frames outermost, then slices, rows, columns), grown and clipped likewise; then for each frame in turn,
@@ -2725,9 +2732,11 @@ its voxels are read or written: FS-58.
   `TIMEOUT` after the alarm; one whose second voxel holds it ends at once, the label never reaching the copy).
 - `MRIdilateThreshLabel` / `MRIdilateInvThreshLabel(src, val, dst, label, niter, thresh)` (bytes: the common rules'
   comparison, so a label outside 0 to 255 changes nothing): check (src, val);
-  `dst = MRIcopy(src, dst)`; up to `niter` steps on bytes, each from a copy of `dst` (`tmp`): the bounding box of
-  `src`'s bytes equal to `label`, grown by one and clipped (from `[w-1, 0]` per axis); over the box (z, y, x; the
-  loops read the box's bounds at each step, so a bound raised during the pass extends it), a voxel whose `val` byte
+  `dst = MRIcopy(src, dst)`; up to `niter` steps on bytes, each from a copy of `dst` (`tmp`): the box of `src`'s
+  bytes equal to `label`, found again at each step by section 48's rule (`MRIdilateUchar`: grown by one and clipped;
+  with no such byte it holds no voxel unless the volume is 1 x 1 x 1, whose one voxel is then visited and keeps its
+  own byte); over the box (z, y, x; the loops read the box's bounds at each turn, so a bound raised during the pass
+  extends it), a voxel whose `val` byte
   is `>= thresh` (`<= thresh` for the inverse) becomes `label` (as a byte) when any of its 27 neighbourhood bytes in
   `tmp` is `label`; then the box grows to include the last neighbour visited (`x+1`, `y+1`, `z+1` clamped) and a voxel
   that was not `label` in `dst` counts as added; every visited voxel of `dst` is written (its `tmp` byte or `label`).
@@ -2783,9 +2792,11 @@ its voxels are read or written: FS-58.
   values, `out` where the mask is below `thresh` (a NaN mask value is not below) (**(observed)**: `vmask`; `vrules22`,
   those replacement values and a float destination).
 - `MRIgrowLabel(mri, filled, in, out)`: check; bytes. For `in != 0` the box of `mri`'s `in` voxels; for `in == 0` the
-  box of nonzero voxels and every voxel on or outside its faces set to `out` in `filled` (counted). The box starts
-  from `[w, 0]` per axis in both cases and is not grown: with no such voxel it is empty, and for `in == 0` every voxel
-  is then on or outside it. Then passes over the box (z, y, x) until none fills: for each voxel of `filled` equal to `out`,
+  box of nonzero voxels and every voxel on or outside its faces set to `out` in `filled` (counted). In both cases, per
+  axis of extent `e`, the low bound starts at `e` and the high bound at 0, and each such voxel at coordinate `c`
+  lowers the low bound to `c` and raises the high bound to `c` where they are not already beyond; the box is neither
+  grown nor clipped: with no such voxel every axis keeps `[e, 0]`, which holds no coordinate (whatever the extent),
+  and for `in == 0` every voxel is then on or outside it. Then passes over the box (z, y, x) until none fills: for each voxel of `filled` equal to `out`,
   each neighbour in the volume equal to `in` in `mri` and not `out` in `filled` is set (counted); after each pass `<n>
   voxels filled, total = <t>.` on standard error (one line per pass, the last one's `<n>` 0). Returns 0
   (**(observed)**: `vmorph`; `vrules22`, labels 257 and 265, a background fill with and without data).

@@ -5835,6 +5835,27 @@ class Gen18(Gen17):
         ]
 
 
+class Gen19(Gen18):
+    """Relay 20: the fixed cases of the clean room's items 119 to 123 (§48, §50)."""
+
+    def vrules23(self) -> list[Batch]:
+        """Item 119: the dilations' box when nothing is found (only a volume of 1 x 1 x 1 visits
+        its voxel)."""
+        L = []
+        P = self.plain
+        for dims in ((1, 1, 1), (2, 1, 1), (4, 1, 1), (1, 2, 1), (1, 1, 2), (2, 2, 1), (3, 3, 1)):
+            n = dims[0] * dims[1] * dims[2]
+            z = self.lab(P(dims), [0] * n, t=1)
+            d7 = self.lab(P(dims), [7] * n, t=1)
+            L.append(f"dilu {z} 0 {d7}")
+            L.append(f"dilate {z} 0 {d7}")
+        for dims in ((4, 1, 1), (2, 2, 1)):
+            z = self.lab(P(dims), [0] * 4, t=0)
+            d7 = self.lab(P(dims), [7] * 4, t=0)
+            L.append(f"dilu {z} 0 {d7}")
+        return [Batch("vrules23", "vrules23", L)]
+
+
 GROUPS = [
     "vgblock",
     "vgcopy",
@@ -5900,6 +5921,7 @@ GROUPS = [
     "vmorph",
     "vmask",
     "vrules22",
+    "vrules23",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -6057,7 +6079,7 @@ def licence_guard(b: Batch) -> None:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen18) else Gen18(gen.seed)
+    gen = gen if isinstance(gen, Gen19) else Gen19(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

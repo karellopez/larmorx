@@ -2,7 +2,7 @@
  "name": "freesurfer-mri-robust-register",
  "tool": "mri_robust_register (FreeSurfer 8.2.0)",
  "status": "experimental",
- "larmorx_commit": "97c6f06db31a",
+ "larmorx_commit": "dfea60b08157",
  "generated": "2026-11-23",
  "platform": "Linux x86_64",
  "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_robust_register/) on larmorx-freesurfer-robust (fs.robust), the larmorx-freesurfer program",
@@ -24,14 +24,14 @@
     "files": true
    },
    "seconds": {
-    "official": 65.9,
-    "reproduce": 96.3,
-    "fix": 90.9
+    "official": 63.2,
+    "reproduce": 97.1,
+    "fix": 95.7
    },
    "peak_mib": {
-    "official": 1799.176,
-    "reproduce": 1606.8,
-    "fix": 1607.6
+    "official": 1799.515625,
+    "reproduce": 1606.3,
+    "fix": 1606.5
    }
   },
   {
@@ -49,14 +49,14 @@
     "files": true
    },
    "seconds": {
-    "official": 20.7,
-    "reproduce": 46.8,
-    "fix": 46.7
+    "official": 19.4,
+    "reproduce": 46.7,
+    "fix": 46.9
    },
    "peak_mib": {
-    "official": 1100.465,
-    "reproduce": 1106.3,
-    "fix": 1105.7
+    "official": 1094.33203125,
+    "reproduce": 1106.5,
+    "fix": 1106.2
    }
   },
   {
@@ -74,14 +74,14 @@
     "files": true
    },
    "seconds": {
-    "official": 24.2,
-    "reproduce": 45.5,
-    "fix": 45.7
+    "official": 23.0,
+    "reproduce": 46.2,
+    "fix": 46.3
    },
    "peak_mib": {
-    "official": 1237.512,
-    "reproduce": 1142.4,
-    "fix": 1142.9
+    "official": 1257.0546875,
+    "reproduce": 1142.7,
+    "fix": 1143.1
    }
   },
   {
@@ -99,14 +99,14 @@
     "files": true
    },
    "seconds": {
-    "official": 21.5,
-    "reproduce": 42.4,
-    "fix": 42.9
+    "official": 20.6,
+    "reproduce": 41.8,
+    "fix": 42.3
    },
    "peak_mib": {
-    "official": 1193.934,
-    "reproduce": 1097.3,
-    "fix": 1098.1
+    "official": 1194.125,
+    "reproduce": 1098.8,
+    "fix": 1098.8
    }
   },
   {
@@ -124,14 +124,14 @@
     "files": true
    },
    "seconds": {
-    "official": 20.2,
-    "reproduce": 40.6,
-    "fix": 41.2
+    "official": 19.1,
+    "reproduce": 40.4,
+    "fix": 40.8
    },
    "peak_mib": {
-    "official": 1348.379,
-    "reproduce": 1208.3,
-    "fix": 1208.4
+    "official": 1352.11328125,
+    "reproduce": 1199.3,
+    "fix": 1208.2
    }
   },
   {
@@ -149,13 +149,13 @@
     "files": true
    },
    "seconds": {
-    "official": 26.4,
-    "reproduce": 49.7,
-    "fix": 49.5
+    "official": 24.3,
+    "reproduce": 50.5,
+    "fix": 48.4
    },
    "peak_mib": {
-    "official": 1538.18,
-    "reproduce": 1366.1,
+    "official": 1539.16015625,
+    "reproduce": 1367.5,
     "fix": 1367.6
    }
   },
@@ -174,14 +174,14 @@
     "files": true
    },
    "seconds": {
-    "official": 79.2,
-    "reproduce": 111.9,
-    "fix": 110.8
+    "official": 80.5,
+    "reproduce": 118.8,
+    "fix": 114.5
    },
    "peak_mib": {
-    "official": 1799.809,
-    "reproduce": 1601.8,
-    "fix": 1601.2
+    "official": 1798.796875,
+    "reproduce": 1608.2,
+    "fix": 1605.3
    }
   },
   {
@@ -199,52 +199,77 @@
     "files": true
    },
    "seconds": {
-    "official": 38.7,
-    "reproduce": 64.3,
-    "fix": 64.7
+    "official": 39.8,
+    "reproduce": 68.0,
+    "fix": 67.4
    },
    "peak_mib": {
-    "official": 1194.766,
-    "reproduce": 1090.4,
-    "fix": 1089.8
+    "official": 1194.2890625,
+    "reproduce": 1106.7,
+    "fix": 1098.0
    }
   }
  ],
  "probe": [
   {
-   "set": "seed 1",
+   "set": "seed 1 (the decided `cabs` and `csqrt` preloaded)",
+   "decided_complex_preloaded": true,
    "cases": 300,
-   "identical": 280,
+   "identical": 290,
    "different": 0,
    "skipped": 8,
-   "not_ported": 12,
-   "fix_different_with_notice": 43,
+   "not_ported": 2,
+   "fix_different_with_notice": 45,
    "fix_different_without_notice": 0
   },
   {
-   "set": "seed 7",
+   "set": "seed 7 (the decided `cabs` and `csqrt` preloaded)",
+   "decided_complex_preloaded": true,
    "cases": 300,
-   "identical": 279,
+   "identical": 289,
    "different": 0,
    "skipped": 9,
-   "not_ported": 12,
-   "fix_different_with_notice": 39,
+   "not_ported": 2,
+   "fix_different_with_notice": 41,
    "fix_different_without_notice": 0
   },
   {
-   "set": "seed 13",
+   "set": "seed 13 (the decided `cabs` and `csqrt` preloaded)",
+   "decided_complex_preloaded": true,
    "cases": 300,
-   "identical": 280,
+   "identical": 290,
    "different": 0,
    "skipped": 8,
-   "not_ported": 12,
-   "fix_different_with_notice": 38,
+   "not_ported": 2,
+   "fix_different_with_notice": 40,
+   "fix_different_without_notice": 0
+  },
+  {
+   "set": "the Powell family (the decided `cabs` and `csqrt` preloaded)",
+   "decided_complex_preloaded": true,
+   "cases": 40,
+   "identical": 36,
+   "different": 0,
+   "skipped": 4,
+   "not_ported": 0,
+   "fix_different_with_notice": 10,
+   "fix_different_without_notice": 0
+  },
+  {
+   "set": "the joint-histogram and SB family (the decided `cabs` and `csqrt` preloaded)",
+   "decided_complex_preloaded": true,
+   "cases": 32,
+   "identical": 29,
+   "different": 0,
+   "skipped": 3,
+   "not_ported": 0,
+   "fix_different_with_notice": 14,
    "fix_different_without_notice": 0
   }
  ],
  "golden_sha256": {
-  "official_and_reproduce": "f2ea31fe966f1da9e8974416edb219442818e06f9d2a412ff47b1ba6e0cea2a1",
-  "fix": "f2ea31fe966f1da9e8974416edb219442818e06f9d2a412ff47b1ba6e0cea2a1"
+  "official_and_reproduce": "a483135a74d4d5280b52d4fcbed46d6634978d6da5e8b7e17d018af80e8fec18",
+  "fix": "a483135a74d4d5280b52d4fcbed46d6634978d6da5e8b7e17d018af80e8fec18"
  },
  "decided_complex": [
   {
@@ -261,14 +286,14 @@
     "files": true
    },
    "seconds": {
-    "official": 69.5,
-    "reproduce": 98.2,
-    "fix": 103.0
+    "official": 62.5,
+    "reproduce": 94.8,
+    "fix": 94.6
    },
    "peak_mib": {
-    "official": 1799.30859375,
-    "reproduce": 1605.5,
-    "fix": 1605.6
+    "official": 1800.34375,
+    "reproduce": 1608.0,
+    "fix": 1606.7
    }
   },
   {
@@ -285,14 +310,14 @@
     "files": true
    },
    "seconds": {
-    "official": 21.6,
-    "reproduce": 50.4,
-    "fix": 50.0
+    "official": 19.1,
+    "reproduce": 46.0,
+    "fix": 45.4
    },
    "peak_mib": {
-    "official": 1100.08984375,
-    "reproduce": 1104.2,
-    "fix": 1104.1
+    "official": 1095.7421875,
+    "reproduce": 1104.8,
+    "fix": 1106.3
    }
   },
   {
@@ -309,14 +334,14 @@
     "files": true
    },
    "seconds": {
-    "official": 25.0,
-    "reproduce": 49.3,
-    "fix": 49.0
+    "official": 22.2,
+    "reproduce": 44.8,
+    "fix": 44.5
    },
    "peak_mib": {
-    "official": 1237.046875,
-    "reproduce": 1141.2,
-    "fix": 1140.6
+    "official": 1257.01171875,
+    "reproduce": 1142.1,
+    "fix": 1143.0
    }
   },
   {
@@ -333,14 +358,14 @@
     "files": true
    },
    "seconds": {
-    "official": 22.8,
-    "reproduce": 46.8,
-    "fix": 45.8
+    "official": 20.1,
+    "reproduce": 42.0,
+    "fix": 41.6
    },
    "peak_mib": {
-    "official": 1194.06640625,
-    "reproduce": 1096.2,
-    "fix": 1095.4
+    "official": 1194.27734375,
+    "reproduce": 1098.5,
+    "fix": 1098.1
    }
   },
   {
@@ -357,14 +382,14 @@
     "files": true
    },
    "seconds": {
-    "official": 21.1,
-    "reproduce": 44.2,
-    "fix": 43.2
+    "official": 18.2,
+    "reproduce": 40.4,
+    "fix": 39.9
    },
    "peak_mib": {
-    "official": 1346.26171875,
-    "reproduce": 1206.4,
-    "fix": 1207.4
+    "official": 1353.03515625,
+    "reproduce": 1200.8,
+    "fix": 1208.7
    }
   },
   {
@@ -381,14 +406,14 @@
     "files": true
    },
    "seconds": {
-    "official": 27.7,
-    "reproduce": 53.4,
-    "fix": 52.6
+    "official": 24.2,
+    "reproduce": 47.6,
+    "fix": 47.3
    },
    "peak_mib": {
-    "official": 1538.00390625,
-    "reproduce": 1365.5,
-    "fix": 1366.4
+    "official": 1538.42578125,
+    "reproduce": 1368.6,
+    "fix": 1368.6
    }
   }
  ],
@@ -407,14 +432,14 @@
     "files": true
    },
    "seconds": {
-    "official": 91.9,
-    "reproduce": 128.5,
-    "fix": 133.6
+    "official": 93.9,
+    "reproduce": 129.8,
+    "fix": 135.4
    },
    "peak_mib": {
-    "official": 1086.645,
-    "reproduce": 1122.2,
-    "fix": 1123.3
+    "official": 1087.7421875,
+    "reproduce": 1116.5,
+    "fix": 1117.3
    }
   },
   {
@@ -431,14 +456,14 @@
     "files": true
    },
    "seconds": {
-    "official": 134.5,
-    "reproduce": 179.0,
-    "fix": 193.2
+    "official": 137.6,
+    "reproduce": 182.5,
+    "fix": 196.8
    },
    "peak_mib": {
-    "official": 1400.438,
-    "reproduce": 1272.3,
-    "fix": 1273.0
+    "official": 1398.1953125,
+    "reproduce": 1274.0,
+    "fix": 1272.6
    }
   }
  ],
@@ -447,13 +472,13 @@
    "case": "fmriprep",
    "mode": "reproduce",
    "larmorx_mib": 1105.6,
-   "freesurfer_mib": 1100.4
+   "freesurfer_mib": 1094.7
   },
   {
    "case": "fmriprep",
    "mode": "fix",
-   "larmorx_mib": 1106.2,
-   "freesurfer_mib": 1100.4
+   "larmorx_mib": 1103.5,
+   "freesurfer_mib": 1094.7
   }
  ]
 }

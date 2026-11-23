@@ -193,7 +193,7 @@ impl Process {
     }
 
     /// The byte replacement (§31): frame 0 (FS-461's `reproduce`) or every frame (the default).
-    fn replace_bytes(&mut self, v: &mut Vols, a: u8, b: u8) -> Result<(), Stop> {
+    pub(crate) fn replace_bytes(&mut self, v: &mut Vols, a: u8, b: u8) -> Result<(), Stop> {
         let (w, h, d) = (v.a().geom.width, v.a().geom.height, v.a().geom.depth);
         let nf = v.a().nframes.min(v.d().nframes);
         let frames = if v.a().nframes > 1 || v.d().nframes > 1 {

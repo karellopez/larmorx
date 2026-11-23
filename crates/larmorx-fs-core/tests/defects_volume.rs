@@ -2093,13 +2093,17 @@ fn fs491_an_orientation_without_an_axis() {
         let (fix, fids) = run(line, UpstreamDefects::Fix);
         assert!(fix.starts_with("EXIT 252 |"), "{fix}");
         assert!(
-            err_of(&fix).contains("lacks a left/right, inferior/superior or anterior/posterior axis"),
+            err_of(&fix)
+                .contains("lacks a left/right, inferior/superior or anterior/posterior axis"),
             "{fix}"
         );
         assert!(fids.iter().any(|i| i == "FS-491"), "{fids:?}");
         let (rep, rids) = run(line, UpstreamDefects::Reproduce);
         assert!(rep.starts_with("EXIT 252 |"), "{rep}");
-        assert!(err_of(&rep).contains("MatrixMultiplyD(): m2 is null"), "{rep}");
+        assert!(
+            err_of(&rep).contains("MatrixMultiplyD(): m2 is null"),
+            "{rep}"
+        );
         assert!(rids.iter().any(|i| i == "FS-491"), "{rids:?}");
     }
 }
@@ -2149,7 +2153,10 @@ fn fs495_fs496_percentiles_past_the_list() {
     for (id, line) in [("FS-495", R22_PTHR_END), ("FS-496", R22_PTHR_PAST)] {
         check(id, true, line);
         assert_eq!(r22_voxels(line, UpstreamDefects::Fix), "4020000000000000");
-        assert_eq!(r22_voxels(line, UpstreamDefects::Reproduce), "0000000000000000");
+        assert_eq!(
+            r22_voxels(line, UpstreamDefects::Reproduce),
+            "0000000000000000"
+        );
     }
     check("FS-495", false, R22_PTHR_EMPTY);
 }
@@ -2161,7 +2168,10 @@ fn fs495_fs496_percentiles_past_the_list() {
 fn fs497_a_dilation_whose_changes_never_reach_its_copy() {
     let (rep, rids) = run(R22_DILSEG_COMPLEX, UpstreamDefects::Reproduce);
     assert!(rep.starts_with("EXIT 252 |"), "{rep}");
-    assert!(err_of(&rep).contains("voxels that the next step does not see"), "{rep}");
+    assert!(
+        err_of(&rep).contains("voxels that the next step does not see"),
+        "{rep}"
+    );
     assert!(rids.iter().any(|i| i == "FS-497"), "{rids:?}");
     let (fix, _) = run(R22_DILSEG_COMPLEX, UpstreamDefects::Fix);
     assert!(!fix.starts_with("EXIT"), "{fix}");

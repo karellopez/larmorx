@@ -45,7 +45,12 @@ impl Process {
     }
 
     /// FS-58 for each volume a direct walk over a nonempty extent reads or writes.
-    pub(crate) fn walk_needs(&mut self, e: (i32, i32, i32), ms: &[&Mri], name: &str) -> Result<(), Stop> {
+    pub(crate) fn walk_needs(
+        &mut self,
+        e: (i32, i32, i32),
+        ms: &[&Mri],
+        name: &str,
+    ) -> Result<(), Stop> {
         if any_voxel(e) {
             for m in ms {
                 self.direct_needs_voxels(m, name)?;
@@ -152,7 +157,11 @@ impl Process {
                 for y in 0..h {
                     for x in 0..w {
                         let s = self.mri_get_vox_val(v.a(), x, y, z, f, 0)?;
-                        let o = if self.int_fs12(sse::widen(s)) == 0 { 1.0 } else { 0.0 };
+                        let o = if self.int_fs12(sse::widen(s)) == 0 {
+                            1.0
+                        } else {
+                            0.0
+                        };
                         self.mri_set_vox_val(v.d_mut(), x, y, z, f, o, 0)?;
                     }
                 }
@@ -164,7 +173,13 @@ impl Process {
     /// `MRIand(a, b, dst, thresh)` (§50): checked; a clone; for each frame of `a` each voxel's
     /// nearest samples (`MRIsampleVolumeFrame` at whole coordinates) taken as 0 below `thresh`;
     /// 1 where both are not 0 (a NaN is not 0), else 0.
-    pub fn mri_and(&mut self, a: &mut Mri, b: &mut Mri, dst: Dst, thresh: i32) -> Result<VolOut, Stop> {
+    pub fn mri_and(
+        &mut self,
+        a: &mut Mri,
+        b: &mut Mri,
+        dst: Dst,
+        thresh: i32,
+    ) -> Result<VolOut, Stop> {
         self.check_vol_dims(a, b)?;
         let mut v = Vols::new(a, Some(b), dst);
         self.clone_dst(&mut v)?;
@@ -244,12 +259,8 @@ impl Process {
             for z in 0..d {
                 for y in 0..h {
                     for x in 0..w {
-                        let face = x == 0
-                            || y == 0
-                            || z == 0
-                            || x == w - 1
-                            || y == h - 1
-                            || z == d - 1;
+                        let face =
+                            x == 0 || y == 0 || z == 0 || x == w - 1 || y == h - 1 || z == d - 1;
                         if face {
                             self.mri_set_vox_val(v.d_mut(), x, y, z, f, fv, 0)?;
                         }
@@ -271,7 +282,11 @@ impl Process {
             for y in 0..h {
                 for z in 0..d {
                     let s = self.mri_get_vox_val(v.a(), x, y, z, 0, 0)?;
-                    let o = if self.nint(sse::widen(s)) == 0 { 1.0 } else { 0.0 };
+                    let o = if self.nint(sse::widen(s)) == 0 {
+                        1.0
+                    } else {
+                        0.0
+                    };
                     self.mri_set_vox_val(v.d_mut(), x, y, z, 0, o, 0)?;
                 }
             }

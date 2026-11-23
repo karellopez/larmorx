@@ -113,7 +113,10 @@ impl Process {
         let mut v = Vols::new(src, Some(mask), dst);
         self.clone_dst(&mut v)?;
         if v.d().kind != v.a().kind {
-            self.error_printf(codes::UNSUPPORTED, b"MRImask: src and dst must be same type");
+            self.error_printf(
+                codes::UNSUPPORTED,
+                b"MRImask: src and dst must be same type",
+            );
             return Ok(VolOut::Nothing);
         }
         let (w, h, d) = ext(v.a());

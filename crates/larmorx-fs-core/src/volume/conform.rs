@@ -130,7 +130,12 @@ impl Process {
         let conform_fov = self.fov_int(sse::mul64(f64::from(cw), conform_size));
         let mut ostr = [0u8; 4];
         self.dircos_to_orientation_string(&m.geom, &mut ostr);
-        let find = |a: u8, b: u8| ostr[..3].iter().position(|&c| c == a || c == b).unwrap_or(3);
+        let find = |a: u8, b: u8| {
+            ostr[..3]
+                .iter()
+                .position(|&c| c == a || c == b)
+                .unwrap_or(3)
+        };
         let idx = [find(b'L', b'R'), find(b'I', b'S'), find(b'A', b'P')];
         let shown: Vec<u8> = ostr.iter().copied().take_while(|&c| c != 0).collect();
         self.put_out(format!("keeping DC {} {} {}\n", idx[0], idx[1], idx[2]).as_bytes());
@@ -185,7 +190,9 @@ impl Process {
             } else {
                 (conform_fov - fi) as f64
             };
-            if reproduce && i64::from((conform_fov as i32).wrapping_sub(fi as i32)) != conform_fov - fi {
+            if reproduce
+                && i64::from((conform_fov as i32).wrapping_sub(fi as i32)) != conform_fov - fi
+            {
                 self.note(
                     &FS_492,
                     "MRIconformedTemplate: a difference of two fields of view wrapped around in 32 bits, as FreeSurfer's",

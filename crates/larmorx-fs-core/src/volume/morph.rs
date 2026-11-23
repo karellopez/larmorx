@@ -46,8 +46,14 @@ fn most_frequent(labels: &[i32]) -> Option<i32> {
 /// The kind of a segmentation's steps.
 #[derive(Clone, Copy)]
 enum SegStep<'m> {
-    Erode { thresh: i32 },
-    Dilate { mask: Option<&'m Mri>, frame: i32, mthresh: f64 },
+    Erode {
+        thresh: i32,
+    },
+    Dilate {
+        mask: Option<&'m Mri>,
+        frame: i32,
+        mthresh: f64,
+    },
 }
 
 impl Process {
@@ -103,7 +109,8 @@ impl Process {
                                 if (nndef == 1 && n > 1) || (nndef == 2 && n > 2) {
                                     continue;
                                 }
-                                let x = sse::widen(self.mri_get_vox_val(v.a(), cc, rr, ss, 0, 0)?);
+                                let x =
+                                    sse::widen(self.mri_get_vox_val(v.a(), cc, rr, ss, 0, 0)?);
                                 if x < min {
                                     min = x;
                                 }
@@ -342,8 +349,10 @@ impl Process {
                     );
                     self.error_exit(
                         codes::BAD_PARM,
-                        format!("{name}: step {k} changes {c} voxels that the next step does not see\n")
-                            .as_bytes(),
+                        format!(
+                            "{name}: step {k} changes {c} voxels that the next step does not see\n"
+                        )
+                        .as_bytes(),
                     )?;
                     return Ok((VolOut::Nothing, None));
                 }
@@ -368,12 +377,7 @@ impl Process {
 
     /// One step of the segmentation's erosion or dilation from the labels of `seg2` (frame 0,
     /// columns outermost) into the destination; the number changed.
-    fn seg_step(
-        &mut self,
-        seg2: &Mri,
-        v: &mut Vols,
-        kind: SegStep,
-    ) -> Result<i32, Stop> {
+    fn seg_step(&mut self, seg2: &Mri, v: &mut Vols, kind: SegStep) -> Result<i32, Stop> {
         let (w, h, d) = ext(seg2);
         let mut changed = 0;
         let label = |p: &mut Process, c: i32, r: i32, s: i32| -> Result<i32, Stop> {
@@ -394,8 +398,12 @@ impl Process {
                     ];
                     let o: Option<i32> = match kind {
                         SegStep::Erode { thresh } => Some({
-                            let face =
-                                c == 0 || r == 0 || s == 0 || c == w - 1 || r == h - 1 || s == d - 1;
+                            let face = c == 0
+                                || r == 0
+                                || s == 0
+                                || c == w - 1
+                                || r == h - 1
+                                || s == d - 1;
                             if face {
                                 0
                             } else {
@@ -745,7 +753,13 @@ impl Process {
     }
 
     /// `k` dilations of `e`, the first into `dst` (`src` the open's source, when `dst` is it).
-    fn dilate_steps(&mut self, src: &mut Mri, e: &mut Mri, dst: Dst, k: i32) -> Result<VolOut, Stop> {
+    fn dilate_steps(
+        &mut self,
+        src: &mut Mri,
+        e: &mut Mri,
+        dst: Dst,
+        k: i32,
+    ) -> Result<VolOut, Stop> {
         match dst {
             Dst::New | Dst::Other => {
                 let mut m = match self.mri_dilate(e, Dst::New)? {
@@ -873,12 +887,8 @@ impl Process {
             for z in 0..d {
                 for y in 0..h {
                     for x in 0..w {
-                        let outside = x <= x0
-                            || x >= x1
-                            || y <= y0
-                            || y >= y1
-                            || z <= z0
-                            || z >= z1;
+                        let outside =
+                            x <= x0 || x >= x1 || y <= y0 || y >= y1 || z <= z0 || z >= z1;
                         if outside {
                             self.byte_put(filled, x, y, z, ob, name);
                             total += 1;

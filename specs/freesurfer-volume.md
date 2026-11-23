@@ -2229,8 +2229,9 @@ statuses are not compared): the implementations' own tests, against these sectio
   sum`); then every such voxel of frame `f` becomes `(float)(v / sqrt(sum_f))` (`v` widened, `double` square root
   and division; a sum of 0 gives infinities or NaN). Returns 0 (**(observed)**: `vcov`, `vrules19`).
 - `PrintPCAStats(fp, S)`: `total` = the sum (`double`, `total + v`) over `n = 1 ..` the vector's columns of `v =
-  S[n] * S[n]` (the product in `float`, widened); then for each `n` in order one line `%3d   %8.2f %9.2f   %6.2f
-  %6.2f ` and a newline (three spaces, one, three, two; a space before the newline), of `n`, `v`, the running sum
+  S[n] * S[n]` (the product in `float`, widened); then for each `n` in order one line in the C format
+  `"%3d   %8.2f %9.2f   %6.2f  %6.2f \n"` (between the fields three spaces, one, three and two; a space before the
+  newline), of `n`, `v`, the running sum
   (`double`, `sum + v`), `100 v / total` and `100 sum / total` (`double`, the product first), printed as glibc's
   `printf` prints them: a NaN as `nan` or `-nan` by its sign bit, x86-64's `0 / 0` the negative default NaN, so a
   total of 0 prints `-nan` (**(observed)**: `vrules19`: three zeros print `  1       0.00      0.00     -nan    -nan `;

@@ -56,3 +56,14 @@ all of them, NaN bits included; the seeded hashes are `0x7fdf578b8ea688b3` (the 
 | powers of two ±3 ulp | 0 |
 | p-values | 259,438 (0.0966 %) |
 | integers and dyadic fractions | 56,392 (0.0210 %) |
+
+## `glibc-form/`: which form of Arm's `log2.c` glibc 2.35 runs (2026-11-23)
+
+`build.sh <out> <optimized-routines-v19.11>/math` builds Arm's `log2.c` and `log2_data.c` (MIT; not
+copied here) with this folder's minimal `math_config.h` and runs nothing; then, in `<out>`:
+`./cmp 67108864` compares the form without `HAVE_FAST_FMA` and without FMA code against the system's
+`log2` on 402,653,199 arguments (six families of 2^26 and special values): 0 differ; `./cmp_fma
+67108864` the `HAVE_FAST_FMA` form built with `-mfma -mavx2`: 175,963 differ (all next to 1 or in
+the main path's last bit). `search*.c` and `near1.c` tried every combination of fused and unfused
+multiply-adds in both paths (`search3`: the non-FMA form with no fusion is the only one with 0 of
+200,000 differing). glibc's own code was not read; its `log2` is called as a black box.

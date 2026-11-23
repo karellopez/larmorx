@@ -28,7 +28,8 @@ const OFFICIAL_SHA256: &str = "70ea2e644455db29d5a7e2b5332748ad3bb816bc9d8add641
 /// not run (about 270 s at one thread in a debug build; `cases::histogram_or_sb_cost`): the same
 /// official lines with those five so (`check.py`'s `official_sha256_skip_debug`). A release build
 /// compares them too, and `fs_robreg_histo_official.rs` holds 32 more.
-const OFFICIAL_SHA256_DEBUG: &str = "f9f10b84d937b70438d4c4d5cde4247a5cb6cd98e4ee0c4d03b54766e34bfb4c";
+const OFFICIAL_SHA256_DEBUG: &str =
+    "f9f10b84d937b70438d4c4d5cde4247a5cb6cd98e4ee0c4d03b54766e34bfb4c";
 const SLOW_IN_DEBUG: usize = 5;
 const SKIPPED: usize = 8;
 const NOT_PORTED: usize = 2;

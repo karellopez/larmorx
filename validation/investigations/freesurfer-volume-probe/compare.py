@@ -5274,7 +5274,7 @@ class Gen18(Gen17):
         n = d[0] * d[1] * d[2] * nf
         return self.pk(geo or self.rgeo(r, d), self.lvals(r, n, t, **kw), t=t, nf=nf)
 
-    def sdst(self, r: random.Random, d, t: int, nf: int = 1, other: bool = False) -> str:
+    def dst10(self, r: random.Random, d, t: int, nf: int = 1, other: bool = False) -> str:
         """D: new, self, other (when there is a second volume), or a volume of the same extent (any
         type), rarely of another extent."""
         k = r.random()
@@ -5375,7 +5375,7 @@ class Gen18(Gen17):
             nf = 1 if r.random() < 0.8 else 2
             a = self.svol(r, d, ta, nf=nf)
             b = self.svol(r, d if r.random() < 0.95 else dims(), tb, nf=nf)
-            dst = self.sdst(r, d, ta, nf, other=True)
+            dst = self.dst10(r, d, ta, nf, other=True)
             k = r.random()
             if k < 0.25:
                 L.append(f"union {a} 0 {b} 0 {dst}")
@@ -5391,7 +5391,7 @@ class Gen18(Gen17):
             t = r.choice(T)
             nf = 1 if r.random() < 0.8 else 2
             a = self.svol(r, d, t, nf=nf)
-            dst = self.sdst(r, d, t, nf)
+            dst = self.dst10(r, d, t, nf)
             cmd = r.choice(["compl", "mnot", "b2c", "edges"])
             if cmd == "edges":
                 L.append(f"edges {a} 0 {f64(r.choice([0.0, 1.0, 7.5, -2.0, 300.0]))} {dst}")
@@ -5442,7 +5442,7 @@ class Gen18(Gen17):
                 L.append(f"rlist {a} 0 {n}{' ' if n else ''}{pairs} {mk} {dst}")
             elif k == 1:
                 vin = r.choice([0.0, 1.0, 2.0, 2.5, -1.0, 1.0000001])
-                L.append(f"rvonly {a} 0 {self.sdst(r, d, t, nf)} {f32(vin)} {f32(r.choice([9.0, 0.0, -3.5, 300.0]))}")
+                L.append(f"rvonly {a} 0 {self.dst10(r, d, t, nf)} {f32(vin)} {f32(r.choice([9.0, 0.0, -3.5, 300.0]))}")
             elif k == 2:
                 dst = "self" if r.random() < 0.2 else self.svol(r, d, r.choice([0, t, 3]), pz=1.0)
                 L.append(f"cplab {a} 0 {dst} {r.choice([1, 2, 3, 0, 300])}")
@@ -5452,7 +5452,7 @@ class Gen18(Gen17):
                 L.append(f"cplv {a} 0 {lb} 0 {dst} {r.choice([1, 2, 3, 0])}")
             else:
                 lb = self.svol(r, d, r.choice([0, 1, 3]))
-                L.append(f"slv {a} 0 {lb} 0 {self.sdst(r, d, t, nf, other=True)} {r.choice([1, 2, 3, 0])} {f32(r.choice([9.0, 0.5, -2.0, 1e6]))}")
+                L.append(f"slv {a} 0 {lb} 0 {self.dst10(r, d, t, nf, other=True)} {r.choice([1, 2, 3, 0])} {f32(r.choice([9.0, 0.5, -2.0, 1e6]))}")
         return [Batch("vset", "vset", L)]
 
     def vmorph(self) -> list[Batch]:
@@ -5480,11 +5480,11 @@ class Gen18(Gen17):
                 dst = "new" if r.random() < 0.6 else self.svol(r, d, r.choice([0, t, 3]), pz=1.0)
                 L.append(f"erodenn {a} 0 {dst} {r.choice([1, 2, 3, 0])} {r.choice([0, 1])}")
             elif cmd in ("erode", "erode2d", "dil6"):
-                L.append(f"{cmd} {a} 0 {self.sdst(r, d, t, nf)}")
+                L.append(f"{cmd} {a} 0 {self.dst10(r, d, t, nf)}")
             elif cmd == "openn":
                 k = r.randrange(3)
                 o = f" {r.choice([1, 2, 3])}" if k == 0 else ""
-                L.append(f"openn {k} {a} 0 {self.sdst(r, d, t, nf)}{o}")
+                L.append(f"openn {k} {a} 0 {self.dst10(r, d, t, nf)}{o}")
             elif cmd == "erodeseg":
                 dst = "new" if r.random() < 0.7 else self.svol(r, d, r.choice([0, t, 3]), pz=1.0)
                 L.append(f"erodeseg {a} 0 {dst} {r.choice([1, 1, 2, 3])} {r.choice([0, 1, 2, 3])}")

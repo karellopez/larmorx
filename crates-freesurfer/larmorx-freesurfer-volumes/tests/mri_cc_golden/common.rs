@@ -43,7 +43,9 @@ pub fn cases() -> Vec<Vec<String>> {
         &["-sdir", ".", "-a", "0", "w"],
         &["-sdir", ".", "-a", "0", "x"],
         &["-sdir", ".", "-d", "51", "s"],
-        &["-sdir", ".", "-aseg", "aseg.mgz", "-o", "out.mgz", "-m", "1", "s"],
+        &[
+            "-sdir", ".", "-aseg", "aseg.mgz", "-o", "out.mgz", "-m", "1", "s",
+        ],
         &["-sdir", ".", "-aseg", "aseg.mgz", "-o", "out.mgz", "c"],
         &[
             "-sdir", ".", "-aseg", "aseg.mgz", "-o", "out.mgz", "-lh", "s",

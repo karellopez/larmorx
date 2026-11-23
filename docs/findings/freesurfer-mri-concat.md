@@ -121,4 +121,10 @@ file of FreeSurfer 8.2.0 reads the variable (only commented-out `setenv` calls i
 
 The memory test's six calls on ds000005's v8 volumes (four 256^3 volumes concatenated, their
 mean, their standard deviation, `--mul`, the dura sum, `pctsurfcon`'s overlays) peak at or below
-FreeSurfer's (277 vs 280 MiB, 342 vs 344 MiB, ...), the output identical byte for byte.
+FreeSurfer's (277 vs 280 MiB, 342 vs 344 MiB, ...), the output identical byte for byte. Speed
+(one thread, three runs each, the official program and the port's `reproduce` timed with
+`/usr/bin/time` on ds000005's v8 volumes): the concatenation of four 256^3 volumes
+7.1 s against FreeSurfer's 6.9 s, their mean 6.1 s against 4.4 s, their standard deviation 10.6 s
+against 6.5 s: the frame reductions of `larmorx-freesurfer-filter` (`MRIframeMean`,
+`fMRIcovariance`) read and write voxel by voxel through the generic accessors; a speed item for
+that crate (bit for bit).

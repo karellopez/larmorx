@@ -25,7 +25,6 @@
 //! FS-1195 (the argument's first word only), FS-1196 (an argument without a word), FS-1197 (a name
 //! of 2,009 bytes or more that opens), FS-1198 (more than 400,000 inputs).
 
-
 use larmorx_core::defects::{FS_1194, FS_1195, FS_1196, FS_1197, FS_1198, FS_1247};
 use larmorx_freesurfer_core::cmdargs::cmd_arg_n_err;
 use larmorx_freesurfer_core::cscan::{Bytes, Scanf};
@@ -278,7 +277,11 @@ fn read_list(
                         )
                     },
                 );
-                if g.notices.reproduce() { w } else { arg.to_owned() }
+                if g.notices.reproduce() {
+                    w
+                } else {
+                    arg.to_owned()
+                }
             } else {
                 w
             }
@@ -333,11 +336,7 @@ fn read_list(
 }
 
 /// `parse_commandline(argc, argv)` on the arguments after the program's name.
-pub fn parse_commandline(
-    g: &mut Globals,
-    r: &mut Run,
-    args: &[String],
-) -> Result<Options, Fatal> {
+pub fn parse_commandline(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<Options, Fatal> {
     let mut o = Options::new();
     let mut table = ListWords::default();
     if args.is_empty() {
@@ -597,7 +596,9 @@ pub fn parse_commandline(
         o.inputs[i] = name;
     }
     if o.stack_smashed {
-        let _ = r.err.write_all(b"*** stack smashing detected ***: terminated\n");
+        let _ = r
+            .err
+            .write_all(b"*** stack smashing detected ***: terminated\n");
         return Err(Fatal::Exit(134));
     }
     Ok(o)
@@ -647,11 +648,7 @@ fn zconcat(g: &mut Globals, r: &mut Run, a: &[String]) -> Fatal {
                     },
                 );
                 if g.notices.fix() {
-                    let _ = writeln!(
-                        r.out,
-                        "ERROR: --zconcat: nskip {} is not a number",
-                        a[2]
-                    );
+                    let _ = writeln!(r.out, "ERROR: --zconcat: nskip {} is not a number", a[2]);
                     return Ok(Fatal::Exit(1));
                 }
                 0
@@ -694,7 +691,10 @@ pub fn check_options(r: &mut Run, o: &Options) -> Result<(), Fatal> {
         return refuse(r, "ERROR: no output specified");
     }
     if o.do_paired_diff && o.do_paired_avg {
-        return refuse(r, "ERROR: cannot specify both --paried-diff-xxx and --paried-avg ");
+        return refuse(
+            r,
+            "ERROR: cannot specify both --paried-diff-xxx and --paried-avg ",
+        );
     }
     if o.do_paired_diff_norm1 && o.do_paired_diff_norm2 {
         return refuse(

@@ -63,7 +63,9 @@ def main(argv: list[str] | None = None) -> int:
         real["kinds"] = dict(Counter(re.sub(r"-(lh|rh)$", "", x["call"]) for x in r["rows"]))
     memory = []
     if a.memory and a.memory.is_file():
-        pat = re.compile(r"mri_concat ([\w-]+) \((\w+)\): larmorx ([\d.]+) MiB, FreeSurfer ([\d.]+)")
+        pat = re.compile(
+            r"mri_concat ([\w-]+) \((\w+)\): larmorx ([\d.]+) MiB, FreeSurfer ([\d.]+)"
+        )
         for m in pat.finditer(a.memory.read_text(encoding="utf-8")):
             memory.append(
                 {"case": m[1], "mode": m[2], "larmorx_mib": float(m[3]),

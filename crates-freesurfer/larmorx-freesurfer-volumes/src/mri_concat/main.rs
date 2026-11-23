@@ -111,7 +111,15 @@ pub fn run(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut 
 }
 
 /// `MRIgetVoxVal(m, c, r, s, f)` as a `double`.
-fn get(g: &mut Globals, r: &mut Run, m: &Mri, c: i32, rr: i32, s: i32, f: i32) -> Result<f64, Fatal> {
+fn get(
+    g: &mut Globals,
+    r: &mut Run,
+    m: &Mri,
+    c: i32,
+    rr: i32,
+    s: i32,
+    f: i32,
+) -> Result<f64, Fatal> {
     Ok(f64::from(mri_get_vox_val(g, r.err, m, c, rr, s, f, 0)?))
 }
 
@@ -218,7 +226,10 @@ fn grouped_mean_matrix(
 ) -> Result<Option<Matrix>, Fatal> {
     let nper = ntotal.wrapping_div(ngroups);
     if nper.wrapping_mul(ngroups) != ntotal {
-        let _ = writeln!(r.out, "ERROR: --gmean, Ng must be integer divisor of Ntotal");
+        let _ = writeln!(
+            r.out,
+            "ERROR: --gmean, Ng must be integer divisor of Ntotal"
+        );
         return Ok(None);
     }
     let Some(mut m) = matrix_alloc(g, r.out, r.err, nper, ntotal, MATRIX_REAL)? else {
@@ -381,7 +392,15 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
                 let _ = writeln!(r.out, "Checking {nthin:2} {name}");
                 let _ = r.out.flush();
             }
-            let Some(h) = mri_read_header(g, r.out, r.err, &r.env, r.dir, name, MRI_VOLUME_TYPE_UNKNOWN)?
+            let Some(h) = mri_read_header(
+                g,
+                r.out,
+                r.err,
+                &r.env,
+                r.dir,
+                name,
+                MRI_VOLUME_TYPE_UNKNOWN,
+            )?
             else {
                 let _ = writeln!(r.out, "ERROR: reading {name}");
                 return Err(Fatal::Exit(1));
@@ -407,7 +426,15 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     } else {
         let _ = writeln!(r.out, "NOT Checking inputs, assuming nframestot = ninputs");
         nframestot = inlist.len() as i64;
-        let Some(h) = mri_read_header(g, r.out, r.err, &r.env, r.dir, &inlist[0], MRI_VOLUME_TYPE_UNKNOWN)?
+        let Some(h) = mri_read_header(
+            g,
+            r.out,
+            r.err,
+            &r.env,
+            r.dir,
+            &inlist[0],
+            MRI_VOLUME_TYPE_UNKNOWN,
+        )?
         else {
             let _ = writeln!(r.out, "ERROR: reading {}", inlist[0]);
             return Err(Fatal::Exit(1));
@@ -419,7 +446,10 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
 
     if o.do_rms {
         if inlist.len() != 1 {
-            let _ = writeln!(r.out, "ERROR: --rms supports only single input w/ multiple frames");
+            let _ = writeln!(
+                r.out,
+                "ERROR: --rms supports only single input w/ multiple frames"
+            );
             return Err(Fatal::Exit(1));
         }
         if nframestot == 1 {
@@ -464,7 +494,11 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
                     )
                 },
             );
-            if g.notices.reproduce() { m.rows } else { m.cols }
+            if g.notices.reproduce() {
+                m.rows
+            } else {
+                m.cols
+            }
         } else {
             m.rows
         };
@@ -476,9 +510,9 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     }
 
     if o.do_paired && libm_remainder(f64::from(nframestot), 2.0) != 0.0 {
-        let _ = r.out.write_all(
-            b"ERROR: --paired-xxx specified but there are an odd number of frames\n",
-        );
+        let _ = r
+            .out
+            .write_all(b"ERROR: --paired-xxx specified but there are an odd number of frames\n");
         return Err(Fatal::Exit(1));
     }
 
@@ -543,7 +577,16 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
             }
         }
         if !o.do_check {
-            no_check_mismatch(g, r, &inlist[0], name, &mritmp, [nc, nr, ns], fout, nframestot)?;
+            no_check_mismatch(
+                g,
+                r,
+                &inlist[0],
+                name,
+                &mritmp,
+                [nc, nr, ns],
+                fout,
+                nframestot,
+            )?;
         }
         if nthin == 0 {
             mri_copy_header(g, r.out, r.err, &mritmp, Some(&mut mriout))?;
@@ -602,7 +645,16 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
                         }
                     }
                     if nhits > 0 {
-                        set(g, r, &mut mritmp, c, rr, s, 0, div64(vsum, f64::from(nhits)))?;
+                        set(
+                            g,
+                            r,
+                            &mut mritmp,
+                            c,
+                            rr,
+                            s,
+                            0,
+                            div64(vsum, f64::from(nhits)),
+                        )?;
                     }
                 }
             }
@@ -748,7 +800,9 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
         }
         // the frames are no longer needed once the variance is made (FreeSurfer frees them after
         // the square root, which it takes in place)
-        mriout = fresh(fmri_covariance(g, r.out, r.err, &mriout, 0, -1.0, None, None)?)?;
+        mriout = fresh(fmri_covariance(
+            g, r.out, r.err, &mriout, 0, -1.0, None, None,
+        )?)?;
         if o.do_std {
             sqrt_in_place(g, r, &mut mriout)?;
         }
@@ -1065,7 +1119,10 @@ fn no_check_mismatch(
     );
     if g.notices.fix() {
         if other {
-            let _ = writeln!(r.out, "ERROR: dimension mismatch between {first} and {name}");
+            let _ = writeln!(
+                r.out,
+                "ERROR: dimension mismatch between {first} and {name}"
+            );
         } else {
             let _ = writeln!(r.out, "ERROR: {name} has more frames than counted");
         }

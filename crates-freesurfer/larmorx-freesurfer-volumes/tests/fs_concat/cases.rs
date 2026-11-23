@@ -106,8 +106,7 @@ fn zeros(g: &mut Gen, m: &mut Mri, k: u64) {
             for y in 0..m.vg.height {
                 for x in 0..m.vg.width {
                     if g.chance(k) {
-                        mri_set_vox_val(&mut fs, &mut e, m, x, y, z, f, 0.0, 0)
-                            .expect("a voxel");
+                        mri_set_vox_val(&mut fs, &mut e, m, x, y, z, f, 0.0, 0).expect("a voxel");
                     }
                 }
             }
@@ -135,7 +134,7 @@ fn mask(g: &mut Gen, dims: [i32; 3]) -> Mri {
 const D: [i32; 3] = [4, 5, 3];
 
 fn base_inputs() -> Inputs {
-    let mut g = Gen::new(0xc0_ca7_0039);
+    let mut g = Gen::new(0x000c_0ca7_0039);
     let mut files: Vec<(String, Vec<u8>)> = Vec::new();
     let put = |files: &mut Vec<(String, Vec<u8>)>, name: &str, m: &mut Mri| {
         files.extend(write_as(m, name));
@@ -170,21 +169,30 @@ fn base_inputs() -> Inputs {
     zeros(&mut g, &mut z1, 2);
     put(&mut files, "z1.mgz", &mut z1);
     // segmentations (with and without a colour table)
-    let mut s1 = build(&mut g, &Spec {
-        seg: true,
-        ctab: true,
-        ..spec(MRI_INT, [D[0], D[1], D[2], 1])
-    });
+    let mut s1 = build(
+        &mut g,
+        &Spec {
+            seg: true,
+            ctab: true,
+            ..spec(MRI_INT, [D[0], D[1], D[2], 1])
+        },
+    );
     put(&mut files, "seg1.mgz", &mut s1);
-    let mut s2 = build(&mut g, &Spec {
-        seg: true,
-        ..spec(MRI_INT, [D[0], D[1], D[2], 1])
-    });
+    let mut s2 = build(
+        &mut g,
+        &Spec {
+            seg: true,
+            ..spec(MRI_INT, [D[0], D[1], D[2], 1])
+        },
+    );
     put(&mut files, "seg2.mgz", &mut s2);
-    let mut s3 = build(&mut g, &Spec {
-        seg: true,
-        ..spec(MRI_UCHAR, [D[0], D[1], D[2], 4])
-    });
+    let mut s3 = build(
+        &mut g,
+        &Spec {
+            seg: true,
+            ..spec(MRI_UCHAR, [D[0], D[1], D[2], 4])
+        },
+    );
     put(&mut files, "seg4.mgz", &mut s3);
     // another grid
     let mut big = build(&mut g, &spec(MRI_FLOAT, [5, 5, 3, 1]));
@@ -230,10 +238,19 @@ fn base_inputs() -> Inputs {
     files.push(("listbad.txt".into(), b"a.mgz nofile.mgz\n".to_vec()));
     let long = format!("{}.mgz", "w".repeat(2096));
     files.push(("longw.txt".into(), format!("{long}\nb.mgz\n").into_bytes()));
-    files.push(("longlast.txt".into(), format!("a.mgz {long}\n").into_bytes()));
+    files.push((
+        "longlast.txt".into(),
+        format!("a.mgz {long}\n").into_bytes(),
+    ));
     let exact = format!("{}.mgz", "x".repeat(1996));
-    files.push(("long2000.txt".into(), format!("{exact} a.mgz\n").into_bytes()));
-    files.push(("m24.txt".into(), b"0.25 0.25 0.25 0.25\n1 -1 1 -1\n".to_vec()));
+    files.push((
+        "long2000.txt".into(),
+        format!("{exact} a.mgz\n").into_bytes(),
+    ));
+    files.push((
+        "m24.txt".into(),
+        b"0.25 0.25 0.25 0.25\n1 -1 1 -1\n".to_vec(),
+    ));
     files.push(("m23.txt".into(), b"1 0 0\n0 1 0\n".to_vec()));
     files.push(("m33.txt".into(), b"1 0 0\n0 1 0\n0 0 1\n".to_vec()));
     files.push(("m14.txt".into(), b"1.5 -2 0.125 3\n".to_vec()));
@@ -257,11 +274,13 @@ fn names(a: &str, f: &str) -> bool {
 pub fn line(env: &[&str], i: &Inputs, args: &[String]) -> String {
     let mut wanted: Vec<String> = args.to_vec();
     for (f, b) in &i.files {
-        if f.ends_with(".txt") || f == "my" {
-            if args.iter().any(|a| names(a, f) || a.split_whitespace().next() == Some(f)) {
-                for w in String::from_utf8_lossy(b).split_whitespace() {
-                    wanted.push(w.to_owned());
-                }
+        if (f.ends_with(".txt") || f == "my")
+            && args
+                .iter()
+                .any(|a| names(a, f) || a.split_whitespace().next() == Some(f))
+        {
+            for w in String::from_utf8_lossy(b).split_whitespace() {
+                wanted.push(w.to_owned());
             }
         }
     }
@@ -269,7 +288,9 @@ pub fn line(env: &[&str], i: &Inputs, args: &[String]) -> String {
         .files
         .iter()
         .filter(|(f, _)| {
-            wanted.iter().any(|a| names(a, f) || a.split_whitespace().next() == Some(f))
+            wanted
+                .iter()
+                .any(|a| names(a, f) || a.split_whitespace().next() == Some(f))
         })
         .collect();
     let dirs: Vec<&String> = i
@@ -410,8 +431,23 @@ fn prelude() -> Vec<String> {
     add(&["--VERSION"]);
     add(&["a.mgz", "--version", "--o", "o.mgz"]);
     for o in [
-        "--o", "--i", "--mtx", "--w", "--wn", "--gmean", "--in-frame", "--rep", "--rusage",
-        "--mask", "--mul", "--div", "--add", "--ctab", "--tar1", "--f", "--pca-mask",
+        "--o",
+        "--i",
+        "--mtx",
+        "--w",
+        "--wn",
+        "--gmean",
+        "--in-frame",
+        "--rep",
+        "--rusage",
+        "--mask",
+        "--mul",
+        "--div",
+        "--add",
+        "--ctab",
+        "--tar1",
+        "--f",
+        "--pca-mask",
         "--max-index-add",
     ] {
         add(&["a.mgz", o]);
@@ -447,7 +483,9 @@ fn prelude() -> Vec<String> {
     }
     // plain concatenation, formats and checks
     add(&["a.mgz", "b.mgz", "--o", "o.mgz"]);
-    add(&["--i", "a.mgz", "--i", "c.mgz", "d.nii.gz", "--o", "o.nii.gz"]);
+    add(&[
+        "--i", "a.mgz", "--i", "c.mgz", "d.nii.gz", "--o", "o.nii.gz",
+    ]);
     add(&["a.mgz", "e.nii", "--o", "o.nii"]);
     add(&["a.mgz", "u.mgz", "--o", "o.mgh"]);
     add(&["c.mgz", "--o", "outdir/o.mgz"]);
@@ -465,7 +503,14 @@ fn prelude() -> Vec<String> {
     add(&["seg1.mgz", "seg2.mgz", "--o", "o.mgz"]);
     add(&["seg2.mgz", "seg1.mgz", "--o", "o.mgz"]);
     add(&["a.mgz", "--o", "o.mgz", "--rusage", "o.rusage"]);
-    add(&["a.mgz", "--o", "o.mgz", "--debug", "--rusage", "nodir/o.rusage"]);
+    add(&[
+        "a.mgz",
+        "--o",
+        "o.mgz",
+        "--debug",
+        "--rusage",
+        "nodir/o.rusage",
+    ]);
     // --no-check
     add(&["--no-check", "a.mgz", "b.mgz", "--o", "o.mgz"]);
     add(&["--no-check", "a.mgz", "c.mgz", "--o", "o.mgz"]);
@@ -474,9 +519,32 @@ fn prelude() -> Vec<String> {
     add(&["--no-check", "big.mgz", "a.mgz", "--o", "o.mgz"]);
     add(&["--no-check", "nofile.mgz", "--o", "o.mgz"]);
     add(&["--no-check", "a.mgz", "nofile.mgz", "--o", "o.mgz"]);
-    add(&["--no-check", "a.mgz", "b.mgz", "--in-frame", "0", "--o", "o.mgz"]);
-    add(&["--no-check", "a.mgz", "c.mgz", "--w", "w2.txt", "--o", "o.mgz"]);
-    add(&["--no-check", "u.mgz", "a.mgz", "--keep-datatype", "--o", "o.mgz"]);
+    add(&[
+        "--no-check",
+        "a.mgz",
+        "b.mgz",
+        "--in-frame",
+        "0",
+        "--o",
+        "o.mgz",
+    ]);
+    add(&[
+        "--no-check",
+        "a.mgz",
+        "c.mgz",
+        "--w",
+        "w2.txt",
+        "--o",
+        "o.mgz",
+    ]);
+    add(&[
+        "--no-check",
+        "u.mgz",
+        "a.mgz",
+        "--keep-datatype",
+        "--o",
+        "o.mgz",
+    ]);
     // the reductions, each on four frames and more
     for op in OPS {
         for input in [&["f4.mgz"][..], &["z.mgz"], &["a.mgz", "b.mgz", "c.mgz"]] {
@@ -500,16 +568,79 @@ fn prelude() -> Vec<String> {
     add(&["f4.mgz", "--rep", "-1", "--o", "o.mgz"]);
     add(&["f4.mgz", "--rep", "3", "--mean", "--o", "o.mgz"]);
     add(&["f4.mgz", "--rep", "x", "--o", "o.mgz"]);
-    add(&["z.mgz", "--max-index-prune", "--max-index-add", "5", "--o", "o.mgz"]);
+    add(&[
+        "z.mgz",
+        "--max-index-prune",
+        "--max-index-add",
+        "5",
+        "--o",
+        "o.mgz",
+    ]);
     add(&["z.mgz", "--max-index-add", "5", "--o", "o.mgz"]);
-    add(&["f4.mgz", "--max-index", "--max-index-add", "-3", "--o", "o.mgz"]);
-    add(&["f4.mgz", "--max-index", "--max-index-add", "+3", "--o", "o.mgz"]);
-    add(&["f4.mgz", "--max-index", "--max-index-add", "-", "--o", "o.mgz"]);
-    add(&["f4.mgz", "--max-index", "--max-index-add", "x", "--o", "o.mgz"]);
-    add(&["f4.mgz", "--max-index", "--max-index-add", "", "--o", "o.mgz"]);
-    add(&["f4.mgz", "--max-index", "--max-index-add", "2147483647", "--o", "o.mgz"]);
-    add(&["f4.mgz", "--max-index", "--max-index-add", "9e9", "--o", "o.mgz"]);
-    add(&["f4.mgz", "--MAX-INDEX-ADD", "1", "--max-index", "--o", "o.mgz"]);
+    add(&[
+        "f4.mgz",
+        "--max-index",
+        "--max-index-add",
+        "-3",
+        "--o",
+        "o.mgz",
+    ]);
+    add(&[
+        "f4.mgz",
+        "--max-index",
+        "--max-index-add",
+        "+3",
+        "--o",
+        "o.mgz",
+    ]);
+    add(&[
+        "f4.mgz",
+        "--max-index",
+        "--max-index-add",
+        "-",
+        "--o",
+        "o.mgz",
+    ]);
+    add(&[
+        "f4.mgz",
+        "--max-index",
+        "--max-index-add",
+        "x",
+        "--o",
+        "o.mgz",
+    ]);
+    add(&[
+        "f4.mgz",
+        "--max-index",
+        "--max-index-add",
+        "",
+        "--o",
+        "o.mgz",
+    ]);
+    add(&[
+        "f4.mgz",
+        "--max-index",
+        "--max-index-add",
+        "2147483647",
+        "--o",
+        "o.mgz",
+    ]);
+    add(&[
+        "f4.mgz",
+        "--max-index",
+        "--max-index-add",
+        "9e9",
+        "--o",
+        "o.mgz",
+    ]);
+    add(&[
+        "f4.mgz",
+        "--MAX-INDEX-ADD",
+        "1",
+        "--max-index",
+        "--o",
+        "o.mgz",
+    ]);
     add(&["z.mgz", "--prune", "--no-prune", "--o", "o.mgz"]);
     add(&["z.mgz", "--prune", "--mean", "--o", "o.mgz"]);
     add(&["z.mgz", "--prune", "--rep", "2", "--o", "o.mgz"]);
@@ -518,13 +649,26 @@ fn prelude() -> Vec<String> {
     add(&["seg4.mgz", "--vote-ex0", "--o", "o.mgz"]);
     add(&["seg4.mgz", "--vote", "--keep-datatype", "--o", "o.mgz"]);
     add(&["seg4.mgz", "--sort", "--keep-datatype", "--o", "o.mgz"]);
-    add(&["seg4.mgz", "--first-non-zero", "--keep-datatype", "--o", "o.mgz"]);
+    add(&[
+        "seg4.mgz",
+        "--first-non-zero",
+        "--keep-datatype",
+        "--o",
+        "o.mgz",
+    ]);
     add(&["f4.mgz", "--scm", "--o", "o.mgz"]);
     add(&["f4.mgz", "--pca", "--o", "o.mgz"]);
     add(&["f4.mgz", "--pca", "--o", "o.nii.gz"]);
     add(&["f4.mgz", "--pca", "--o", "outdir/o.mgh"]);
     add(&["f4.mgz", "--pca", "--pca-mask", "k.mgz", "--o", "o.mgz"]);
-    add(&["f4.mgz", "--pca", "--pca-mask", "nofile.mgz", "--o", "o.mgz"]);
+    add(&[
+        "f4.mgz",
+        "--pca",
+        "--pca-mask",
+        "nofile.mgz",
+        "--o",
+        "o.mgz",
+    ]);
     add(&["f4.mgz", "--pca-mask", "k.mgz", "--o", "o.mgz"]);
     add(&["f4.mgz", "--pca", "--o", "onoext"]);
     add(&["a.mgz", "--pca", "--o", "o.mgz"]);
@@ -536,7 +680,15 @@ fn prelude() -> Vec<String> {
     add(&["c.mgz", "--rms", "--in-frame", "1", "--o", "o.mgz"]);
     add(&["u2.mgz", "--rms", "--keep-datatype", "--o", "o.mgz"]);
     // pairs (pctsurfcon's call first)
-    add(&["lh.wm.mgh", "lh.gm.mgh", "--paired-diff-norm", "--mul", "100", "--o", "o.mgh"]);
+    add(&[
+        "lh.wm.mgh",
+        "lh.gm.mgh",
+        "--paired-diff-norm",
+        "--mul",
+        "100",
+        "--o",
+        "o.mgh",
+    ]);
     for p in [
         "--paired-avg",
         "--paired-sum",
@@ -549,9 +701,13 @@ fn prelude() -> Vec<String> {
         add(&["z1.mgz", "a.mgz", p, "--o", "o.mgz"]);
     }
     add(&["c.mgz", "--paired-sum", "--o", "o.mgz"]);
-    add(&["seg1.mgz", "seg2.mgz", "--sum", "--ctab", "lut.txt", "--o", "o.mgz"]);
+    add(&[
+        "seg1.mgz", "seg2.mgz", "--sum", "--ctab", "lut.txt", "--o", "o.mgz",
+    ]);
     add(&["seg1.mgz", "seg2.mgz", "--sum", "--o", "o.mgz"]);
-    add(&["seg2.mgz", "a.mgz", "--sum", "--CTAB", "lut.txt", "--o", "o.mgz"]);
+    add(&[
+        "seg2.mgz", "a.mgz", "--sum", "--CTAB", "lut.txt", "--o", "o.mgz",
+    ]);
     add(&["a.mgz", "--ctab", "nofile.txt", "--o", "o.mgz"]);
     add(&["a.mgz", "--ctab", "notvol.txt", "--o", "o.mgz"]);
     // matrices and weights
@@ -618,13 +774,36 @@ fn prelude() -> Vec<String> {
     }
     add(&["u.mgz", "--mul", "300", "--keep-datatype", "--o", "o.mgz"]);
     add(&["u.mgz", "--add", "-300", "--keep-datatype", "--o", "o.mgz"]);
-    add(&["d.nii.gz", "--mul", "+nan", "--keep-datatype", "--o", "o.mgz"]);
-    add(&["a.mgz", "--mul", "2", "--div", "4", "--add", "1", "--o", "o.mgz"]);
+    add(&[
+        "d.nii.gz",
+        "--mul",
+        "+nan",
+        "--keep-datatype",
+        "--o",
+        "o.mgz",
+    ]);
+    add(&[
+        "a.mgz", "--mul", "2", "--div", "4", "--add", "1", "--o", "o.mgz",
+    ]);
     add(&["f4.mgz", "--max-bonfcor", "--add", "7", "--o", "o.mgz"]);
-    add(&["u2.mgz", "seg1.mgz", "--keep-datatype", "--sum", "--o", "o.mgz"]);
+    add(&[
+        "u2.mgz",
+        "seg1.mgz",
+        "--keep-datatype",
+        "--sum",
+        "--o",
+        "o.mgz",
+    ]);
     add(&["seg1.mgz", "u2.mgz", "--keep-datatype", "--o", "o.mgz"]);
     // masks
-    for op in ["--sort", "--vote", "--vote-ex0", "--first-non-zero", "--cumsum", "--mean"] {
+    for op in [
+        "--sort",
+        "--vote",
+        "--vote-ex0",
+        "--first-non-zero",
+        "--cumsum",
+        "--mean",
+    ] {
         add(&["f4.mgz", op, "--mask", "k.mgz", "--o", "o.mgz"]);
         add(&["f4.mgz", op, "--mask", "k2.mgz", "--o", "o.mgz"]);
     }
@@ -632,7 +811,15 @@ fn prelude() -> Vec<String> {
     add(&["f4.mgz", "--sort", "--mask", "notvol.txt", "--o", "o.mgz"]);
     // --zconcat
     add(&["--zconcat", "zb.mgz", "zt.mgz", "1", "oz.mgz"]);
-    add(&["--zconcat", "zb.mgz", "zt.mgz", "0", "oz.nii.gz", "--o", "o.mgz"]);
+    add(&[
+        "--zconcat",
+        "zb.mgz",
+        "zt.mgz",
+        "0",
+        "oz.nii.gz",
+        "--o",
+        "o.mgz",
+    ]);
     add(&["a.mgz", "--zconcat", "zb.mgz", "zt.mgz", "3", "oz.mgz"]);
     add(&["--zconcat", "zb.mgz", "zt.mgz", "4", "oz.mgz"]);
     add(&["--zconcat", "zb.mgz", "zt.mgz", "-1", "oz.mgz"]);
@@ -644,7 +831,9 @@ fn prelude() -> Vec<String> {
     add(&["--zconcat", "zb.mgz", "zt.mgz", "2x", "oz.mgz"]);
     // --f
     add(&["--f", "list.txt", "--o", "o.mgz"]);
-    add(&["--F", "list.txt", "c.mgz", "--f", "list.txt", "--o", "o.mgz"]);
+    add(&[
+        "--F", "list.txt", "c.mgz", "--f", "list.txt", "--o", "o.mgz",
+    ]);
     add(&["--f", "list2.txt", "--o", "o.mgz"]);
     add(&["--f", "my list.txt", "--o", "o.mgz"]);
     add(&["--f", " list.txt", "--o", "o.mgz"]);
@@ -682,8 +871,18 @@ pub fn golden_cases() -> Vec<String> {
     let i = base_inputs();
     let mut out = Vec::new();
     for a in [
-        &["lh.wm.mgh", "lh.gm.mgh", "--paired-diff-norm", "--mul", "100", "--o", "o.mgh"][..],
-        &["seg1.mgz", "seg2.mgz", "--sum", "--ctab", "lut.txt", "--o", "o.mgz"],
+        &[
+            "lh.wm.mgh",
+            "lh.gm.mgh",
+            "--paired-diff-norm",
+            "--mul",
+            "100",
+            "--o",
+            "o.mgh",
+        ][..],
+        &[
+            "seg1.mgz", "seg2.mgz", "--sum", "--ctab", "lut.txt", "--o", "o.mgz",
+        ],
         &["a.mgz", "c.mgz", "d.nii.gz", "--o", "o.nii.gz"],
         &["f4.mgz", "--mean", "--o", "o.mgz"],
         &["f4.mgz", "--std", "--o", "o.mgz"],

@@ -2790,9 +2790,9 @@ defects! {
     FS_1196 = "FS-1196", "FreeSurfer", true,
         "mri_concat --f with an empty argument (or only white space) opens a name taken from memory contents; corrected: the empty name is opened (ERROR: opening , status 1)";
     FS_1197 = "FS-1197", "FreeSurfer", true,
-        "mri_concat --f with a list file name of 2,000 bytes or more that opens: the official build stops when the command line has been read (*** stack smashing detected ***: terminated, status 134); corrected: the whole name is used";
+        "mri_concat --f with a list file name of 2,009 bytes or more that opens (a name past its buffer of 2,000 bytes): the official build stops when the command line has been read (*** stack smashing detected ***: terminated, status 134); corrected: the whole name is used";
     FS_1198 = "FS-1198", "FreeSurfer", true,
-        "mri_concat --f lists that bring the inputs past 400,000 are stored past the program's tables (memory contents, a crash); corrected: ERROR: ninputs > 400000, status 1, as for the command line's inputs";
+        "mri_concat --f lists that bring the inputs past 400,000 are stored past the program's tables: it crashes (status 139); corrected: ERROR: ninputs > 400000, status 1, as for the command line's inputs";
     FS_1200 = "FS-1200", "FreeSurfer", true,
         "mri_concat --rms with an input whose header reads but whose voxels do not crashes (status 139) after the reader's messages; corrected: status 1";
     FS_1241 = "FS-1241", "FreeSurfer", true,

@@ -23,7 +23,7 @@
 //! opening <name>`, status 1, when it does not open. FreeSurfer keeps the words in a table of
 //! 400,000 slots of 2,000 bytes: FS-1194 (a word of 2,000 bytes or more runs into the next slots),
 //! FS-1195 (the argument's first word only), FS-1196 (an argument without a word), FS-1197 (a name
-//! of 2,000 bytes or more), FS-1198 (more than 400,000 inputs).
+//! of 2,009 bytes or more that opens), FS-1198 (more than 400,000 inputs).
 
 
 use larmorx_core::defects::{FS_1194, FS_1195, FS_1196, FS_1197, FS_1198, FS_1247};
@@ -49,6 +49,10 @@ use crate::mri_segstats::options::{scan_d, scan_lf};
 pub const NIN_MAX: usize = 400_000;
 /// The size of a list file's word slot (`flist[NInMAX][2000]`) and of `listfile[2000]`.
 pub const SLOT: usize = 2000;
+/// The length from which a list file name reaches the stack's guard past `listfile[2000]`
+/// (measured on the official build: 2,009 bytes and more abort, 2,000 to 2,008 do not;
+/// `validation/probes/fs-concat/long_names.sh`).
+pub const SMASHED: usize = 2009;
 
 /// The settings the options give (`mri_concat.cpp`'s globals).
 #[derive(Default)]
@@ -291,15 +295,6 @@ fn read_list(
             arg.to_owned()
         }
     };
-    if listfile.len() >= SLOT {
-        g.notices.add(
-            &FS_1197,
-            format!(
-                "mri_concat --f: a list file name of {} bytes used whole (FreeSurfer's buffer holds 1,999: the name passes it, and the official build stops when its parsing ends if the file opened)",
-                listfile.len()
-            ),
-        );
-    }
     let mut fp = match CFile::open(r.dir, &listfile, "r") {
         Ok(f) => f,
         Err(e) => {
@@ -308,9 +303,19 @@ fn read_list(
             return Err(Fatal::Exit(1));
         }
     };
-    if listfile.len() >= SLOT && g.notices.reproduce() {
-        // the overflow reached the stack's guard: the official build aborts at the parser's end
-        o.stack_smashed = true;
+    if listfile.len() >= SMASHED {
+        // the name ran past the buffer into the stack's guard: the official build aborts when
+        // the parser returns (measured: names of 2,000 to 2,008 bytes pass unnoticed)
+        g.notices.add(
+            &FS_1197,
+            format!(
+                "mri_concat --f: a list file name of {} bytes used whole (it passes FreeSurfer's buffer of 2,000 bytes: the official build aborts when the command line has been read)",
+                listfile.len()
+            ),
+        );
+        if g.notices.reproduce() {
+            o.stack_smashed = true;
+        }
     }
     loop {
         let mut sc = Scanf::new(&mut fp);
@@ -564,11 +569,21 @@ pub fn parse_commandline(
             if o.inputs.len() > NIN_MAX {
                 g.notices.add(
                     &FS_1198,
-                    format!(
-                        "mri_concat --f: {} inputs: ERROR: ninputs > 400000, status 1 (FreeSurfer's tables hold 400,000: it writes past them, memory contents)",
-                        o.inputs.len()
-                    ),
+                    if g.notices.reproduce() {
+                        format!(
+                            "mri_concat --f: {} inputs stored past FreeSurfer's tables of 400,000: it crashes (status 139)",
+                            o.inputs.len()
+                        )
+                    } else {
+                        format!(
+                            "mri_concat --f: {} inputs: ERROR: ninputs > 400000, status 1 (FreeSurfer stores them past its tables of 400,000 and crashes)",
+                            o.inputs.len()
+                        )
+                    },
                 );
+                if g.notices.reproduce() {
+                    return Err(Fatal::Exit(139));
+                }
                 let _ = writeln!(r.out, "ERROR: ninputs > {NIN_MAX}");
                 return Err(Fatal::Exit(1));
             }

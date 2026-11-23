@@ -394,7 +394,8 @@ def whole_path_texts(args: Sequence[str]) -> list[str]:
 #: entry re-keyed, run fresh: the same result). ``validation/tests/test_oracle_cache.py`` fails when a
 #: program registered in larmorx-freesurfer (its crates' ``PROGRAMS``) is missing here;
 #: ``fs_temp_file`` and ``getfullpath`` read no file but are listed, so the rule has no exception;
-#: ``mri_vol2vol`` from relay 53 of track A (no run of it was in the cache before).
+#: ``mri_vol2vol`` from relay 53 of track A, ``mri_concat`` from relay 55 (no run of either was in
+#: the cache before).
 EXTENSION_FROM_WHOLE_PATH = (
     "fs_temp_file",
     "fsunit",
@@ -403,6 +404,7 @@ EXTENSION_FROM_WHOLE_PATH = (
     "mri_add_xform_to_header",
     "mri_binarize",
     "mri_cc",
+    "mri_concat",
     "mri_convert",
     "mri_info",
     "mri_make_uchar",

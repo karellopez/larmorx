@@ -439,7 +439,9 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
             return Err(Fatal::Exit(1));
         };
         if o.debug {
-            matrix_print(g, None, r.out, r.err, Some(&m), 5);
+            let mut buf = Vec::new();
+            matrix_print(g, Some(&mut buf), &mut std::io::sink(), r.err, Some(&m), 5);
+            let _ = r.out.write_all(&buf);
         }
         o.m = Some(m);
     }

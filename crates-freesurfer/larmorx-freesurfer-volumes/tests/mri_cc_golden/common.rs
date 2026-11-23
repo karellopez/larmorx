@@ -31,7 +31,7 @@ pub const SUBJECTS: [&str; 5] = ["s", "n", "w", "x", "c"];
 /// The command lines: the white-matter path (`-a 0`; on 32^3 its seed search finds no column:
 /// FS-1210), with other divisions and thickness, with NaNs kept ([`case_env`]); without `mri/wm` (FS-1205: a crash, an
 /// error by default) and without the transform; more than 50 divisions (FS-1211: a crash); the
-/// aseg path (`-aseg`), on an aseg that holds the callosum already (status 77), with `-lh` (the
+/// aseg path (`-aseg`; its rotation search within 1 degree, `-m 1`, for the test's time), on an aseg that holds the callosum already (status 77), with `-lh` (the
 /// aseg copied); a name of 1,024 bytes (FS-1212: an abort); no subjects folder;
 /// a norm that does not read.
 pub fn cases() -> Vec<Vec<String>> {
@@ -43,7 +43,7 @@ pub fn cases() -> Vec<Vec<String>> {
         &["-sdir", ".", "-a", "0", "w"],
         &["-sdir", ".", "-a", "0", "x"],
         &["-sdir", ".", "-d", "51", "s"],
-        &["-sdir", ".", "-aseg", "aseg.mgz", "-o", "out.mgz", "s"],
+        &["-sdir", ".", "-aseg", "aseg.mgz", "-o", "out.mgz", "-m", "1", "s"],
         &["-sdir", ".", "-aseg", "aseg.mgz", "-o", "out.mgz", "c"],
         &[
             "-sdir", ".", "-aseg", "aseg.mgz", "-o", "out.mgz", "-lh", "s",

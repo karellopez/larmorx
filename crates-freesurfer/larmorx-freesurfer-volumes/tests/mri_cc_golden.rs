@@ -16,11 +16,11 @@ use sha2::{Digest, Sha256};
 
 /// Recorded 2026-11-23 by `prog.py --golden` from the official program on Linux x64 (the port's
 /// `reproduce` gave the same): twelve cases.
-const OFFICIAL_SHA256: &str = "0e2b4dc412a3490eb3db28399000846b652119720de56e3d02f15e7085b73776";
+const OFFICIAL_SHA256: &str = "93da69667ef481b6687d4fc483aea5a6998497ae47c0f297f470fcd165e03993";
 /// The port's default on Linux x64 (`cases_digest(Fix)`): the seed's voxel where the seed search
 /// fails (FS-1210), errors where FreeSurfer crashes or aborts (FS-1205, FS-1211, FS-1212), no NUL
 /// byte in the error lines (FS-01).
-const FIX_SHA256: &str = "20551191e9771ab307b4301454ca3f5bb9572d7ffd0c493c0a75e0ccb7226bab";
+const FIX_SHA256: &str = "c817c0e13c00a567625bbea9e7d087d604958a26242b2d0b629a949349c34412";
 
 fn cases_digest(mode: UpstreamDefects) -> String {
     let dir = tempfile::tempdir().expect("a folder");

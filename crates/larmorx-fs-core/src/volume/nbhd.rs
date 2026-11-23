@@ -294,7 +294,7 @@ impl Process {
 
     /// The byte at element `x` of row `y` of slice `z` read directly as a byte whatever the
     /// volume's type (§35).
-    fn row_byte(&mut self, m: &Mri, (x, y, z): (i32, i32, i32), name: &str) -> u8 {
+    pub(crate) fn row_byte(&mut self, m: &Mri, (x, y, z): (i32, i32, i32), name: &str) -> u8 {
         let place = self.row_place(m, i64::from(x), i64::from(y), i64::from(z), 0, 1);
         self.direct_read8(m, place, 1, name)[0]
     }

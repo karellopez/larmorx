@@ -13,7 +13,8 @@
 //! `pvlabel`), random and constant volumes, frames, orders, fractions and difference lists (§38,
 //! `seqops`) and voxelwise operations (§39, `voxelwise`); and of §54's parts ready for the clean
 //! room, the inverses' fill and the changes between the voxel, RAS-to-RAS and physical-voxel
-//! types (`ltaops`).
+//! types (`ltaops`); part 10a, the Talairach helpers (§46, `talairach`) and dilation and the
+//! segment helpers (§48, `dilate`).
 //!
 //! Functions that take a destination (§6) take a [`Dst`]: none (the function makes one), the
 //! first source itself, the second source itself, or the caller's volume; they return a
@@ -25,6 +26,7 @@ pub mod aseg;
 pub mod cma;
 pub mod crops;
 pub mod deriv;
+pub mod dilate;
 pub mod extract;
 pub mod frames;
 pub mod geomblock;
@@ -47,6 +49,7 @@ pub mod segs;
 pub mod seqops;
 pub mod skull;
 pub mod stats;
+pub mod talairach;
 pub mod v2v;
 pub mod vgcopy;
 pub mod voxelwise;

@@ -243,20 +243,20 @@ impl Process {
 
     /// `MRIvol2VolTLKernel(src, targ, M)` (§41): the eight trilinear weights of each target
     /// voxel's source point (inside the source) into its frames 0 to 7; an 8-frame work volume
-    /// made and discarded; returns none (always).
+    /// made first (its allocation's messages before `M`'s) and discarded; returns none (always).
     pub fn mri_vol2vol_tl_kernel(
         &mut self,
         src: &Mri,
         targ: &mut Mri,
         m: Option<&Matrix>,
     ) -> Result<Option<Mri>, Stop> {
+        let ext = (targ.geom.width, targ.geom.height, targ.geom.depth);
+        let work = self.alloc_with_header(targ, ext, types::FLOAT, 8)?;
+        drop(work);
         let v2v = match m {
             Some(m) => Some(m.clone()),
             None => self.v2v_default(src, targ)?,
         };
-        let ext = (targ.geom.width, targ.geom.height, targ.geom.depth);
-        let work = self.alloc_with_header(targ, ext, types::FLOAT, 8)?;
-        drop(work);
         let Some(v2v) = v2v else {
             return Ok(None);
         };
@@ -472,9 +472,10 @@ impl Process {
     ) -> Result<i32, Stop> {
         let v2v = match reg {
             Some(r) => {
+                // In order: Tmov, its inverse, Ttarg, then the two products (§56).
                 let tmov = self.vox2ras_tkreg(&mov.geom)?;
-                let ttarg = self.vox2ras_tkreg(&targ.geom)?;
                 let inv = returned(self.matrix_inverse(Some(&tmov), None)?);
+                let ttarg = self.vox2ras_tkreg(&targ.geom)?;
                 let a = returned(self.matrix_multiply(inv.as_ref(), Some(r), None)?);
                 let m = returned(self.matrix_multiply(a.as_ref(), Some(&ttarg), None)?);
                 if m.is_none() {
@@ -584,13 +585,14 @@ impl Process {
             None => self.region_get_bounding_box(src, npad)?,
         };
         if self.gdiag_no > 0 {
-            let n = src
-                .geom
-                .width
-                .wrapping_mul(src.geom.height)
-                .wrapping_mul(src.geom.depth);
+            // The source's extent multiplied in single precision (each product rounded to
+            // `float`), over the box's sizes multiplied as wrapping 32-bit integers.
+            let n = sse::mul32(
+                sse::mul32(src.geom.width as f32, src.geom.height as f32),
+                src.geom.depth as f32,
+            );
             let k = b.dx.wrapping_mul(b.dy).wrapping_mul(b.dz);
-            let ratio = sse::div32(n as f32, k as f32);
+            let ratio = sse::div32(n, k as f32);
             let mut line = b" mask-and-upsample bounding box ".to_vec();
             line.extend_from_slice(&sprintf_f64(b"%g", sse::widen(ratio)));
             line.push(b' ');

@@ -239,7 +239,9 @@ here); `include/macros.h`'s `MAX`; the official build's operand orders from the 
 - `src/rotmat.rs` (3.1-40; relay 34): `utils/transform.cpp` `MRIangles2RotMat` (4591-4652), `LTAmat2RotMat`
   (4956-4977), `RMSregDiffMJ` (4989-5024), `TranformAffineParams2Matrix` (5228-5289), `TranformExtractAffineParams`
   (5298-5361; the official object code's `atan2f` for its two `float`-argument angles). Changes: FS-504 (error).
-- `src/voxlist.rs` (3.1-40; relay 34): `utils/voxlist.cpp` `VLSTcreate` (98-169), `compare_sort` (176-215), `VLSTsort`
+- `src/voxlist.rs` (3.1-40; relay 34; `VLSTcreateInRegion` (29-96) added by track D's relay 53 for `mri_cc`,
+  3.2-27, its count frame 0's alone and its `MRIneighbors` given the frame as the value, as FreeSurfer):
+  `utils/voxlist.cpp` `VLSTcreate` (98-169), `compare_sort` (176-215), `VLSTsort`
   (217-252), `VLSTfree` (254-276), `VLSTcomputeStats` (419-446), `VLSTalloc` (588-608), `VLSTcopy` (610-647),
   `VLSTcopyInto` (649-686), `VLSTaddUnique` (688-693), `VLSTaddWithValue` (695-707), `VLSTadd` (709-721), `VLSTinList`
   (723-730); `include/voxlist.h` `VOXEL_LIST` (32-56). Changes: FS-888, FS-891 (rule A), FS-889, FS-890 (errors);

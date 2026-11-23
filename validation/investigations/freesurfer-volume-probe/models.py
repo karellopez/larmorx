@@ -41,6 +41,21 @@ nothing else).
         ``reproduce`` products, with the geometries' matrices taken from the probe's ``vgi2r`` and
         ``vgr2i`` (the arrays: seeded, valid geometries, general 4 x 4 matrices).
 
+    python -P models.py region --probe P --scratch DIR [--candidate C]
+        every ``rgbb`` line of the groups vregion, vrules17 and vrules18 against §43's statements:
+        the mask's extremes (frame 0, magnitudes not below 1e-5, a NaN counted), FreeSurfer's box
+        and REGIONgetBoundingBoxEqOdd's steps and lines; the probe must print FreeSurfer's box. With
+        ``--candidate``, the candidate's lines too: with ``reproduce`` FreeSurfer's box, with ``fix``
+        the box FS-269's decision gives (one more voxel on each axis where FreeSurfer's box ends
+        before the mask's last voxel), notices taken out of standard error.
+
+    python -P models.py cov --probe P --scratch DIR [--candidate C]
+        every ``cov`` line of the groups vcov and vrules19 whose types it decodes and whose mask has
+        the volume's extent against §42's MRIcovarianceMatrix (the sums of ``v2 v1`` in ``double``
+        over the voxels in order, divided by the count, as ``float``; a NaN's payload is left out);
+        with ``--candidate``, the candidate's lines with ``reproduce`` (FreeSurfer's count) and
+        ``fix`` (FS-483's decided count: the voxels the sums take).
+
 The probe runs through the oracle-output cache (one thread, the family ``freesurfer``) when the
 validation package is importable (``PYTHONPATH=validation/src``), else directly. Exit status 1 when a
 line differs from its model.
@@ -50,6 +65,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import math
 import struct
 import sys
 from collections import Counter
@@ -1109,21 +1125,359 @@ def ltatypes(runner, scratch: Path) -> int:
     return 1 if bad else 0
 
 
+def i32(x: int) -> int:
+    """x as a 32-bit two's-complement integer (C's int arithmetic on x86-64)."""
+    return (x + 2**31) % 2**32 - 2**31
+
+
+def region_values(w_s: str) -> tuple[tuple[int, int, int], list[float]]:
+    """The extent and frame 0's values of a W with an ``i`` fill (README.md, "Encodings")."""
+    p = w_s.split()
+    w, h, d, t, _f, hdr = (int(x) for x in p[:6])
+    assert hdr == 0 and p[6].startswith("i"), w_s[:60]
+    words = [int(x) for x in p[6][1:].split(",")]
+    n = w * h * d
+    if t == 3:
+        raw = struct.pack(f"<{n}I", *(words[i % len(words)] for i in range(n)))
+        vals = [float(v) for v in struct.unpack(f"<{n}f", raw)]
+    elif t == 1:
+        vals = [float(i32(words[i % len(words)])) for i in range(n)]
+    elif t == 0:
+        nb = (n + 3) // 4
+        raw = struct.pack(f"<{nb}I", *(words[i % len(words)] for i in range(nb)))
+        vals = [float(b) for b in raw[:n]]
+    else:
+        raise ValueError(f"type {t} is outside the model")
+    return (w, h, d), vals
+
+
+def region_extremes(dims, vals) -> tuple[list[int], list[int]]:
+    """§43: the extremes of the voxels whose magnitude is not below 1e-5 (a NaN counts), from
+    1000000 and 0."""
+    lo, hi = [1000000] * 3, [0] * 3
+    w, h, d = dims
+    for z in range(d):
+        for y in range(h):
+            for x in range(w):
+                v = vals[x + w * (y + h * z)]
+                if abs(v) < 1e-5:
+                    continue
+                for a, c in enumerate((x, y, z)):
+                    lo[a] = min(lo[a], c)
+                    hi[a] = max(hi[a], c)
+    return lo, hi
+
+
+def region_box(dims, lo, hi, pads: list[int], decided: bool) -> list[int]:
+    """§43's box (pads before and after each axis): FreeSurfer's, or FS-269's decided one."""
+    start = [max(i32(lo[a] - pads[2 * a]), 0) for a in range(3)]
+
+    def size(a: int, one: int) -> int:
+        return min(
+            i32(hi[a] - lo[a] + one + pads[2 * a] + pads[2 * a + 1]), i32(dims[a] - start[a])
+        )
+
+    out = [size(a, 0) for a in range(3)]
+    if decided and lo[0] <= hi[0]:
+        out = [size(a, 1) if start[a] + out[a] - 1 < hi[a] else out[a] for a in range(3)]
+    return start + out
+
+
+def region_eqodd(dims, box: list[int]) -> tuple[str, str]:
+    """§43's REGIONgetBoundingBoxEqOdd from a box: (the result, standard output)."""
+    w, h, d = dims
+    x, y, z, dx, dy, dz = box
+
+    def show(b):
+        return f"{b[0]} {b[1]} {b[2]}  {b[3]} {b[4]} {b[5]}\n"
+
+    so = f"Volume size: {w} {h} {d}, OrigRegion: " + show(box)
+    if dx > h:
+        return "null", so + "ERROR: REGIONgetBoundingBoxEqOdd(): dx is bigger than MRI height\n"
+    if dy > w:
+        return "null", so + "ERROR: REGIONgetBoundingBoxEqOdd(): dy is bigger than MRI width\n"
+    isodd = math.fmod(dz, 2) != 0
+
+    def res(*b):
+        return " ".join(map(str, b))
+
+    if dx == dy and isodd:
+        return res(x, y, z, dx, dy, dz), so
+    if not isodd:
+        if dz < d:
+            dz += 1
+        elif z > 0:
+            z, dz = z - 1, dz + 1
+        else:
+            return "null", so + (
+                f"ERROR: REGIONgetBoundingBoxEqOdd(): cannot make z odd: z={z}, dz={dz}, nz={d}\n"
+            )
+    if dx == dy:
+        return res(x, y, z, dx, dy, dz), so
+    dxy = max(dx, dy)
+    if x + dxy <= w and y + dxy <= h:
+        return res(x, y, z, dxy, dxy, dz), so
+    delta = abs(dx - dy)
+    d1 = delta // 2
+    d2 = delta - d1
+    if dx < dy:
+        if x - d1 > 0 and x + dx + d2 <= w:
+            return res(x - d1, y, z, dx + delta, dy, dz), so
+        if x < w - (x + dx):
+            x, dx = 0, dy
+        else:
+            dx = dy
+            x = w - dx
+        b = [x, y, z, dx, dy, dz]
+        return res(*b), so + f"Volume size: {w} {h} {d}, xAsymRegion: " + show(b)
+    if y - d1 > 0 and y + dy + d2 <= h:
+        return res(x, y - d1, z, dx, dy + delta, dz), so
+    if y < h - (y + dy):
+        y, dy = 0, dx
+    else:
+        dy = dx
+        y = h - dy
+    b = [x, y, z, dx, dy, dz]
+    return res(*b), so + f"Volume size: {w} {h} {d}, yAsymRegion: " + show(b)
+
+
+def region_model(line: str, seen: set[str], decided: bool) -> tuple[str, str]:
+    """An ``rgbb`` line's result and standard output by §43 (FreeSurfer's box, or the decided)."""
+    rest = line.partition(" ")[2]
+    w_s = max((s for s in seen if rest.startswith(s + " ")), key=len)
+    tail = rest[len(w_s) + 1 :].split()
+    assert tail[0] == "0", line[:80]  # no paint
+    kind = int(tail[1])
+    pads = [int(v) for v in tail[2:8]] if kind == 1 else [int(tail[2])] * 6
+    dims, vals = region_values(w_s)
+    lo, hi = region_extremes(dims, vals)
+    box = region_box(dims, lo, hi, pads, decided)
+    if kind == 2:
+        return region_eqodd(dims, box)
+    return " ".join(map(str, box)), ""
+
+
+def region(runner, scratch: Path, candidate: Path | None = None) -> int:
+    gen = C.Gen16(7)
+    seen: set[str] = set()
+    orig = C.Gen13.lab
+
+    def lab(geo, vals, t=1, nf=1, ct="null"):
+        s = orig(geo, vals, t=t, nf=nf, ct=ct)
+        seen.add(s)
+        return s
+
+    gen.lab = lab
+    tally: Counter[str] = Counter()
+    bad = 0
+    for group in ("vregion", "vrules17", "vrules18"):
+        lines = [ln for b in getattr(gen, group)() for ln in b.lines if ln.startswith("rgbb ")]
+        b = C.Batch(group, f"region-{group}", lines)
+        path = C.write_batch(scratch, b)
+        plain, memory = runner.probe_runs(b, path)
+        runs = {"probe": plain}
+        if candidate is not None:
+            for mode in ("reproduce", "fix"):
+                runs[mode] = runner.candidate_run(candidate, b, path, mode)
+        for i, line in enumerate(lines):
+            fs = region_model(line, seen, decided=False)
+            dec = region_model(line, seen, decided=True)
+            tally[f"{group}: lines"] += 1
+            tally[f"{group}: the decided box differs"] += fs != dec
+            for who, out in runs.items():
+                want = dec if who == "fix" else fs
+                if memory[i] and who == "probe":
+                    tally[f"{group}: memory"] += 1
+                    continue
+                res, so, se = C.decode(out[i]) if i < len(out) else (b"<missing>", b"", b"")
+                se = C.NOTICE.sub(b"", se)
+                got = (res.decode("latin-1"), so.decode("latin-1"))
+                if got == want and not se:
+                    tally[f"{group}: {who} as the model"] += 1
+                else:
+                    bad += 1
+                    if bad <= 5:
+                        print(f"DIFFERS ({who}): {group} line {i + 1}: {line[:90]}")
+                        print(f"    got   {got!r} {se[:80]!r}\n    model {want!r}")
+    for k, v in sorted(tally.items()):
+        print(f"region: {k}: {v}")
+    print(f"region: differ from the model: {bad}")
+    return 1 if bad else 0
+
+
+#: struct formats of a voxel of the types the covariance model reads
+VOXFMT = {0: "B", 1: "i", 2: "q", 3: "f", 4: "h", 10: "H"}
+
+
+def vol_values(w_s: str) -> tuple[tuple[int, int, int, int], list[float]] | None:
+    """The extent, frame count and every voxel's ``MRIgetVoxVal`` (frame-major: index ((f depth
+    + s) height + r) width + c) of a W with an ``i`` fill; None for a type outside the model."""
+    p = w_s.split()
+    w, h, d, t, f, hdr = (int(x) for x in p[:6])
+    if hdr or t not in VOXFMT or not p[6].startswith("i"):
+        return None
+    words = [int(x) for x in p[6][1:].split(",")]
+    n = w * h * d * f
+    size = struct.calcsize(VOXFMT[t])
+    # the probe fills whole words only: bytes past the last whole word stay as allocated (0)
+    nw = (n * size) // 4
+    raw = struct.pack(f"<{nw}I", *(words[i % len(words)] for i in range(nw)))
+    raw += bytes(n * size - len(raw))
+    vals = list(struct.unpack(f"<{n}{VOXFMT[t]}", raw)) if n else []
+    # MRIgetVoxVal: the value as a float (ints and longs rounded to float)
+    vals = [float(np.float32(v)) for v in vals]
+    return (w, h, d, f), vals
+
+
+def cov_model(line: str, seen: set[str], decided: bool) -> tuple[str, str] | None:
+    """A ``cov`` line's result and standard output by §42 (FreeSurfer's count or FS-483's
+    decided one); None when the line is outside the model (a type it does not decode, a mask of
+    another extent)."""
+    rest = line.partition(" ")[2]
+    w_s = max((s for s in seen if rest.startswith(s + " ")), key=len)
+    tail = rest[len(w_s) + 1 :]
+    assert tail.startswith("0 "), line[:80]
+    tail = tail[2:]
+    vv = vol_values(w_s)
+    if vv is None:
+        return None
+    (w, h, d, nf), vals = vv
+    mask = None
+    if tail != "null":
+        m_s = max((s for s in seen if tail.startswith(s + " ")), key=len)
+        mv = vol_values(m_s)
+        if mv is None or mv[0][:3] != (w, h, d):
+            return None
+        mask = mv[1]
+    order = [(c, r, s) for c in range(w) for r in range(h) for s in range(d)]
+
+    def mval(c: int, r: int, s: int) -> float:
+        return mask[(s * h + r) * w + c]
+
+    if mask is None:
+        count = w * h * d
+        use = order
+    else:
+        use = [v for v in order if not mval(*v) < 0.5]
+        count = len(use) if decided else sum(1 for v in order if mval(*v) > 0.5)
+        if count == 0:
+            so = (
+                ""
+                if nf
+                else "MRI::Shape::Shape(): volume size must be greater than 0 in every dimension\n"
+            )
+            return "null", so + "ERROR: no voxels in mask\n"
+    out = [[0.0] * nf for _ in range(nf)]
+    for f1 in range(nf):
+        for f2 in range(f1, nf):
+            acc = 0.0
+            for c, r, s in use:
+                v1 = vals[((f1 * d + s) * h + r) * w + c]
+                v2 = vals[((f2 * d + s) * h + r) * w + c]
+                acc = v2 * v1 + acc
+            with np.errstate(over="ignore"):  # beyond the float range: an infinity, as x86 rounds
+                e = float(np.float32(acc / count))
+            out[f1][f2] = out[f2][f1] = e
+    cells = [struct.pack(">f", x).hex() for row in out for x in row]
+    # a volume without frames: its allocation (the probe's, before the call) prints fs.mri §4's line
+    so = (
+        "" if nf else "MRI::Shape::Shape(): volume size must be greater than 0 in every dimension\n"
+    )
+    return " ".join([str(nf), str(nf), *cells]), so
+
+
+def cov(runner, scratch: Path, candidate: Path | None = None) -> int:
+    gen = C.Gen16(7)
+    seen: set[str] = set()
+    orig = C.Gen13.lab
+
+    def lab(geo, vals, t=1, nf=1, ct="null"):
+        s = orig(geo, vals, t=t, nf=nf, ct=ct)
+        seen.add(s)
+        return s
+
+    gen.lab = lab
+    tally: Counter[str] = Counter()
+    bad = 0
+    for group in ("vcov", "vrules19"):
+        lines = [ln for b in getattr(gen, group)() for ln in b.lines if ln.startswith("cov ")]
+        b = C.Batch(group, f"cov-{group}", lines)
+        path = C.write_batch(scratch, b)
+        plain, memory = runner.probe_runs(b, path)
+        runs = {"probe": plain}
+        if candidate is not None:
+            for mode in ("reproduce", "fix"):
+                runs[mode] = runner.candidate_run(candidate, b, path, mode)
+        for i, line in enumerate(lines):
+            fs = cov_model(line, seen, decided=False)
+            if fs is None:
+                tally[f"{group}: outside the model (a mask of another extent)"] += 1
+                continue
+            dec = cov_model(line, seen, decided=True)
+            tally[f"{group}: lines"] += 1
+            tally[f"{group}: FS-483's count changes the result"] += fs != dec
+            for who, out in runs.items():
+                want = dec if who == "fix" else fs
+                if memory[i] and who == "probe":
+                    tally[f"{group}: memory"] += 1
+                    continue
+                res, so, se = C.decode(out[i]) if i < len(out) else (b"<missing>", b"", b"")
+                se = C.NOTICE.sub(b"", se)
+                got = (res.decode("latin-1"), so.decode("latin-1"))
+                if got == want and not se:
+                    tally[f"{group}: {who} as the model"] += 1
+                    continue
+                # a NaN's payload is outside the model: the same places NaN, the rest equal
+                g, m = got[0].split(), want[0].split()
+                if len(g) == len(m) and got[1] == want[1] and not se:
+                    pairs = list(zip(g[2:], m[2:], strict=True))
+
+                    def nan(x: str) -> bool:
+                        return (int(x, 16) & 0x7F800000) == 0x7F800000 and int(x, 16) & 0x7FFFFF
+
+                    if g[:2] == m[:2] and all(a == z or (nan(a) and nan(z)) for a, z in pairs):
+                        tally[f"{group}: {who} as the model but a NaN's payload"] += 1
+                        continue
+                bad += 1
+                if bad <= 5 or who == "probe":
+                    print(f"DIFFERS ({who}): {group} line {i + 1}: {line[:90]}")
+                    print(f"    got   {got!r}\n    model {want!r}")
+    for k, v in sorted(tally.items()):
+        print(f"cov: {k}: {v}")
+    print(f"cov: differ from the model: {bad}")
+    return 1 if bad else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     ap.add_argument(
         "command",
-        choices=["fs291", "skull", "cma", "view", "smooth", "nearest", "physvox", "ltatypes"],
+        choices=[
+            "fs291",
+            "skull",
+            "cma",
+            "view",
+            "smooth",
+            "nearest",
+            "physvox",
+            "ltatypes",
+            "region",
+            "cov",
+        ],
     )
     ap.add_argument("--probe", type=Path, required=True)
     ap.add_argument("--scratch", type=Path, required=True)
+    ap.add_argument("--candidate", type=Path, help="region, cov: also check this candidate's lines")
     ap.add_argument("--no-cache", action="store_true")
     a = ap.parse_args()
     scratch = a.scratch.resolve()
     scratch.mkdir(parents=True, exist_ok=True)
     runner = C.Runner(a.probe.resolve(), scratch, not a.no_cache)
+    if a.command in ("region", "cov"):
+        fn = region if a.command == "region" else cov
+        return fn(runner, scratch, a.candidate.resolve() if a.candidate else None)
     return {
         "fs291": fs291,
         "skull": skull,

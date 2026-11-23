@@ -2996,7 +2996,7 @@ defects! {
     FS_496 = "FS-496", "FreeSurfer", true,
         "the percentile threshold of a volume (MRIpercentThresh) for a percentage that rounds past the list's allocation, below 0, or NaN reads memory it does not own";
     FS_497 = "FS-497", "FreeSurfer", true,
-        "the dilation of a segmentation until it stops changing (MRIdilateSegmentation with -1) never ends when a step's new labels do not reach the next step's copy (a complex volume, whose copy FreeSurfer makes of half of each row): the same changes are counted forever";
+        "the dilation of a segmentation until it stops changing (MRIdilateSegmentation with -1) never ends when a step's new labels do not reach the next step's copy (a complex volume, of whose rows FreeSurfer's copy holds only the first width bytes, an eighth of a float complex row): the same changes are counted forever";
     FS_498 = "FS-498", "FreeSurfer", true,
         "the histograms of a whole volume (MRIhistogram), of a region of bytes and of a label in a region (MRIhistogramLabelRegion) count a voxel whose bin falls outside the histogram (a NaN voxel or bin size, a rounding past the last bin) in memory they do not own, or crash";
     FS_499 = "FS-499", "FreeSurfer", true,

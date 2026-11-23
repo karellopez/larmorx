@@ -5155,6 +5155,686 @@ class Gen17(Gen16):
         return [Batch("vrules20", "vrules20", L)]
 
 
+class Gen18(Gen17):
+    """Relay 19: the fixed cases of the clean room's items 107 to 111 (§46, §48)."""
+
+    @staticmethod
+    def tarr_inner(ty: int, inner: int, ga, gb, m: str) -> str:
+        """An array of one transform of the array type ``ty`` whose transform has its own type
+        ``inner``, from ga to gb (valid), its inverse transform the identity."""
+        ident = "4 4 " + " ".join(f32(1.0 if i % 5 == 0 else 0.0) for i in range(16))
+
+        def lt(mm: str, a: str, b: str, t: int) -> str:
+            return " ".join([f32(0.0)] * 3 + [f32(1.0), mm, Z44, Z44, str(t), "0", a, b])
+
+        fw = lt(m, Gen12.g_of(ga), Gen12.g_of(gb), inner)
+        inv = lt(ident, Gen12.g_of(gb), Gen12.g_of(ga), inner)
+        return f"1 {ty} {f32(1.0)} {xs('')} {fw} {inv}"
+
+    @staticmethod
+    def with_cache(w: str, cache: int) -> str:
+        """A W of ``lab``'s form with its cache flag changed (0: the allocation's, 2: none)."""
+        t = w.split(" ")
+        t[-3] = str(cache)
+        return " ".join(t)
+
+    def vrules21(self) -> list[Batch]:
+        """Fixed cases (relay 19) of the clean room's items: 107 (§46, the array's type is checked,
+        never the transform's), 108 (§46, the matrices computed from the geometry, never the
+        cached ones: a volume whose cache is its allocation's, and one with none), 109 (§48,
+        MRIsegStats: a NaN after the first value), 110 (§48, MRIdilate's neighbours past a face
+        with an outside value that is not 0: `dilo`), 111 (§48, MRIdilate on longs, which the
+        nearest sampler refuses: its error per sample)."""
+        L = []
+        ga = self.plain((3, 3, 2), c=(1.0, -2.0, 3.0))
+        gb = self.plain((4, 4, 4), c=(5.0, 6.0, 7.0))
+        v = self.lab(ga, [float(i) for i in range(18)], t=3)
+        m = "4 4 " + " ".join(f32(x) for x in (1, 0, 0, 2, 0, 1, 0, -3, 0, 0, 1, 4, 0, 0, 0, 1))
+        # item 107: arrays of type 1 and 0 whose transform is of type 1 and 0
+        for ty, inner in ((1, 1), (0, 1), (2, 1), (1, 2)):
+            a = self.tarr_inner(ty, inner, ga, gb, m)
+            L.append(f"talcras {v} 0 {a}")
+            L.append(f"talmat 0 {v} 0 {a}")
+        # item 108: the source or destination's cache stale (as allocated) or absent
+        a1 = self.tarr_inner(1, 0, ga, gb, m)
+        pts = "2 " + " ".join(f64(x) for x in (1.0, 2.0, 0.5, -1.0, 0.0, 3.0))
+        for cache in (1, 0, 2):
+            vc = self.with_cache(v, cache)
+            for k in range(4):
+                L.append(f"talmat {k} {vc} 0 {a1}")
+                L.append(f"talmat {k} {vc} 0 null")
+                L.append(f"talpt {k} {vc} 0 {a1} {pts}")
+        # item 109: MRIsegStats with a NaN after the first value (label 1: 1.0, 1.0, NaN)
+        sg = self.lab(self.plain((3, 2, 2)), [1, 2, 3, 2, 2, 0, 1, 1, 3, 5, 2, 2], t=1)
+        nvol = self.lab(self.plain((3, 2, 2)), [1.0, QNAN, 2.0, QNAN, 4.0, 5.0] * 2, t=3)
+        L.append(f"sstat {sg} 0 {nvol} 0 1 0")
+        L.append(f"sstat {sg} 0 {nvol} 0 3 0")
+        L.append(f"sstat {sg} 0 {nvol} 0 5 0")  # one voxel, NaN
+        L.append(f"sstat {sg} 0 {nvol} 0 0 0")  # one voxel, 5
+        # item 110: an outside value that is not 0 (dilo: MRIdilate with the source's outside value)
+        dv = [0.0] * 12
+        dv[4] = 2.0  # column 1, row 1, slice 0 of 3 x 2 x 2
+        for t in (3, 1, 4, 0):
+            src = self.lab(self.plain((3, 2, 2)), dv if t == 3 else [int(x) for x in dv], t=t)
+            for od in (5.0, 0.0, -1.0, float("nan")):
+                L.append(f"dilo {src} 0 {f64(od)} new")
+        z = self.lab(self.plain((3, 2, 2)), [0.0] * 12, t=3)
+        L.append(f"dilo {z} 0 {f64(5.0)} new")
+        L.append(f"dilo {self.lab(self.plain((1, 1, 1)), [0.0], t=3)} 0 {f64(5.0)} new")
+        # item 111: longs (the nearest sampler refuses them: its error per sample, the sample 0)
+        for d, nf in (((1, 1, 1), 1), ((1, 1, 1), 2), ((2, 1, 1), 2), ((1, 2, 1), 1)):
+            n = d[0] * d[1] * d[2] * nf * 2
+            lv = self.lab(self.plain(d), [3] + [0] * (n - 1), t=2, nf=nf)
+            L.append(f"dilate {lv} 0 new")
+        lv = self.lab(self.plain((1, 1, 1)), [3, 0], t=2)
+        L.append(f"dilate {lv} 0 self")
+        return [Batch("vrules21", "vrules21", L)]
+
+    # -- part 10b (relay 19): conforming (§49), set operations, morphology, masks, counts (§50) ---
+
+    @classmethod
+    def pk(cls, geo, vals, t: int = 1, nf: int = 1, ct: str = "null") -> str:
+        """``lab`` with the values packed by the type: shorts two to a 32-bit word, longs as two
+        words (the low one first), the others as ``lab`` takes them."""
+        if t == 4:
+            v = [int(x) & 0xFFFF for x in vals]
+            if len(v) % 2:
+                v.append(0)
+            vals = [v[i] | v[i + 1] << 16 for i in range(0, len(v), 2)]
+        elif t == 2:
+            w = []
+            for x in vals:
+                x = int(x) & 0xFFFFFFFFFFFFFFFF
+                w += [x & 0xFFFFFFFF, x >> 32]
+            vals = w
+        return cls.lab(geo, vals, t=t, nf=nf, ct=ct)
+
+    def lvals(self, r: random.Random, n: int, t: int, labels=(1, 2, 3), pz: float = 0.5) -> list:
+        """n label values of the type: zeros with probability pz, else from the labels (floats
+        also halves, a negative and NaN; bytes their low byte)."""
+        out = []
+        for _ in range(n):
+            if r.random() < pz:
+                out.append(0.0 if t == 3 else 0)
+            elif t == 3:
+                k = r.random()
+                out.append(
+                    QNAN
+                    if k < 0.05
+                    else r.choice([0.5, 2.5, -1.0, 0.25])
+                    if k < 0.2
+                    else float(r.choice(labels))
+                )
+            else:
+                out.append(int(r.choice(labels)) & (0xFF if t == 0 else 0xFFFFFFFF))
+        return out
+
+    def svol(self, r: random.Random, d, t: int, nf: int = 1, geo=None, **kw) -> str:
+        """A label volume of the extent, type and frames (its geometry given or drawn)."""
+        n = d[0] * d[1] * d[2] * nf
+        return self.pk(geo or self.rgeo(r, d), self.lvals(r, n, t, **kw), t=t, nf=nf)
+
+    def dst10(self, r: random.Random, d, t: int, nf: int = 1, other: bool = False) -> str:
+        """D: new, self, other (when there is a second volume), or a volume of the same extent (any
+        type), rarely of another extent."""
+        k = r.random()
+        if k < 0.4:
+            return "new"
+        if k < 0.55:
+            return "self"
+        if other and k < 0.62:
+            return "other"
+        dd = d if r.random() < 0.92 else (d[0] + 1, d[1], max(d[2] - 1, 1))
+        return self.svol(r, dd, r.choice([0, t, 3, 1]), nf=nf, pz=1.0)
+
+    @staticmethod
+    def ras_bad(w: str) -> str:
+        """A W of ``lab``'s form with its ras_good_flag 0."""
+        t = w.split(" ")
+        t[10] = "0"
+        return " ".join(t)
+
+    def cgeo(self, r: random.Random, d):
+        """A geometry for conforming: axis-aligned of any order and signs, oblique, near the
+        conformed grid's, or with special sizes and cosines."""
+        k = r.random()
+        if k < 0.45:
+            return self.rplain(r, d)
+        if k < 0.7:
+            f = self.gfields(r, 0.0, shear=0.0)
+            f[3] = "1"
+            return d, f
+        if k < 0.85:
+            # the conformed grid's cosines with a slight rotation
+            e = r.uniform(-0.05, 0.05)
+            cos = [-1.0, e, 0.0, 0.0, 0.0, -1.0, e, 1.0, 0.0]
+            f = [f32(1.0)] * 3 + ["1"] + [f32(x) for x in cos]
+            f += [self.fv(r) for _ in range(3)] + [f32(0.0)] * 3
+            return d, f
+        f = self.gfields(r, 0.5, shear=0.0)
+        f[3] = "1"
+        return d, f
+
+    def vconf(self) -> list[Batch]:
+        """§49: MRIgetConformMatrix and MRIconformedTemplate (widths 0 to 256, sizes 0.5 to 2,
+        0, NaN, 1e10, with and without KeepDC) on small volumes of any geometry, a good RAS or not;
+        MRIconform (its 256^3 result's voxels hashed) on small volumes of several types and frames
+        and on the conformed grid itself."""
+        r = self.rng("vconf")
+        L = []
+        sizes = [0.5, 1.0, 1.0, 1.5, 2.0, 0.9375, 0.0, float("nan"), 1e10, -1.0]
+        for _ in range(60):
+            d = (r.randint(1, 5), r.randint(1, 5), r.randint(1, 4))
+            t = r.choice([0, 1, 3, 4])
+            w = self.svol(r, d, t, nf=r.choice([1, 1, 2]), geo=self.cgeo(r, d), pz=0.3)
+            if r.random() < 0.15:
+                w = self.ras_bad(w)
+            if r.random() < 0.3:
+                L.append(f"conform 1 {w} 0")
+            else:
+                cw = r.choice([0, 1, 2, 3, 5, 8, 16, 255, 256])
+                sz = r.choice(sizes)
+                L.append(f"conform 2 {w} 0 {cw} {f64(sz)} {r.choice([0, 1, 1])}")
+        # MRIconform: small volumes resampled onto the 256^3 grid (a few: each is 16 million voxels)
+        for _ in range(8):
+            d = (r.randint(1, 4), r.randint(1, 4), r.randint(1, 3))
+            t = r.choice([0, 1, 3, 4])
+            w = self.svol(
+                r, d, t, nf=r.choice([1, 1, 2]), geo=self.cgeo(r, d), pz=0.2, labels=(1, 50, 200)
+            )
+            if r.random() < 0.2:
+                w = self.ras_bad(w)
+            L.append(f"conform 0 {w} 0")
+        # the conformed grid itself: bytes (nothing to do), floats (a change of type only), and a
+        # slight rotation (resampled)
+        grid = (
+            (256, 256, 256),
+            [f32(1.0)] * 3
+            + ["1"]
+            + [f32(x) for x in (-1, 0, 0, 0, 0, -1, 0, 1, 0)]
+            + [f32(1.5), f32(-2.0), f32(3.0)]
+            + [f32(0.0)] * 3,
+        )
+        gw = self.lab(grid, [0], t=0).split(" ")
+        gw[6] = "77"  # the probe's seeded byte fill
+        L.append(f"conform 0 {' '.join(gw)} 0")
+        L.append(f"conform 1 {' '.join(gw)} 0")
+        gf = self.lab(grid, [0.0, 10.5, 100.0, 250.0, 37.25, -3.0], t=3).split(" ")
+        L.append(f"conform 0 {' '.join(gf)} 0")
+        return [Batch("vconf", "vconf", L)]
+
+    def vset(self) -> list[Batch]:
+        """§50: MRIunion, MRIintersect, MRIand, MRIxor, MRIcomplement, MRIsetEdges, MRInot,
+        MRIbinMaskToCol; the counts (MRItotalVoxelsOn, MRIvoxelsInLabel, MRIlabelInVolume,
+        MRInMask), MRIcomputeCentroid, MRIcountValInNbhd, MRIpercentThresh; MRIreplaceList,
+        MRIreplaceValuesOnly, MRIcopyLabel, MRIcopyLabeledVoxels, MRIsetLabelValues: bytes, ints,
+        floats (halves, negatives, NaN) and shorts of one or two frames, destinations new, the
+        source, the second volume, a volume of the same extent and, rarely, of another."""
+        r = self.rng("vset")
+        L = []
+        T = [0, 0, 1, 3, 3, 4]
+
+        def dims():
+            return (r.randint(1, 5), r.randint(1, 4), r.randint(1, 3))
+
+        for _ in range(140):
+            d = dims()
+            ta, tb = r.choice(T), r.choice(T)
+            nf = 1 if r.random() < 0.8 else 2
+            a = self.svol(r, d, ta, nf=nf)
+            b = self.svol(r, d if r.random() < 0.95 else dims(), tb, nf=nf)
+            dst = self.dst10(r, d, ta, nf, other=True)
+            k = r.random()
+            if k < 0.25:
+                L.append(f"union {a} 0 {b} 0 {dst}")
+            elif k < 0.5:
+                L.append(f"isect {a} 0 {b} 0 {dst}")
+            elif k < 0.75:
+                L.append(f"mand {a} 0 {b} 0 {dst} {r.choice([0, 1, 2, 3, -1])}")
+            else:
+                t1 = r.choice([0, 1, 2, -1])
+                L.append(f"mxor {a} 0 {b} 0 {dst} {t1} {t1 + r.choice([0, 1, 2, -1])}")
+        for _ in range(110):
+            d = dims()
+            t = r.choice(T)
+            nf = 1 if r.random() < 0.8 else 2
+            a = self.svol(r, d, t, nf=nf)
+            dst = self.dst10(r, d, t, nf)
+            cmd = r.choice(["compl", "mnot", "b2c", "edges"])
+            if cmd == "edges":
+                L.append(f"edges {a} 0 {f64(r.choice([0.0, 1.0, 7.5, -2.0, 300.0]))} {dst}")
+            else:
+                L.append(f"{cmd} {a} 0 {dst}")
+        for _ in range(100):
+            d = dims()
+            t = r.choice(T)
+            a = self.svol(r, d, t, nf=r.choice([1, 1, 2]))
+            k = r.randrange(6)
+            if k < 3:
+                L.append(f"cntv {k} {a} 0 {r.choice([0, 1, 2, 3, -1, 300])}")
+            elif k == 3:
+                L.append(f"cntv 3 {a} 0")
+            elif k == 4:
+                L.append(f"cent {a} 0")
+            else:
+                n = r.randint(1, 4)
+                pts = []
+                for _ in range(n):
+                    pts += [
+                        str(r.choice([1, 3, 3, 5, 0, 2, -1])),
+                        str(r.randint(0, d[0] - 1)),
+                        str(r.randint(0, d[1] - 1)),
+                        str(r.randint(0, d[2] - 1)),
+                        str(r.choice([0, 1, 2, 3])),
+                    ]
+                L.append(f"cnbhd {a} 0 {n} {' '.join(pts)}")
+        for _ in range(50):
+            d = dims()
+            t = r.choice([0, 1, 3, 3])
+            a = self.p9vol(r, d, t, r.choice([1, 2]))[0]
+            mk = (
+                "null"
+                if r.random() < 0.4
+                else self.svol(r, d, r.choice([0, 3]), labels=(1,), pz=0.4) + " 0"
+            )
+            frame = 0 if mk == "null" or r.random() < 0.7 else 1
+            pct = r.choice([10.0, 25.0, 50.0, 90.0, 99.0, 1.0])
+            L.append(f"pthr {a} 0 {mk} {frame} {f64(pct)}")
+        for _ in range(100):
+            d = dims()
+            t = r.choice(T)
+            nf = 1 if r.random() < 0.85 else 2
+            a = self.svol(r, d, t, nf=nf)
+            k = r.randrange(5)
+            if k == 0:
+                n = r.randint(0, 4)
+                pairs = " ".join(
+                    f"{r.choice([0, 1, 2, 3, 7])} {r.choice([0, 5, 9, 255, 256, -2])}"
+                    for _ in range(n)
+                )
+                mk = "null" if r.random() < 0.5 else self.svol(r, d, 3, labels=(1,), pz=0.4) + " 0"
+                dst = "new" if r.random() < 0.6 else self.svol(r, d, r.choice([0, 1, 3]), pz=1.0)
+                L.append(f"rlist {a} 0 {n}{' ' if n else ''}{pairs} {mk} {dst}")
+            elif k == 1:
+                vin = r.choice([0.0, 1.0, 2.0, 2.5, -1.0, 1.0000001])
+                L.append(
+                    f"rvonly {a} 0 {self.dst10(r, d, t, nf)} {f32(vin)} {f32(r.choice([9.0, 0.0, -3.5, 300.0]))}"
+                )
+            elif k == 2:
+                dst = "self" if r.random() < 0.2 else self.svol(r, d, r.choice([0, t, 3]), pz=1.0)
+                L.append(f"cplab {a} 0 {dst} {r.choice([1, 2, 3, 0, 300])}")
+            elif k == 3:
+                lb = self.svol(r, d, r.choice([0, 1, 3]))
+                dst = (
+                    r.choice(["self", "other"])
+                    if r.random() < 0.2
+                    else self.svol(r, d, r.choice([0, t, 3]), pz=1.0)
+                )
+                L.append(f"cplv {a} 0 {lb} 0 {dst} {r.choice([1, 2, 3, 0])}")
+            else:
+                lb = self.svol(r, d, r.choice([0, 1, 3]))
+                L.append(
+                    f"slv {a} 0 {lb} 0 {self.dst10(r, d, t, nf, other=True)} {r.choice([1, 2, 3, 0])} {f32(r.choice([9.0, 0.5, -2.0, 1e6]))}"
+                )
+        return [Batch("vset", "vset", L)]
+
+    def vmorph(self) -> list[Batch]:
+        """§50: MRIerodeNN (each neighbourhood, edges eroded or not), MRIerode, MRIerode2D,
+        MRIerodeSegmentation and MRIdilateSegmentation (counts 1 to 3 and -1, masks), the
+        threshold dilations of a label (MRIdilateThreshLabel and its inverse), MRIdilateLabel and
+        MRIdilateLabelUchar, MRIopenN, MRIopen, MRIclose, MRIdilate6, MRIgrowLabel, MRIturnOnFG,
+        MRIturnOffBG: label volumes of bytes, ints, floats and shorts."""
+        r = self.rng("vmorph")
+        L = []
+        T = [0, 0, 1, 3, 3, 4]
+
+        def dims(lo=1):
+            return (r.randint(lo, 5), r.randint(lo, 5), r.randint(lo, 4))
+
+        for _ in range(170):
+            d = dims()
+            t = r.choice(T)
+            cmd = r.choice(
+                ["erodenn", "erode", "erode2d", "dil6", "openn", "openn", "erodeseg", "dilseg"]
+            )
+            # the segmentation functions copy a source of two frames into their one-frame output
+            # (FreeSurfer writes outside it: vrules22 holds that case once)
+            nf = 1 if r.random() < 0.85 or cmd in ("erodeseg", "dilseg") else 2
+            a = self.svol(r, d, t, nf=nf, pz=r.choice([0.2, 0.5]))
+            if cmd == "erodenn":
+                dst = "new" if r.random() < 0.6 else self.svol(r, d, r.choice([0, t, 3]), pz=1.0)
+                L.append(f"erodenn {a} 0 {dst} {r.choice([1, 2, 3, 0])} {r.choice([0, 1])}")
+            elif cmd in ("erode", "erode2d", "dil6"):
+                L.append(f"{cmd} {a} 0 {self.dst10(r, d, t, nf)}")
+            elif cmd == "openn":
+                k = r.randrange(3)
+                o = f" {r.choice([1, 2, 3])}" if k == 0 else ""
+                L.append(f"openn {k} {a} 0 {self.dst10(r, d, t, nf)}{o}")
+            elif cmd == "erodeseg":
+                dst = "new" if r.random() < 0.7 else self.svol(r, d, r.choice([0, t, 3]), pz=1.0)
+                L.append(f"erodeseg {a} 0 {dst} {r.choice([1, 1, 2, 3])} {r.choice([0, 1, 2, 3])}")
+            else:
+                dst = "new" if r.random() < 0.7 else self.svol(r, d, r.choice([0, t, 3]), pz=1.0)
+                mk = "null"
+                if r.random() < 0.4:
+                    mk = self.svol(r, d, 3, nf=r.choice([1, 2]), labels=(1,), pz=0.3) + " 0"
+                frame = 0 if mk == "null" or r.random() < 0.7 else 1
+                L.append(
+                    f"@3 dilseg {a} 0 {dst} {r.choice([1, 1, 2, 3, -1])} {mk} {frame} "
+                    f"{f64(r.choice([0.5, 1.0, 0.0]))}"
+                )
+        for _ in range(90):
+            d = dims()
+            ts = r.choice([0, 0, 0, 1, 3])
+            a = self.svol(r, d, ts, labels=(1, 2, 130), pz=0.6)
+            v = self.svol(r, d, r.choice([0, 0, 3]), labels=(50, 100, 115, 120, 200), pz=0.2)
+            k = r.random()
+            if k < 0.45:
+                dst = (
+                    r.choice(["new", "self", "other"])
+                    if r.random() < 0.6
+                    else self.svol(r, d, 0, pz=1.0)
+                )
+                L.append(
+                    f"dtl {r.randrange(2)} {a} 0 {v} 0 {dst} {r.choice([130, 130, 1, 2, 300])} "
+                    f"{r.choice([1, 2, 3, 5])} {r.choice([115, 100, 0, 200])}"
+                )
+            else:
+                dst = (
+                    r.choice(["new", "self"])
+                    if r.random() < 0.6
+                    else self.svol(r, d, r.choice([0, ts, 3]), pz=1.0)
+                )
+                L.append(
+                    f"dlab {r.randrange(2)} {a} 0 {dst} {r.choice([130, 1, 2])} {r.choice([1, 2, 3])}"
+                )
+        for _ in range(80):
+            d = dims()
+            k = r.randrange(3)
+            if k == 0:
+                a = self.svol(r, d, 0, labels=(1, 2, 3), pz=0.5)
+                f = self.svol(r, d, 0, labels=(0, 1, 255), pz=0.7)
+                L.append(f"grow {a} 0 {f} 0 {r.choice([1, 2, 0, 300])} {r.choice([1, 255, 9])}")
+            elif k == 1:
+                a = self.svol(r, d, 0, labels=(1, 7, 200), pz=0.5)
+                fg = self.svol(r, d, 0, labels=(1, 9), pz=0.5)
+                bg = self.svol(r, d, 0, labels=(0, 1), pz=0.8)
+                L.append(f"onfg {a} 0 {fg} 0 {bg} 0")
+            else:
+                a = self.svol(r, d, 0, labels=(3, 6, 7, 9, 200), pz=0.5)
+                bg = self.svol(r, d, 0, labels=(1,), pz=0.7)
+                L.append(f"offbg {a} 0 {bg} 0")
+        return [Batch("vmorph", "vmorph", L)]
+
+    def vmask(self) -> list[Batch]:
+        """§50: MRImask (the same geometry, another one with FS_MRIMASK_ALLOW_DIFF_GEOM unset, 0 or
+        1, Gdiag set or not), MRImaskDifferentGeometry, MRIthresholdMask: sources of bytes, ints,
+        floats and shorts of one or two frames, masks of bytes and floats, destinations new, the
+        source, the mask, a volume of the same extent and type and of another type."""
+        r = self.rng("vmask")
+        L = []
+        T = [0, 0, 1, 3, 3, 4]
+
+        def dims():
+            return (r.randint(1, 5), r.randint(1, 4), r.randint(1, 3))
+
+        for _ in range(110):
+            d = dims()
+            t = r.choice(T)
+            nf = 1 if r.random() < 0.8 else 2
+            geo = self.rgeo(r, d)
+            a = self.pk(
+                geo,
+                self.lvals(r, d[0] * d[1] * d[2] * nf, t, labels=(4, 9, 100), pz=0.2),
+                t=t,
+                nf=nf,
+            )
+            same = r.random() < 0.6
+            mgeo = (
+                geo
+                if same
+                else self.rgeo(
+                    r,
+                    d if r.random() < 0.8 else (r.randint(1, 5), r.randint(1, 4), r.randint(1, 3)),
+                )
+            )
+            mt = r.choice([0, 3])
+            mn = mgeo[0][0] * mgeo[0][1] * mgeo[0][2]
+            mk = self.pk(mgeo, self.lvals(r, mn, mt, labels=(1, 2), pz=0.5), t=mt)
+            k = r.random()
+            pre = ""
+            if r.random() < 0.3:
+                pre += f"+env=FS_MRIMASK_ALLOW_DIFF_GEOM={r.choice(['0', '1', 'x', ''])} "
+            if r.random() < 0.15:
+                pre += "+gdiag=1 "
+            if k < 0.45:
+                dst = (
+                    r.choice(["new", "self", "other"])
+                    if r.random() < 0.6
+                    else self.svol(r, d, r.choice([t, t, 3]), nf=nf, pz=1.0)
+                )
+                L.append(
+                    f"{pre}mmask 0 {a} 0 {mk} 0 {dst} {r.choice([0, 0, 1, 2])} {f32(r.choice([0.0, -1.0, 7.5]))}"
+                )
+            elif k < 0.65:
+                dst = (
+                    "new" if r.random() < 0.7 else self.svol(r, d, r.choice([t, 3]), nf=nf, pz=1.0)
+                )
+                L.append(
+                    f"mmask 1 {a} 0 {mk} 0 {dst} {r.choice([0, 1])} {f32(r.choice([0.0, 9.0]))}"
+                )
+            else:
+                dst = (
+                    r.choice(["new", "self"])
+                    if r.random() < 0.6
+                    else self.svol(r, d, r.choice([0, t, 3]), pz=1.0)
+                )
+                L.append(
+                    f"tmask {a} 0 {mk} 0 {dst} {f32(r.choice([0.5, 1.0, 1.5, 0.0]))} "
+                    f"{f32(r.choice([0.0, 5.0, 255.0, 2.5]))}"
+                )
+        return [Batch("vmask", "vmask", L)]
+
+    def vrules22(self) -> list[Batch]:
+        """Fixed cases of part 10b (relay 19): §49's FS-491 and FS-492, the template's widths of 0
+        and below, a good RAS made in place, a header-only volume conformed; §50's ends and
+        messages, FS-493 and FS-497 (the alarm ends them), FS-494, FS-495, FS-496, MRIerodeNN's
+        offsets in order with edges eroded, the threshold dilation's box raised during a pass, the
+        steps' MRIfree with no steps, MRIopenN's order below 1, MRIdilate6 in place, the replace
+        list's byte target, MRImask's variable and diagnostic line, MRIgrowLabel's labels outside
+        the byte range, MRIturnOffBG's growing cube, MRIreplaceValuesOnly's FLT_EPSILON."""
+        L = []
+        P = self.plain
+        # §49: an orientation without one of the axes (FS-491): bad RAS, two axes along one direction
+        lia = self.lab(P((3, 2, 2)), [1.0] * 12, t=3)
+        bad = self.ras_bad(lia)
+        two = self.lab(P((3, 2, 2), perm=(0, 0, 2)), [1.0] * 12, t=3)
+        for w in (bad, two):
+            for keep in (1, 0):
+                L.append(f"conform 2 {w} 0 8 {f64(1.0)} {keep}")
+        L.append(f"conform 1 {bad} 0")
+        # FS-492: fields of view beyond the int range, NaN; widths 0 and below; sizes 0 and below
+        for cw, sz in (
+            (256, 1e10),
+            (3, 1e10),
+            (8, float("nan")),
+            (8, float("inf")),
+            (8, 0.0),
+            (8, -2.0),
+            (0, 1.0),
+            (-1, 1.0),
+            (1, 1.0),
+        ):
+            L.append(f"conform 2 {lia} 0 {cw} {f64(sz)} 1")
+        L.append(f"conform 2 {lia} 0 -2 {f64(1.0)} 0")
+        # MRIconform of a header-only volume and of one of 0 voxels
+        hv = lia.split(" ")
+        hv[5] = "1"
+        L.append(f"conform 0 {' '.join(hv)} 0")
+        L.append(f"conform 1 {' '.join(hv)} 0")
+        # MRIerodeNN: in place, another extent, each neighbourhood with edges eroded or not, on
+        # negative values (an outside offset resets the minimum to 0 in its turn)
+        neg = self.lab(P((3, 3, 1)), [-3.0, 5.0, 2.0, 4.0, -1.0, 6.0, 7.0, 8.0, -5.0], t=3)
+        for nn in (1, 2, 3, 0, 7):
+            for ee in (0, 1):
+                L.append(f"erodenn {neg} 0 new {nn} {ee}")
+        L.append(f"erodenn {neg} 0 self 1 0")
+        L.append(f"erodenn {neg} 0 {self.lab(P((3, 3, 2)), [0.0], t=3)} 1 0")
+        L.append(f"erodenn {neg} 0 {self.lab(P((3, 3, 1)), [9.0], t=3, nf=2)} 3 1")
+        # the segmentation functions: in place, another extent, a source of two frames (written
+        # outside the one-frame output), counts that never end (FS-493), a complex volume (FS-497)
+        sg = self.lab(P((4, 4, 3)), [0, 1, 1, 2, 0, 0, 3, 3, 1, 0, 2, 2] * 4, t=1)
+        L.append(f"erodeseg {sg} 0 self 1 0")
+        L.append(f"erodeseg {sg} 0 {self.lab(P((4, 3, 3)), [0], t=1)} 1 0")
+        L.append(f"erodeseg {self.lab(P((4, 4, 3)), [1] * 48, t=1, nf=2)} 0 new 1 0")
+        L.append(f"dilseg {sg} 0 self 1 null 0 {f64(0.5)}")
+        L.append(f"dilseg {sg} 0 {self.lab(P((4, 3, 3)), [0], t=1)} 1 null 0 {f64(0.5)}")
+        L.append(
+            f"dilseg {self.lab(P((4, 4, 3)), [1, 0] * 48, t=1, nf=2)} 0 new 1 null 0 {f64(0.5)}"
+        )
+        # the lines that never end (FS-493, FS-497: the alarm of 1 second ends them) run without the guard
+        # allocator: the erosion's steps each keep a copy, and under the guard allocator the process runs out
+        # of mappings before the alarm, sooner or later from run to run
+        H = []
+        for n in (0, -1, -5):
+            H.append(f"@1 erodeseg {sg} 0 new {n} 0")
+        for n in (0, -2):
+            H.append(f"@1 dilseg {sg} 0 new {n} null 0 {f64(0.5)}")
+        L.append(f"dilseg {sg} 0 new -1 null 0 {f64(0.5)}")
+        # complex volumes (pairs of floats): FreeSurfer's copy holds the first `width` bytes of each row, so a
+        # label in the first voxel's real part reaches the working copy and its new neighbours never do (FS-497,
+        # the alarm ends it), and a label in the second voxel never reaches it (the dilation ends at once)
+        for vals in ([2.0] + [0.0] * 7, [0.0, 0.0, 2.0] + [0.0] * 5):
+            cx = self.lab(P((4, 2, 1)), vals * 2, t=3).split(" ")
+            cx[3] = "7"
+            cxw = " ".join(cx)
+            (H if vals[0] else L).append(
+                f"{'@1 ' if vals[0] else ''}dilseg {cxw} 0 new -1 null 0 {f64(0.5)}"
+            )
+            L.append(f"dilseg {cxw} 0 new 1 null 0 {f64(0.5)}")
+        # masks of the dilation: a NaN mask value is inside; a frame of the mask
+        mk = self.lab(P((4, 4, 3)), [1.0, QNAN, 0.0, 0.4] * 12, t=3) + " 0"
+        L.append(f"dilseg {sg} 0 new 1 {mk} 0 {f64(0.5)}")
+        L.append(f"dilseg {sg} 0 new 2 {mk} 0 {f64(0.4)}")
+        # the threshold dilations: no steps (MRIfree's error), a label outside the byte range, the
+        # box raised during a pass, a label equal to the threshold
+        # (byte volumes here hold a multiple of 4 voxels: the probe's i fill writes whole words)
+        row = self.lab(P((8, 1, 1)), [130, 0, 0, 0, 0, 0, 0, 0], t=0)
+        val = self.lab(P((8, 1, 1)), [200] * 8, t=0)
+        for k in (0, 1):
+            for lab_, nit, th in (
+                (130, 0, 115),
+                (130, 1, 115),
+                (130, 3, 115),
+                (386, 2, 115),
+                (130, 2, 200),
+                (130, 2, 201),
+            ):
+                L.append(f"dtl {k} {row} 0 {val} 0 new {lab_} {nit} {th}")
+        L.append(f"dtl 0 {row} 0 {val} 0 {self.lab(P((4, 1, 1)), [0], t=0)} 130 1 115")
+        for k in (0, 1):
+            for lab_, nit in ((130, 0), (130, -1), (386, 2), (130, 2)):
+                L.append(f"dlab {k} {row} 0 new {lab_} {nit}")
+        frow = self.lab(
+            P((6, 1, 1)), [2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], t=3, nf=2
+        )
+        L.append(f"dlab 0 {frow} 0 new 2 2")
+        # MRIopenN of order 0 and -1; MRIdilate6 in place and new on NaN values
+        blob = self.lab(P((4, 4, 2)), [0.0, 1.0, 2.0, 0.0, QNAN, 3.0, 0.0, 1.0] * 4, t=3)
+        for o in (0, -1, 2):
+            L.append(f"openn 0 {blob} 0 new {o}")
+        L.append(f"dil6 {blob} 0 self")
+        L.append(f"dil6 {blob} 0 new")
+        L.append(f"dil6 {self.lab(P((2, 2, 1)), [QNAN] * 4, t=3)} 0 new")
+        # MRIreplaceList: a byte output and a target above 255 or negative; an output of another
+        # extent; an int output given
+        bseg = self.lab(P((4, 2, 1)), [1, 2, 3, 1, 2, 3, 0, 1], t=0)
+        L.append(f"rlist {bseg} 0 1 1 256 null {self.lab(P((4, 2, 1)), [0], t=0)}")
+        L.append(f"rlist {bseg} 0 2 1 255 2 -2 null {self.lab(P((4, 2, 1)), [0], t=0)}")
+        L.append(f"rlist {bseg} 0 1 1 9 null {self.lab(P((2, 2, 1)), [0], t=1)}")
+        L.append(
+            f"rlist {bseg} 0 2 1 9 1 7 {self.lab(P((4, 2, 1)), [1.0, 0.4, QNAN, 0.5, 0.0, 1.0, 0.6, 0.49], t=3)} 0 new"
+        )
+        # MRIthresholdMask of bytes with replacement values outside 0..255 and NaN (FS-494)
+        bsrc = self.lab(P((4, 2, 1)), [10, 20, 30, 40, 50, 60, 70, 80], t=0)
+        bmk = self.lab(P((4, 2, 1)), [0, 1, 2, 0, 1, 2, 0, 1], t=0)
+        for ov in (300.0, -1.0, float("nan"), 1e10, 255.5, 2.7, -0.5):
+            L.append(f"tmask {bsrc} 0 {bmk} 0 new {f32(1.0)} {f32(ov)}")
+        L.append(
+            f"tmask {bsrc} 0 {bmk} 0 {self.lab(P((4, 2, 1)), [0.0], t=3)} {f32(1.0)} {f32(300.0)}"
+        )
+        # MRIpercentThresh: the list's end, past it, below it, NaN (FS-495, FS-496), an empty mask
+        pv = self.lab(P((3, 2, 2)), [float(i) for i in (5, 3, 9, 1, 7, 2, 8, 4, 6, 0, 11, 10)], t=3)
+        pm = self.lab(P((3, 2, 2)), [1.0, 0.0, 0.0] * 4, t=3) + " 0"
+        pz = self.lab(P((3, 2, 2)), [0.0] * 12, t=3) + " 0"
+        for pct in (50.0, 0.0, 12.5, -200.0, 300.0, float("nan"), 100.0, 99.0):
+            L.append(f"pthr {pv} 0 {pm} 0 {f64(pct)}")
+        for pct in (0.0, 50.0, 100.0):
+            L.append(f"pthr {pv} 0 null 0 {f64(pct)}")
+        L.append(f"pthr {pv} 0 {pz} 0 {f64(50.0)}")
+        # MRImask: the variable's forms, the diagnostic line, another type, another geometry of
+        # another extent (MRImaskDifferentGeometry), the same geometry
+        ga = P((3, 2, 2), c=(1.0, 2.0, 3.0))
+        gb = P((3, 2, 2), c=(1.0, 2.0, 3.5))
+        gc = P((2, 2, 2), sizes=(1.5, 1.0, 1.0), c=(1.0, 2.0, 3.0))
+        ms = self.lab(ga, [float(i) for i in range(12)], t=3)
+        mk_a = self.lab(ga, [0.0, 1.0, 2.0] * 4, t=3)
+        mk_b = self.lab(gb, [0.0, 1.0, 2.0] * 4, t=3)
+        mk_c = self.lab(gc, [0.0, 1.0] * 4, t=3)
+        for envv in ("", "0", "1", "x", "2abc", "-1"):
+            L.append(
+                f"+env=FS_MRIMASK_ALLOW_DIFF_GEOM={envv} mmask 0 {ms} 0 {mk_b} 0 new 0 {f32(-9.0)}"
+            )
+        L.append(f"+gdiag=1 mmask 0 {ms} 0 {mk_a} 0 new 0 {f32(-9.0)}")
+        L.append(f"mmask 0 {ms} 0 {mk_a} 0 {self.lab(ga, [0], t=1)} 0 {f32(-9.0)}")
+        L.append(f"mmask 0 {ms} 0 {mk_c} 0 new 1 {f32(-9.0)}")
+        L.append(f"+env=FS_MRIMASK_ALLOW_DIFF_GEOM=0 mmask 0 {ms} 0 {mk_c} 0 new 1 {f32(-9.0)}")
+        L.append(f"mmask 1 {ms} 0 {mk_c} 0 new 1 {f32(-9.0)}")
+        L.append(f"mmask 0 {ms} 0 {mk_a} 0 new 2 {f32(float('nan'))}")
+        # MRIgrowLabel: labels outside the byte range, a fill of the background with no data
+        g1 = self.lab(P((4, 3, 1)), [1, 1, 0, 2, 0, 1, 1, 0, 0, 0, 1, 2], t=0)
+        f0 = self.lab(P((4, 3, 1)), [0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], t=0)
+        for i_, o_ in ((1, 9), (257, 9), (1, 265), (0, 9), (2, 9)):
+            L.append(f"grow {g1} 0 {f0} 0 {i_} {o_}")
+        L.append(f"grow {self.lab(P((4, 3, 1)), [0], t=0)} 0 {f0} 0 0 9")
+        # MRIturnOffBG: a voxel whose nearest label is 4 away, and none within 4
+        ob = self.lab(P((12, 1, 1)), [0] * 11 + [9], t=0)
+        L.append(f"offbg {ob} 0 {self.lab(P((12, 1, 1)), [0], t=0)} 0")
+        L.append(
+            f"offbg {self.lab(P((4, 1, 1)), [7, 0, 6, 0], t=0)} 0 {self.lab(P((4, 1, 1)), [0], t=0)} 0"
+        )
+        # MRIreplaceValuesOnly within FLT_EPSILON (the previous float of 1 is, the next is not)
+        ev = self.lab(P((3, 1, 1)), ["3f800000", "3f800001", "3f7fffff"], t=3)
+        L.append(f"rvonly {ev} 0 new {f32(1.0)} {f32(9.0)}")
+        L.append(f"rvonly {ev} 0 self {f32(1.0)} {f32(9.0)}")
+        # MRIcopyLabel: a byte label outside the range; floats equal to the label
+        L.append(f"cplab {bseg} 0 {self.lab(P((4, 2, 1)), [0], t=0)} 258")
+        L.append(
+            f"cplab {self.lab(P((3, 2, 1)), [2.0, 2.5, 2.0, QNAN, 0.0, 1.0], t=3)} 0 {self.lab(P((3, 2, 1)), [0.0], t=3)} 2"
+        )
+        # MRIcomplement of two frames into a new one-frame volume (written outside: FS-53)
+        L.append(f"compl {self.lab(P((2, 2, 1)), [0, 1, 2, 0, 3, 0, 0, 1], t=1, nf=2)} 0 new")
+        # MRIsetEdges: NaN and a value beyond the float range
+        for v in (float("nan"), 1e40, -0.0):
+            L.append(f"edges {self.lab(P((3, 3, 3)), [1.0] * 27, t=3)} 0 {f64(v)} new")
+        # MRIbinMaskToCol into a volume of other frames; MRIcomputeCentroid of NaN, zero, negative
+        L.append(
+            f"b2c {self.lab(P((3, 2, 1)), [1.0] * 6, t=3)} 0 {self.lab(P((3, 2, 1)), [0], t=1, nf=2)}"
+        )
+        for cv in ([QNAN, 1.0, 0.0], [0.0, 0.0, 0.0], [-1.0, 0.5, 0.25], ["33d6bf95", 0.0, 0.0]):
+            L.append(f"cent {self.lab(P((3, 1, 1)), cv, t=3)} 0")
+        # MRIcountValInNbhd: window sizes 0, -1, -2, 2, 1 at a corner
+        cn = self.lab(P((3, 3, 3)), [1] * 27, t=1)
+        pts = []
+        for w in (0, -1, -2, 2, 1, 3):
+            pts += [str(w), "0", "0", "0", "1"]
+        L.append(f"cnbhd {cn} 0 6 {' '.join(pts)}")
+        return [
+            Batch("vrules22", "vrules22", L),
+            Batch("vrules22", "vrules22-hang", H, guards=False),
+        ]
+
+
 GROUPS = [
     "vgblock",
     "vgcopy",
@@ -5214,6 +5894,12 @@ GROUPS = [
     "vtal",
     "vdil",
     "vrules20",
+    "vrules21",
+    "vconf",
+    "vset",
+    "vmorph",
+    "vmask",
+    "vrules22",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -5371,7 +6057,7 @@ def licence_guard(b: Batch) -> None:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen17) else Gen17(gen.seed)
+    gen = gen if isinstance(gen, Gen18) else Gen18(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

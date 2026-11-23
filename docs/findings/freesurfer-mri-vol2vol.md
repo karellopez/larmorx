@@ -51,7 +51,7 @@ linear paths). The replica: `crates-freesurfer/larmorx-freesurfer-volumes/src/mr
   examples 1.A to 1.D), `lta = LTAchangeType(lta, LINEAR_RAS_TO_RAS)`, which refuses invalid
   geometries: `ErrorExit(ERROR_BADPARM, "LTAchangeType: src geometry must be valid")` (status 252).
   So FreeSurfer 8.2.0's `mri_vol2vol` never applies a register.dat with a target (measured on the
-  probe: every such case, 87 of seed 1's 600). Rule A: by default the block is skipped for an array
+  probe: every such case, 87 of a 600-case run of seed 1). Rule A: by default the block is skipped for an array
   read from a name not ending in `.lta` whose geometry is not valid, and the register.dat's matrix
   (`regio_read_register`'s) is the registration, as the help documents.
 
@@ -102,6 +102,7 @@ case with `DIAG_NO` or `--gdiagno` other than `0` or `-1`.
 
 ## 5. Measured
 
-- Probe (`validation/probes/fs-vol2vol/`): seed 1, 600 cases: 587 identical with `reproduce`, 13
-  `SKIP` (5 crashes, 8 paths of part 2), 0 different; `fix` differs on 113, each with a notice.
+- Probe (`validation/probes/fs-vol2vol/`): seed 1, 400 cases: 387 identical with `reproduce`, 13
+  `SKIP` (5 crashes, 8 paths of part 2), 0 different; `fix` differs on 91, each with a notice; seed
+  2, 1,500 cases: 1,487 identical, 13 `SKIP`, 0 different, `fix` 208, each with a notice.
 - The recorded calls: see the record (`docs/validation/freesurfer-mri-vol2vol.md`).

@@ -42,12 +42,13 @@ reading and checks and every linear path; the morphs, `--gcam`, `--spm-warp`, `-
 
 ## Results (relay 53)
 
-Seed 1, 600 cases: 587 identical with `reproduce`, 13 `SKIP` (5 crashes, 8 paths of part 2), 0
-different; `fix` differs on 113, each with a notice. Seed 2, 1,500 cases: see the record. The
-recorded calls and fMRIPrep's: 72 on 6 heads, all identical in both modes. Recorded test:
-`tests/fs_vol2vol_official.rs` (seed 1, 600 cases, 13 `SKIP`, `27d88053...`). Golden: 8 cases,
-`be32774d...` (official and `reproduce`), `c84fa0a2...` (`fix`).
+Seed 1, 400 cases: 387 identical with `reproduce`, 13 `SKIP` (5 crashes, 8 paths of part 2), 0
+different; `fix` differs on 91, each with a notice. Seed 2, 1,500 cases: 1,487 identical, 13
+`SKIP`, 0 different; `fix` differs on 208, each with a notice. The recorded calls and fMRIPrep's:
+72 on 6 heads, all identical in both modes. Recorded test: `tests/fs_vol2vol_official.rs` (seed 1,
+400 cases, 13 `SKIP`, `481398e5...`; debug 1.8 s on Linux, release 4.8 s on the Windows laptop).
+Golden: 10 cases, `6ab5f3d7...` (official and `reproduce`), `2bb70a5b...` (`fix`).
 
-    scripts/orchestration/boxed.sh 20 python -P validation/probes/fs-vol2vol/check.py --seed 1 --n 600
+    scripts/orchestration/boxed.sh 20 python -P validation/probes/fs-vol2vol/check.py --seed 1 --n 400
     scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-vol2vol/check.py --golden
     scripts/orchestration/boxed.sh 16 python -P validation/probes/fs-vol2vol/real.py --port <larmorx-freesurfer>

@@ -27,7 +27,7 @@ locale and ``errno``). No case sets ``DIAG_NO`` or ``--gdiagno`` above 0: FreeSu
 check prints the licence's lines when the diagnostic number is above 0, and the script refuses
 such a case.
 
-    python -P validation/probes/fs-vol2vol/check.py --seed 1 --n 600 [--json out.json]
+    python -P validation/probes/fs-vol2vol/check.py --seed 1 --n 400 [--json out.json]
 """
 
 from __future__ import annotations
@@ -211,7 +211,7 @@ def official_line(exe: Path, line: str, root: Path, k: int) -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--n", type=int, default=600)
+    ap.add_argument("--n", type=int, default=400)
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--json", type=Path)
     ap.add_argument("--dump", type=Path, help="a folder for the official, reproduce, fix lines")

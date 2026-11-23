@@ -52,7 +52,15 @@ pub fn region_get_bounding_box(
 ) -> Result<MriRegion, Fatal> {
     let (lo, hi) = extremes(g, err, mask)?;
     let npad = [npad; 6];
-    Ok(padded_box(g, "REGIONgetBoundingBox", mask, lo, hi, npad, false))
+    Ok(padded_box(
+        g,
+        "REGIONgetBoundingBox",
+        mask,
+        lo,
+        hi,
+        npad,
+        false,
+    ))
 }
 
 /// The box from the extremes `lo`, `hi` with the pads `npad` (before and after the columns, the
@@ -142,7 +150,15 @@ pub fn region_get_bounding_box_m(
     npad: [i32; 6],
 ) -> Result<MriRegion, Fatal> {
     let (lo, hi) = extremes(g, err, mask)?;
-    Ok(padded_box(g, "REGIONgetBoundingBoxM", mask, lo, hi, npad, true))
+    Ok(padded_box(
+        g,
+        "REGIONgetBoundingBoxM",
+        mask,
+        lo,
+        hi,
+        npad,
+        true,
+    ))
 }
 
 /// The smallest and largest column, row and slice of the voxels of frame 0 not within

@@ -5,6 +5,8 @@
 //! `MRIdilateLabelUchar`, `MRIopenN`, `MRIopen`, `MRIclose`, `MRIdilate6`, `MRIgrowLabel`,
 //! `MRIturnOnFG` and `MRIturnOffBG`; §50's common rules as in `setops`.
 
+use std::cmp::Ordering;
+
 use larmorx_core::defects::{FS_493, FS_497};
 
 use super::setops::ext;
@@ -127,7 +129,7 @@ impl Process {
     /// The destinations of `MRIerode` and `MRIerode2D`: a clone without one; a given one of
     /// another extent ends the program (`MRIcheckVolDims`, observed: `vmorph`); the source itself
     /// into a clone copied back with `MRIcopy` at the end.
-    fn into_clone(
+    fn erode_dst(
         &mut self,
         src: &mut Mri,
         dst: Dst,
@@ -157,7 +159,7 @@ impl Process {
     /// bytes (coordinates clamped) from 255; else for each frame the smallest of the voxel's
     /// value and its 27 neighbours' (`float`, `<`), as values.
     pub fn mri_erode(&mut self, src: &mut Mri, dst: Dst) -> Result<VolOut, Stop> {
-        self.into_clone(src, dst, Process::erode_into)
+        self.erode_dst(src, dst, Process::erode_into)
     }
 
     fn erode_into(&mut self, src: &Mri, dst: &mut Mri) -> Result<(), Stop> {
@@ -215,7 +217,7 @@ impl Process {
     /// `MRIerode2D(src, dst)` (§50): `MRIerode`'s destinations; frame 0, the smallest of the
     /// 3 x 3 in-slice neighbourhood (`double`, from the voxel), as values.
     pub fn mri_erode_2d(&mut self, src: &mut Mri, dst: Dst) -> Result<VolOut, Stop> {
-        self.into_clone(src, dst, Process::erode_2d_into)
+        self.erode_dst(src, dst, Process::erode_2d_into)
     }
 
     fn erode_2d_into(&mut self, src: &Mri, dst: &mut Mri) -> Result<(), Stop> {
@@ -424,9 +426,11 @@ impl Process {
                         } => {
                             let mut o = None;
                             let in_mask = match mask {
+                                // not below the threshold (a NaN on either side is not below)
                                 Some(m) => {
-                                    !(sse::widen(self.mri_get_vox_val(m, c, r, s, frame, 0)?)
-                                        < mthresh)
+                                    sse::widen(self.mri_get_vox_val(m, c, r, s, frame, 0)?)
+                                        .partial_cmp(&mthresh)
+                                        != Some(Ordering::Less)
                                 }
                                 None => true,
                             };

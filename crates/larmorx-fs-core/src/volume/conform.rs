@@ -178,7 +178,7 @@ impl Process {
         }
         let mut k = Matrix::zeros(4, 4, MATRIX_REAL);
         k.set(4, 4, 1.0);
-        let letters = [b'L', b'I', b'A'];
+        let letters = b"LIA";
         for row in 0..3 {
             let i = idx[row];
             // FS-491 with reproduce: the values read past the arrays taken as 0 (they reach no

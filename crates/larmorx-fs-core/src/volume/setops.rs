@@ -11,6 +11,8 @@
 //! x unless columns outermost; `(int)` under FS-12; a volume without voxels where it is read or
 //! written, FS-58.
 
+use std::cmp::Ordering;
+
 use larmorx_core::defects::{FS_495, FS_496};
 use larmorx_core::glibc_qsort::qsort;
 
@@ -560,8 +562,11 @@ impl Process {
                     let l = self.mri_get_vox_val(v.a(), x, y, z, 0, 0)?;
                     let l = self.int_fs12(sse::widen(l));
                     let mut o = l;
+                    // not below 0.5 (a NaN mask value is not below)
                     let inside = if has_mask {
-                        !(self.mri_get_vox_val(v.b(), x, y, z, 0, 0)? < 0.5)
+                        self.mri_get_vox_val(v.b(), x, y, z, 0, 0)?
+                            .partial_cmp(&0.5)
+                            != Some(Ordering::Less)
                     } else {
                         true
                     };

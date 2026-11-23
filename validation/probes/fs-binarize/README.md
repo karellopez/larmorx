@@ -23,6 +23,15 @@ comparison is the open probe `validation/investigations/freesurfer-mri-binarize-
     scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-binarize/prog.py --golden
     scripts/orchestration/boxed.sh 20 python -P validation/probes/fs-binarize/real.py --json real.json
 
+## Results (relay 53 of track D, 2026-11-23: after FS-268's and FS-269's defaults)
+
+From the clean commit of `docs/validation/freesurfer-mri-binarize.md`: the open probe's seeds 1 and
+2 (133 cases each): 125 identical in `reproduce`, 8 counted, 0 different; `fix` 106 identical, 19
+explained by a notice (FS-269: `--crop 0`, `--bb 0`, `--bb -2`; FS-268: `--crop-around-ras` of an
+`SRA` volume). `real.py`: 81 calls, 78 identical in `reproduce`, 3 counted, 0 different (as below).
+The golden cases (seven): `76bdf3d9...` (`reproduce`, the official value), `be04301f...` (the
+default). Memory: 4 calls, the port below FreeSurfer's peak (141.0 vs 144.8 MiB the largest).
+
 ## Results (relay 48 of track D, 2026-11-21)
 
 The open probe's seeds 1 and 2 (130 cases each): 122 identical in `reproduce`, 8 counted, 0

@@ -33,7 +33,7 @@ to match), of a geometry that matches neither, without geometry, without the sou
 transforms that chain (directly and inverted) and that do not, with a matrix of zeros, two found to
 be singular for the oblique grid in single precision (`SINGULAR_V2V`, `SINGULAR_RAS`); an FSL
 matrix, an MNI transform, a `register.dat`; a text file as `.txt` and as `.lta`; a folder) and runs
-193 command lines: no arguments, one, two, four; `--help`, `--usage`, `-help`, `-USAGE`, the
+195 command lines: no arguments, one, two, four; `--help`, `--usage`, `-help`, `-USAGE`, the
 version options, unknown options; every option given last (or before too few values); every
 input type and the masks above; the threshold (0, negative, huge, NaN, text), `-invert` before and
 after `-T`, `-no-invert`, `-abs`; `-samseg`, `-lh`, `-rh`, `-no_cerebellum`, a name in upper case;
@@ -43,7 +43,9 @@ one, combined crops, `-crop-to-fov` and `-mm`); `-transfer`, `-oval` (NaN, beyon
 another geometry with and without `-no-allow-diff-geom`; odd and one-voxel volumes; each transform
 (with `-lta_src`, `-src`, `-lta_dst`, `-dst`, a source that does not read), the singular transforms
 with each later option; missing or unreadable inputs; the output's names (`.mgh`, `.nii`,
-`.nii.gz`, no extension, an unknown extension, a folder that does not exist, `a.b/c`).
+`.nii.gz`, no extension, an unknown extension, a folder that does not exist, `a.b/c`); and (cases
+193 and 194, added 2026-11-23) recon-all's spelling `-bb 0` and `-BBMM` with a pad of 0 after the
+mask on one axis only (FS-269: the default differs there with a notice).
 
 Compared for each case and mode: the exit status (a process ended by a signal as 128 + its
 number); standard output and standard error (the case's folder in messages that name a file by its
@@ -64,3 +66,9 @@ library gives an error in both modes: FS-307, FS-309, FS-310; their texts are in
 
 It exits with 1 when a compared case differs in `reproduce`, or differs in `fix` without a notice.
 Run it in a memory box (every case needs less than 200 MiB).
+
+## Results (observed, relay 53 of track D, 2026-11-23)
+
+The replica as the candidate, seeds 1 and 2, 195 cases each: 194 identical in `reproduce`, 1 counted
+(FS-309), 0 different; `fix` identical on 113, explained by a notice on 81 (FS-269 on the nine
+crops whose pad after the mask is 0 or less on some axis).

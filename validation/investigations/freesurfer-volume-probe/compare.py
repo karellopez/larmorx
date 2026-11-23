@@ -4519,6 +4519,81 @@ class Gen15(Gen14):
         return [Batch("vrules17", "vrules17", L)]
 
 
+class Gen16(Gen15):
+    """Part 9's second half (relay 17): the frame covariance, PCA and the false discovery rate
+    (§42), the voxel neighbourhood measures (§44); the fixed cases of FS-269 as decided (§43, §41)."""
+
+    def p9bmask(self, d, blocks, t: int = 3, cells=()) -> str:
+        """A mask of the extent: 1 in each block ((lo), (hi), inclusive), then the single voxels
+        ``cells`` ((x, y, z), value: a float or a float's bits), on a plain geometry."""
+        vals: list = [0.0] * (d[0] * d[1] * d[2])
+        for lo, hi in blocks:
+            for z in range(lo[2], hi[2] + 1):
+                for y in range(lo[1], hi[1] + 1):
+                    for x in range(lo[0], hi[0] + 1):
+                        vals[x + d[0] * (y + d[1] * z)] = 1.0
+        for (x, y, z), v in cells:
+            vals[x + d[0] * (y + d[1] * z)] = v
+        if t != 3:
+            vals = [int(v) for v in vals]
+        return self.lab(self.plain(d), vals, t=t)
+
+    def vrules18(self) -> list[Batch]:
+        """Fixed cases (relay 17). §43, FS-269 as decided (rules A and C): pads of -1 to 2 around
+        a block, per-axis pads that reach the mask's last voxel or end before it (a start clamped
+        at 0 among them), a block at the volume's last voxels, one voxel, a NaN voxel, magnitudes
+        either side of 1e-5, an empty mask; REGIONgetBoundingBoxEqOdd where the decided box changes
+        the outcome; MRImaskAndUpsample with pads 0 and 1 (§41)."""
+        L = []
+        d = (6, 5, 4)
+        blk = self.p9bmask(d, [((1, 1, 1), (3, 2, 2))])
+        for pad in (-1, 0, 1, 2):
+            L.append(f"rgbb {blk} 0 0 {pad}")
+        for pads in (
+            (0, 0, 0, 0, 0, 0),
+            (0, 1, 1, 0, 0, 0),
+            (-1, 1, 0, -1, 2, 0),
+            (3, 0, 1, -1, 0, 0),
+            (2, -2, 0, 3, 1, 1),
+            (1, 1, 1, 1, 1, 1),
+        ):
+            L.append(f"rgbb {blk} 0 1 {' '.join(map(str, pads))}")
+        last = self.p9bmask(d, [((4, 3, 2), (5, 4, 3))])
+        L.append(f"rgbb {last} 0 0 0")
+        L.append(f"rgbb {last} 0 1 0 0 1 0 0 1")
+        one = self.p9bmask(d, [], cells=[((0, 0, 0), 1.0)])
+        for pad in (0, -1, 1):
+            L.append(f"rgbb {one} 0 0 {pad}")
+        nan = self.p9bmask(d, [], cells=[((2, 3, 1), QNAN)])
+        L.append(f"rgbb {nan} 0 0 0")
+        small = self.p9bmask(
+            d, [], cells=[((1, 1, 1), 1e-5), ((4, 2, 3), 2e-5), ((0, 4, 0), -1e-5)]
+        )
+        L.append(f"rgbb {small} 0 0 0")
+        ints = self.p9bmask(d, [((2, 0, 1), (5, 1, 3))], t=1)
+        L.append(f"rgbb {ints} 0 0 0")
+        empty = self.p9bmask(d, [])
+        L.append(f"rgbb {empty} 0 0 0")
+        L.append(f"rgbb {empty} 0 1 0 1 0 1 0 1")
+        L.append(f"rgbb {empty} 0 2 0")
+        # REGIONgetBoundingBoxEqOdd: FreeSurfer's box is returned as it is (equal sides, an odd
+        # depth) where the decided box grows its depth; FreeSurfer's box passes the height check
+        # where the decided one does not; a pad of 1 (the same box in both modes)
+        eq = self.p9bmask((6, 6, 4), [((1, 1, 1), (3, 3, 2))])
+        L.append(f"rgbb {eq} 0 2 0")
+        L.append(f"rgbb {eq} 0 2 1")
+        wide = self.p9bmask((4, 3, 3), [((0, 0, 0), (3, 1, 0))])
+        L.append(f"rgbb {wide} 0 2 0")
+        # MRImaskAndUpsample: a block's box with pads 0 and 1, factors 1 and 2; the source's own
+        # box (no mask) with a pad of 0
+        src = self.lab(self.plain((4, 4, 3)), [float(i % 7) for i in range(48)], t=3)
+        mk = self.p9bmask((4, 4, 3), [((1, 1, 1), (2, 2, 1))])
+        for up, pad in ((1, 0), (2, 0), (1, 1), (2, 1)):
+            L.append(f"maskup {src} 0 {mk} 0 {up} {pad} 0")
+        L.append(f"maskup {src} 0 null 1 0 0")
+        return [Batch("vrules18", "vrules18", L)]
+
+
 GROUPS = [
     "vgblock",
     "vgcopy",
@@ -4571,6 +4646,7 @@ GROUPS = [
     "vv2v",
     "vregion",
     "vrules17",
+    "vrules18",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -4678,7 +4754,7 @@ def mask(b: Batch, line: bytes) -> bytes:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen15) else Gen15(gen.seed)
+    gen = gen if isinstance(gen, Gen16) else Gen16(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

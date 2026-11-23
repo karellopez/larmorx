@@ -24,7 +24,7 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
 | `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 33 groups of seeded cases and fourteen of fixed cases (`vrules`, `vrules4` to `vrules15`, `vbsrules`; 16,422 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
-| `models.py` | statements of the spec checked as models of the probe's printed results: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`) |
+| `models.py` | statements of the spec checked as models of the probe's printed results: `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `region` (§43's boxes, FS-269 as decided: every `rgbb` line of `vregion`, `vrules17` and `vrules18`, on the probe and, with `--candidate`, a candidate's lines in both modes) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
 runs use the fs.maths probe's guard allocator, `guard_malloc.so` beside it
@@ -267,6 +267,13 @@ PYTHONPATH=validation/src scripts/orchestration/boxed.sh 4 python -P \
 (`fs291`; `skull` and `cma` the same way.) Prints how many lines match the model (by the types met: `uchar` only, a tensor, other types), how
 many it leaves out (FreeSurfer crashed or read memory it does not own) and how many differ; exit
 status 1 when one differs.
+
+`region` also takes the clean room's program: `models.py region --probe <the probe> --candidate <the candidate>
+--scratch <scratch>/models` checks every `rgbb` line of `vregion`, `vrules17` and `vrules18` on the probe (FreeSurfer's
+box, §43), on the candidate with `reproduce` (FreeSurfer's box) and with `fix` (the box FS-269's decision gives:
+the loop allows those lines with their notice but does not check their values). The probe as its own candidate gives
+"differ" on exactly the lines where the decided box differs from FreeSurfer's (77), its own `fix` lines being
+FreeSurfer's.
 
 ## The comparison loop
 

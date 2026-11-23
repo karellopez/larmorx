@@ -2251,10 +2251,12 @@ statuses are not compared): the implementations' own tests, against these sectio
   frame (`ERROR: MRIfdr2vwth: frame = <f>, must be < nframes = <n>` when the frame is not below the frame count), its
   type (`ERROR: MRIfdr2vwth: input volume is not of type MRI_FLOAT`), then, when an output list is passed and the
   input has an output, its type (`... output volume is not of type MRI_FLOAT`) and extent (`... output/input
-  dimension mismatch`: width, height and depth), then, when a mask list is passed, the mask's extent (`...
-  mask/input dimension mismatch`) (**(observed)**: `vrules19`, each refusal, and a second input refused after the
+  dimension mismatch`: width, height and depth), then, when a mask list is passed and the input has a mask in it,
+  the mask's extent (`... mask/input dimension mismatch`; an input whose entry in the list is absent has no mask:
+  nothing checked) (**(observed)**: `vrules19`, each refusal, and a second input refused after the
   first passed). The values: for each input in order, its voxels (columns outermost, then rows, slices) whose mask
-  value (frame 0, `MRIgetVoxVal`; only with a mask list) is not below 0.5 (a NaN is not below) and whose value at
+  value (frame 0, `MRIgetVoxVal`; only for an input with a mask: with no list, or an absent entry in it, every voxel
+  passes, **(observed)**: `vcov`, `vrules19`'s lines passing a list with absent entries) is not below 0.5 (a NaN is not below) and whose value at
   the frame (read directly as `float`, widened) fits the sign (`sign` -1: not above 0; +1: not below 0; any other:
   every value; so 0, -0 and a NaN fit every sign), as `|v|` or, with `log10flag`, `pow(10, -|v|)` (glibc's `pow` with
   `reproduce`, correctly rounded by default: GLIBC-07, noted where the two differ). With `debug`, `MRIfdr2vwth: np =
@@ -2265,7 +2267,7 @@ statuses are not compared): the implementations' own tests, against these sectio
   0 returned. Otherwise every input with an output (the others skipped) gets, at each voxel of the input's extent,
   in frame 0 of the output (written directly; `self` is the input itself, whose frame 0 is overwritten voxel by
   voxel after that voxel is read), the input's frame value (the `float` as it is) where the voxel passes the mask
-  (with a mask list), the sign and the threshold (the value as above not above `vwth`: a NaN passes), else 1 (0
+  (an input with a mask; else every voxel passes it), the sign and the threshold (the value as above not above `vwth`: a NaN passes), else 1 (0
   with `log10flag`). Then with `log10flag` `vwth` becomes `-log10(vwth)` (`log10`: glibc 2.35's with
   `reproduce`, correctly rounded by default, section 44; GLIBC-07 where the choice changes the returned threshold
   or the debug line's printed text). Returns 0 (**(observed)**: `vcov`, `vrules19`: the signs with zeros, the

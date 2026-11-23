@@ -308,6 +308,9 @@ def main(argv: list[str] | None = None) -> int:
                     first.append({"case": k, "official": c[:900], "fix": f[:900]})
     summary = {
         "seed": a.seed,
+        # relay 47: which cases, and whether the official program ran with --preload's library
+        "family": "golden" if a.golden else a.family,
+        "preload": bool(a.preload),
         "cases": len(cases),
         "reproduce_equal": equal,
         "reproduce_differ": differ,

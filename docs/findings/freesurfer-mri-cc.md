@@ -10,8 +10,9 @@ Track D's relay 53 (2026-11-23): the path recon-all's `seg2cc` runs. The replica
 it), fs.filter's segments and fs.core's matrices. Relay 54 (2026-11-23): the white-matter path (`-a
 0`, `wm.rs`: `findMinSize`, `find_corpus_callosum`, `find_cc_slice`, `remove_fornix`,
 `edge_detection`; fs.volume's new `mritransform.rs` for `Trns_ExtractRotationMatrix`), which recon-all
-never runs, the options' edge cases against the official program (§5), golden cases. Still to come
-(relay 55): the open probe, the spec and the record.
+never runs, the options' edge cases against the official program (§5), golden cases. Relay 55
+(2026-11-24): the open probe (`validation/investigations/freesurfer-mri-cc-probe/`), the spec
+(`specs/mri_cc.md`) and the record (`docs/validation/freesurfer-mri-cc.*`), §7.
 
 ## 1. The recorded steps
 
@@ -210,8 +211,14 @@ head's subject folder, the official program and the port in both modes, every fi
   default `mri_cc: the callosum's slab (column <c>, half thickness <t>: -t) reaches past the volume's
   last column <w - 1>` (252); `reproduce` FreeSurfer's reads as fs.mri's accessors give them (FS-52;
   FS-53's fill where FreeSurfer reads past the buffer: not comparable).
+- `-t` far past the volume with `-a 0` on a 32^3 subject (relay 55, observed): `-t 100000` ends with
+  status 0 after reading memory past the volume (FS-53: not comparable), `-t 1000000` crashes (139)
+  within 3 s, `-t 2147483647` was still running after 15 minutes (stopped; consistent with its slab
+  loop running upward from column `xi - t` as if `xi + t` did not overflow), where
+  `reproduce`'s bounds wrap and it runs no column: not comparable either (the open probe runs `-t
+  1000000`).
 - Checked and FreeSurfer's in both modes: `-t -1` (no slab: nothing thickened, no fornix model; the
-  aseg and `cc_org.mgz` identical), `-t 2147483647` with `-a 0`, `-m nan` (the rotation search's
+  aseg and `cc_org.mgz` identical), `-m nan` (the rotation search's
   window), `-d 3` and `-d 50`, `-f` (the fornix written with the aseg path; nothing with `-a 0`),
   `-lh` with `-a 0` (ignored), SUBJECTS_DIR unset (`ERROR_BADPARM`), a missing transform with or
   without `mri/wm` (the transform's error first), `cc_org.mgz` that cannot be written (a read-only

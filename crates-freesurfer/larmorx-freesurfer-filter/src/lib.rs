@@ -20,6 +20,7 @@ pub mod fastmarch;
 pub mod flood;
 pub mod fmri;
 pub(crate) mod mem;
+pub mod mode;
 pub mod nonpar;
 pub mod norm;
 pub mod normalize;

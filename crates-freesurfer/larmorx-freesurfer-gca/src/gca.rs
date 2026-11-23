@@ -636,6 +636,30 @@ pub fn gca_source_voxel_to_prior(
     Ok((code, p))
 }
 
+/// The end of `GCAsourceVoxelToPriorReal(gca, mri, transform, xv, yv, zv, ..)` (`utils/gca.cpp`
+/// 21878-21943; track A relay 54, for `mri_vol2vol --inv-morph`): the source voxel's point in the
+/// atlas's template volume `t` (the transform's sample, `float`) to the prior grid as
+/// `GCAvoxelToPriorReal` maps it (`tal`: [`voxel_to_prior_matrix`] of `mri_tal__`; `AffineMV` in
+/// `float`, each coordinate stored as a `double`), each coordinate then clamped into the prior
+/// grid (below 0: 0; the extent or more: the extent - 1). Always `NO_ERROR` in FreeSurfer.
+pub fn gca_tal_to_prior_real_clamped(gca: &Gca, tal: &AffineMatrix, t: [f32; 3]) -> [f64; 3] {
+    let mut vv = AffineVector::default();
+    set_affine_vector(&mut vv, t[0], t[1], t[2]);
+    let pv = affine_mv(tal, &vv);
+    let (x, y, z) = get_affine_vector(&pv);
+    let mut p = [f64::from(x), f64::from(y), f64::from(z)];
+    let dims = [gca.prior_width, gca.prior_height, gca.prior_depth];
+    for k in 0..3 {
+        if p[k] < 0.0 {
+            p[k] = 0.0;
+        }
+        if p[k] >= f64::from(dims[k]) {
+            p[k] = f64::from(dims[k] - 1);
+        }
+    }
+    p
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

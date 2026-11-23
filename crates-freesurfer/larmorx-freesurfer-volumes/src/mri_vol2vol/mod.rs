@@ -15,5 +15,7 @@
 //! `GCAMmorphToAtlas`/`GCAMmorphFromAtlas`), `--gcam`, `--spm-warp`, `--map-point`, the affine
 //! displacement (`--disp`) and the registration cost (`--cost`).
 
+pub mod gcam;
 pub mod main;
 pub mod options;
+pub mod standalone;

@@ -44,12 +44,13 @@ use larmorx_freesurfer_volume::coords::index_not_in_volume;
 use larmorx_freesurfer_volume::resize::mri_set_resolution;
 use larmorx_freesurfer_volume::sample::{sample_volume, sample_volume_frame_type};
 
+use crate::gca::{Gca, gca_tal_to_prior_real_clamped, voxel_to_prior_matrix};
 use crate::gcam::{Gcam, gcam_compute_metric_properties, gcam_invert};
-use crate::transform::gcam_sample_morph;
+use crate::transform::{gcam_sample_morph, transform_sample_gcam};
 
 /// A value no sampler writes (a signalling NaN with low bits a `float`'s NaN never has): a sample
 /// that leaves it there wrote nothing.
-const UNWRITTEN: u64 = 0x7ff4_dead_beef_0001;
+pub const UNWRITTEN: u64 = 0x7ff4_dead_beef_0001;
 
 /// `FZERO`: `fabs(f) < FLT_EPSILON`.
 fn fzero(x: f32) -> bool {
@@ -61,18 +62,19 @@ fn fzero(x: f32) -> bool {
 /// (an interpolation the sampler does not support, or a volume type it does not read) leaves the
 /// previous voxel's value under `reproduce` (FS-930; the first of a call: memory contents, FS-931,
 /// taken as 0) and 0 by default.
-struct Chain {
+pub struct Chain {
     val: Option<f64>,
     what: &'static str,
 }
 
 impl Chain {
-    fn new(what: &'static str) -> Chain {
+    /// No value yet.
+    pub fn new(what: &'static str) -> Chain {
         Chain { val: None, what }
     }
 
     /// The value after one sample (`v` as the sampler left it).
-    fn take(&mut self, g: &mut Globals, v: f64) -> f64 {
+    pub fn take(&mut self, g: &mut Globals, v: f64) -> f64 {
         if v.to_bits() != UNWRITTEN {
             self.val = Some(v);
             return v;
@@ -101,7 +103,7 @@ impl Chain {
     }
 
     /// A value written without a sample (`val = 0.0`).
-    fn set(&mut self, v: f64) -> f64 {
+    pub fn set(&mut self, v: f64) -> f64 {
         self.val = Some(v);
         v
     }
@@ -450,6 +452,27 @@ pub fn gcam_morph_from_atlas(
     dst: Option<&mut Mri>,
     sample_type: i32,
 ) -> Result<Ret<Mri>, Fatal> {
+    gcam_morph_from_atlas_gca(g, out, err, env, dir, src, gcam, None, dst, sample_type)
+}
+
+/// [`gcam_morph_from_atlas`] of a morph that holds an atlas (`gcam->gca`, as `mri_vol2vol
+/// --inv-morph` sets it, `gcaAllocMax(1, 1, 1, <source's extent>, 0, 0)`): each output voxel's
+/// point is then the morph's sample of the voxel ([`transform_sample_gcam`], the inverse's index
+/// volumes) mapped to the atlas's prior grid and clamped into it
+/// ([`gca_tal_to_prior_real_clamped`], `GCAsourceVoxelToPriorReal`): every voxel is written.
+#[allow(clippy::too_many_arguments)]
+pub fn gcam_morph_from_atlas_gca(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    dir: Option<&Path>,
+    src: &Mri,
+    gcam: &mut Gcam,
+    gca: Option<&Gca>,
+    dst: Option<&mut Mri>,
+    sample_type: i32,
+) -> Result<Ret<Mri>, Fatal> {
     let mut fresh = None;
     let given = dst.is_some();
     let m: &mut Mri = match dst {
@@ -468,16 +491,26 @@ pub fn gcam_morph_from_atlas(
     let image = gcam.image.clone();
     use_vol_geom_to_mri(g, out, err, &image, &mut m.vg)?;
     gcam_invert(g, out, err, env, dir, gcam, Some(&*m))?;
+    let tal = gca.map(|a| {
+        let t = a.mri_tal.as_ref().expect("GCAsetup made the template grid");
+        (a, voxel_to_prior_matrix(a, t))
+    });
     let mut chain = Chain::new("GCAMmorphFromAtlas");
     for x in 0..m.vg.width.max(0) {
         for y in 0..m.vg.height.max(0) {
             for z in 0..m.vg.depth.max(0) {
-                let (r, [xf, yf, zf]) =
-                    gcam_sample_inverse_morph(g, out, err, gcam, x as f32, y as f32, z as f32);
-                if r != NO_ERROR {
-                    continue;
-                }
-                let (xr, yr, zr) = (f64::from(xf), f64::from(yf), f64::from(zf));
+                let (xr, yr, zr) = if let Some((a, tal)) = &tal {
+                    let (_, t) = transform_sample_gcam(g, err, gcam, x as f32, y as f32, z as f32)?;
+                    let p = gca_tal_to_prior_real_clamped(a, tal, t);
+                    (p[0], p[1], p[2])
+                } else {
+                    let (r, [xf, yf, zf]) =
+                        gcam_sample_inverse_morph(g, out, err, gcam, x as f32, y as f32, z as f32);
+                    if r != NO_ERROR {
+                        continue;
+                    }
+                    (f64::from(xf), f64::from(yf), f64::from(zf))
+                };
                 for f in 0..m.nframes {
                     let mut v = f64::from_bits(UNWRITTEN);
                     sample_volume_frame_type(g, err, src, xr, yr, zr, f, sample_type, &mut v);

@@ -49,7 +49,11 @@
 use std::io::Write;
 
 use larmorx_core::cfmt;
-use larmorx_core::defects::{FS_1178, FS_1179, FS_1181, FS_1182};
+use larmorx_core::defects::{
+    FS_1178, FS_1179, FS_1181, FS_1182, FS_1186, FS_1187, FS_1191, FS_1193,
+};
+use larmorx_freesurfer_core::affine::float_to_int;
+use larmorx_freesurfer_core::cstd::fmt_f;
 use larmorx_freesurfer_core::diag::diag_init;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal, error_exit};
@@ -58,12 +62,20 @@ use larmorx_freesurfer_core::matrix_ops::{matrix_inverse, matrix_subtract};
 use larmorx_freesurfer_core::pdf::pdf_tod_seed;
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::{Environment, Settings};
+use larmorx_freesurfer_core::sse::{div64, mul64};
 use larmorx_freesurfer_core::system;
 use larmorx_freesurfer_core::utils::{get_vm_peak, nint};
 use larmorx_freesurfer_core::version::handle_version_option_whole;
+use larmorx_freesurfer_filter::mode::mri_mode_filter;
 use larmorx_freesurfer_filter::norm::{CONTROL_MARKED, mri_soap_bubble};
-use larmorx_freesurfer_gca::transform::GcaLtaIo;
+use larmorx_freesurfer_gca::gca::gca_alloc_max;
+use larmorx_freesurfer_gca::gcam::{gcam_invert, gcam_read};
+use larmorx_freesurfer_gca::ltamatrix::{SegRegCosts, mri_affine_displacement, seg_reg_cost};
+use larmorx_freesurfer_gca::morph::{gcam_morph_from_atlas_gca, gcam_morph_to_atlas};
+use larmorx_freesurfer_gca::transform::{GcaLtaIo, Transform, Xform, gcam_apply_transform};
+use larmorx_freesurfer_io::cfile::CFile;
 use larmorx_freesurfer_io::colortab::ctab_read_ascii;
+use larmorx_freesurfer_io::identify::id_name_from_stem;
 use larmorx_freesurfer_io::mriio::mri_write;
 use larmorx_freesurfer_io::registerio::{FLT2INT_ROUND, regio_write_register};
 use larmorx_freesurfer_mri::copy::mri_copy;
@@ -71,10 +83,10 @@ use larmorx_freesurfer_mri::ctab::ctab_deep_copy;
 use larmorx_freesurfer_mri::lta::{LINEAR_VOX_TO_VOX, REGISTER_DAT, lta_alloc};
 use larmorx_freesurfer_mri::mri::{
     MGZ_INTENT_UNKNOWN, MRI_FLOAT, Mri, SAMPLE_NEAREST, mri_alloc, mri_alloc_header,
-    mri_copy_header, mri_copy_pulse_parameters, mri_copy_vol_geom_to_mri,
+    mri_copy_header, mri_copy_pulse_parameters, mri_copy_vol_geom_to_mri, use_vol_geom_to_mri,
 };
 use larmorx_freesurfer_mri::tkreg::{fsl2tkreg, tkreg_mtx, xfm_crs2xyz_tkreg};
-use larmorx_freesurfer_mri::vol_geom::xfm_crs2xyz;
+use larmorx_freesurfer_mri::vol_geom::{VolGeom, xfm_crs2xyz};
 use larmorx_freesurfer_mri::voxel::mri_bounding_box;
 use larmorx_freesurfer_volume::arith::{Pair, mri_binarize, mri_clone, mri_clone_by_space};
 use larmorx_freesurfer_volume::frames::mri_randn;
@@ -91,8 +103,8 @@ use larmorx_freesurfer_volume::voxops::{
 };
 
 use super::options::{
-    Options, check_options, dump_options, identity, load_rtal, not_ported, or_null,
-    parse_commandline, print_matrix, read_header, read_volume, usage_exit,
+    Options, check_options, dump_options, identity, load_rtal, or_null, parse_commandline,
+    print_matrix, read_header, read_volume, usage_exit,
 };
 
 /// The program's name as `argv[0]` gives it (the scripts and sMRIPrep run it by name).
@@ -232,7 +244,12 @@ fn inverse(g: &mut Globals, r: &mut Run, m: Option<&Matrix>) -> Result<Option<Ma
 }
 
 /// `MRIwrite(m, name)`'s status.
-fn write_volume(g: &mut Globals, r: &mut Run, m: &mut Mri, name: &str) -> Result<i32, Fatal> {
+pub(crate) fn write_volume(
+    g: &mut Globals,
+    r: &mut Run,
+    m: &mut Mri,
+    name: &str,
+) -> Result<i32, Fatal> {
     let env = r.env.clone();
     mri_write(
         g,
@@ -253,7 +270,7 @@ fn lf(x: f64) -> String {
 }
 
 /// `GetVmPeak()`'s line.
-fn vmpc(g: &mut Globals, r: &mut Run) {
+pub(crate) fn vmpc(g: &mut Globals, r: &mut Run) {
     let peak = get_vm_peak(g);
     let _ = writeln!(r.out, "#VMPC# mri_vol2vol VmPeak {peak}");
 }
@@ -684,12 +701,19 @@ fn resample(
     print_matrix(g, r, m.as_ref());
     let _ = writeln!(r.out);
 
-    if o.disp_file.is_some() {
+    if let Some(dispfile) = o.disp_file.clone() {
         let _ = writeln!(r.out, "Computing affine displacment");
-        return Err(not_ported(
-            r,
-            "--disp (MRIaffineDisplacment, the affine displacement volume)",
-        ));
+        let Some(m) = o.r.as_ref() else {
+            return Err(Fatal::Exit(139));
+        };
+        let mut disp = mri_affine_displacement(g, r.out, r.err, &input, m)?;
+        // MRIwrite's status is not checked
+        write_volume(g, r, &mut disp, &dispfile)?;
+        if o.outvolfile.is_none() {
+            let _ = writeln!(r.out, "No other output specified, so exiting now");
+            vmpc(g, r);
+            return Err(Fatal::Exit(0));
+        }
     }
 
     let inv_r = inverse(g, r, o.r.as_ref())?;
@@ -782,14 +806,11 @@ fn resample(
         template.flip_angle = input.flip_angle;
         template.te = input.te;
     }
-    if o.do_morph {
-        return Err(not_ported(
-            r,
-            "the morphs (--morph, --inv-morph, --m3z: GCAMmorphToAtlas, GCAMmorphFromAtlas)",
-        ));
-    }
     let mut out: Mri;
-    if o.do_kernel {
+    if o.do_morph {
+        let mov_vg = movv!().vg.clone();
+        out = morph(g, r, &o, &input, &template.vg, &mov_vg)?;
+    } else if o.do_kernel {
         out = mri_clone_by_space(g, r.out, r.err, &template, MRI_FLOAT, 8)?;
         let _ = writeln!(r.out, "Computing Trilinear Kernel");
         mri_vol2vol_tl_kernel(g, r.out, r.err, &input, &mut out, vox2vox.as_ref())?;
@@ -872,11 +893,11 @@ fn resample(
         }
     }
 
-    if o.seg_reg_cost_file.is_some() {
-        return Err(not_ported(
-            r,
-            "--cost (SegRegCost, the segmentation-based registration cost)",
-        ));
+    if let Some(costfile) = o.seg_reg_cost_file.clone() {
+        seg_reg_cost_line(g, r, &o, &out, &costfile)?;
+        if o.cost_only {
+            return Err(Fatal::Exit(0));
+        }
     }
     if o.slice_crop_flag {
         let _ = writeln!(
@@ -1048,4 +1069,198 @@ fn downsampled(g: &mut Globals, r: &mut Run, o: &Options, mov: &Mri) -> Result<M
     (t.ystart, t.yend) = half(t.ysize, t.height);
     (t.zstart, t.zend) = half(t.zsize, t.depth);
     Ok(t)
+}
+
+/// The morphs (`main` 999-1072): `--morph` (`--m3z`): the morph `$SUBJECTS_DIR/<subject>/mri/
+/// transforms/<m3z>` (`talairach.m3z` unless `--m3z`; with `--noDefM3zPath` the `--m3z` name as
+/// it is) read (`GCAMread`, `Reading gcam`) and the input resampled onto its atlas
+/// (`GCAMmorphToAtlas`, `Applying morph to input`); `--inv-morph`: the morph inverted on a
+/// `float` volume of its image's grid (`GCAMinvert`), the registration (`TransformRegDat2LTA` of
+/// the template, the moving volume and `R`, a voxel-to-voxel `TRANSFORM`) applied to its nodes
+/// (`GCAMapplyTransform`, `Applying reg to gcam`: no effect on the inverse already made), and the
+/// input resampled back onto the image (`GCAMmorphFromAtlas` with an atlas of the input's extent,
+/// `gcaAllocMax(1, 1, 1, ...)`: every voxel through the inverse, clamped into the input; `Applying
+/// inverse morph to input`). `--filter`: the mode filter of the result (`MRImodeFilter`, one pass,
+/// `filtering labeled volume...`). FS-1191: a morph name of 1,000 bytes or more.
+fn morph(
+    g: &mut Globals,
+    r: &mut Run,
+    o: &Options,
+    input: &Mri,
+    template_vg: &VolGeom,
+    mov_vg: &VolGeom,
+) -> Result<Mri, Fatal> {
+    let Some(ltareg) = transform_reg_dat2_lta(g, r.out, r.err, template_vg, mov_vg, o.r.as_ref())?
+    else {
+        return Err(Fatal::Exit(139));
+    };
+    let mut rtransform = Transform::new(LINEAR_VOX_TO_VOX, Xform::Lta(ltareg));
+    let _ = writeln!(r.out, "Reading gcam");
+    let gcamfile = if o.def_m3z_path {
+        let sd = o.subjects_dir.clone().unwrap_or_default();
+        let subj = String::from_utf8_lossy(&o.subject_text()).into_owned();
+        format!("{sd}/{subj}/mri/transforms/{}", o.m3zfile)
+    } else {
+        o.m3zfile.clone()
+    };
+    if gcamfile.len() >= 1000 {
+        g.notices.add(
+            &FS_1191,
+            format!(
+                "mri_vol2vol: the morph's name of {} bytes used whole (FreeSurfer's buffer holds 999: the official build aborts)",
+                gcamfile.len()
+            ),
+        );
+        if g.notices.reproduce() {
+            return Err(overflow_abort(r));
+        }
+    }
+    let env = r.env.clone();
+    let Some(mut gcam) = gcam_read(g, r.out, r.err, &env, r.dir, &gcamfile)? else {
+        return Err(Fatal::Exit(1));
+    };
+    let out = if !o.invert_morph {
+        let _ = writeln!(r.out, "Applying morph to input");
+        gcam_morph_to_atlas(g, r.out, r.err, &env, input, &gcam, None, -1, o.interpcode)?.into_new()
+    } else {
+        let image = gcam.image.clone();
+        let mut tmp = mri_alloc(
+            g,
+            r.out,
+            r.err,
+            image.width,
+            image.height,
+            image.depth,
+            MRI_FLOAT,
+        )?;
+        use_vol_geom_to_mri(g, r.out, r.err, &image, &mut tmp.vg)?;
+        gcam_invert(g, r.out, r.err, &env, r.dir, &mut gcam, Some(&tmp))?;
+        drop(tmp);
+        let _ = writeln!(r.out, "Applying reg to gcam");
+        gcam_apply_transform(g, r.out, r.err, &env, &mut gcam, &mut rtransform)?;
+        let _ = writeln!(r.out, "Applying inverse morph to input");
+        let gca = gca_alloc_max(
+            g,
+            r.out,
+            r.err,
+            1,
+            1.0,
+            1.0,
+            [input.vg.width, input.vg.height, input.vg.depth],
+            0,
+            0,
+            None,
+        )?;
+        gcam_morph_from_atlas_gca(
+            g,
+            r.out,
+            r.err,
+            &env,
+            r.dir,
+            input,
+            &mut gcam,
+            Some(&gca),
+            None,
+            o.interpcode,
+        )?
+        .into_new()
+    };
+    let Some(mut out) = out else {
+        return Err(Fatal::Exit(1));
+    };
+    if o.setfilter {
+        let _ = writeln!(r.out, "filtering labeled volume...");
+        out = mri_mode_filter(g, r.out, r.err, &out, None, 1)?;
+    }
+    Ok(out)
+}
+
+/// `--cost <file>` (`main` 1075-1092): the segmentation `$SUBJECTS_DIR/<subject>/mri/regseg`
+/// (`IDnameFromStem`: `.nii`, `.nii.gz`, `.mgh`, `.mgz`, ...; read whole) and the resampled volume's
+/// white matter and cortex statistics ([`seg_reg_cost`]), appended to the file as one line:
+/// `--trans`'s three numbers (`%7.3lf `), `--rot`'s three in degrees (`%5.1lf `), the white
+/// matter's count, mean and standard deviation (`%7d %10.4lf %8.4lf `), the cortex's, `t` and the
+/// cost (`%8.4lf %8.4lf `). A segmentation that does not read ends the program (status 1).
+/// FS-1193: no volume of that stem (FreeSurfer crashes); FS-1187: a cost refused (FreeSurfer
+/// writes numbers it never computed); FS-1186: a file that does not open (FreeSurfer crashes).
+fn seg_reg_cost_line(
+    g: &mut Globals,
+    r: &mut Run,
+    o: &Options,
+    out: &Mri,
+    costfile: &str,
+) -> Result<(), Fatal> {
+    let sd = o.subjects_dir.clone().unwrap_or_default();
+    let subj = String::from_utf8_lossy(&o.subject_text()).into_owned();
+    let stem = format!("{sd}/{subj}/mri/regseg");
+    if fixed_buffer(g, &stem, 2000, "the regseg segmentation's name") {
+        return Err(overflow_abort(r));
+    }
+    let Some(fspec) = id_name_from_stem(g, r.dir, &stem) else {
+        g.notices.add(
+            &FS_1193,
+            format!(
+                "mri_vol2vol --cost: no volume {stem}.* (FreeSurfer reads a null name and crashes)"
+            ),
+        );
+        if g.notices.reproduce() {
+            return Err(Fatal::Exit(139));
+        }
+        let _ = writeln!(
+            r.out,
+            "ERROR: --cost: cannot find the segmentation {stem} (.nii, .nii.gz, .mgh, .mgz, ...)"
+        );
+        return Err(Fatal::Exit(1));
+    };
+    let Some(regseg) = read_volume(g, r, &fspec)? else {
+        return Err(Fatal::Exit(1));
+    };
+    let mut costs: SegRegCosts = [0.0; 8];
+    if !seg_reg_cost(g, r.out, r.err, &regseg, out, &mut costs)? {
+        g.notices.add(
+            &FS_1187,
+            "mri_vol2vol --cost: the cost was refused (FreeSurfer writes eight numbers it never computed: memory contents)",
+        );
+        if !g.notices.reproduce() {
+            return Err(Fatal::Exit(1));
+        }
+    }
+    let mut fp = match CFile::open(r.dir, costfile, "a") {
+        Ok(f) => f,
+        Err(e) => {
+            g.errno = e;
+            g.notices.add(
+                &FS_1186,
+                format!("mri_vol2vol --cost: {costfile} does not open (FreeSurfer writes through a null file and crashes)"),
+            );
+            if g.notices.reproduce() {
+                return Err(Fatal::Exit(139));
+            }
+            let _ = writeln!(r.out, "ERROR: could not open {costfile}");
+            return Err(Fatal::Exit(1));
+        }
+    };
+    let mut line = String::new();
+    for t in o.xyztrans {
+        line.push_str(&format!("{} ", fmt_f(t, 7, 3)));
+    }
+    for a in o.angles {
+        let deg = div64(mul64(a, 180.0), std::f64::consts::PI);
+        line.push_str(&format!("{} ", fmt_f(deg, 5, 1)));
+    }
+    for k in [0usize, 3] {
+        let n = float_to_int(g, costs[k], "mri_vol2vol --cost");
+        line.push_str(&format!(
+            "{n:7} {} {} ",
+            fmt_f(costs[k + 1], 10, 4),
+            fmt_f(costs[k + 2], 8, 4)
+        ));
+    }
+    line.push_str(&format!(
+        "{} {} \n",
+        fmt_f(costs[6], 8, 4),
+        fmt_f(costs[7], 8, 4)
+    ));
+    let _ = fp.write_all(line.as_bytes());
+    Ok(())
 }

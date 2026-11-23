@@ -6,8 +6,8 @@
 //! or changed and every folder it made; the case's folder as `<DIR>`, the noise seed, `VmPeak`
 //! and the transforms' `# created by` line masked) for the probe's cases of seed 1, recorded by
 //! `validation/probes/fs-vol2vol/check.py --seed 1 --n <N>` on Linux x64, against the port's
-//! lines with `reproduce` (cases whose result in FreeSurfer is undefined or whose path relay 53
-//! leaves for later, `check.py`'s `SKIP`, hashed as `SKIP`).
+//! lines with `reproduce` (cases whose result in FreeSurfer is undefined: a crash or memory
+//! contents, `check.py`'s `SKIP`, hashed as `SKIP`).
 
 #[path = "fs_vol2vol/cases.rs"]
 mod cases;
@@ -15,14 +15,14 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-23 from the official program (`check.py --seed 1 --n 400`): 400 cases, 387
-/// lines identical, 13 hashed as `SKIP`.
-const N: usize = 400;
-const OFFICIAL_SHA256: &str = "481398e593805b6d03285710b28e3a001bdeb74bfc6cdc0d9ed5b893cbc1f776";
-const SKIPPED: usize = 13;
+/// Recorded 2026-11-23 from the official program (`check.py --seed 1 --n 600`, relay 54: part 2's
+/// cases in): 600 cases, 567 lines identical, 33 hashed as `SKIP`.
+const N: usize = 600;
+const OFFICIAL_SHA256: &str = "9742f37adc504fb61ad6597005ee854f9f46faaf7c40c6633a5f224dcad63073";
+const SKIPPED: usize = 33;
 
 /// `check.py`'s `SKIP` (the port's pseudo-notices).
-const SKIP: [&str; 2] = ["CRASH", "NOTPORTED"];
+const SKIP: [&str; 3] = ["CRASH", "NOTPORTED", "MEMORY"];
 
 #[test]
 fn reproduce_gives_the_official_outputs() {

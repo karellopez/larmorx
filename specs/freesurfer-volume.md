@@ -2751,7 +2751,13 @@ its voxels are read or written: FS-58.
   is `>= thresh` (`<= thresh` for the inverse) becomes `label` (as a byte) when any of its 27 neighbourhood bytes in
   `tmp` is `label`; then the box grows to include the last neighbour visited (`x+1`, `y+1`, `z+1` clamped) and a voxel
   that was not `label` in `dst` counts as added; every visited voxel of `dst` is written (its `tmp` byte or `label`).
-  A step that adds none ends the steps. With `niter` 0 or below no copy is made and FreeSurfer's final free prints
+  A step that adds none ends the steps. `dst` itself is not checked: a given `dst` of another extent or frame count
+  meets `MRIcopy`'s rules (fs.mri §13, FS-163: refused by default; with `reproduce` FreeSurfer's placement where every
+  row lands inside `dst`, and in both modes, noted, the error `MRIcopy: the destination is too small for the source's
+  voxels` (status 252) where a row would not: FreeSurfer then writes past `dst`, memory it does not own, which on the
+  probe lands in the allocator's slack and prints `dst`'s own voxels the same in every run, so the loop allows that
+  line by name, §69.3) (**(observed)**: `vrules22`, a row of eight bytes into a given destination of four). With
+  `niter` 0 or below no copy is made and FreeSurfer's final free prints
   `MRIfree: null pointer` as an error (`specs/freesurfer-core.md` §2's C-style error, returning: the program goes on)
   (**(observed)**: `vmorph`; `vrules22`, a row of eight bytes whose label moves one voxel further at each of three
   steps through the raised bound, no steps, a label of 386, thresholds equal to and above the values).
@@ -2839,7 +2845,9 @@ its voxels are read or written: FS-58.
   parameters; a `col` of other dimensions (frames compared): `ERROR: MRIbinMaskToCol: input/output dim mismatch`, none.
   Frame 0: the column where the mask is not below 0.5, else 0.
 - `MRIpercentThresh(mri, mask, frame, pct)`: columns outermost, `frame`'s values (`double`) where the mask is not below
-  0.5 (a NaN mask value is not below), sorted by the C library's `qsort` (glibc's merge order, `specs/glibc-qsort.md`)
+  0.5 (a NaN mask value is not below; a `frame` past the volume's frames is read as fs.mri §5 reads it: FS-53, noted,
+  memory FreeSurfer does not own, which its runs often read the same), sorted by the C library's `qsort` (glibc's
+  merge order, `specs/glibc-qsort.md`)
   with `CompareDoubles` (-1 when `a < b`, +1 when `a > b`, else 0: equal values, +0 and -0 included, and NaNs keep
   their order); the value at `npct = (int) round(n (100 - pct) / 100)` (`double`). FS-495: `npct` from `n` to
   the volume's voxel count minus 1 gives 0 in FreeSurfer (the list's unused, zeroed part); FS-496: `npct` below 0,
@@ -4354,6 +4362,12 @@ standard error) are taken out and their IDs kept. Every line must be identical, 
   transform the array does not hold, read), FS-509 in `vrules15` (§55: a tissue type of 100 counted past
   FreeSurfer's array, a value of its memory), FS-517 in `vrules15` and `vrules16` (§57: larmorx ends where FreeSurfer, as its
   build compiles the overflow, returns a crop of zeros);
+- in both modes, single lines named by the loop (`compare.py`'s `both_lines`) where FreeSurfer reads or writes memory
+  it does not own and the probe's four runs still agree (a write in the allocator's slack, or bytes every run leaves
+  the same), when the candidate noted the line's defect: FS-163 on `vrules22`'s threshold dilation into a destination
+  too small (§50), FS-496 on its three `MRIpercentThresh` lines whose position is past the list's allocation or below
+  0, FS-53 on `vset`'s seven `MRIpercentThresh` lines that read a frame past the volume's (a run with another heap
+  layout may print other values there);
 - in both modes, the `bvr` line without a cache that FreeSurfer ends at its licence check (§23:
   `EXIT 255` with the licence message; LARMORX performs none).
 

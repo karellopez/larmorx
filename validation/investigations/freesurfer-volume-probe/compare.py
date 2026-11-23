@@ -97,6 +97,11 @@ class Batch:
     # there is memory it never wrote, or memory outside the table it reads: a line noting one of them
     # may differ in both modes
     both: str = ""
+    # the same for single lines (a line's text -> its defects): lines where FreeSurfer reads or
+    # writes memory it does not own and the probe's four runs still agree (the read or write lands
+    # in the allocator's slack, or reads bytes every run leaves the same), which the loop cannot see
+    # as memory lines
+    both_lines: dict[str, str] = field(default_factory=dict)
 
 
 def block(fields: dict[str, str], order: list[str] | None = None) -> list[str]:
@@ -5428,10 +5433,12 @@ class Gen18(Gen17):
                         str(r.choice([0, 1, 2, 3])),
                     ]
                 L.append(f"cnbhd {a} 0 {n} {' '.join(pts)}")
+        past = {}
         for _ in range(50):
             d = dims()
             t = r.choice([0, 1, 3, 3])
-            a = self.p9vol(r, d, t, r.choice([1, 2]))[0]
+            nf = r.choice([1, 2])
+            a = self.p9vol(r, d, t, nf)[0]
             mk = (
                 "null"
                 if r.random() < 0.4
@@ -5440,6 +5447,10 @@ class Gen18(Gen17):
             frame = 0 if mk == "null" or r.random() < 0.7 else 1
             pct = r.choice([10.0, 25.0, 50.0, 90.0, 99.0, 1.0])
             L.append(f"pthr {a} 0 {mk} {frame} {f64(pct)}")
+            if frame >= nf:
+                # FS-53: a frame past the volume's, read from memory FreeSurfer does not own (often
+                # the same in every run)
+                past[L[-1]] = "FS-53"
         for _ in range(100):
             d = dims()
             t = r.choice(T)
@@ -5476,7 +5487,7 @@ class Gen18(Gen17):
                 L.append(
                     f"slv {a} 0 {lb} 0 {self.dst10(r, d, t, nf, other=True)} {r.choice([1, 2, 3, 0])} {f32(r.choice([9.0, 0.5, -2.0, 1e6]))}"
                 )
-        return [Batch("vset", "vset", L)]
+        return [Batch("vset", "vset", L, both_lines=past)]
 
     def vmorph(self) -> list[Batch]:
         """§50: MRIerodeNN (each neighbourhood, edges eroded or not), MRIerode, MRIerode2D,
@@ -5731,7 +5742,11 @@ class Gen18(Gen17):
                 (130, 2, 201),
             ):
                 L.append(f"dtl {k} {row} 0 {val} 0 new {lab_} {nit} {th}")
-        L.append(f"dtl 0 {row} 0 {val} 0 {self.lab(P((4, 1, 1)), [0], t=0)} 130 1 115")
+        small = f"dtl 0 {row} 0 {val} 0 {self.lab(P((4, 1, 1)), [0], t=0)} 130 1 115"
+        L.append(small)
+        # FreeSurfer's copy writes the source's 8 bytes into the destination's 4 (memory it does not
+        # own, in the allocator's slack: the same in every run); both modes refuse it (FS-163)
+        both_lines = {small: "FS-163"}
         for k in (0, 1):
             for lab_, nit in ((130, 0), (130, -1), (386, 2), (130, 2)):
                 L.append(f"dlab {k} {row} 0 new {lab_} {nit}")
@@ -5769,8 +5784,14 @@ class Gen18(Gen17):
         pz = self.lab(P((3, 2, 2)), [0.0] * 12, t=3) + " 0"
         for pct in (50.0, 0.0, 12.5, -200.0, 300.0, float("nan"), 100.0, 99.0):
             L.append(f"pthr {pv} 0 {pm} 0 {f64(pct)}")
+            if pct in (-200.0, 300.0):
+                # FS-496: the position 12 (the voxel count) and -8, read from memory FreeSurfer does
+                # not own (often the same in every run)
+                both_lines[L[-1]] = "FS-496"
         for pct in (0.0, 50.0, 100.0):
             L.append(f"pthr {pv} 0 null 0 {f64(pct)}")
+            if pct == 0.0:
+                both_lines[L[-1]] = "FS-496"
         L.append(f"pthr {pv} 0 {pz} 0 {f64(50.0)}")
         # MRImask: the variable's forms, the diagnostic line, another type, another geometry of
         # another extent (MRImaskDifferentGeometry), the same geometry
@@ -5830,7 +5851,7 @@ class Gen18(Gen17):
             pts += [str(w), "0", "0", "0", "1"]
         L.append(f"cnbhd {cn} 0 6 {' '.join(pts)}")
         return [
-            Batch("vrules22", "vrules22", L),
+            Batch("vrules22", "vrules22", L, both_lines=both_lines),
             Batch("vrules22", "vrules22-hang", H, guards=False),
         ]
 
@@ -6249,6 +6270,10 @@ def main() -> int:
                 noted.update(ids)
                 continue
             if b.both and any(d in ids for d in b.both.split(",")):
+                t["defect corrected"] += 1
+                noted.update(ids)
+                continue
+            if any(d in ids for d in b.both_lines.get(src, "").split(",") if d):
                 t["defect corrected"] += 1
                 noted.update(ids)
                 continue

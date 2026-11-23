@@ -85,6 +85,11 @@ It exits with 1 when a compared case differs in `reproduce`, or differs in `fix`
 Run it in a memory box: the phantom's inputs take about 2 GiB to write, each case less than 500
 MiB, `--jobs` cases at once.
 
-## Results (observed, relay 55 of track D, 2026-11-24)
+## Results (observed, relay 55 of track D, 2026-11-23)
 
-See the end of this file (filled from the runs of the record).
+The replica as the candidate (`docs/validation/freesurfer-mri-cc.md`): seed 1, 112 cases: `reproduce` 107
+identical, 5 counted (FS-53: an empty segmentation, `-t 1000000` and `-t 200` on both paths, the 0.45 mm white
+matter, whose seed search reads past the 64^3 volume), 0 different; `fix` 41 identical, 66 explained by a notice,
+0 unexplained; with `--heads` 24 more: 24 identical in `reproduce`, `fix` 23 identical and 1 explained (FS-1210 on
+ds004173's v8 head). Seed 2: 107 identical, 5 counted, 0 different; `fix` 40 identical, 67 explained, 0
+unexplained.

@@ -231,3 +231,19 @@ head's subject folder, the official program and the port in both modes, every fi
   not compared: no diagnostic setting is ever given to the official program (its licence check
   prints the licence file from a diagnostic level of 1).
 
+## 7. The open probe, the spec and the record (relay 55)
+
+- The open probe `validation/investigations/freesurfer-mri-cc-probe/` (112 command lines on seeded subjects: small
+  32^3 ones, a conformed 256^3 phantom head with flat medial faces, a callosum whose two white-matter labels
+  interleave at the midline and ventricles, as a NIfTI `wm`, a COR folder and at 1.4 mm; `--heads` the recorded
+  heads): with the replica as the candidate every compared case is FreeSurfer's in `reproduce` and explained in
+  `fix` (numbers in `docs/validation/freesurfer-mri-cc.md`). The phantom reaches the whole aseg path (the plane
+  search, the upright frame, the fornix's removal with `WARNING: min_x_fornix not set` on its slices: FS-1202's
+  case, though FreeSurfer's shaving erases no voxel there) and the whole white-matter path.
+- The 0.45 mm white matter (64^3) does not reach FS-1206: its seed search reads past the volume (FS-53) and finds no
+  column (FS-1210), so no slice table is made; a volume large enough at 0.45 mm (569^3) was not run.
+- Its first record run found the probe's own fault: `--all-info`'s `TimeStamp` of a cached official run against a
+  fresh one; masked since.
+- `specs/mri_cc.md` is the clean room's input (both paths' maths and operation order, every message, the exit
+  statuses, the defects); the record `docs/validation/freesurfer-mri-cc.{json,md}` from the clean 1e9f3f4d.
+

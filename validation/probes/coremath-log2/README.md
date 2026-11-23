@@ -63,7 +63,7 @@ all of them, NaN bits included; the seeded hashes are `0x7fdf578b8ea688b3` (the 
 copied here) with this folder's minimal `math_config.h` and runs nothing; then, in `<out>`:
 `./cmp 67108864` compares the form without `HAVE_FAST_FMA` and without FMA code against the system's
 `log2` on 402,653,199 arguments (six families of 2^26 and special values): 0 differ; `./cmp_fma
-67108864` the `HAVE_FAST_FMA` form built with `-mfma -mavx2`: 175,963 differ (all next to 1 or in
-the main path's last bit). `search*.c` and `near1.c` tried every combination of fused and unfused
+67108864` the `HAVE_FAST_FMA` form built with `-mfma -mavx2` (GCC 11.4): 175,963 differ, next to 1
+and in the main path. `search*.c` and `near1.c` tried every combination of fused and unfused
 multiply-adds in both paths (`search3`: the non-FMA form with no fusion is the only one with 0 of
 200,000 differing). glibc's own code was not read; its `log2` is called as a black box.

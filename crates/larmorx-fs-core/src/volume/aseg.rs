@@ -504,12 +504,19 @@ impl Process {
                     self.put_out(b"MRIapplySpmWarp(): changing Source LTA type to vox2vox\n");
                     self.lta_change_type(l, lta_type::LINEAR_VOX_TO_VOX)?;
                 }
-                // the volume the array's source: its matrix inverted (the array itself untouched)
+                // SPM's input space: the first transform's end that is not the volume (its
+                // destination when the volume is its source, the map then the inverse of its
+                // matrix; else its source and its matrix); the array itself untouched
                 let inverted = self.lta_mri_is_source(l, vol)? != 0;
                 let Some(first) = l.xforms.first() else {
                     return Ok(VolOut::Nothing);
                 };
-                let (g, fw) = (first.src.clone(), first.m_l.clone());
+                let g = if inverted {
+                    first.dst.clone()
+                } else {
+                    first.src.clone()
+                };
+                let fw = first.m_l.clone();
                 let m = if inverted {
                     self.put_out(b"MRIapplySpmWarp(): inverting Source LTA\n");
                     returned(self.matrix_inverse(fw.as_ref(), None)?)
@@ -531,7 +538,9 @@ impl Process {
             vol.geom.height as f32,
             vol.geom.depth as f32,
         );
-        let mut val: Option<f64> = None;
+        // the sampler's value, kept across frames and voxels; whether the call wrote one yet
+        let mut val = 0f64;
+        let mut written = false;
         let dst: &mut Mri = match (&mut own, &mut given) {
             (Some(m), _) => m,
             (None, Some(m)) => m,
@@ -577,26 +586,27 @@ impl Process {
                         continue;
                     }
                     for f in 0..vol.nframes {
-                        let mut v = 0f64;
-                        let ok = self.mri_sample_volume_frame_type(
+                        // a refused trilinear sample writes nothing (the last value stays); the
+                        // nearest sampler's refusal writes 0
+                        let wrote = self.frame_type_kept(
                             vol,
                             f64::from(x),
                             f64::from(y),
                             f64::from(z),
                             f,
                             interp,
-                            &mut v,
-                        )? == 0;
-                        if ok {
-                            val = Some(v);
-                        } else if val.is_none() {
+                            &mut val,
+                        )?;
+                        if wrote {
+                            written = true;
+                        } else if !written {
                             self.note(
                                 &FS_511,
                                 "MRIapplySpmWarp: a sample that failed before any succeeded stored 0 (FreeSurfer: a value never written)",
                             );
-                            val = Some(0.0);
+                            val = 0.0;
                         }
-                        let x = sse::narrow(val.unwrap_or(0.0));
+                        let x = sse::narrow(val);
                         self.mri_set_vox_val(dst, c, r, s, f, x, 0)?;
                     }
                 }

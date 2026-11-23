@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-//! Crops (spec §57): `MRIcropToFoV`, `MRIcropAroundCRS` (FS-517) and `MRIcropAroundRAS` (FS-515,
-//! FS-516).
+//! Crops (spec §57): `MRIcropToFoV`, `MRIcropAroundCRS` (FS-517) and `MRIcropAroundRAS` (FS-268,
+//! FS-515, FS-516).
 
-use larmorx_core::defects::{FS_515, FS_516, FS_517};
+use larmorx_core::defects::{FS_268, FS_515, FS_516, FS_517};
 
 use super::ltachain::LtaInto;
 use super::sample::cvtt;
@@ -134,7 +134,8 @@ impl Process {
     /// `round(center - floor((FoV - 1) / 2))` on, `FoV` of them per axis; inside the volume
     /// `MRIextractRegion`, otherwise a new volume (its centre from its first voxel's RAS) with the
     /// voxels inside copied; with `keep`, voxels whose value is none of its labels become 0.
-    /// FS-517: a last voxel beyond `int` ends the program in both modes.
+    /// FS-517: a last voxel beyond `int` ends the program in both modes after the limits, one at
+    /// `int`'s maximum after the new volume's `P0` and `c_ras` lines.
     pub fn mri_crop_around_crs(
         &mut self,
         vol: &mut Mri,
@@ -146,11 +147,13 @@ impl Process {
         let mut first = [0i32; 3];
         let mut last = [0i32; 3];
         let mut beyond = false;
+        let mut at_max = false;
         for k in 0..3 {
             let half = (f64::from(fov[k]) - 1.0) / 2.0;
             first[k] = cvtt(sse::sub64(center[k], half.floor()).round());
             let l = i64::from(first[k]) + i64::from(fov[k]) - 1;
             beyond |= i32::try_from(l).is_err();
+            at_max |= l == i64::from(i32::MAX);
             last[k] = l as i32;
         }
         let mut b = format!("MRIcropAroundCRS()\nvol size {w} {h} {d}\ncenter ").into_bytes();
@@ -171,15 +174,7 @@ impl Process {
         }
         self.put_out(&b);
         if beyond {
-            self.note(
-                &FS_517,
-                "MRIcropAroundCRS: a last voxel beyond the int range: the program ended (FreeSurfer loops through the int range and writes outside the volume)",
-            );
-            self.error_exit(
-                codes::BAD_PARM,
-                b"MRIcropAroundCRS(): the last voxel lies beyond the int range (FreeSurfer loops through the int range and writes outside the volume here)\n",
-            )?;
-            return Ok(None);
+            return self.crop_fs517("beyond the int range");
         }
         let ext = [w, h, d];
         let inside = (0..3).all(|k| first[k] >= 0 && last[k] < ext[k]);
@@ -218,6 +213,9 @@ impl Process {
             b.extend_from_slice(&g3(m.geom.c.map(sse::widen), b" "));
             b.push(b'\n');
             self.put_out(&b);
+            if at_max {
+                return self.crop_fs517("at the int maximum");
+            }
             for c in 0..fov[0] {
                 for r in 0..fov[1] {
                     for s in 0..fov[2] {
@@ -252,6 +250,20 @@ impl Process {
         Ok(Some(out))
     }
 
+    /// FS-517's end (§57, both modes): a crop whose last voxel lies past `int`'s range, or at its
+    /// maximum (after the new volume's lines), ends the program, noted.
+    fn crop_fs517(&mut self, where_: &str) -> Result<Option<Mri>, Stop> {
+        self.note(
+            &FS_517,
+            format!("MRIcropAroundCRS: a last voxel {where_}: the program ended (FreeSurfer's crop overflows its limits or its loop counter)"),
+        );
+        self.error_exit(
+            codes::BAD_PARM,
+            format!("MRIcropAroundCRS(): the last voxel lies {where_} (FreeSurfer's crop overflows its limits or its loop counter here)\n").as_bytes(),
+        )?;
+        Ok(None)
+    }
+
     /// `vg_isEqual` of a volume's geometry with one of an array's: by default the volume taken
     /// as valid; FS-516's `reproduce` its own `valid` flag.
     fn crop_vol_is(&mut self, vol: &VolGeom, g: &VolGeom, own_flag: bool) -> bool {
@@ -265,7 +277,7 @@ impl Process {
     /// `MRIcropAroundRAS(vol, rasCenter, voxFoVRAS, lta, iKeep)` (§57): the RAS centre's voxel
     /// by the inverse vox2ras (through a copy of the array made RAS to RAS, inverted when the
     /// volume is its source: FS-516's direction), each voxel axis the field of view its
-    /// orientation letter names (FS-515), then `MRIcropAroundCRS`.
+    /// orientation letter names (FS-268; FS-515), then `MRIcropAroundCRS`.
     pub fn mri_crop_around_ras(
         &mut self,
         vol: &mut Mri,
@@ -382,33 +394,59 @@ impl Process {
             b'S' | b'I' => Some(2),
             _ => None,
         };
-        // as FreeSurfer fills them (observed: vcrops): for each RAS axis k, the first voxel axis
-        // c whose letter names it gives entry k the field of view of entry c
-        let mut fov: [Option<i32>; 3] = [None; 3];
-        for (k, slot) in fov.iter_mut().enumerate() {
-            if let Some(c) = (0..3).find(|&c| axis_of(ostr[c]) == Some(k)) {
-                *slot = Some(fov_ras[c]);
+        // FreeSurfer's (FS-268): for each voxel axis k in order, entry k of the RAS fields of view
+        // goes to the voxel axis whose place is the RAS direction k's letter names, a later
+        // axis's write replacing an earlier one's
+        let mut theirs: [Option<i32>; 3] = [None; 3];
+        for (k, &ch) in ostr[..3].iter().enumerate() {
+            if let Some(a) = axis_of(ch) {
+                theirs[a] = Some(fov_ras[k]);
             }
         }
         let name = String::from_utf8_lossy(&ostr[..3]).into_owned();
-        let fov = if fov.iter().all(Option::is_some) {
-            fov.map(|f| f.unwrap_or(0))
-        } else if reproduce {
-            self.note(
-                &FS_515,
-                format!("MRIcropAroundRAS: the orientation {name} names an axis twice or is unknown: the field of view never set taken as 0 (FreeSurfer's memory contents)"),
-            );
-            fov.map(|f| f.unwrap_or(0))
+        let mut named = [0u8; 3];
+        for &ch in &ostr[..3] {
+            if let Some(a) = axis_of(ch) {
+                named[a] += 1;
+            }
+        }
+        let fov = if named != [1, 1, 1] {
+            // FS-515: a direction named twice, or an unknown orientation
+            if reproduce {
+                self.note(
+                    &FS_515,
+                    format!("MRIcropAroundRAS: the orientation {name} does not name each of the three directions once: a field of view never set taken as 0 (FreeSurfer's memory contents)"),
+                );
+                theirs.map(|f| f.unwrap_or(0))
+            } else {
+                self.note(
+                    &FS_515,
+                    format!("MRIcropAroundRAS: the orientation {name} does not name each of the three directions once: the program ended (FreeSurfer reads memory it does not own)"),
+                );
+                self.error_exit(
+                    codes::BAD_PARM,
+                    format!("MRIcropAroundRAS: the orientation {name} does not name each of the three directions once (FreeSurfer reads memory it does not own here)\n").as_bytes(),
+                )?;
+                return Ok(None);
+            }
         } else {
-            self.note(
-                &FS_515,
-                format!("MRIcropAroundRAS: the orientation {name} names an axis twice or is unknown: the program ended (FreeSurfer crops to a field of view never set)"),
-            );
-            self.error_exit(
-                codes::BAD_PARM,
-                format!("MRIcropAroundRAS(): the orientation {name} names an axis twice or is unknown (FreeSurfer crops to a field of view never set here)\n").as_bytes(),
-            )?;
-            return Ok(None);
+            // by default each voxel axis takes the entry its orientation letter names
+            let ours = [0, 1, 2].map(|c| axis_of(ostr[c]).map_or(0, |a| fov_ras[a]));
+            let theirs = theirs.map(|f| f.unwrap_or(0));
+            if ours != theirs {
+                if reproduce {
+                    self.note(
+                        &FS_268,
+                        format!("MRIcropAroundRAS: the orientation {name}: the fields of view given to the voxel axes the other way round (FreeSurfer's)"),
+                    );
+                } else {
+                    self.note(
+                        &FS_268,
+                        format!("MRIcropAroundRAS: the orientation {name}: each voxel axis took the field of view its letter names (FreeSurfer gives them the other way round)"),
+                    );
+                }
+            }
+            if reproduce { theirs } else { ours }
         };
         self.put_out(
             format!(

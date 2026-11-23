@@ -263,11 +263,11 @@ const GOLDEN: &[(&str, &str)] = &[
     ),
     (
         "segs57.fix",
-        "047348cde3ce21f1408a2a87ca4123e853b3faf5c416414985e068daf01199ef",
+        "178c5e4e37fbda6bbda8b3819c5e13695af0b50d9685fe9e2e4694d91a0f2392",
     ),
     (
         "segs57.reproduce",
-        "9604a9930481e8e48bef51a8a3fcbcaec25e116385ca9f1c11cee985e0d1fb17",
+        "e89796efaca01f7295f895553d65559d74726c9ba4dba75af0497539498d1568",
     ),
 ];
 

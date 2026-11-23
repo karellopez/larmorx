@@ -36,7 +36,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_1203, FS_1204};
+use larmorx_core::defects::{FS_1203, FS_1204, FS_1211, FS_1212, FS_1213, FS_1214, FS_1215};
 use larmorx_freesurfer_core::cstd::{atof, atoi, fmt_f};
 use larmorx_freesurfer_core::diag::{DIAG_VERBOSE, DIAG_WRITE, diag_init};
 use larmorx_freesurfer_core::globals::Globals;
@@ -159,7 +159,7 @@ pub fn run(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut 
             Err(f) => f.status(),
         }
     };
-    let keep = if i32::from(status) == SEGFAULT && g.notices.reproduce() {
+    let keep = if matches!(i32::from(status), SEGFAULT | ABORT) && g.notices.reproduce() {
         cout.kept_by_crash()
     } else {
         cout.buf.len()
@@ -195,10 +195,29 @@ fn need(g: &mut Globals, r: &mut Run, rest: &[String], n: usize) -> Result<(), F
     Err(Fatal::Exit(1))
 }
 
-/// `strcpy` into one of the names' `STRLEN` buffers (a longer name kept whole: the buffers are
-/// larmorx's own strings).
-fn name(s: &str) -> String {
-    s.to_owned()
+/// The status of a process ended by `SIGABRT` (glibc's fortified `strcpy`).
+const ABORT: i32 = 134;
+
+/// `strcpy` into one of the names' `STRLEN` buffers. FS-1212: a name of `STRLEN` bytes or more
+/// (the official build's checked `strcpy` aborts: `*** buffer overflow detected ***: terminated`,
+/// status 134, standard output lost); by default the name is kept whole.
+fn name(g: &mut Globals, r: &mut Run, what: &str, s: &str) -> Result<String, Fatal> {
+    if s.len() >= STRLEN {
+        g.notices.add(
+            &FS_1212,
+            format!(
+                "mri_cc: {what} of {} bytes is kept whole (FreeSurfer's {STRLEN}-byte buffer: it aborts)",
+                s.len()
+            ),
+        );
+        if g.notices.reproduce() {
+            let _ = r
+                .err
+                .write_all(b"*** buffer overflow detected ***: terminated\n");
+            return Err(Fatal::Exit(ABORT));
+        }
+    }
+    Ok(s.to_owned())
 }
 
 /// `get_option(argc, argv)` on `rest` (`argv[1]` and what follows): the arguments it takes after
@@ -214,7 +233,7 @@ pub fn get_option(
     let is = |g: &mut Globals, n: &str| stricmp(g, option, n) == 0;
     if is(g, "SDIR") {
         need(g, r, rest, 1)?;
-        o.sdir = name(&rest[1]);
+        o.sdir = name(g, r, "-sdir's value", &rest[1])?;
         let _ = writeln!(r.out, "using {} as SUBJECTS_DIR...", o.sdir);
         return Ok(1);
     }
@@ -232,20 +251,20 @@ pub fn get_option(
     }
     if is(g, "ASEG") {
         need(g, r, rest, 1)?;
-        o.aseg_fname = name(&rest[1]);
+        o.aseg_fname = name(g, r, "-aseg's value", &rest[1])?;
         let _ = writeln!(r.out, "will read input aseg from {}", o.aseg_fname);
         o.use_aseg = 1;
         return Ok(1);
     }
     if is(g, "NORM") {
         need(g, r, rest, 1)?;
-        o.norm_fname = name(&rest[1]);
+        o.norm_fname = name(g, r, "-norm's value", &rest[1])?;
         let _ = writeln!(r.out, "will read norm from {}", o.norm_fname);
         return Ok(1);
     }
     if is(g, "LTA") {
         need(g, r, rest, 1)?;
-        o.lta_fname = name(&rest[1]);
+        o.lta_fname = name(g, r, "-lta's value", &rest[1])?;
         let _ = writeln!(r.out, "will write lta as {}", o.lta_fname);
         o.write_lta = true;
         return Ok(1);
@@ -293,6 +312,17 @@ pub fn get_option(
             need(g, r, rest, 1)?;
             o.cc_divisions = atoi(rest[1].as_bytes());
             if o.cc_divisions > MAX_CC_DIVISIONS {
+                // FS-1211: FreeSurfer's message gives the count to a `%s`
+                g.notices.add(
+                    &FS_1211,
+                    format!(
+                        "mri_cc: -d {} is above {MAX_CC_DIVISIONS}: FreeSurfer's error message reads the count as text and crashes",
+                        o.cc_divisions
+                    ),
+                );
+                if g.notices.reproduce() {
+                    return Err(Fatal::Exit(SEGFAULT));
+                }
                 log::error_exit(
                     g,
                     r.err,
@@ -301,6 +331,34 @@ pub fn get_option(
                         "{NAME}: too many CC divisions specified (max = {MAX_CC_DIVISIONS})\n"
                     ),
                 )?;
+            }
+            if o.cc_divisions < 1 {
+                // FS-1213 (rule B): no compartment to count into
+                g.notices.add(
+                    &FS_1213,
+                    if g.notices.reproduce() {
+                        format!(
+                            "mri_cc: -d {}: the divisions' table is indexed before its start (memory outside it: not written), as FreeSurfer runs",
+                            o.cc_divisions
+                        )
+                    } else {
+                        format!(
+                            "mri_cc: -d {} is refused (FreeSurfer counts into the table's element before its start)",
+                            o.cc_divisions
+                        )
+                    },
+                );
+                if !g.notices.reproduce() {
+                    log::error_exit(
+                        g,
+                        r.err,
+                        ERROR_BADPARM,
+                        &format!(
+                            "{NAME}: the number of CC divisions must be at least 1 (-d {})\n",
+                            o.cc_divisions
+                        ),
+                    )?;
+                }
             }
             let _ = writeln!(
                 r.out,
@@ -327,7 +385,7 @@ pub fn get_option(
         }
         Some(b'O') => {
             need(g, r, rest, 1)?;
-            o.output_fname = name(&rest[1]);
+            o.output_fname = name(g, r, "-o's value", &rest[1])?;
             let _ = writeln!(r.out, "writing aseg with cc labels to {}", o.output_fname);
             Ok(1)
         }
@@ -351,7 +409,7 @@ pub fn get_option(
 /// `snprintf(buf, STRLEN, "%s/%s/mri/%s", ...)` with `main`'s truncation message on the C++ error
 /// stream (`std::cerr << __FUNCTION__ << ": Truncation on line " << line`) when the name is
 /// `STRLEN` bytes or more (cut to `STRLEN - 1` bytes).
-fn path_in(g: &mut Globals, r: &mut Run, name: String, line: u32) -> String {
+pub(crate) fn path_in(g: &mut Globals, r: &mut Run, name: String, line: u32) -> String {
     if name.len() < STRLEN {
         return name;
     }
@@ -362,6 +420,41 @@ fn path_in(g: &mut Globals, r: &mut Run, name: String, line: u32) -> String {
         end -= 1;
     }
     name[..end].to_owned()
+}
+
+/// FS-1215 (rule B): the callosum's slab, `center - thick` to `center + thick`, reaches past the
+/// volume's last column (`width`): FreeSurfer reads other voxels of the volume there (the next
+/// rows'), and further out memory past it (a crash). By default an error; `reproduce` goes on (the
+/// reads as fs.mri's accessors give them: FS-52, FS-53).
+pub(crate) fn slab_inside(
+    g: &mut Globals,
+    r: &mut Run,
+    center: i32,
+    thick: i32,
+    width: i32,
+) -> Result<(), Fatal> {
+    if i64::from(center) + i64::from(thick) < i64::from(width) {
+        return Ok(());
+    }
+    g.notices.add(
+        &FS_1215,
+        format!(
+            "mri_cc: the callosum's slab, column {center} +- {thick}, reaches past the volume's last column {}: FreeSurfer reads other voxels there",
+            width - 1
+        ),
+    );
+    if g.notices.reproduce() {
+        return Ok(());
+    }
+    log::error_exit(
+        g,
+        r.err,
+        ERROR_BADPARM,
+        &format!(
+            "{NAME}: the callosum's slab (column {center}, half thickness {thick}: -t) reaches past the volume's last column {}\n",
+            width - 1
+        ),
+    )
 }
 
 /// FS-1204: a file the program wrote that could not be written.
@@ -436,7 +529,7 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     let then = Timer::new();
     if o.sdir.is_empty() {
         match r.env.get("SUBJECTS_DIR") {
-            Some(v) => o.sdir = v.to_string_lossy().into_owned(),
+            Some(v) => o.sdir = name(g, r, "SUBJECTS_DIR", &v.to_string_lossy())?,
             None => {
                 log::error_exit(
                     g,
@@ -476,67 +569,69 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
         let _ = writeln!(r.out, "writing results to {ifname}");
     }
 
-    if o.use_aseg == 0 {
-        let _ = writeln!(
-            r.err,
-            "{NAME}: the white-matter path (-a 0) is not ported yet"
-        );
-        return Err(Fatal::Exit(1));
-    }
-    let ifname = path_in(
-        g,
-        r,
-        format!("{data_dir}/{subject}/mri/{}", o.aseg_fname),
-        240,
-    );
-    let _ = writeln!(r.out, "reading aseg from {ifname}");
-    let mut aseg = read_input(g, r, &ifname, "aseg")?;
-    if o.lh_only || o.rh_only {
-        let ofname = path_in(
-            g,
-            r,
-            format!("{data_dir}/{subject}/mri/{}", o.output_fname),
-            252,
-        );
-        let _ = writeln!(r.out, "copying aseg WITHOUT callosum to {ofname}...");
-        if write_volume(g, r, &mut aseg, &ofname)? != 0 {
-            unwritten(g, &ofname)?;
-        }
-        return Err(Fatal::Exit(0));
-    }
-    if mri_voxels_in_label(g, r.err, &aseg, CC_CENTRAL)? > 0 && !o.force {
-        let _ = r.out.flush();
-        log::error_exit(
-            g,
-            r.err,
-            77,
-            &format!(
-                "{NAME}: volume {ifname} already has CC in it.\nRun with -force to reprocess (not recommended)\n"
-            ),
-        )?;
-    }
-    let ifname = path_in(
-        g,
-        r,
-        format!("{data_dir}/{subject}/mri/{}", o.norm_fname),
-        275,
-    );
-    let _ = writeln!(r.out, "reading norm from {ifname}");
-    let norm = read_input(g, r, &ifname, "aseg")?;
-    let mut fornix = mri_clone(g, r.out, r.err, &aseg, None)?.unwrap_new();
-    let found = find_cc_with_aseg(g, r, &o, &aseg, &norm, &mut fornix)?;
     // FS-1204: a failed write ends the run with status 1 by default only after the rest is done
     let mut failed: Vec<String> = Vec::new();
-    if o.write_lta && found.lta_unwritten {
-        failed.push(o.lta_fname.clone());
+    // with the aseg: the aseg, the fornix and the transform that rotated them upright
+    let mut with_aseg: Option<(Mri, Mri, larmorx_freesurfer_mri::lta::Lta)> = None;
+    let (mut cc, xc, yc, zc);
+    if o.use_aseg == 0 {
+        let found = super::wm::find_cc_with_wm(g, r, &o, &data_dir, &subject)?;
+        failed.extend(found.unwritten);
+        (cc, xc, yc, zc) = (found.cc, found.xc, found.yc, found.zc);
+    } else {
+        let ifname = path_in(
+            g,
+            r,
+            format!("{data_dir}/{subject}/mri/{}", o.aseg_fname),
+            240,
+        );
+        let _ = writeln!(r.out, "reading aseg from {ifname}");
+        let mut aseg = read_input(g, r, &ifname, "aseg")?;
+        if o.lh_only || o.rh_only {
+            let ofname = path_in(
+                g,
+                r,
+                format!("{data_dir}/{subject}/mri/{}", o.output_fname),
+                252,
+            );
+            let _ = writeln!(r.out, "copying aseg WITHOUT callosum to {ofname}...");
+            if write_volume(g, r, &mut aseg, &ofname)? != 0 {
+                unwritten(g, &ofname)?;
+            }
+            return Err(Fatal::Exit(0));
+        }
+        if mri_voxels_in_label(g, r.err, &aseg, CC_CENTRAL)? > 0 && !o.force {
+            let _ = r.out.flush();
+            log::error_exit(
+                g,
+                r.err,
+                77,
+                &format!(
+                    "{NAME}: volume {ifname} already has CC in it.\nRun with -force to reprocess (not recommended)\n"
+                ),
+            )?;
+        }
+        let ifname = path_in(
+            g,
+            r,
+            format!("{data_dir}/{subject}/mri/{}", o.norm_fname),
+            275,
+        );
+        let _ = writeln!(r.out, "reading norm from {ifname}");
+        let norm = read_input(g, r, &ifname, "aseg")?;
+        let mut fornix = mri_clone(g, r.out, r.err, &aseg, None)?.unwrap_new();
+        let found = find_cc_with_aseg(g, r, &o, &aseg, &norm, &mut fornix)?;
+        if o.write_lta && found.lta_unwritten {
+            failed.push(o.lta_fname.clone());
+        }
+        drop(norm);
+        (cc, xc, yc, zc) = (found.cc, found.xc, found.yc, found.zc);
+        with_aseg = Some((aseg, fornix, found.lta));
     }
-    drop(norm);
-    let mut cc = found.cc;
-    let lta = found.lta;
 
     // the midsagittal slab divided along the axis nearest z
-    let xi = nint(g, found.xc);
-    let (yi, zi) = (nint(g, found.yc), nint(g, found.zc));
+    let xi = nint(g, xc);
+    let (yi, zi) = (nint(g, yc), nint(g, zc));
     let _ = writeln!(r.out, "cc center is found at {xi} {yi} {zi}");
     let mut m_evectors = matrix_alloc(g, r.out, r.err, 3, 3, MATRIX_REAL)?.expect("a real matrix");
     let mut evalues = [0f32; 3];
@@ -581,6 +676,7 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     }
     let ndiv = o.cc_divisions;
     let mut volume = [0f32; MAX_CC_DIVISIONS as usize];
+    slab_inside(g, r, xi, o.dxi, cc.vg.width)?;
     for i in xi.wrapping_sub(o.dxi)..=xi.wrapping_add(o.dxi) {
         for j in 0..cc.vg.height {
             for k in 0..cc.vg.depth {
@@ -612,6 +708,81 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
         }
     }
 
+    // with the aseg: the callosum pasted into it, the aseg written
+    let mut fornix_out = None;
+    if let Some((aseg, fornix, lta)) = with_aseg {
+        let (ofname, ok, fornix) =
+            paste_into_aseg(g, r, &o, &data_dir, &subject, cc, aseg, fornix, &lta)?;
+        if !ok {
+            failed.push(ofname);
+        }
+        fornix_out = Some(fornix);
+    }
+
+    if let Some(fp) = vol_fp.as_mut() {
+        if !(5..=MAX_CC_DIVISIONS).contains(&o.cc_divisions) {
+            // FS-1214: the five divisions printed, of which only the first `-d` were counted
+            g.notices.add(
+                &FS_1214,
+                format!(
+                    "mri_cc: the volume measurement file's line prints five divisions; with -d {} the others were never counted (memory contents): 0",
+                    o.cc_divisions
+                ),
+            );
+        }
+        let line = format!(
+            "{subject} {} {} {} {} {} \n",
+            nint(g, f64::from(volume[4])),
+            nint(g, f64::from(volume[3])),
+            nint(g, f64::from(volume[2])),
+            nint(g, f64::from(volume[1])),
+            nint(g, f64::from(volume[0]))
+        );
+        let _ = fp.write_all(line.as_bytes());
+        let _ = r.out.write_all(line.as_bytes());
+    }
+    // the fornix exists with the aseg only (FreeSurfer's `mri_fornix` is NULL with `-a 0`)
+    if let (Some(fornix), true) = (fornix_out.as_mut(), o.fornix) {
+        let ofname = path_in(g, r, format!("{data_dir}/{subject}/mri/fornix.mgz"), 711);
+        let _ = writeln!(r.out, "writing fornix to to {ofname}...");
+        write_volume(g, r, fornix, &ofname)?;
+    }
+    let msec = then.milliseconds();
+    let _ = writeln!(
+        r.out,
+        "corpus callosum segmentation took {} minutes",
+        fmt_f(f64::from(msec as f32 / 60000.0f32), 2, 1)
+    );
+    drop(vol_fp);
+    let peak = get_vm_peak(g);
+    let _ = writeln!(r.out, "#VMPC# mri_cc VmPeak  {peak}");
+    let _ = writeln!(r.out, "mri_cc done");
+    let mut status = Ok(());
+    for f in &failed {
+        if let Err(e) = unwritten(g, f) {
+            status = Err(e);
+        }
+    }
+    status
+}
+
+/// The aseg path's end (`mri_cc.cpp` 524-680): the callosum and the fornix rotated back, pasted
+/// into the aseg as the divisions' labels (and the fornix's with `f`), the holes between callosum
+/// voxels filled, the curved callosums' ends relabelled, the aseg written: its name, whether it
+/// was written, and the fornix (rotated back).
+#[allow(clippy::too_many_arguments)]
+fn paste_into_aseg(
+    g: &mut Globals,
+    r: &mut Run,
+    o: &Options,
+    data_dir: &str,
+    subject: &str,
+    mut cc: Mri,
+    mut aseg: Mri,
+    mut fornix: Mri,
+    lta: &larmorx_freesurfer_mri::lta::Lta,
+) -> Result<(String, bool, Mri), Fatal> {
+    let ndiv = o.cc_divisions;
     // the callosum and the fornix rotated back and pasted into the aseg
     let inv = lta.inv_xforms[0].m_l.clone();
     let tmp =
@@ -720,42 +891,5 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     );
     let _ = writeln!(r.out, "writing aseg with callosum to {ofname}...");
     let written = write_volume(g, r, &mut aseg, &ofname)? == 0;
-
-    if let Some(fp) = vol_fp.as_mut() {
-        let line = format!(
-            "{subject} {} {} {} {} {} \n",
-            nint(g, f64::from(volume[4])),
-            nint(g, f64::from(volume[3])),
-            nint(g, f64::from(volume[2])),
-            nint(g, f64::from(volume[1])),
-            nint(g, f64::from(volume[0]))
-        );
-        let _ = fp.write_all(line.as_bytes());
-        let _ = r.out.write_all(line.as_bytes());
-    }
-    if o.fornix {
-        let ofname = path_in(g, r, format!("{data_dir}/{subject}/mri/fornix.mgz"), 711);
-        let _ = writeln!(r.out, "writing fornix to to {ofname}...");
-        write_volume(g, r, &mut fornix, &ofname)?;
-    }
-    let msec = then.milliseconds();
-    let _ = writeln!(
-        r.out,
-        "corpus callosum segmentation took {} minutes",
-        fmt_f(f64::from(msec as f32 / 60000.0f32), 2, 1)
-    );
-    drop(vol_fp);
-    let peak = get_vm_peak(g);
-    let _ = writeln!(r.out, "#VMPC# mri_cc VmPeak  {peak}");
-    let _ = writeln!(r.out, "mri_cc done");
-    if !written {
-        failed.push(ofname);
-    }
-    let mut status = Ok(());
-    for f in &failed {
-        if let Err(e) = unwritten(g, f) {
-            status = Err(e);
-        }
-    }
-    status
+    Ok((ofname, written, fornix))
 }

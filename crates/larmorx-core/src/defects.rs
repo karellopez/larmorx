@@ -2054,7 +2054,29 @@ defects! {
     FS_1203 = "FS-1203", "FreeSurfer", true,
         "mri_cc given an option that takes a value (-sdir, -DEBUG_VOXEL, -aseg, -norm, -lta, -m, -d, -s, -a, -o, -t) as its last argument, without its value, reads past its arguments and crashes (signal 11): larmorx prints that the option needs its values and the help, status 1";
     FS_1204 = "FS-1204", "FreeSurfer", true,
-        "mri_cc ends with status 0 when its output aseg or the transform of -lta cannot be written: larmorx ends with status 1 after the writer's messages";
+        "mri_cc ends with status 0 when its output aseg, the transform of -lta or (with -a 0) cc_org.mgz cannot be written: larmorx ends with status 1 after the writer's messages";
+    FS_1205 = "FS-1205", "FreeSurfer", true,
+        "mri_cc -a 0 (the white-matter path) whose mri/wm does not read (it is not there, or it is a file whose format is not found without a suffix: recon-all writes wm.mgz) goes on and crashes (signal 11) once its Talairach transform is read: larmorx ends with 'could not read white matter volume from <file>', the status of a missing input";
+    FS_1206 = "FS-1206", "FreeSurfer", true,
+        "mri_cc -a 0 on voxels smaller than 0.5 mm makes more sagittal slices than its tables hold (42) and writes past them: larmorx ends with an error in both modes";
+    FS_1207 = "FS-1207", "FreeSurfer", true,
+        "mri_cc -a 0 on voxels larger than 1.3125 mm makes fewer sagittal slices (fewer than 17) than its choice of the midline reads, and reads areas it never computed (memory contents): larmorx reads them as 0 in both modes, with a notice";
+    FS_1208 = "FS-1208", "FreeSurfer", true,
+        "mri_cc -a 0's cut of the fornix compares the width of its first row with that of the row before it, which it never measured (memory contents): larmorx takes that width as 0 in both modes, with a notice";
+    FS_1209 = "FS-1209", "FreeSurfer", true,
+        "mri_cc -a 0 on a volume taller than 258 voxels or of more than 257 slices never ends (the cut of the fornix searches its sagittal slices only up to voxel 256): larmorx ends with an error in both modes";
+    FS_1211 = "FS-1211", "FreeSurfer", true,
+        "mri_cc -d with more than 50 divisions crashes (signal 11) in its own error message, which reads the count as text, and loses the messages before it: larmorx prints 'too many CC divisions specified (max = 50)', the status of an unsupported request";
+    FS_1212 = "FS-1212", "FreeSurfer", true,
+        "mri_cc given a name of 1,024 bytes or more (-sdir, -aseg, -norm, -lta, -o, or SUBJECTS_DIR) aborts in its checked copy into a 1,024-byte buffer (*** buffer overflow detected ***, signal 6) and loses its messages: larmorx keeps the name whole";
+    FS_1213 = "FS-1213", "FreeSurfer", true,
+        "mri_cc -d 0 or a negative count counts each callosum voxel into the element before its table of divisions (memory outside it) and labels the whole callosum with one label: larmorx refuses such a count by default";
+    FS_1214 = "FS-1214", "FreeSurfer", true,
+        "mri_cc's volume measurement file (written only with the diagnostic flags DIAG_WRITE and DIAG_VERBOSE) prints five divisions; with fewer than five (-d 1 to 4) it prints counts it never made (memory contents): larmorx prints 0 for them in both modes, with a notice";
+    FS_1215 = "FS-1215", "FreeSurfer", true,
+        "mri_cc -t with a half thickness that takes the callosum's slab past the volume's last column reads other voxels of the volume as the slab's (the next rows') and, further out, memory past the volume, where it crashes (a large -t: signal 11): larmorx refuses such a thickness by default";
+    FS_1210 = "FS-1210", "FreeSurfer", true,
+        "mri_cc -a 0 whose search for the callosum's seed fails (no column of the callosum's thickness near Talairach's origin, or 'could not find valid seed for the cc') uses the seed's Talairach millimetres as a voxel position (only the printed centre and the division counts depend on it): larmorx uses the seed's voxel";
     FS_974 = "FS-974", "FreeSurfer", true,
         "sampling a surface's long-range neighbours (MRISsampleDistances: mris_register, mris_sphere, mris_curvature) with the progress report on (Gdiag's heartbeat bit) divides by zero on a surface of fewer than 10 vertices: the program crashes (signal 8)";
     FS_975 = "FS-975", "FreeSurfer", true,

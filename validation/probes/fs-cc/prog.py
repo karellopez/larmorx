@@ -107,7 +107,10 @@ def main(argv: list[str] | None = None) -> int:
     if ws is None:
         raise SystemExit("no workspace with oracles/")
     if not a.golden:
-        raise SystemExit("the open probe's cases come with relay 55: use --golden")
+        raise SystemExit(
+            "the whole program's cases are the open probe's: "
+            "validation/investigations/freesurfer-mri-cc-probe/compare.py; here use --golden"
+        )
     exe = ws / FS_HOME / "bin" / "mri_cc"
     genv = {"PATH": f"{exe.parent}:/usr/bin:/bin", "LC_ALL": "C", "LANG": "C",
             "OMP_NUM_THREADS": "1", "USER": "probe", "FS_DISABLE_LANG": "1"}  # fmt: skip

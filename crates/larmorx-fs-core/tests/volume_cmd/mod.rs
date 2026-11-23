@@ -19,6 +19,7 @@ mod lta54;
 mod part7b;
 mod part8;
 mod part9;
+mod part10;
 mod segcrop;
 
 use std::io::Write;
@@ -1337,6 +1338,7 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                 && !lta54::call(p, l, &c)?
                 && !segcrop::call(p, l, &c)?
                 && !part9::call(p, l, &c)?
+                && !part10::call(p, l, &c)?
             {
                 args::bad("unknown command")
             }

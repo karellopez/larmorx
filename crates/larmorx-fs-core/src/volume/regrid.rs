@@ -52,7 +52,7 @@ fn apply(
 impl Process {
     /// The size check of `MRIreplaceValues` (§31, `MRIcheckVolDims`): another height, width or
     /// depth ends the program (code -4).
-    fn check_vol_dims(&mut self, a: &Mri, b: &Mri) -> Result<(), Stop> {
+    pub(crate) fn check_vol_dims(&mut self, a: &Mri, b: &Mri) -> Result<(), Stop> {
         for (what, x, y) in [
             ("height", a.geom.height, b.geom.height),
             ("width", a.geom.width, b.geom.width),

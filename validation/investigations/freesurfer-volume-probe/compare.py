@@ -4959,6 +4959,7 @@ class Runner:
         whose results differ between the plain run, a second plain run in another process (the
         stack below each call zeroed: MALLOC_PERTURB_=0, which leaves glibc's allocator as it is)
         and the two guard runs (a batch without guards: the plain runs only)."""
+        licence_guard(b)
         env = dict(BASE_ENV, **b.env)
         argv = [str(self.probe), "batch", str(path)]
         plain = parse(self._run(argv, env, b.never, "freesurfer-volume-probe"))
@@ -4980,6 +4981,7 @@ class Runner:
         return plain, memory
 
     def candidate_run(self, cand: Path, b: Batch, path: Path, mode: str) -> list[bytes]:
+        licence_guard(b)
         env = dict(BASE_ENV, **b.env, LARMORX_UPSTREAM_DEFECTS=mode)
         p = subprocess.run(
             [str(cand), "batch", str(path)],
@@ -4996,11 +4998,61 @@ def mask(b: Batch, line: bytes) -> bytes:
     return line
 
 
+#: The probe's commands whose calls can reach FreeSurfer's licence check, which prints the licence
+#: file's lines at any diagnostic level above 0 once it finds the file: no line may set a level above
+#: 0 on them (the licence file never appears in an output). From the prebuilt probe's own code by
+#: ``licence_reach.py`` (README.md, "The licence check"); rebuilt probes are checked again.
+LICENCE_COMMANDS = frozenset({"bvr", "ltaread", "ltareads", "pvlab", "tiv"})
+#: Variables that let the licence check find a licence file, and FreeSurfer's diagnostic level
+#: (which the probe never reads): never set by a line or a batch.
+LICENCE_VARS = frozenset({"FREESURFER_HOME", "FS_LICENSE", "DIAG_NO"})
+
+
+def c_level(text: str) -> int:
+    """The diagnostic level the probe sets from ``+gdiagno=<text>``: C's ``strtol`` (base 10,
+    leading blanks, a sign, digits; nothing else gives 0; clamped to 64 bits) kept as a 32-bit
+    ``int``."""
+    m = re.match(r"[ \t\n\v\f\r]*([+-]?\d+)", text)
+    v = int(m.group(1)) if m else 0
+    v = max(-(2**63), min(2**63 - 1, v)) & 0xFFFFFFFF
+    return v - 2**32 if v >= 2**31 else v
+
+
+def licence_guard(b: Batch) -> None:
+    """Refuses a batch that could print the licence file: a diagnostic level above 0 on a command
+    of ``LICENCE_COMMANDS``, or a variable of ``LICENCE_VARS`` set by a line or the batch."""
+    bad = sorted(LICENCE_VARS & set(b.env))
+    if bad:
+        raise SystemExit(f"{b.name}: the batch sets {', '.join(bad)} (the licence check)")
+    for ln in b.lines:
+        level = -1
+        for tok in re.split(r"[ \t]+", ln.strip(" \t")):  # the probe splits at blanks and tabs
+            if tok.startswith("@") or tok.startswith("+gdiag="):
+                continue
+            if tok.startswith("+gdiagno="):
+                level = c_level(tok[9:])
+            elif tok.startswith("+env="):
+                name = tok[5:].split("=", 1)[0]
+                if name in LICENCE_VARS:
+                    raise SystemExit(
+                        f"{b.name}: a line sets {name} (the licence check): {ln[:120]}"
+                    )
+            else:
+                if level > 0 and tok in LICENCE_COMMANDS:
+                    raise SystemExit(
+                        f"{b.name}: a diagnostic level of {level} on {tok}, which can reach the "
+                        f"licence check: {ln[:120]}"
+                    )
+                break
+
+
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
     gen = gen if isinstance(gen, Gen16) else Gen16(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()
+    for b in out:
+        licence_guard(b)
     return out
 
 

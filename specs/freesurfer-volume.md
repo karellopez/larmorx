@@ -3633,7 +3633,11 @@ the prebuilt probe `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_p
 flags) with the fs.maths probe's `guard_malloc.so` beside it, and never builds them. Each call runs
 in a child process of its own with an alarm: its line is the printed result, or `EXIT <status>`
 where FreeSurfer's error functions end the program, `CRASH <signal>`, `TIMEOUT` where FreeSurfer
-never returns; then its standard output and standard error.
+never returns; then its standard output and standard error. FreeSurfer's licence check, which prints the
+licence file's lines at any diagnostic level above 0 once it finds the file, is reached only by the commands
+`bvr`, `ltaread`, `ltareads`, `pvlab` and `tiv`: the loop refuses a diagnostic level above 0 on them and any
+line or batch that sets `FREESURFER_HOME`, `FS_LICENSE` or `DIAG_NO` (the README's "The licence check"); a
+candidate needs no licence check of its own (larmorx performs none, §23's `bvr` line).
 
 ### 69.2 The groups and their reference hashes
 

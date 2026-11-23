@@ -152,6 +152,15 @@ share an entry; since 2026-11-13 the key holds every variable FreeSurfer reads, 
 `PROFILE`, `IMAGE_SIZE`, `TMPDIR` and the others, so none of the loop's cases is left out for
 that). `--no-cache` runs them directly.
 
+## The licence check
+
+FreeSurfer's licence check prints the licence file's lines at any diagnostic level above 0 once it finds
+the file, so a diagnostic level is never set where the check can be reached. The prebuilt probe holds no
+licence check (it is not linked in: `../freesurfer-volume-probe/licence_reach.py <probe> fs_core_probe.cpp`,
+the spec writer's step after a build, prints so), so the loop's `DIAG_NO` cases (`init`) print nothing of
+it. `official.sh` runs the official `mri_info`, whose volume reads do reach it: its runs set no `DIAG_NO`,
+and it refuses a case that would.
+
 ## Results (2026-11-13, the reference machine: glibc 2.35, Linux 6.8, x86-64)
 
 - `refs`, seed 7, the prebuilt probe (commit `bd50220e`): the hashes quoted in the spec's §20.2;

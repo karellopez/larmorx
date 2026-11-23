@@ -23,6 +23,7 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 |---|---|
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
+| `licence_reach.py` | which of a prebuilt probe's commands can reach FreeSurfer's licence check ("The licence check" below): `licence_reach.py <probe> <source.cpp> [--expect a,b]` (the same step after each build, not the implementer's: it reads the probe binary) |
 | `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 37 groups of seeded cases and eighteen of fixed cases (`vrules`, `vrules4` to `vrules19`, `vbsrules`; 18,023 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 | `models.py` | statements of the spec checked as models of the probe's printed results (`region` and `cov` also a candidate's, in both modes): `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `region` (§43's boxes, FS-269 as decided: every `rgbb` line of `vregion`, `vrules17` and `vrules18`, on the probe and, with `--candidate`, a candidate's lines in both modes), `cov` (§42's `MRIcovarianceMatrix`, FS-483's count as decided: every `cov` line of `vcov` and `vrules19` whose mask has the volume's extent) |
 
@@ -276,6 +277,19 @@ the loop allows those lines with their notice but does not check their values). 
 FreeSurfer's. `cov`: every `cov` line of `vcov` and `vrules19` whose types it decodes and whose mask has the
 volume's extent, with `reproduce` against FreeSurfer's count and with `fix` against FS-483's decided count (the
 voxels the sums take); a NaN's payload is outside the model.
+
+## The licence check
+
+FreeSurfer's licence check prints the licence file's lines at any diagnostic level above 0 once it finds
+the file (`FREESURFER_HOME` or `FS_LICENSE` naming it). Five commands can reach it, `bvr`, `ltaread`,
+`ltareads`, `pvlab` and `tiv` (`licence_reach.py <probe> fs_volume_probe.cpp`, the spec writer's or the
+orchestrator's step after a build, as `build.sh`: from the prebuilt probe's own code, exact because no
+function on the way is reached otherwise than by a direct call; it prints those commands). The loop
+(`compare.py`, `models.py`) refuses a batch where a line sets a diagnostic level above 0 (`+gdiagno=`, read
+as the probe reads it) on one of them (`LICENCE_COMMANDS`), or where a line (`+env=`) or the batch sets
+`FREESURFER_HOME`, `FS_LICENSE` or `DIAG_NO` (the probe's runs start from `PATH`, `LC_ALL` and
+`OMP_NUM_THREADS` only, so the check never finds a licence file and ends with `FREESURFER_HOME is not
+defined`: the `bvr` line without a cache).
 
 ## The comparison loop
 

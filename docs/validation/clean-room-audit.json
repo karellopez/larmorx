@@ -121,7 +121,7 @@
   }
  ],
  "evidence": {
-  "accesses": 541346,
+  "accesses": 541399,
   "agents": 576,
   "archive_checksums_differ": 0,
   "archive_checksums_matched": 975,
@@ -601,7 +601,7 @@
    },
    "2026-11-23-session-transcripts-freesurfer-batch-103": {
     "files": 8,
-    "sha256": "6bb55f2f28a9d770ef23fe10f2c8e5c1894b2b4e8b4a0993d9e4319ac9aa2134"
+    "sha256": "4f38b0aec47007216bf9fd95a6708121538e041623ae9bf1cc32e06ec1b42d87"
    },
    "2026-11-23-session-transcripts-freesurfer-batch-92": {
     "files": 5,
@@ -636,7 +636,7 @@
     "sha256": "1ac6f11be0f13e4e8f34fc5264fdcc58fb2232ce94c569ad4ef34c6c64d276be"
    }
   },
-  "commits_printed": 5658,
+  "commits_printed": 5661,
   "distinct_transcripts": 580,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
@@ -651,11 +651,11 @@
    "results_without_call": 0,
    "unresolved_paths": 10222
   },
-  "last_record": "2026-11-23 16:56 UTC",
+  "last_record": "2026-11-23 16:59 UTC",
   "live_files": 580,
   "live_files_also_archived": 578,
   "sessions": 4,
-  "tool_calls": 151963,
+  "tool_calls": 151979,
   "tool_calls_by_tool": [
    [
     "Agent",
@@ -671,7 +671,7 @@
    ],
    [
     "Bash",
-    133656
+    133672
    ],
    [
     "CronCreate",
@@ -742,9 +742,9 @@
     7353
    ]
   ],
-  "transcript_bytes": 36017780026,
+  "transcript_bytes": 36018357482,
   "transcript_files": 1555,
-  "unique_paths": 98791
+  "unique_paths": 98799
  },
  "levels": [
   [
@@ -825,7 +825,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "facfbb25"
+  "verdicts_repository": "82d83002"
  },
  "overview": {
   "agents_by_role": [
@@ -5125,16 +5125,16 @@
   },
   {
    "agent": "a42d559bb7bb1e9f1",
-   "declared": "",
+   "declared": "yes",
    "description": "Clean room relay 19 (NaN fix)",
    "files": [
     "validation/probes/fsl-mcflirt-affine-trace/nan_trap.c"
    ],
-   "judged": false,
-   "judgement": "",
+   "judged": true,
+   "judgement": "no contamination of substance: the same tool batch 8 judged for fs.core's clean room; declared in the relay's report (item 118)",
    "kind": "restricted material",
    "line": 47,
-   "nature": "",
+   "nature": "a generic test tool of the project that lies in FSL's mcflirt probe folder; no FSL code and nothing of FreeSurfer, the clean room's family",
    "register": null,
    "rules": [
     [
@@ -5146,21 +5146,21 @@
      1
     ]
    ],
-   "shown": "",
+   "shown": "lines of nan_trap.c (validation/probes/fsl-mcflirt-affine-trace/: its header comments and the lines that read its environment variables), the project's own Apache-2.0 LD_PRELOAD NaN trap, read to build the AArch64 NaN emulation the orchestrator's task named",
    "time": "2026-11-23 15:27 UTC"
   },
   {
    "agent": "a42d559bb7bb1e9f1",
-   "declared": "",
+   "declared": "yes",
    "description": "Clean room relay 19 (NaN fix)",
    "files": [
     "validation/probes/fsl-mcflirt-affine-trace/nan_trap.c"
    ],
-   "judged": false,
-   "judgement": "",
+   "judged": true,
+   "judgement": "no contamination of substance: as line 47's call",
    "kind": "restricted material",
    "line": 51,
-   "nature": "",
+   "nature": "the same generic test tool; no FSL code, nothing of FreeSurfer",
    "register": null,
    "rules": [
     [
@@ -5168,7 +5168,7 @@
      1
     ]
    ],
-   "shown": "",
+   "shown": "the same file's lines as line 47's call (its build and environment lines), read again",
    "time": "2026-11-23 15:27 UTC"
   }
  ],

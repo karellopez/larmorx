@@ -165,6 +165,24 @@ shown = "the implementer's own changed files (crates/larmorx-fs-core/src/mri/*.r
 nature = "the clean room's own code; no file of the unit oracle's folder exists at those paths"
 judgement = "not restricted material: a scanner false positive (relative paths of the implementer's own worktree resolved against a stale working directory)"
 
+[[access]]
+agent = "a42d559bb7bb1e9f1"
+line = 47
+time = "2026-11-23T15:27:00Z"
+declared = "yes"
+shown = "lines of nan_trap.c (validation/probes/fsl-mcflirt-affine-trace/: its header comments and the lines that read its environment variables), the project's own Apache-2.0 LD_PRELOAD NaN trap, read to build the AArch64 NaN emulation the orchestrator's task named"
+nature = "a generic test tool of the project that lies in FSL's mcflirt probe folder; no FSL code and nothing of FreeSurfer, the clean room's family"
+judgement = "no contamination of substance: the same tool batch 8 judged for fs.core's clean room; declared in the relay's report (item 118)"
+
+[[access]]
+agent = "a42d559bb7bb1e9f1"
+line = 51
+time = "2026-11-23T15:27:00Z"
+declared = "yes"
+shown = "the same file's lines as line 47's call (its build and environment lines), read again"
+nature = "the same generic test tool; no FSL code, nothing of FreeSurfer"
+judgement = "no contamination of substance: as line 47's call"
+
 # ------------------------------------------------- implementers: files their briefs forbade
 
 [[access]]

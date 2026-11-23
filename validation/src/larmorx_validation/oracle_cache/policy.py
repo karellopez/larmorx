@@ -401,6 +401,7 @@ EXTENSION_FROM_WHOLE_PATH = (
     "lta_convert",
     "mri_add_xform_to_header",
     "mri_binarize",
+    "mri_cc",
     "mri_convert",
     "mri_info",
     "mri_make_uchar",

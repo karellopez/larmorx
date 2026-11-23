@@ -44,7 +44,7 @@ use larmorx_freesurfer_filter::segment::{mri_segment, mri_segment_max, mri_segme
 use larmorx_freesurfer_io::mriio::mri_write;
 use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::lta::{LINEAR_VOX_TO_VOX, Lta, lta_alloc};
-use larmorx_freesurfer_mri::mri::{MGZ_INTENT_UNKNOWN, Mri, MriRegion};
+use larmorx_freesurfer_mri::mri::{MAX_INDEX, MGZ_INTENT_UNKNOWN, Mri, MriRegion};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use larmorx_freesurfer_volume::arith::{
     Pair, Tri, mri_binarize, mri_clear, mri_clone, mri_replace_values, mri_subtract,
@@ -358,6 +358,12 @@ fn cutting_plane_debug(
 /// `find_voxels_close_to_both_hemis(mri_aseg, lh_label, rh_label, wsize)`: a clone of zeros with 1
 /// at each voxel whose window of half-width `(wsize - 1) / 2` (through the index tables; x
 /// outermost, z innermost, stopping once both are found) holds both labels.
+///
+/// The window's coordinates are clamped to the volume by its index tables, so it holds a label
+/// exactly when the window's part inside the volume does: computed as the two labels' masks
+/// widened by the half-width along z, y and x (a sliding count per axis), from the labels read
+/// once (`(int)` of each voxel, in FreeSurfer's raster order). Volumes whose tables are not the
+/// clamping ones take the window loop itself.
 pub fn find_voxels_close_to_both_hemis(
     g: &mut Globals,
     r: &mut Run,
@@ -372,6 +378,44 @@ pub fn find_voxels_close_to_both_hemis(
     let xt = aseg.xi.as_deref().unwrap_or(&[]).to_vec();
     let yt = aseg.yi.as_deref().unwrap_or(&[]).to_vec();
     let zt = aseg.zi.as_deref().unwrap_or(&[]).to_vec();
+    let clamping = |t: &[i32], n: i32| {
+        whalf >= 0
+            && whalf < MAX_INDEX
+            && (-whalf..n.saturating_add(whalf)).all(|i| {
+                let k = i64::from(i) + i64::from(MAX_INDEX);
+                k >= 0 && (k as usize) < t.len() && t[k as usize] == i.clamp(0, (n - 1).max(0))
+            })
+    };
+    if w > 0 && h > 0 && d > 0 && clamping(&xt, w) && clamping(&yt, h) && clamping(&zt, d) {
+        let (wu, hu, du) = (w as usize, h as usize, d as usize);
+        let n = wu * hu * du;
+        let (mut lh, mut rh) = (vec![false; n], vec![false; n]);
+        for x in 0..w {
+            for y in 0..h {
+                for z in 0..d {
+                    let label = lab(g, r, aseg, x, y, z)?;
+                    let i = (x as usize * hu + y as usize) * du + z as usize;
+                    lh[i] = label == lh_label;
+                    rh[i] = label != lh_label && label == rh_label;
+                }
+            }
+        }
+        let wh = whalf as usize;
+        for m in [&mut lh, &mut rh] {
+            widen(m, [wu, hu, du], wh);
+        }
+        for x in 0..w {
+            for y in 0..h {
+                for z in 0..d {
+                    let i = (x as usize * hu + y as usize) * du + z as usize;
+                    if lh[i] && rh[i] {
+                        set(g, r, &mut dst, x, y, z, 1.0)?;
+                    }
+                }
+            }
+        }
+        return Ok(dst);
+    }
     for x in 0..w {
         for y in 0..h {
             for z in 0..d {
@@ -401,6 +445,40 @@ pub fn find_voxels_close_to_both_hemis(
         }
     }
     Ok(dst)
+}
+
+/// A mask (x outermost, z innermost, `dims` = width, height, depth) widened by `wh` voxels along
+/// each axis within the volume: a voxel is set when any voxel of its window's part inside is.
+fn widen(m: &mut [bool], dims: [usize; 3], wh: usize) {
+    let strides = [dims[1] * dims[2], dims[2], 1];
+    let mut line: Vec<bool> = Vec::new();
+    for axis in [2usize, 1, 0] {
+        let len = dims[axis];
+        let stride = strides[axis];
+        let total = m.len();
+        for start in 0..total {
+            // the first voxel of each line along `axis`
+            if (start / stride) % len != 0 {
+                continue;
+            }
+            line.clear();
+            line.extend((0..len).map(|k| m[start + k * stride]));
+            let mut count = 0usize;
+            // the window [k - wh, k + wh] slides; count the set voxels in it
+            for &v in line.iter().take(wh.min(len)) {
+                count += usize::from(v);
+            }
+            for k in 0..len {
+                if k + wh < len {
+                    count += usize::from(line[k + wh]);
+                }
+                if k > wh {
+                    count -= usize::from(line[k - wh - 1]);
+                }
+                m[start + k * stride] = count > 0;
+            }
+        }
+    }
 }
 
 /// What `find_cc_with_aseg` gives back: the callosum (a clone of the aseg's type: 128 inside,

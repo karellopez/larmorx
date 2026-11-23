@@ -111,7 +111,7 @@ fn write_new(
     mris: &mut Mris,
     name: &str,
 ) -> Result<i32, Fatal> {
-    chklc();
+    chklc(g);
     let fname = strcpy_checked(g, io, name, "MRISwrite_new")?;
     Ok(match mris_file_name_type(g, &fname) {
         MRIS_ASCII_TRIANGLE_FILE => sfile::write_ascii(g, io, dir, mris, &fname),
@@ -696,7 +696,7 @@ pub fn read_over_alloc(
 ) -> Result<Option<Mris>, Fatal> {
     let fname = c_str(fname);
     let ty = mris_file_name_type(g, fname);
-    chklc();
+    chklc(g);
     let Some((mut mris, version, done)) = read_by_type(g, sg, io, dir, fname, nvf_multiplier, ty)?
     else {
         return Ok(None);

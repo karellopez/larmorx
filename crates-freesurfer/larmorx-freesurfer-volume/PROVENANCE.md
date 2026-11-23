@@ -148,7 +148,8 @@ here); `include/macros.h`'s `MAX`; the official build's operand orders from the 
 - `src/vol2vol.rs` (3.1-37; relay 21): `utils/mri2.cpp` `MRIvol2Vol` (877-1051), `MRIvol2VolTLKernel` (1233-1302),
   `MRImaskAndUpsample` (1304-1344), `MRIvol2VolDelta` (2580-2641), `MRIvol2VolVSM` (3102-3266); `utils/transform.cpp`
   `TransformRegDat2LTA` (4417-4452, 3.1-40 taken early); operand orders from the official `mri2.cpp.o`. Changes:
-  FS-482 (0 for a shift never written, both modes); cubic B-splines and `LTAchangeType` port errors until ported.
+  FS-482 (0 for a shift never written, both modes); cubic B-splines and `LTAchangeType` port errors until ported
+  (both wired since: `LTAchangeType` of the voxel-shift transform's copy by track A's relay 53, `mri_vol2vol_vsm_env`).
 - `src/pca.rs` (3.1-37; relay 21): `utils/mri2.cpp` `MRIfdr2vwth` (1402-1574), `MRIcovarianceMatrix` (1576-1641),
   `MRIpca` (1643-1744), `PrintPCAStats`, `WritePCAStats` (1746-1779); `utils/sig.cpp` `fdr2vwth`, `doublecompar`
   (53-110). Changes: FS-483 (rule A), FS-484 (an error); `log10` glibc's with `reproduce`, CORE-MATH's correctly

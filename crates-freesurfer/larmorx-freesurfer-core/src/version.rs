@@ -160,6 +160,14 @@ fn version_kind(a: &str) -> Option<bool> {
 
 /// FreeSurfer's loop: the reports and the arguments left (`argv` with `argc - nargs` kept).
 fn plan_freesurfer(argv: &[String]) -> (Vec<VersionReport>, Vec<String>) {
+    let (reports, mut a, num) = plan_freesurfer_whole(argv);
+    a.truncate(argv.len() - num);
+    (reports, a)
+}
+
+/// FreeSurfer's loop over the whole `argv`: the reports, `argv` as the loop leaves it (its last
+/// `nargs` places hold the arguments that were there) and `nargs`.
+fn plan_freesurfer_whole(argv: &[String]) -> (Vec<VersionReport>, Vec<String>, usize) {
     let mut a = argv.to_vec();
     let argc = a.len();
     let mut num = 0;
@@ -175,8 +183,7 @@ fn plan_freesurfer(argv: &[String]) -> (Vec<VersionReport>, Vec<String>) {
             a[nnarg] = a[nnarg + 1].clone();
         }
     }
-    a.truncate(argc - num);
-    (reports, a)
+    (reports, a, num)
 }
 
 /// The corrected loop: each argument once; the reports show the command line as given.
@@ -214,6 +221,46 @@ pub fn handle_version_option(
     }
     let (reports, left) = if g.notices.reproduce() {
         freesurfer
+    } else {
+        fixed
+    };
+    for r in &reports {
+        match r {
+            VersionReport::Version => {
+                let _ = writeln!(out, "{progname} freesurfer {FS_VERSION}");
+            }
+            VersionReport::AllInfo(a) => {
+                let line = get_all_info(g, env, a, progname);
+                let _ = writeln!(out, "{line}");
+            }
+        }
+    }
+    let _ = out.flush();
+    (reports.len() as i32, left)
+}
+
+/// [`handle_version_option`] for a program that keeps `argc` after it (`mri_vol2vol`, which
+/// never subtracts the options handled): with `reproduce` the arguments are `argv` as FreeSurfer's
+/// loop leaves it, whole (its last places repeat arguments that were moved, or keep a version
+/// option that was the last argument, which the program then reads again); by default each
+/// argument once (FS-07, noted when the two differ).
+pub fn handle_version_option_whole(
+    g: &mut Globals,
+    env: &Environment,
+    out: &mut dyn Write,
+    argv: &[String],
+    progname: &str,
+) -> (i32, Vec<String>) {
+    let (reports, whole, _) = plan_freesurfer_whole(argv);
+    let fixed = plan_fixed(argv);
+    if (reports.clone(), whole.clone()) != fixed {
+        g.notices.add(
+            &FS_07,
+            "the version options: each argument looked at once, the command line as given",
+        );
+    }
+    let (reports, left) = if g.notices.reproduce() {
+        (reports, whole)
     } else {
         fixed
     };

@@ -296,7 +296,7 @@ pub fn mri_read_type(
     fname: &str,
     mtype: i32,
 ) -> Result<Option<Mri>, Fatal> {
-    larmorx_freesurfer_core::chklc::chklc();
+    larmorx_freesurfer_core::chklc::chklc_env(g, env);
     mri_read(g, out, err, env, dir, fname, mtype, true, -1, -1)
 }
 
@@ -344,7 +344,7 @@ fn mri_read_ex_frames(
     frame: i32,
     who: &str,
 ) -> Result<Option<Mri>, Fatal> {
-    larmorx_freesurfer_core::chklc::chklc();
+    larmorx_freesurfer_core::chklc::chklc_env(g, env);
     fits(g, who, fname);
     let name = utils::file_name_from_wildcard(dir, fname);
     if name != fname {
@@ -1155,7 +1155,7 @@ pub fn mri_write(
     several: Option<&mut [Mri]>,
     intent: i32,
 ) -> Result<i32, Fatal> {
-    larmorx_freesurfer_core::chklc::chklc();
+    larmorx_freesurfer_core::chklc::chklc_env(g, env);
     let int_type = identify::mri_identify(g, dir, env, out, err, fname)?;
     if int_type < 0 {
         return Ok(fail_code(

@@ -774,7 +774,7 @@ pub fn golden_cases() -> Vec<String> {
         &["--mov", "seg.mgz", "--targ", "t2.nii.gz", "--lta", "seg.lta", "--interp", "nearest", "--o", "seg.nii.gz"],
         &["--mov", "m.mgz", "--targ", "t.mgz", "--reg", "r.dat", "--o", "o.mgz", "--no-resample", "--save-reg"],
         &["--mov", "nan.mgz", "--targ", "t.mgz", "--regheader", "--o", "o.mgz"],
-        &["--mov", "nan.mgz", "--targ", "t2.nii.gz", "--reg", "r.dat", "--o", "o.mgz", "--cubic"],
+        &["--mov", "nan.mgz", "--targ", "t2.nii.gz", "--lta", "r.lta", "--o", "o.mgz", "--cubic"],
     ] {
         out.push(line(&[], &i, &s(a)));
     }

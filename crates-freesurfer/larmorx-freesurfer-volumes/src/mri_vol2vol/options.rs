@@ -22,7 +22,7 @@
 
 use std::path::Path;
 
-use larmorx_core::defects::{FS_1177, FS_1180};
+use larmorx_core::defects::{FS_1177, FS_1180, FS_1183};
 use larmorx_freesurfer_core::cmdargs::{cmd_arg_n_err, cmd_is_flag, cmd_nth_is_arg};
 use larmorx_freesurfer_core::cscan::Scanf;
 use larmorx_freesurfer_core::globals::Globals;
@@ -1130,7 +1130,25 @@ pub fn check_options(g: &mut Globals, r: &mut Run, o: &mut Options) -> Result<()
             print_matrix(g, r, m.as_ref());
         }
     }
-    if o.lta.is_some() && !o.fstal && o.targvolfile.is_some() {
+    // FS-1183: the transform array read from a register.dat has no geometry, which the change of
+    // type below refuses
+    let from_dat = o.lta.as_ref().is_some_and(|l| {
+        l.xforms[0].src.valid == 0 || l.xforms[0].dst.valid == 0
+    }) && o.regfile.as_deref().is_some_and(|f| {
+        let ext = file_name_extension(g, f);
+        stricmp(g, &ext, "LTA") != 0
+    });
+    if from_dat && !o.fstal && o.targvolfile.is_some() {
+        g.notices.add(
+            &FS_1183,
+            "mri_vol2vol --reg with a register.dat and a target: its matrix applied (FreeSurfer stops: LTAchangeType: src geometry must be valid)",
+        );
+    }
+    if o.lta.is_some()
+        && !o.fstal
+        && o.targvolfile.is_some()
+        && !(from_dat && !g.notices.reproduce())
+    {
         let targvol = o.targvolfile.clone().unwrap_or_default();
         let _ = writeln!(r.out, "{} {targvol}", or_null(o.movvolfile.as_deref()));
         let Some(movname) = o.movvolfile.clone() else {

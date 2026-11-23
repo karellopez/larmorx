@@ -2729,6 +2729,8 @@ defects! {
         "mri_vol2vol --inv with an LTA and no --mov crashes (status 139) where it reads the moving volume's header (with --keep-precision, or with --targ); corrected: an error naming the missing --mov, status 1";
     FS_1181 = "FS-1181", "FreeSurfer", true,
         "mri_vol2vol --crop cuts the moving volume to one voxel more than the box of its voxels above 0 on each axis (the output one voxel per axis larger, times the scale), and crashes (status 139) when the box reaches the volume's last voxel on any axis; corrected: the box itself";
+    FS_1183 = "FS-1183", "FreeSurfer", true,
+        "mri_vol2vol --reg with a tkregister register.dat (not an .lta) and a target (--targ or --fstarg) always stops with LTAchangeType: src geometry must be valid (status 252): the register.dat's matrix is never applied; corrected: the register.dat's matrix maps the target to the moving volume";
     FS_1182 = "FS-1182", "FreeSurfer", true,
         "mri_vol2vol --crop with a scale that leaves no voxel (0, or so small that a size rounds to 0) writes an empty volume with status 0, and a negative scale stops with the allocation's messages (status 1); corrected: ERROR: --crop's scale <s> leaves no voxel, status 1";
     FS_758 = "FS-758", "FreeSurfer", true,

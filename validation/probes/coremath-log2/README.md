@@ -35,3 +35,24 @@ included. `log2_glibc` translates that form.
 Meaningful on x86-64 Linux with glibc 2.35 (the oracle machine). `build.sh` compiles `log2.c`
 (CORE-MATH commit `040ee482a8ca`) with `gcc -O2 -ffp-contract=off -fPIC -shared` (the system's gcc
 11.4: `PATH=/usr/bin:$PATH` when another compiler comes first).
+
+## Results (2026-11-23)
+
+`coremath-log2 ... 28 --threads 4 --wc log2.wc` (log
+`<workspace>/oracles/logs/fs-found-c-r47-coremath-log2-28.log`): larmorx equals the C on all
+2,147,552,192 arguments (NaN bits aside for `x < 0`, as above); `log2_glibc` equals glibc's `log2` on
+all of them, NaN bits included; the seeded hashes are `0x7fdf578b8ea688b3` (the C and larmorx) and
+`0xd5a3591b5b6bfea5` (glibc and `log2_glibc`). glibc's `log2` is not correctly rounded on:
+
+| family (2^28 arguments each unless stated) | glibc's `log2` not correctly rounded |
+|---|---|
+| special values and 2^k (2,068) | 0 |
+| `log2.wc` at ±x (66,476; half NaN) | 7,637 (11.49 %) |
+| random bit patterns (half negative: NaN) | 1,385 (0.0005 %) |
+| uniform on (0, 1000) | 32,820 (0.0122 %) |
+| next to 1 | 162,729 (0.0606 %) |
+| log-uniform normal numbers | 2,741 (0.0010 %) |
+| subnormal numbers | 341 (0.0001 %) |
+| powers of two ±3 ulp | 0 |
+| p-values | 259,438 (0.0966 %) |
+| integers and dyadic fractions | 56,392 (0.0210 %) |

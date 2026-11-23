@@ -2439,10 +2439,13 @@ written), so nothing notes it.
 ## 46. Talairach helpers (3.1-38)
 (Made ready for the clean room by the spec finisher's relay 18: §69.2's groups `vtal` and `vrules20`.)
 - `ModifyTalairachCRAS(mri_tal, lta)`: sets the Talairach volume's centre. With a transform array: it must hold
-  exactly one transform (otherwise `<Progname>: xfm has more than one xfrm`, also for none) of type
-  `LINEAR_RAS_TO_RAS` (otherwise `<Progname>: xfm passed is not of RAS-to-RAS type`; both end the program as
-  C-style errors with `ERROR_BADPARM`, status 252, `specs/freesurfer-core.md` §2 and §3, the count checked first;
-  `<Progname>` the program's name, the probe's `fs_volume_probe`). Its destination geometry's centre is taken when that geometry's `valid`
+  exactly one transform (otherwise `<Progname>: xfm has more than one xfrm`, also for none), and the array's own
+  type must be `LINEAR_RAS_TO_RAS` (otherwise `<Progname>: xfm passed is not of RAS-to-RAS type`). Both end the
+  program as C-style errors with `ERROR_BADPARM`, status 252 (`specs/freesurfer-core.md` §2 and §3), the count
+  checked first; `<Progname>` is the program's name, the probe's `fs_volume_probe`. The type of the transform inside
+  the array is never looked at: an array of type 1 holding a transform of type 0 or 2 passes, an array of type 0 or 2
+  holding one of type 1 ends (**(observed)**: `vtal` and `vrules20`, whose arrays' transforms are all of type 0;
+  `vrules21`, arrays of type 1 holding transforms of type 1 and 2, of types 0 and 2 holding one of type 1). Its destination geometry's centre is taken when that geometry's `valid`
   is exactly 1 (with both `DIAG_SHOW` and `DIAG_VERBOSE` in `Gdiag`: `INFO: Modifying dst c_(r,a,s), using the transform dst` on
   standard output). Otherwise, and without a transform array: when the environment has `NO_AVERAGE305` (any value,
   empty included) `INFO: tal c_(r,a,s) not modified` on standard error and the centre is kept; else the centre
@@ -2459,9 +2462,10 @@ written), so nothing notes it.
   (its messages and ends each time).
 - `MtalairachFromVoxel(src, lta)`: `src`'s voxel-to-RAS matrix (section 2, no shear), with a transform array
   multiplied on the left by its first transform's matrix (`MatrixMultiply(M, A)`); without, a copy. A transform
-  array holding no transform ends the program with `lta does not have xform`, one of another type than
-  `LINEAR_RAS_TO_RAS` with `lta must be RAS_TO_RAS transform` (C-style errors, `ERROR_BADPARM`, status 252; checked
-  in that order, after the voxel-to-RAS matrix is made). The product follows fs.maths' `MatrixMultiply` (its size
+  array holding no transform ends the program with `lta does not have xform`, an array whose own type is not
+  `LINEAR_RAS_TO_RAS` with `lta must be RAS_TO_RAS transform` (the transforms' own types not looked at, as
+  `ModifyTalairachCRAS`'s, **(observed)**: `vrules21`; C-style errors, `ERROR_BADPARM`, status 252; checked in that
+  order, after the voxel-to-RAS matrix is made). The product follows fs.maths' `MatrixMultiply` (its size
   rules: a transform matrix that is not 4 x 4 gives no matrix with its error and returns, **(observed)**:
   `vrules20`).
 - `MtalVoxelFromVoxel(src, lta)`: `MtalairachFromVoxel` first, then the Talairach volume of `src`; the product of the

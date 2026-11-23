@@ -5155,6 +5155,80 @@ class Gen17(Gen16):
         return [Batch("vrules20", "vrules20", L)]
 
 
+class Gen18(Gen17):
+    """Relay 19: the fixed cases of the clean room's items 107 to 111 (§46, §48)."""
+
+    @staticmethod
+    def tarr_inner(ty: int, inner: int, ga, gb, m: str) -> str:
+        """An array of one transform of the array type ``ty`` whose transform has its own type
+        ``inner``, from ga to gb (valid), its inverse transform the identity."""
+        ident = "4 4 " + " ".join(f32(1.0 if i % 5 == 0 else 0.0) for i in range(16))
+
+        def lt(mm: str, a: str, b: str, t: int) -> str:
+            return " ".join([f32(0.0)] * 3 + [f32(1.0), mm, Z44, Z44, str(t), "0", a, b])
+
+        fw = lt(m, Gen12.g_of(ga), Gen12.g_of(gb), inner)
+        inv = lt(ident, Gen12.g_of(gb), Gen12.g_of(ga), inner)
+        return f"1 {ty} {f32(1.0)} {xs('')} {fw} {inv}"
+
+    @staticmethod
+    def with_cache(w: str, cache: int) -> str:
+        """A W of ``lab``'s form with its cache flag changed (0: the allocation's, 2: none)."""
+        t = w.split(" ")
+        t[-3] = str(cache)
+        return " ".join(t)
+
+    def vrules21(self) -> list[Batch]:
+        """Fixed cases (relay 19) of the clean room's items: 107 (§46, the array's type is checked,
+        never the transform's), 108 (§46, the matrices computed from the geometry, never the
+        cached ones: a volume whose cache is its allocation's, and one with none), 109 (§48,
+        MRIsegStats: a NaN after the first value), 110 (§48, MRIdilate's neighbours past a face
+        with an outside value that is not 0: `dilo`), 111 (§48, MRIdilate on longs, which the
+        nearest sampler refuses: its error per sample)."""
+        L = []
+        ga = self.plain((3, 3, 2), c=(1.0, -2.0, 3.0))
+        gb = self.plain((4, 4, 4), c=(5.0, 6.0, 7.0))
+        v = self.lab(ga, [float(i) for i in range(18)], t=3)
+        m = "4 4 " + " ".join(f32(x) for x in (1, 0, 0, 2, 0, 1, 0, -3, 0, 0, 1, 4, 0, 0, 0, 1))
+        # item 107: arrays of type 1 and 0 whose transform is of type 1 and 0
+        for ty, inner in ((1, 1), (0, 1), (2, 1), (1, 2)):
+            a = self.tarr_inner(ty, inner, ga, gb, m)
+            L.append(f"talcras {v} 0 {a}")
+            L.append(f"talmat 0 {v} 0 {a}")
+        # item 108: the source or destination's cache stale (as allocated) or absent
+        a1 = self.tarr_inner(1, 0, ga, gb, m)
+        pts = "2 " + " ".join(f64(x) for x in (1.0, 2.0, 0.5, -1.0, 0.0, 3.0))
+        for cache in (1, 0, 2):
+            vc = self.with_cache(v, cache)
+            for k in range(4):
+                L.append(f"talmat {k} {vc} 0 {a1}")
+                L.append(f"talmat {k} {vc} 0 null")
+                L.append(f"talpt {k} {vc} 0 {a1} {pts}")
+        # item 109: MRIsegStats with a NaN after the first value (label 1: 1.0, 1.0, NaN)
+        sg = self.lab(self.plain((3, 2, 2)), [1, 2, 3, 2, 2, 0, 1, 1, 3, 5, 2, 2], t=1)
+        nvol = self.lab(self.plain((3, 2, 2)), [1.0, QNAN, 2.0, QNAN, 4.0, 5.0] * 2, t=3)
+        L.append(f"sstat {sg} 0 {nvol} 0 1 0")
+        L.append(f"sstat {sg} 0 {nvol} 0 3 0")
+        # item 110: an outside value that is not 0 (dilo: MRIdilate with the source's outside value)
+        dv = [0.0] * 12
+        dv[4] = 2.0  # column 1, row 1, slice 0 of 3 x 2 x 2
+        for t in (3, 1, 4, 0):
+            src = self.lab(self.plain((3, 2, 2)), dv if t == 3 else [int(x) for x in dv], t=t)
+            for od in (5.0, 0.0, -1.0, float("nan")):
+                L.append(f"dilo {src} 0 {f64(od)} new")
+        z = self.lab(self.plain((3, 2, 2)), [0.0] * 12, t=3)
+        L.append(f"dilo {z} 0 {f64(5.0)} new")
+        L.append(f"dilo {self.lab(self.plain((1, 1, 1)), [0.0], t=3)} 0 {f64(5.0)} new")
+        # item 111: longs (the nearest sampler refuses them: its error per sample, the sample 0)
+        for d, nf in (((1, 1, 1), 1), ((1, 1, 1), 2), ((2, 1, 1), 2), ((1, 2, 1), 1)):
+            n = d[0] * d[1] * d[2] * nf * 2
+            lv = self.lab(self.plain(d), [3] + [0] * (n - 1), t=2, nf=nf)
+            L.append(f"dilate {lv} 0 new")
+        lv = self.lab(self.plain((1, 1, 1)), [3, 0], t=2)
+        L.append(f"dilate {lv} 0 self")
+        return [Batch("vrules21", "vrules21", L)]
+
+
 GROUPS = [
     "vgblock",
     "vgcopy",

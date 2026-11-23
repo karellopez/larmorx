@@ -2,8 +2,8 @@
  "name": "freesurfer-mri-robust-register",
  "tool": "mri_robust_register (FreeSurfer 8.2.0)",
  "status": "experimental",
- "larmorx_commit": "e0e05f174473",
- "generated": "2026-11-22",
+ "larmorx_commit": "97c6f06db31a",
+ "generated": "2026-11-23",
  "platform": "Linux x86_64",
  "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_robust_register/) on larmorx-freesurfer-robust (fs.robust), the larmorx-freesurfer program",
  "reference": "FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mri_robust_register) on the recorded heads (oracles/freesurfer-8.2.0/runs/) and on synthetic cases",
@@ -25,13 +25,13 @@
    },
    "seconds": {
     "official": 65.9,
-    "reproduce": 94.2,
-    "fix": 95.9
+    "reproduce": 96.3,
+    "fix": 90.9
    },
    "peak_mib": {
     "official": 1799.176,
-    "reproduce": 1606.1,
-    "fix": 1606.8
+    "reproduce": 1606.8,
+    "fix": 1607.6
    }
   },
   {
@@ -50,13 +50,13 @@
    },
    "seconds": {
     "official": 20.7,
-    "reproduce": 45.6,
-    "fix": 45.7
+    "reproduce": 46.8,
+    "fix": 46.7
    },
    "peak_mib": {
     "official": 1100.465,
-    "reproduce": 1105.7,
-    "fix": 1105.4
+    "reproduce": 1106.3,
+    "fix": 1105.7
    }
   },
   {
@@ -75,12 +75,12 @@
    },
    "seconds": {
     "official": 24.2,
-    "reproduce": 44.9,
-    "fix": 45.0
+    "reproduce": 45.5,
+    "fix": 45.7
    },
    "peak_mib": {
     "official": 1237.512,
-    "reproduce": 1142.5,
+    "reproduce": 1142.4,
     "fix": 1142.9
    }
   },
@@ -100,13 +100,13 @@
    },
    "seconds": {
     "official": 21.5,
-    "reproduce": 42.6,
-    "fix": 42.5
+    "reproduce": 42.4,
+    "fix": 42.9
    },
    "peak_mib": {
     "official": 1193.934,
-    "reproduce": 1098.4,
-    "fix": 1097.6
+    "reproduce": 1097.3,
+    "fix": 1098.1
    }
   },
   {
@@ -125,13 +125,13 @@
    },
    "seconds": {
     "official": 20.2,
-    "reproduce": 41.0,
-    "fix": 40.5
+    "reproduce": 40.6,
+    "fix": 41.2
    },
    "peak_mib": {
     "official": 1348.379,
     "reproduce": 1208.3,
-    "fix": 1208.1
+    "fix": 1208.4
    }
   },
   {
@@ -150,13 +150,13 @@
    },
    "seconds": {
     "official": 26.4,
-    "reproduce": 47.8,
-    "fix": 47.1
+    "reproduce": 49.7,
+    "fix": 49.5
    },
    "peak_mib": {
     "official": 1538.18,
-    "reproduce": 1366.6,
-    "fix": 1366.5
+    "reproduce": 1366.1,
+    "fix": 1367.6
    }
   },
   {
@@ -175,13 +175,13 @@
    },
    "seconds": {
     "official": 79.2,
-    "reproduce": 112.3,
-    "fix": 110.7
+    "reproduce": 111.9,
+    "fix": 110.8
    },
    "peak_mib": {
     "official": 1799.809,
-    "reproduce": 1601.6,
-    "fix": 1601.6
+    "reproduce": 1601.8,
+    "fix": 1601.2
    }
   },
   {
@@ -200,13 +200,13 @@
    },
    "seconds": {
     "official": 38.7,
-    "reproduce": 64.1,
-    "fix": 64.0
+    "reproduce": 64.3,
+    "fix": 64.7
    },
    "peak_mib": {
     "official": 1194.766,
-    "reproduce": 1090.3,
-    "fix": 1090.8
+    "reproduce": 1090.4,
+    "fix": 1089.8
    }
   }
  ],
@@ -228,7 +228,7 @@
    "different": 0,
    "skipped": 9,
    "not_ported": 12,
-   "fix_different_with_notice": 40,
+   "fix_different_with_notice": 39,
    "fix_different_without_notice": 0
   },
   {
@@ -238,14 +238,210 @@
    "different": 0,
    "skipped": 8,
    "not_ported": 12,
-   "fix_different_with_notice": 39,
+   "fix_different_with_notice": 38,
    "fix_different_without_notice": 0
   }
  ],
  "golden_sha256": {
-  "official_and_reproduce": "069de7ceeaff8f3826ba76ef4333a0bfd0c233ed57a2b45a138683492badd6c7",
-  "fix": "069de7ceeaff8f3826ba76ef4333a0bfd0c233ed57a2b45a138683492badd6c7"
+  "official_and_reproduce": "f2ea31fe966f1da9e8974416edb219442818e06f9d2a412ff47b1ba6e0cea2a1",
+  "fix": "f2ea31fe966f1da9e8974416edb219442818e06f9d2a412ff47b1ba6e0cea2a1"
  },
+ "decided_complex": [
+  {
+   "head": "ds000005-sub-01",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 69.5,
+    "reproduce": 98.2,
+    "fix": 103.0
+   },
+   "peak_mib": {
+    "official": 1799.30859375,
+    "reproduce": 1605.5,
+    "fix": 1605.6
+   }
+  },
+  {
+   "head": "ds000228-sub-pixar008",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 21.6,
+    "reproduce": 50.4,
+    "fix": 50.0
+   },
+   "peak_mib": {
+    "official": 1100.08984375,
+    "reproduce": 1104.2,
+    "fix": 1104.1
+   }
+  },
+  {
+   "head": "ds002422-sub-02",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 25.0,
+    "reproduce": 49.3,
+    "fix": 49.0
+   },
+   "peak_mib": {
+    "official": 1237.046875,
+    "reproduce": 1141.2,
+    "fix": 1140.6
+   }
+  },
+  {
+   "head": "ds004173-sub-603309",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 22.8,
+    "reproduce": 46.8,
+    "fix": 45.8
+   },
+   "peak_mib": {
+    "official": 1194.06640625,
+    "reproduce": 1096.2,
+    "fix": 1095.4
+   }
+  },
+  {
+   "head": "ds005003-sub-RS001",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 21.1,
+    "reproduce": 44.2,
+    "fix": 43.2
+   },
+   "peak_mib": {
+    "official": 1346.26171875,
+    "reproduce": 1206.4,
+    "fix": 1207.4
+   }
+  },
+  {
+   "head": "ds005454-sub-16",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 27.7,
+    "reproduce": 53.4,
+    "fix": 52.6
+   },
+   "peak_mib": {
+    "official": 1538.00390625,
+    "reproduce": 1365.5,
+    "fix": 1366.4
+   }
+  }
+ ],
+ "entropy_images": [
+  {
+   "head": "ds000228-sub-pixar008",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 91.9,
+    "reproduce": 128.5,
+    "fix": 133.6
+   },
+   "peak_mib": {
+    "official": 1086.645,
+    "reproduce": 1122.2,
+    "fix": 1123.3
+   }
+  },
+  {
+   "head": "ds004173-sub-603309",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 134.5,
+    "reproduce": 179.0,
+    "fix": 193.2
+   },
+   "peak_mib": {
+    "official": 1400.438,
+    "reproduce": 1272.3,
+    "fix": 1273.0
+   }
+  }
+ ],
  "memory": [
   {
    "case": "fmriprep",

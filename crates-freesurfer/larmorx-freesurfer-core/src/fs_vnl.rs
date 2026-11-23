@@ -95,6 +95,21 @@ pub struct FsCostFunction<'a> {
     /// constructor, 0 with the one-argument one (`fs_powell` never reads it).
     pub dim: i32,
     p: Vec<f32>,
+    /// A subclass's own `f(const vnl_vector<double>&)` ([`FsCostFunction::with_double`]).
+    double_f: Option<&'a mut dyn FnMut(&[f64]) -> Option<f64>>,
+    /// The override ended the program inside an evaluation (it returned `None`).
+    stop: bool,
+}
+
+/// No function pointers: a subclass of `fs_cost_function` built with `fs_cost_function(NULL)`
+/// that overrides `f` ([`FsCostFunction::with_double`]); `fs_powell` reaches only its no-op
+/// iteration callback.
+pub struct NoFsFunctions;
+
+impl FsFunctions for NoFsFunctions {
+    fn function(&mut self, _p: &[f32]) -> f32 {
+        0.0
+    }
 }
 
 impl<'a> FsCostFunction<'a> {
@@ -104,7 +119,33 @@ impl<'a> FsCostFunction<'a> {
             funcs,
             dim: 0,
             p: Vec::new(),
+            double_f: None,
+            stop: false,
         }
+    }
+
+    /// A subclass of `fs_cost_function(NULL)` with `set_number_of_unknowns(dim)` whose own
+    /// `f(const vnl_vector<double>&)` is `f` (`mri_robust_register`'s `my_cost_function`): the
+    /// parameters reach it in `double`, with no conversion to `float`. `None` from `f`: the
+    /// program ends inside that evaluation (an `exit` in FreeSurfer's cost function): the
+    /// minimizer returns at once, printing nothing more ([`FsCostFunction::stopped`]).
+    pub fn with_double(
+        funcs: &'a mut NoFsFunctions,
+        dim: i32,
+        f: &'a mut dyn FnMut(&[f64]) -> Option<f64>,
+    ) -> Self {
+        FsCostFunction {
+            funcs,
+            dim,
+            p: Vec::new(),
+            double_f: Some(f),
+            stop: false,
+        }
+    }
+
+    /// Whether the override ended the program inside an evaluation.
+    pub fn stopped(&self) -> bool {
+        self.stop
     }
 
     /// `fs_cost_function(function, functionGradient, numberOfUnknowns)`.
@@ -113,6 +154,8 @@ impl<'a> FsCostFunction<'a> {
             funcs,
             dim: number_of_unknowns,
             p: Vec::new(),
+            double_f: None,
+            stop: false,
         }
     }
 
@@ -121,8 +164,21 @@ impl<'a> FsCostFunction<'a> {
         &mut *self.funcs
     }
 
-    /// `f(x)`: the cost function at `x` converted to `float` (1-based), widened to `double`.
+    /// `f(x)`: the cost function at `x` converted to `float` (1-based), widened to `double`; with
+    /// [`FsCostFunction::with_double`] the override at `x` itself.
     pub fn f(&mut self, x: &[f64]) -> f64 {
+        if let Some(f) = self.double_f.as_mut() {
+            if self.stop {
+                return f64::NAN;
+            }
+            return match f(x) {
+                Some(v) => v,
+                None => {
+                    self.stop = true;
+                    f64::NAN
+                }
+            };
+        }
         to_float_1based(x, &mut self.p);
         f64::from(self.funcs.function(&self.p))
     }
@@ -226,6 +282,9 @@ impl FsPowell {
         let mut ptt = vec![0.0f64; n];
         let mut xit = vec![0.0f64; n];
         let mut fret = functor.f(p);
+        if functor.stopped() {
+            return ReturnCode::ErrorFailure;
+        }
         self.base.report_eval(fret);
         let mut pt = p.to_vec();
         let _ = writeln!(out, "fs_powell::minimize");
@@ -261,6 +320,9 @@ impl FsPowell {
                 }
                 let fptt = fret;
                 let (xx, fr) = self.line_minimize(functor, p, &xit, self.initial_step, true, out);
+                if functor.stopped() {
+                    return ReturnCode::ErrorFailure;
+                }
                 fret = fr;
                 if verbose {
                     let _ = writeln!(out, "  min xx={}, fret={}", pg(xx), pg(fret));
@@ -304,12 +366,18 @@ impl FsPowell {
                 pt[j] = p[j];
             }
             let fptt = functor.f(&ptt);
+            if functor.stopped() {
+                return ReturnCode::ErrorFailure;
+            }
             self.base.report_eval(fret);
             if fptt < fp {
                 let t =
                     2.0 * (fp - 2.0 * fret + fptt) * sqr(fp - fret - del) - del * sqr(fp - fptt);
                 if t < 0.0 {
                     let (xx, fr) = self.line_minimize(functor, p, &xit, 1.0, false, out);
+                    if functor.stopped() {
+                        return ReturnCode::ErrorFailure;
+                    }
                     fret = fr;
                     uninit(p, &xit, xx);
                     for j in 0..n {

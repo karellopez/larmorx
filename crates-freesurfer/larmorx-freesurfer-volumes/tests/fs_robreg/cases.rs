@@ -589,6 +589,66 @@ fn seeded(g: &mut Gen) -> String {
     line(None, &files, &[], &args)
 }
 
+/// The Powell registration's cases (relay 46; `check.py --family powell`, the recorded test
+/// `fs_robreg_powell_official`): pairs of images of a random type (a few 2-D), each
+/// with one of the costs ported (`LS`, `NCC`, `TB`, `LNCC`, `SAD`) and random options (the
+/// models, the intensity scale, no symmetry, the full images alone, the tolerance, the start, the
+/// subsampling, the outputs but the half-way ones).
+pub fn powell_cases() -> Vec<String> {
+    let mut g = Gen::new(0x0070_6f77);
+    (0..40).map(|_| seeded_powell(&mut g)).collect()
+}
+
+fn seeded_powell(g: &mut Gen) -> String {
+    let flat = g.chance(8);
+    let n = g.pick(&[16, 16, 17, 18]);
+    let ty = g.pick(&[MRI_UCHAR, MRI_UCHAR, MRI_SHORT, MRI_FLOAT, MRI_INT]);
+    let (mut a, mut b) = pair(g, n, ty);
+    if flat {
+        a.dims = [n + 2, n, 1];
+        b.dims = [n + 2, n, 1];
+    } else {
+        if g.chance(6) {
+            b.mdc = RAS;
+        }
+        if g.chance(6) {
+            b.dims = [n + 2, n, n + 1];
+        }
+    }
+    let files = vec![
+        ("mov.mgz".to_owned(), write_as(&mut image(g, &a), "mov.mgz")),
+        ("dst.mgz".to_owned(), write_as(&mut image(g, &b), "dst.mgz")),
+    ];
+    let mut args = s(&["--mov", "mov.mgz", "--dst", "dst.mgz", "--lta", "out.lta"]);
+    args.extend(s(&[
+        "--cost",
+        g.pick(&["ls", "ncc", "tb", "lncc", "sad", "LS"]),
+    ]));
+    let mut opt = |g: &mut Gen, k: u64, a: &[&str]| {
+        if g.chance(k) {
+            args.extend(s(a));
+        }
+    };
+    opt(g, 3, &["--iscale"]);
+    opt(g, 5, &["--affine"]);
+    opt(g, 10, &["--isoscale"]);
+    opt(g, 8, &["--transonly"]);
+    opt(g, 6, &["--nosym"]);
+    opt(g, 6, &["--nomulti"]);
+    opt(g, 6, &["--powelltol", "0.001"]);
+    opt(g, 10, &["--initorient"]);
+    opt(g, 10, &["--noinit"]);
+    opt(g, 8, &["--subsample", "12"]);
+    opt(g, 10, &["--uchar"]);
+    opt(g, 10, &["--satit"]);
+    opt(g, 8, &["--vox2vox"]);
+    opt(g, 4, &["--mapmov", "mm.mgz"]);
+    opt(g, 8, &["--weights", "w.mgz"]);
+    opt(g, 6, &["--verbose", "2"]);
+    opt(g, 12, &["--iscaleout", "i.txt", "--iscale"]);
+    line(None, &files, &[], &args)
+}
+
 /// The entropy images' cases (relay 45, `--cost ROBENT`): byte, short and float sources, a mask
 /// on each side, 2-D images, every entropy option (the radius 0, 1, 2, 9 and below 0, the ball,
 /// the correction and both, the written images), the Sobel image and the intensity scale first.

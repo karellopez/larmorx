@@ -130,11 +130,11 @@ fn det4(m: &Mat4) -> f64 {
     vnl_fixed::determinant(&flat, 4)
 }
 
-fn fixed(m: &VnlMatrix) -> Mat4 {
+pub(crate) fn fixed(m: &VnlMatrix) -> Mat4 {
     m.to_4x4().expect("a 4 x 4 transform")
 }
 
-fn dynm(m: &Mat4) -> VnlMatrix {
+pub(crate) fn dynm(m: &Mat4) -> VnlMatrix {
     VnlMatrix::from_4x4(m)
 }
 
@@ -199,6 +199,15 @@ pub struct RegRobust {
     pub mri_weights: Option<Mri>,
     pub mri_hweights: Option<Mri>,
     pub mri_indexing: Option<Mri>,
+    /// `RegPowell` instead of `RegRobust` (`getClassName()`): the cost functions other than the
+    /// robust one, minimized by Powell's method ([`crate::powell`]).
+    pub powell: bool,
+    /// `RegPowell`'s `xtol`, `ftol` (`setTolerance`; 1e-5).
+    pub xtol: f64,
+    pub ftol: f64,
+    /// The precision of the program's `std::cout` for numbers: 6, and 14 once `RegPowell` has
+    /// printed its final error (`setprecision(14)` stays on the stream).
+    pub cout_precision: usize,
 }
 
 impl Default for RegRobust {
@@ -264,7 +273,33 @@ impl RegRobust {
             mri_weights: None,
             mri_hweights: None,
             mri_indexing: None,
+            powell: false,
+            xtol: 1e-5,
+            ftol: 1e-5,
+            cout_precision: 6,
         }
+    }
+
+    /// `RegPowell()`: `Registration()`'s defaults, both tolerances 1e-5.
+    pub fn new_powell() -> RegRobust {
+        RegRobust {
+            powell: true,
+            ..RegRobust::new()
+        }
+    }
+
+    /// `getClassName()`.
+    pub fn class_name(&self) -> &'static str {
+        if self.powell {
+            "RegPowell"
+        } else {
+            "RegRobust"
+        }
+    }
+
+    /// `std::cout << v` at the stream's current precision.
+    pub fn os(&self, v: f64) -> String {
+        cfmt::g(v, self.cout_precision)
     }
 
     /// `RegRobust::clear()`: `Registration::clear()` (the robust cost, no intensity scaling, no
@@ -397,6 +432,21 @@ impl RegRobust {
         err: &mut dyn Write,
         is2d: bool,
     ) -> Result<(), Fatal> {
+        if self.powell {
+            // RegPowell::setTransformation: the second type of each model, affine otherwise
+            let kind = match (self.transonly, self.rigid, self.isoscale, is2d) {
+                (true, _, _, true) => Kind::Translate2d,
+                (true, _, _, false) => Kind::Translate3d,
+                (_, true, _, true) => Kind::Rigid2d2,
+                (_, true, _, false) => Kind::Rigid3d2,
+                (_, _, true, true) => Kind::Isoscale2d2,
+                (_, _, true, false) => Kind::Isoscale3d2,
+                (_, _, _, true) => Kind::Affine2d2,
+                (_, _, _, false) => Kind::Affine3d2,
+            };
+            self.trans = Some(Transformation::new(kind));
+            return Ok(());
+        }
         let kind = if self.transonly {
             if is2d {
                 Kind::Translate2d
@@ -1007,7 +1057,7 @@ impl RegRobust {
     /// images' RAS (without `inittransform`), from their sizes (`initscaling`, only without
     /// `symmetry`), from their principal axes (`initorient`, when no axis turns by more than 84
     /// degrees) or from the centroids' difference.
-    fn initialize_transform(
+    pub(crate) fn initialize_transform(
         &mut self,
         g: &mut Globals,
         io: &mut Io,
@@ -1324,16 +1374,16 @@ impl RegRobust {
         nmax: i32,
         epsit: f64,
     ) -> Result<(), Fatal> {
-        let s = self.mri_source.take().expect("the source");
-        let t = self.mri_target.take().expect("the target");
+        let mut s = self.mri_source.take().expect("the source");
+        let mut t = self.mri_target.take().expect("the target");
         let m = self.get_minit_resampled();
         let r = self.compute_iterative_registration_full(
             g,
             io,
             nmax,
             epsit,
-            &s,
-            &t,
+            &mut s,
+            &mut t,
             m.as_ref(),
             self.iscaleinit,
         );
@@ -1351,11 +1401,15 @@ impl RegRobust {
         io: &mut Io,
         nmax: i32,
         epsit: f64,
-        mri_s: &Mri,
-        mri_t: &Mri,
+        mri_s: &mut Mri,
+        mri_t: &mut Mri,
         m: Option<&VnlMatrix>,
         scaleinit: f64,
     ) -> Result<(), Fatal> {
+        if self.powell {
+            return self.powell_full(g, io, mri_s, mri_t, m, scaleinit);
+        }
+        let (mri_s, mri_t) = (&*mri_s, &*mri_t);
         if self.doubleprec {
             self.iterative_registration_helper::<f64>(
                 g, io, nmax, epsit, mri_s, mri_t, m, scaleinit,
@@ -1830,7 +1884,7 @@ impl RegRobust {
         if self.verbose > 0 {
             let _ = writeln!(io.out, "   - initial transform:");
             print_m(io.out, &md.0, "Ti");
-            let _ = writeln!(io.out, "   - initial iscale:  Ii ={}", ostream(md.1));
+            let _ = writeln!(io.out, "   - initial iscale:  Ii ={}", self.os(md.1));
         }
         for _ in 1..=limits.1 {
             for rr in 0..3 {
@@ -1852,12 +1906,12 @@ impl RegRobust {
         }
         let mut m = n;
         self.converged = true;
-        let gp_s = std::mem::take(&mut self.gp_s);
-        let gp_t = std::mem::take(&mut self.gp_t);
+        let mut gp_s = std::mem::take(&mut self.gp_s);
+        let mut gp_t = std::mem::take(&mut self.gp_t);
         let res = (|| -> Result<(), Fatal> {
             let mut r = resolution - 1;
             while r >= stopres {
-                let (s, t) = (&gp_s[r as usize], &gp_t[r as usize]);
+                let (s, t) = (&mut gp_s[r as usize], &mut gp_t[r as usize]);
                 if self.verbose > 0 {
                     let _ = writeln!(io.out);
                     let _ = writeln!(
@@ -1890,7 +1944,7 @@ impl RegRobust {
                     let _ = writeln!(io.out);
                     let _ = writeln!(io.out, " current : Matrix: ");
                     print_m(io.out, &cmd.0, "Tc");
-                    let _ = writeln!(io.out, " intens:  Ic = {}", ostream(cmd.1));
+                    let _ = writeln!(io.out, " intens:  Ic = {}", self.os(cmd.1));
                     let (mut tx, mut ty, mut tz) = (cmd.0[0][3], cmd.0[1][3], cmd.0[2][3]);
                     for _ in 0..r {
                         tx = mul64(tx, 2.0);
@@ -1900,9 +1954,9 @@ impl RegRobust {
                     let _ = writeln!(
                         io.out,
                         " equiv trans on highres: {} {} {}",
-                        ostream(tx),
-                        ostream(ty),
-                        ostream(tz)
+                        self.os(tx),
+                        self.os(ty),
+                        self.os(tz)
                     );
                 }
                 if r != 0 {
@@ -1915,7 +1969,7 @@ impl RegRobust {
                     let _ = writeln!(io.out);
                     let _ = writeln!(io.out, " Matrix: ");
                     print_m(io.out, &md.0, "Tcpost");
-                    let _ = writeln!(io.out, " intens: Icpost = {}", ostream(md.1));
+                    let _ = writeln!(io.out, " intens: Icpost = {}", self.os(md.1));
                 }
                 r -= 1;
             }
@@ -1937,7 +1991,7 @@ impl RegRobust {
             let _ = writeln!(io.out);
             let _ = writeln!(io.out, "   - final transform: ");
             print_m(io.out, &md.0, "Tf");
-            let _ = writeln!(io.out, "   - final iscale:  If = {}", ostream(md.1));
+            let _ = writeln!(io.out, "   - final iscale:  If = {}", self.os(md.1));
         }
         if !self.converged && self.verbose > 0 {
             let star = "**********************************************************";
@@ -1980,12 +2034,12 @@ impl RegRobust {
         let resolution = self.gp_s.len() as i32;
         let rstart = 1;
         let stopres = sat_stopres(&self.gp_s, resolution, rstart);
-        let gp_s = std::mem::take(&mut self.gp_s);
-        let gp_t = std::mem::take(&mut self.gp_t);
+        let mut gp_s = std::mem::take(&mut self.gp_s);
+        let mut gp_t = std::mem::take(&mut self.gp_t);
         let res = (|| -> Result<(), Fatal> {
             let mut r = resolution - rstart;
             while r >= stopres {
-                let (s, t) = (&gp_s[r as usize], &gp_t[r as usize]);
+                let (s, t) = (&mut gp_s[r as usize], &mut gp_t[r as usize]);
                 if self.verbose > 1 {
                     let _ = writeln!(io.out);
                     let _ = writeln!(io.out, "Resolution: {r}");
@@ -2031,9 +2085,9 @@ impl RegRobust {
                     let _ = writeln!(
                         io.out,
                         " equiv trans on highres: {} {} {}",
-                        ostream(tx),
-                        ostream(ty),
-                        ostream(tz)
+                        self.os(tx),
+                        self.os(ty),
+                        self.os(tz)
                     );
                 }
                 if r != 0 {

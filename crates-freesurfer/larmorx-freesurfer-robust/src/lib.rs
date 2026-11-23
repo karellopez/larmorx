@@ -16,6 +16,7 @@ pub mod costs;
 pub mod entropy;
 pub mod mymatrix;
 pub mod mymri;
+pub mod powell;
 pub mod quaternion;
 pub mod real;
 pub mod registration;

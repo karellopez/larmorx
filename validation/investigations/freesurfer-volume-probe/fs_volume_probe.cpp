@@ -50,6 +50,7 @@
 #include "matrix.h"
 #include "mri.h"
 #include "mri2.h"
+#include "mri_conform.h"
 #include "region.h"
 #include "talairachex.h"
 #include "resample.h"
@@ -712,6 +713,29 @@ static MRI *getw()
   COLOR_TABLE *ct = getct();
   if (ct) m->ct = ct;
   return m;
+}
+// a volume as putv prints it, but its voxels as the FNV-1a 64 hash of their bytes (h and 16 hex digits)
+static void putvh(const MRI *m)
+{
+  if (!m) {
+    out("null");
+    return;
+  }
+  puthdr(m);
+  putct(m->ct, true);
+  if (!has_voxels(m)) {
+    out("novox");
+    return;
+  }
+  uint64_t h = 1469598103934665603ULL;
+  const unsigned char *b = (const unsigned char *)m->chunk;
+  for (size_t i = 0; i < m->bytes_total; i++) {
+    h ^= b[i];
+    h *= 1099511628211ULL;
+  }
+  char s[24];
+  snprintf(s, sizeof s, "h%016" PRIx64, h);
+  out(s);
 }
 static void putv(const MRI *m)
 {
@@ -2814,6 +2838,316 @@ static void call(const std::string &c)
         putf(h->bins[i]);
         putf(h->counts[i]);
       }
+    }
+  }
+  // part 10b (relay 19): conforming (§49), set operations, morphology, masks and counts (§50)
+  else if (c == "conform") {
+    // k 0 MRIconform, 1 MRIgetConformMatrix, 2 MRIconformedTemplate (width, size, KeepDC); then the
+    // input; volumes with their voxels hashed
+    int k = geti();
+    MRI *m = getw();
+    paint(m);
+    int w = 0, keep = 0;
+    double sz = 0;
+    if (k == 2) {
+      w = geti();
+      sz = getd();
+      keep = geti();
+    }
+    fflush(stdout);
+    if (k == 0) {
+      MRI *res = MRIconform(m);
+      fflush(stdout);
+      putvh(res);
+    }
+    else if (k == 1) {
+      MATRIX *M = MRIgetConformMatrix(m);
+      fflush(stdout);
+      putm(M);
+    }
+    else {
+      MRI *res = MRIconformedTemplate(m, w, sz, keep);
+      fflush(stdout);
+      putvh(res);
+    }
+    putvh(m);
+  }
+  else if (c == "union" || c == "isect" || c == "mand" || c == "mxor") {
+    MRI *a = getw();
+    paint(a);
+    MRI *b = getw();
+    paint(b);
+    MRI *d = getdst(a, b);
+    int t1 = 0, t2 = 0;
+    if (c == "mand") t1 = geti();
+    if (c == "mxor") {
+      t1 = geti();
+      t2 = geti();
+    }
+    fflush(stdout);
+    MRI *res = c == "union"   ? MRIunion(a, b, d)
+               : c == "isect" ? MRIintersect(a, b, d)
+               : c == "mand"  ? MRIand(a, b, d, t1)
+                              : MRIxor(a, b, d, t1, t2);
+    fflush(stdout);
+    putres(res, a, b, d);
+  }
+  else if (c == "compl" || c == "erode" || c == "erode2d" || c == "dil6" || c == "mnot" || c == "b2c") {
+    MRI *a = getw();
+    paint(a);
+    MRI *d = getdst(a);
+    fflush(stdout);
+    MRI *res = c == "compl"     ? MRIcomplement(a, d)
+               : c == "erode"   ? MRIerode(a, d)
+               : c == "erode2d" ? MRIerode2D(a, d)
+               : c == "dil6"    ? MRIdilate6(a, d)
+               : c == "mnot"    ? MRInot(a, d)
+                                : MRIbinMaskToCol(a, d);
+    fflush(stdout);
+    putres(res, a, NULL, d);
+  }
+  else if (c == "edges") {
+    MRI *a = getw();
+    paint(a);
+    double v = getd();
+    MRI *d = getdst(a);
+    fflush(stdout);
+    MRI *res = MRIsetEdges(a, v, d);
+    fflush(stdout);
+    putres(res, a, NULL, d);
+  }
+  else if (c == "erodenn" || c == "erodeseg") {
+    MRI *a = getw();
+    paint(a);
+    MRI *d = getdst(a);
+    int i1 = geti(), i2 = geti();
+    fflush(stdout);
+    MRI *res = c == "erodenn" ? MRIerodeNN(a, d, i1, i2) : MRIerodeSegmentation(a, d, i1, i2);
+    fflush(stdout);
+    putres(res, a, NULL, d);
+  }
+  else if (c == "dilseg") {
+    // seg, out, nDils, the mask (null or a volume), its frame and threshold; then nchanges (7 unset)
+    MRI *a = getw();
+    paint(a);
+    MRI *d = getdst(a);
+    int n = geti();
+    MRI *mk = NULL;
+    if (!take("null")) {
+      mk = getw();
+      paint(mk);
+    }
+    int frame = geti();
+    double th = getd();
+    int nch = 7;
+    fflush(stdout);
+    MRI *res = MRIdilateSegmentation(a, d, n, mk, frame, th, &nch);
+    fflush(stdout);
+    putres(res, a, NULL, d);
+    puti(nch);
+  }
+  else if (c == "dtl") {
+    // k 0 MRIdilateThreshLabel, 1 MRIdilateInvThreshLabel (src, val, dst, label, niter, thresh)
+    int k = geti();
+    MRI *a = getw();
+    paint(a);
+    MRI *v = getw();
+    paint(v);
+    MRI *d = getdst(a, v);
+    int label = geti(), niter = geti(), th = geti();
+    fflush(stdout);
+    MRI *res = k == 0 ? MRIdilateThreshLabel(a, v, d, label, niter, th)
+                      : MRIdilateInvThreshLabel(a, v, d, label, niter, th);
+    fflush(stdout);
+    putres(res, a, v, d);
+  }
+  else if (c == "dlab") {
+    // k 0 MRIdilateLabel, 1 MRIdilateLabelUchar (src, dst, label, niter)
+    int k = geti();
+    MRI *a = getw();
+    paint(a);
+    MRI *d = getdst(a);
+    int label = geti(), niter = geti();
+    fflush(stdout);
+    MRI *res = k == 0 ? MRIdilateLabel(a, d, label, niter) : MRIdilateLabelUchar(a, d, label, niter);
+    fflush(stdout);
+    putres(res, a, NULL, d);
+  }
+  else if (c == "openn") {
+    // k 0 MRIopenN (an order), 1 MRIopen, 2 MRIclose
+    int k = geti();
+    MRI *a = getw();
+    paint(a);
+    MRI *d = getdst(a);
+    int order = k == 0 ? geti() : 0;
+    fflush(stdout);
+    MRI *res = k == 0 ? MRIopenN(a, d, order) : k == 1 ? MRIopen(a, d) : MRIclose(a, d);
+    fflush(stdout);
+    putres(res, a, NULL, d);
+  }
+  else if (c == "rlist") {
+    // seg, n pairs (source, target), the mask (null or a volume), out
+    MRI *a = getw();
+    paint(a);
+    int n = geti();
+    std::vector<int> s((size_t)(n > 0 ? n : 1)), t((size_t)(n > 0 ? n : 1));
+    for (int i = 0; i < n; i++) {
+      s[(size_t)i] = geti();
+      t[(size_t)i] = geti();
+    }
+    MRI *mk = NULL;
+    if (!take("null")) {
+      mk = getw();
+      paint(mk);
+    }
+    MRI *d = getdst(a, mk);
+    fflush(stdout);
+    MRI *res = MRIreplaceList(a, s.data(), t.data(), n, mk, d);
+    fflush(stdout);
+    putres(res, a, mk, d);
+  }
+  else if (c == "rvonly") {
+    MRI *a = getw();
+    paint(a);
+    MRI *d = getdst(a);
+    float in = getf(), ov = getf();
+    fflush(stdout);
+    MRI *res = MRIreplaceValuesOnly(a, d, in, ov);
+    fflush(stdout);
+    putres(res, a, NULL, d);
+  }
+  else if (c == "mmask" || c == "tmask") {
+    // mmask k (0 MRImask, 1 MRImaskDifferentGeometry) src mask dst m out; tmask src mask dst
+    // thresh out (MRIthresholdMask)
+    int k = c == "mmask" ? geti() : 0;
+    MRI *a = getw();
+    paint(a);
+    MRI *mk = getw();
+    paint(mk);
+    MRI *d = getdst(a, mk);
+    MRI *res;
+    if (c == "mmask") {
+      int m = geti();
+      float ov = getf();
+      fflush(stdout);
+      res = k == 0 ? MRImask(a, mk, d, m, ov) : MRImaskDifferentGeometry(a, mk, d, m, ov);
+    }
+    else {
+      float th = getf(), ov = getf();
+      fflush(stdout);
+      res = MRIthresholdMask(a, mk, d, th, ov);
+    }
+    fflush(stdout);
+    putres(res, a, mk, d);
+  }
+  else if (c == "grow" || c == "onfg" || c == "offbg") {
+    // grow mri filled in out (MRIgrowLabel); onfg mri fg bg (MRIturnOnFG); offbg mri bg
+    // (MRIturnOffBG): the result, then every volume
+    MRI *a = getw();
+    paint(a);
+    MRI *b = getw();
+    paint(b);
+    MRI *e = NULL;
+    int i1 = 0, i2 = 0;
+    if (c == "onfg") {
+      e = getw();
+      paint(e);
+    }
+    else if (c == "grow") {
+      i1 = geti();
+      i2 = geti();
+    }
+    fflush(stdout);
+    int r = c == "grow" ? MRIgrowLabel(a, b, i1, i2) : c == "onfg" ? MRIturnOnFG(a, b, e) : MRIturnOffBG(a, b);
+    fflush(stdout);
+    puti(r);
+    putv(a);
+    putv(b);
+    if (e) putv(e);
+  }
+  else if (c == "cplab" || c == "cplv") {
+    // cplab src dst label (MRIcopyLabel); cplv src lab dst label (MRIcopyLabeledVoxels): the count,
+    // then dst (`self` or `other` as D)
+    MRI *a = getw();
+    paint(a);
+    MRI *lb = NULL;
+    if (c == "cplv") {
+      lb = getw();
+      paint(lb);
+    }
+    MRI *d = getdst(a, lb);
+    int label = geti();
+    fflush(stdout);
+    int n = c == "cplab" ? MRIcopyLabel(a, d, label) : MRIcopyLabeledVoxels(a, lb, d, label);
+    fflush(stdout);
+    puti(n);
+    putv(d);
+  }
+  else if (c == "slv") {
+    MRI *a = getw();
+    paint(a);
+    MRI *lb = getw();
+    paint(lb);
+    MRI *d = getdst(a, lb);
+    int label = geti();
+    float v = getf();
+    fflush(stdout);
+    MRI *res = MRIsetLabelValues(a, lb, d, label, v);
+    fflush(stdout);
+    putres(res, a, lb, d);
+  }
+  else if (c == "cntv") {
+    // k 0 MRItotalVoxelsOn, 1 MRIvoxelsInLabel, 2 MRIlabelInVolume (an int), 3 MRInMask
+    int k = geti();
+    MRI *a = getw();
+    paint(a);
+    int i = k < 3 ? geti() : 0;
+    fflush(stdout);
+    int r = k == 0   ? MRItotalVoxelsOn(a, i)
+            : k == 1 ? MRIvoxelsInLabel(a, i)
+            : k == 2 ? MRIlabelInVolume(a, i)
+                     : MRInMask(a);
+    fflush(stdout);
+    puti(r);
+  }
+  else if (c == "cent") {
+    MRI *a = getw();
+    paint(a);
+    double x = UNSETD, y = UNSETD, z = UNSETD;
+    fflush(stdout);
+    int r = MRIcomputeCentroid(a, &x, &y, &z);
+    fflush(stdout);
+    puti(r);
+    putd(x);
+    putd(y);
+    putd(z);
+  }
+  else if (c == "pthr") {
+    // the volume, the mask (null or a volume), the frame, the percentage
+    MRI *a = getw();
+    paint(a);
+    MRI *mk = NULL;
+    if (!take("null")) {
+      mk = getw();
+      paint(mk);
+    }
+    int frame = geti();
+    double pct = getd();
+    fflush(stdout);
+    double r = MRIpercentThresh(a, mk, frame, pct);
+    fflush(stdout);
+    putd(r);
+  }
+  else if (c == "cnbhd") {
+    // n points: wsize x y z val
+    MRI *a = getw();
+    paint(a);
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int w = geti(), x = geti(), y = geti(), z = geti(), v = geti();
+      fflush(stdout);
+      puti(MRIcountValInNbhd(a, w, x, y, z, v));
+      fflush(stdout);
     }
   }
   else

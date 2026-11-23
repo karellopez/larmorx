@@ -2590,112 +2590,167 @@ value beyond the `int` range or NaN is FS-12 here too (clamped by default, NaN t
   `reproduce` but FS-490 and memory the original does not own (FS-52, FS-53), lines the loop allows; the default
   differs only with a notice (FS-12, FS-489).
 
-## 49. Conforming (3.1-38: mri_conform.cpp)
+## 49. Conforming (3.1-38)
+(Made ready for the clean room by the spec finisher's relay 19: §69.2's groups `vconf` and `vrules22`.)
 - The conformed grid: a header-only byte volume of 256 x 256 x 256 voxels and the input's frame count; `imnr0` 1,
   `imnr1` 256, `thick`, `ps` and the three voxel sizes 1, the starts -128 and ends 128, the coronal direction cosines
   (`x_r` -1, `y_s` -1, `z_a` 1, the others 0), `ras_good_flag` 1, the centre (`c_r`, `c_a`, `c_s`) and TR, TE, TI and
   flip angle taken from the volume as stated below.
-- `MRIgetConformMatrix(mri)`: a volume whose `ras_good_flag` is 0 first gets the coronal cosines and centre 0 (in
-  place, its cached matrices untouched); then the resampling matrix from the conformed grid (with this volume's
-  centre and pulse parameters) to the volume (`MRIgetResampleMatrix`, section 29), or none where that fails.
-- `MRIconform(mri)`: a copy (`MRIcopy`); a copy whose `ras_good_flag` is 0 gets the coronal cosines and centre 0; the
-  grid takes the copy's centre and the input's pulse parameters. A copy of another type than bytes is changed with
-  `MRIchangeType(copy, MRI_UCHAR, 0.0, 0.999, 0)` (scaled by its robust range; none: the result is none). Then, unless
-  the copy's three voxel sizes, extent and nine direction cosines all equal the grid's (`!=` on `float`s and `int`s: a
-  NaN always differs), it is resampled onto the grid with trilinear interpolation (`MRIresample`, section 31; none:
-  the result is none). The input is never changed.
+- **The coronal cosines and centre 0** below set those twelve fields only: the volume's `ras_good_flag` and its cached
+  matrices are left as they are.
+- `MRIgetConformMatrix(mri)`: a volume whose `ras_good_flag` is 0 first gets the coronal cosines and centre 0, in
+  place (the caller sees them afterwards); then the resampling matrix from the conformed grid (with this volume's
+  centre and pulse parameters) to the volume (`MRIgetResampleMatrix(mri, grid)`, section 29), or none where that
+  fails, with its messages. A volume whose `ras_good_flag` is 0 therefore always gives none, after section 29's
+  `MRIresample(): source volume orientation is unknown`, its cosines and centre changed all the same
+  (**(observed)**: `vconf`; `vrules22`).
+- `MRIconform(mri)`: a copy (`MRIcopy`, fs.mri §13); a copy whose `ras_good_flag` is 0 gets the coronal cosines and
+  centre 0; the grid takes the copy's centre and the input's pulse parameters. A copy of another type than bytes is
+  changed with `MRIchangeType(copy, MRI_UCHAR, 0.0, 0.999, 0)` (section 25: scaled by its robust range, its
+  `MRIchangeType: Building histogram ...` line on standard output; none: the result is none). Then, unless the copy's
+  three voxel sizes, extent and nine direction cosines all equal the grid's (`!=` on `float`s and `int`s: a NaN
+  always differs), it is resampled onto the grid with trilinear interpolation (`MRIresample`, section 31; none: the
+  result is none), so a copy whose `ras_good_flag` is 0 that must be resampled gives section 31's warning, then
+  section 29's error, and none. The input is never changed. A volume without voxels: FS-58 where its voxels are read
+  (FreeSurfer crashes in the change of type or the resampling; both modes FS-58's C-style error, fs.mri §5)
+  (**(observed)**: `vconf`, small volumes of bytes, ints, floats and shorts of one and two frames resampled onto the
+  grid, the grid itself in bytes (the copy) and in floats (a change of type only), a good RAS or not, the result's
+  voxels hashed; `vrules22`, a header-only volume: `CRASH 11`).
 - `MRIconformedTemplate(mri, conform_width, conform_size, KeepDC)`: a header-only byte volume of `conform_width`^3
-  voxels and the input's frame count with the input's header (`MRIcopyHeader`) and pulse parameters, `imnr0` 1,
-  `imnr1` `conform_width`, `thick`, `ps` and the voxel sizes `(float) conform_size`, starts `-conform_width / 2` and
-  ends `conform_width / 2` (integer division, then `float`). Without `KeepDC` the coronal cosines (the centre stays the
-  input's). With `KeepDC`:
+  voxels and the input's frame count (fs.mri §4: a width of 0 or below prints the allocation's shape message for each
+  of the three extents, and the template is made all the same), with the input's header (`MRIcopyHeader`) and pulse
+  parameters, `imnr0` 1, `imnr1` `conform_width`, `thick`, `ps` and the voxel sizes `(float) conform_size`, starts
+  `-conform_width / 2` and ends `conform_width / 2` (integer division, then `float`). Without `KeepDC` the coronal
+  cosines (the centre stays the input's). With `KeepDC`:
   - `conform_FoV = (int)(conform_width * conform_size)`; the input's orientation string (`MRIdircosToOrientationString`,
-    `???` when its cosines are not good); `iLR`, `iIS`, `iAP` the positions (0 to 2) of its first `L`/`R`, `I`/`S`
-    and `A`/`P` letter, 3 when absent; on standard output `keeping DC <iLR> <iIS> <iAP>` and `ostr <ostr>, width
+    section 33: `???` when its `ras_good_flag` is 0); `iLR`, `iIS`, `iAP` the positions (0 to 2) of its first `L`/`R`,
+    `I`/`S` and `A`/`P` letter, 3 when absent; on standard output `keeping DC <iLR> <iIS> <iAP>` and `ostr <ostr>, width
     <conform_width>, size <conform_size as %g>`.
   - `Nvox` the input's width, height, depth; `delta` its voxel sizes (`double`); `FoV[c] = (int)(Nvox[c] * delta[c])`.
   - `K` a 4 x 4 `float` matrix of zeros with `K[4][4] = 1`; for rows 1, 2, 3 and the axes LR, IS, AP in that order:
     `step = delta[i] / conform_size`, `pad = round(((conform_FoV - FoV[i]) / 2.0) / conform_size)` (the difference of
     two `int`s, then `double`; `round` half away from zero); when the axis' letter is `L` (`I`, `A`): `K[row][i+1] =
     step`, `K[row][4] = pad`; else `K[row][i+1] = -step`, `K[row][4] = conform_width - pad`.
-  - `Kinv = MatrixInverse(K)`, `Smri = MRIxfmCRS2XYZ(mri, 0)` (no shear), `Stemp = MatrixMultiplyD(Smri, Kinv)`
-    (a singular `K` ends the program in the product: `MatrixMultiplyD(): m2 is null`), the template's geometry set
-    from `Stemp` (`MRIsetVox2RASFromMatrix`), then on standard output `K ---------------`, `MatrixPrint(K)`,
-    `Kinv ---------------`, its print, `Smri ---------------`, its print, `Stemp ---------------`, its print,
-    `----------------------` (`MatrixPrint` with 5 decimals, `freesurfer-maths.md` §8.6).
-  - FS-491: an absent letter (index 3) makes FreeSurfer read a voxel size and field of view past its three-element
-    arrays (memory contents) and write that row's step into column 4 before the padding overwrites it. By default the
-    program ends with `MRIconformedTemplate: orientation string <ostr> lacks a left/right, inferior/superior or
-    anterior/posterior axis` (`ERROR_BADPARM`) after the two lines above; with `reproduce` the two values read are 0.
+  - `Kinv = MatrixInverse(K)` (`specs/freesurfer-maths.md` §8.8), `Smri = MRIxfmCRS2XYZ(mri, 0)` (no shear), `Stemp =
+    MatrixMultiplyD(Smri, Kinv)`, the template's geometry set from `Stemp` (`MRIsetVox2RASFromMatrix`, fs.mri §3, with
+    its warning when the sizes it finds differ from the template's, a negative `conform_size` for one), then on
+    standard output `K ---------------`, `MatrixPrint(K)`, `Kinv ---------------`, its print, `Smri ---------------`,
+    its print, `Stemp ---------------`, its print, `----------------------` (`MatrixPrint` with 5 decimals,
+    `specs/freesurfer-maths.md` §8.6).
+  - A `K` that cannot be inverted (a zero column: a `conform_size` of 0 makes the steps infinite, or an absent
+    letter below) or that has an element that is not finite (a NaN or infinite `conform_size`) gives no `Kinv`
+    (`MatrixInverse`'s rules), and the program ends in the product with `MatrixMultiplyD(): m2 is null` and its
+    `break` line (`specs/freesurfer-maths.md` §2.5, status 252), after the two lines above (**(observed)**: `vconf`;
+    `vrules22`, sizes 0, NaN and infinite).
+  - FS-491: an absent letter (index 3: `???` or two axes along one direction, such as `RRS` or `IIP`) makes FreeSurfer
+    read that axis' voxel size and field of view past its three-element arrays (memory contents) and write the row's
+    step into column 4, which the padding then overwrites: the axis' column of `K` stays 0 whatever was read, so `K`
+    cannot be inverted and the program always ends as just said (the values read reach no output). By default the
+    program ends instead, after the two lines above, with the C-style error `MRIconformedTemplate: orientation string
+    <ostr> lacks a left/right, inferior/superior or anterior/posterior axis` (`ERROR_BADPARM`, status 252), noted;
+    with `reproduce` FreeSurfer's end (taking the two values read as 0 gives it) (**(observed)**: `vconf`, `???`, `PAP`,
+    `IIP`, `APP`, `AAS`; `vrules22`, `???` and `RRS`, with and without `KeepDC`).
   - FS-492: a field of view beyond the `int` range or NaN converts to -2147483648 in FreeSurfer and the difference
     `conform_FoV - FoV[i]` wraps around in 32 bits; by default each conversion is clamped (NaN to 0) and the difference
-    taken exactly. Both noted.
+    taken exactly. Both noted (**(observed)**: `vrules22`, widths 256 and 3 with the size 1e10).
 
-## 50. Set operations, morphology, masks and counts (3.1-38: the rest of mriset.cpp)
+## 50. Set operations, morphology, masks and counts (3.1-38)
+(Made ready for the clean room by the spec finisher's relay 19: §69.2's groups `vset`, `vmorph`, `vmask` and
+`vrules22`.)
 Common rules: "bytes" means frame 0 read and written as one byte per voxel at the voxel's index in its row, whatever
 the volume's type; "values" means `MRIgetVoxVal`/`MRIsetVoxVal` (`float`). `MRIcheckVolDims(a, b)` ends the program
-when both exist and their height, width or depth differ (section 31). A "clone" is `MRIclone` (zeros, the source's
-header). `(int) v` of a value beyond the `int` range or NaN is FS-12 (clamped by default, -2147483648 with
-`reproduce`). Loops run z, y, x (x innermost) unless "x outermost" is said (then x, y, z). Index tables clamp a
-coordinate to the volume.
+when both exist and their height, width or depth differ (section 31; the height compared first, then the width, then
+the depth). A "clone" is `MRIclone` (zeros, the source's header). `(int) v` of a value beyond the `int` range or NaN
+is FS-12 (clamped by default, NaN to 0, -2147483648 with `reproduce`). Loops run z, y, x (x innermost) unless "x
+outermost" is said (then x, y, z). Index tables clamp a coordinate to the volume. A byte compared with an `int` label
+is compared as an integer, so a label outside 0 to 255 never equals a byte, and a label written as a byte keeps its low
+8 bits. Only the volumes this section names as checked are checked: a destination, mask or second volume of a smaller
+extent, or with fewer frames than are written, is read and written as the voxel functions do outside a volume (fs.mri
+§5, FS-52, FS-53; FreeSurfer reads and writes outside it, often crashing: those lines are memory or crash lines), and
+`MRIcopy` into a destination with fewer frames or another extent likewise (fs.mri §13). A volume without voxels where
+its voxels are read or written: FS-58.
 - `MRIunion(a, b, dst)`: check (a, b); clone of `a` without `dst`; bytes: `max(a, b)`.
 - `MRIintersect(a, b, dst)`: check; clone; for each frame of `dst`: `min((int) a, (int) b)` as a value.
 - `MRIcomplement(src, dst)`: check (src, dst); without `dst` one frame of the source's extent and type with its
-  header; for each frame of `src`: `1` where `(int) v == 0`, else `0`.
+  header; for each frame of `src`: `1` where `(int) v == 0`, else `0` (so a source of two frames writes its second
+  frame outside a new destination: FS-53, **(observed)**: `vrules22`, `CRASH 11`).
 - `MRIand(a, b, dst, thresh)`: check; clone; for each frame of `a`: each voxel sampled (`MRIsampleVolumeFrame` at whole
-  coordinates), taken as 0 below `thresh`; `1` where both are not 0 (NaN is not 0), else `0`.
+  coordinates, section 18: the nearest voxel, a type it refuses giving 0 with its error, a frame past `b`'s its
+  `outside_val`), taken as 0 below `thresh` (the `int` as a `double`); `1` where both are not 0 (NaN is not 0), else
+  `0`.
 - `MRIxor(a, b, dst, t1, t2)`: check; clone; frame 0: each `(int) v` is on when in `[t1, t2]`; `1` where exactly one is.
 - `MRIsetEdges(in, val, out)`: `out = MRIcopy(in, out)` (none: none), pulse parameters and colour table copied; every
   voxel of every frame on the six faces gets `(float) val`.
 - `MRIerodeNN(in, out, NNDef, ErodeEdges)`: `in == out`: `ERROR: MRIerodeNN(): cannot be done in-place` (standard
   output), none. Without `out` one frame of `in`'s extent and type with its header, pulse parameters and colour table;
   a given `out` of other dimensions (`MRIdimMismatch`, frames not compared): `ERROR: MRIerodeNN(): seg/out dim
-  mismatch`, none; else `out` is first set to 0. Columns outermost: start from the voxel's own value (`double`); for
-  each of the 27 offsets, one outside the volume sets the minimum to 0 when `ErodeEdges`, else is skipped; inside,
-  `NNDef` 1 keeps only offsets with `|dc|+|dr|+|ds| <= 1`, 2 those `<= 2`; a smaller value replaces the minimum.
+  mismatch`, none; else every voxel of every frame of `out` is first set to 0 (`MRIsetValues`). Columns outermost:
+  the minimum starts from the voxel's own frame-0 value (`double`); then the 27 offsets in order, `dc` from -1 to 1
+  outermost, then `dr`, then `ds` innermost (the voxel's own offset included). An offset outside the volume, when
+  `ErodeEdges` is set, sets the minimum to 0 at its turn (replacing a lower value found before it; later offsets may
+  lower it again), and is otherwise skipped; this test comes before the neighbourhood's, so it holds for every offset.
+  Inside, `NNDef` 1 keeps only offsets with `|dc|+|dr|+|ds| <= 1`, 2 those `<= 2`, any other value all 27; a smaller
+  value replaces the minimum (a NaN never does; a NaN start stays). The minimum is written into frame 0 of `out`. So
+  with `ErodeEdges` every voxel on a far face (column `w - 1`, row `h - 1` or slice `d - 1`, whose last offset (1, 1,
+  1) is outside) becomes 0, and one on a near face only becomes the smaller of 0 and the inside values after its
+  first outside offset (**(observed)**: `vmorph`; `vrules22`, a slice of negative values with each neighbourhood, edges
+  eroded or not: eroded, every voxel 0).
 - `MRIerode(src, dst)`: clone without `dst`; `dst == src` works into a clone copied back (`MRIcopy`) at the end. Two
   byte volumes: bytes, the smallest of the 27 neighbourhood bytes starting from 255. Otherwise for each frame of `src`
   the smallest of the voxel's value and its 27 neighbours' (`float`, `<`), as values.
 - `MRIerode2D(src, dst)`: as `MRIerode`'s destinations; frame 0, the smallest of the 3 x 3 in-slice neighbourhood
   (`double`, starting from the voxel), as values.
 - `MRIerodeSegmentation(seg, out, n, thresh)` and `MRIdilateSegmentation(seg, out, n, mask, frame, mthresh,
-  &nchanges)`: `seg == out`: `ERROR: <name>(): cannot be done in-place`, none. Without `out` one frame of `seg`'s
-  extent and type; one of other dimensions: `ERROR: <name>(): seg/out dim mismatch`, none. `out = MRIcopy(seg, out)`;
+  &nchanges)`: `seg == out`: `ERROR: <name>(): cannot be done in-place` (standard output, as the other messages of
+  these two), none. Without `out` one frame of `seg`'s extent and type; one of other dimensions (frames not
+  compared): `ERROR: <name>(): seg/out dim mismatch`, none. `out = MRIcopy(seg, out)` (a `seg` of two frames into the
+  one-frame output: FS-53, **(observed)**: `vrules22`, `CRASH 11`);
   a working copy `seg2`. `n - 1` single steps first (each from `seg2` into `out`, then `seg2 = copy of out`); for the
   dilation `n == -1` repeats single steps until one changes nothing and sets `nchanges` to the number of steps.
   FS-493: an erosion count below 1 or a dilation count of 0 or below -1 never ends in FreeSurfer; an error here in
-  both modes (`<name>: a count of <n> never ends`). The last step, columns outermost, on `(int)` labels of `seg2`:
-  erosion: voxels on a face become 0; others become 0 when more than `thresh` of the 6 face neighbours differ;
-  `seg`'s colour table deep-copied into `out` when both have one. Dilation: a voxel of label 0 inside the mask
+  both modes (`<name>: a count of <n> never ends`) (**(observed)**: `vrules22`, counts 0, -1 and -5 of the erosion and
+  0 and -2 of the dilation: `TIMEOUT` after an alarm of 1 second). The last step, columns outermost, on `(int)`
+  labels of `seg2` (frame 0): erosion: voxels on a face become 0; each other voxel counts its 6 face neighbours whose
+  label differs from its own and becomes 0 when the count is above `thresh`, else its own `(int)` label (written as
+  a value: a float label 2.5 becomes 2); `seg`'s colour table deep-copied into `out` when both have one (each step's
+  own, the last step's kept). Dilation: a voxel of label 0 inside the mask
   (`mask`'s `frame` value not below `mthresh`; all without a mask) whose face neighbours in the volume (order -c, +c,
   -r, +r, -s, +s) carry nonzero labels takes the most frequent (the smallest of a tie); `nchanges` the number changed.
   FS-497: with `n == -1`, a step that changes voxels without changing the working copy (a complex volume: FreeSurfer's
   copy takes half of each row, FS-161) repeats forever in FreeSurfer; here an error in both modes
   (`MRIdilateSegmentation: step <k> changes <n> voxels that the next step does not see`).
-- `MRIdilateThreshLabel` / `MRIdilateInvThreshLabel(src, val, dst, label, niter, thresh)`: check (src, val);
+- `MRIdilateThreshLabel` / `MRIdilateInvThreshLabel(src, val, dst, label, niter, thresh)` (bytes: the common rules'
+  comparison, so a label outside 0 to 255 changes nothing): check (src, val);
   `dst = MRIcopy(src, dst)`; up to `niter` steps on bytes, each from a copy of `dst` (`tmp`): the bounding box of
   `src`'s bytes equal to `label`, grown by one and clipped (from `[w-1, 0]` per axis); over the box (z, y, x; the
   loops read the box's bounds at each step, so a bound raised during the pass extends it), a voxel whose `val` byte
   is `>= thresh` (`<= thresh` for the inverse) becomes `label` (as a byte) when any of its 27 neighbourhood bytes in
   `tmp` is `label`; then the box grows to include the last neighbour visited (`x+1`, `y+1`, `z+1` clamped) and a voxel
   that was not `label` in `dst` counts as added; every visited voxel of `dst` is written (its `tmp` byte or `label`).
-  A step that adds none ends the steps. With `niter` 0 no copy is made and FreeSurfer's final free prints `MRIfree:
-  null pointer` as an error.
+  A step that adds none ends the steps. With `niter` 0 or below no copy is made and FreeSurfer's final free prints
+  `MRIfree: null pointer` as an error (`specs/freesurfer-core.md` §2's C-style error, returning: the program goes on)
+  (**(observed)**: `vmorph`; `vrules22`, a row of eight bytes whose label moves one voxel further at each of three
+  steps through the raised bound, no steps, a label of 386, thresholds equal to and above the values).
 - `MRIdilateLabelUchar(src, dst, label, niter)`: check (src, dst) with `dst`; `dst = MRIcopy(src, dst)`; `niter` steps
   on bytes over the box of `src`'s `label` (fixed bounds): a voxel becomes `label` when it or a neighbourhood byte of
   `tmp` is `label` (search in z, y, x order, stopping at the first). `MRIdilateLabel(src, dst, label, niter)`: check;
   byte sources go to `MRIdilateLabelUchar`; otherwise the same on values for every frame, the box made from `tmp`'s
-  values of any frame equal to `label` (`double`). Both print `MRIfree: null pointer` with `niter` 0.
+  values of any frame equal to `label` (`double`). Both print `MRIfree: null pointer` with `niter` 0 or below
+  (**(observed)**: `vmorph`; `vrules22`, as for the threshold dilations, and two frames of floats).
 - `MRIopenN(src, dst, order)`: `order` erosions (the first into a new volume, the others in place), then `order`
-  dilations (`MRIdilate`, the first into `dst`, the others in place). `MRIopen`: one erosion, one dilation; `MRIclose`:
-  one dilation, one erosion.
+  dilations (`MRIdilate`, the first into `dst`, the others in place); an `order` below 1 still makes one of each.
+  `MRIopen`: one erosion, one dilation; `MRIclose`: one dilation, one erosion (**(observed)**: `vmorph`; `vrules22`,
+  orders 0, -1 and 2).
 - `MRIdilate6(src, dst)`: clone without `dst`; check (src, dst); frame 0 in one pass (in place, voxels already written
   are read): from -1e10 (`float`), the largest of the voxel's three z neighbours (z-1, z, z+1), its two y neighbours,
-  and its three x neighbours (the voxel itself included again), as values.
+  and its three x neighbours (the voxel itself included again), as values; a NaN never wins, so a voxel whose
+  samples are all NaN becomes -1e10 (**(observed)**: `vmorph`; `vrules22`, in place and new, NaN values).
 - `MRIreplaceList(seg, src, targ, n, mask, out)`: without `out` one frame of `MRI_INT` with `seg`'s header and pulse
   parameters; `out` of other dimensions: `ERROR: MRIreplaceList(): seg/out dim mismatch`, none; a byte `out` and a
-  target above 255: `ERROR: MRIreplaceList(): output is UCHAR, but target is > 255`, none. Columns outermost, frame 0:
-  `(int)` label; where the mask is below 0.5 the label; else the target of the first equal source entry, or the label.
+  target above 255: `ERROR: MRIreplaceList(): output is UCHAR, but target is > 255`, none (a negative target is
+  written as `MRIsetVoxVal` writes it). Columns outermost, frame 0: `(int)` label; where the mask's frame-0 value is
+  below 0.5 the label (a NaN mask value is not below); else the target of the first equal source entry, or the
+  label; each written as a value (**(observed)**: `vset`; `vrules22`).
 - `MRIreplaceValuesOnly(src, dst, in, out)`: check; clone; two byte volumes: `MRIreplaceValuesUchar(src, dst,
   (byte) nint(in), (byte) nint(out))` (section 31); else each value of each frame (z, y, x, frame innermost) with
   `|(float)(v - in)| < FLT_EPSILON` becomes `out`; others are not written.
@@ -2703,28 +2758,35 @@ coordinate to the volume.
   (`MRIgetVoxelToVoxelXform`); clone without `dst`; columns outermost: the voxel times the matrix (`float`), rounded
   (`nint`); outside the mask's extent the mask value is `m`, else `nint` of the mask's frame-0 value; every frame of
   `dst` gets `out` where the mask value is `m`, else `src`'s value.
-- `MRImask(src, mask, dst, m, out)`: the environment's `FS_MRIMASK_ALLOW_DIFF_GEOM` read as `%d` (1 without it); with
-  `Gdiag > 0` `MRImask(): AllowDiffGeom = <n>`. Geometries compared as `vg_isNotEqualThresh` at 1e-4 (section 3)
+- `MRImask(src, mask, dst, m, out)`: the environment's `FS_MRIMASK_ALLOW_DIFF_GEOM` read as `%d` (`sscanf`: leading
+  blanks, a sign and digits; 1 without the variable or when no number starts it, an empty value or `x`; `2abc` gives
+  2, `-1` gives -1: any number but 0 allows another geometry); with any bit of `Gdiag` set, `MRImask(): AllowDiffGeom
+  = <n>` on standard output. Geometries compared as `vg_isNotEqualThresh` at 1e-4 (section 3)
   after copying each volume's geometry with `valid` 1: different and allowed: `INFO: MRImask() using
   MRImaskDifferentGeometry()` then that function; different and not allowed: `INFO: MRImask(): geometries differ but
-  not using MRImaskDifferentGeometry() ` (with the trailing blank). Then check (src, mask); clone; a `dst` of another
-  type: the error `MRImask: src and dst must be same type` (`ERROR_UNSUPPORTED`), none; each voxel whose `(int)` mask
-  value is `m` gets `out` in every frame, the others `src`'s values.
+  not using MRImaskDifferentGeometry() ` (with the trailing blank). Then check (src, mask) (so masks of another
+  geometry that `MRImaskDifferentGeometry` takes are never checked); clone; a `dst` of another type: the error
+  `MRImask: src and dst must be same type` (`ERROR_UNSUPPORTED`; returning), none; each voxel whose `(int)` frame-0
+  mask value is `m` gets `out` in every frame of `src`, the others `src`'s values (**(observed)**: `vmask`; `vrules22`,
+  the variable's forms, the diagnostic line, a destination of another type, masks of another geometry of the same and
+  of another extent).
 - `MRInMask(mask)`: the number of values of every frame above 0.5.
 - `MRIthresholdMask(src, mask, dst, thresh, out)`: check (src, mask); clone; two byte volumes: bytes, the source's
   where the mask byte is `>= thresh` (`float`), else `out` as a byte; FS-494: `out` outside 0..255 or NaN becomes in
   FreeSurfer the low byte of its truncation to a 32-bit integer (-2147483648 for NaN and beyond); by default clamped to
   0..255 (NaN to 0). Otherwise frame 0 values, `out` where the mask is below `thresh`.
-- `MRIgrowLabel(mri, filled, in, out)`: check; bytes. For `in != 0` the box of `mri`'s `in` voxels (from `[w, 0]` per
-  axis, not grown); for `in == 0` the box of nonzero voxels and every voxel on or outside its faces set to `out` in
-  `filled` (counted). Then passes over the box (z, y, x) until none fills: for each voxel of `filled` equal to `out`,
+- `MRIgrowLabel(mri, filled, in, out)`: check; bytes. For `in != 0` the box of `mri`'s `in` voxels; for `in == 0` the
+  box of nonzero voxels and every voxel on or outside its faces set to `out` in `filled` (counted). The box starts
+  from `[w, 0]` per axis in both cases and is not grown: with no such voxel it is empty, and for `in == 0` every voxel
+  is then on or outside it. Then passes over the box (z, y, x) until none fills: for each voxel of `filled` equal to `out`,
   each neighbour in the volume equal to `in` in `mri` and not `out` in `filled` is set (counted); after each pass `<n>
-  voxels filled, total = <t>.` on standard error. Returns 0.
+  voxels filled, total = <t>.` on standard error (one line per pass, the last one's `<n>` 0). Returns 0
+  (**(observed)**: `vmorph`; `vrules22`, labels 257 and 265, a background fill with and without data).
 - `MRIturnOnFG(mri, fg, bg)`: check (mri, fg); bytes: `mri` takes `fg` where `fg > 0`; then where `fg == 0` and
   `mri > 0`: `mri` 0, `bg` 1. `MRIturnOffBG(mri, bg)`: check; bytes: `mri` 0 where `bg > 0`; then each voxel 0 in both
   takes the most frequent byte above 5 (`WM_MIN_VAL`) in the cube of half-width 1 around it in the volume (the lowest
   of a tie), the half-width grown up to 4 while none is found, else 0 (voxels set earlier in the pass count). Both
-  return 0.
+  return 0 (**(observed)**: `vmorph`; `vrules22`, a voxel whose nearest label is 4 or more away).
 - `MRIcopyLabel(src, dst, label)`: check; frame 0; two byte volumes: bytes equal to `label` copied as `(byte) label`;
   else values equal to `(float) label` set to it. Returns the count.
 - `MRItotalVoxelsOn(mri, t)`: values of every frame `>= (float) t`. `MRIvoxelsInLabel(mri, l)`: frame-0 values with
@@ -2739,27 +2801,33 @@ coordinate to the volume.
   parameters; a `col` of other dimensions (frames compared): `ERROR: MRIbinMaskToCol: input/output dim mismatch`, none.
   Frame 0: the column where the mask is not below 0.5, else 0.
 - `MRIpercentThresh(mri, mask, frame, pct)`: columns outermost, `frame`'s values (`double`) where the mask is not below
-  0.5, sorted by the C library's `qsort` with `CompareDoubles` (glibc's merge sort: equal values, +0 and -0 included,
-  keep their order); the value at `npct = (int) round(n (100 - pct) / 100)` (`double`). FS-495: `npct` from `n` to
+  0.5 (a NaN mask value is not below), sorted by the C library's `qsort` (glibc's merge order, `specs/glibc-qsort.md`)
+  with `CompareDoubles` (-1 when `a < b`, +1 when `a > b`, else 0: equal values, +0 and -0 included, and NaNs keep
+  their order); the value at `npct = (int) round(n (100 - pct) / 100)` (`double`). FS-495: `npct` from `n` to
   the volume's voxel count minus 1 gives 0 in FreeSurfer (the list's unused, zeroed part); FS-496: `npct` below 0,
   at or past the voxel count, or from NaN reads memory it does not own. By default both give the largest value (0 for
-  an empty list); with `reproduce` 0. Both noted.
+  an empty list); with `reproduce` 0. Both noted (**(observed)**: `vset`; `vrules22`, percentages giving the list's
+  end, past it, below it, NaN (`CRASH 11`), 100 and an empty mask).
 - `MRIcountValInNbhd(mri, wsize, x, y, z, val)`: `whalf = (wsize - 1) / 2` (integer division toward zero); over the
   cube of offsets `-whalf..whalf` (z, y, x; coordinates through the index tables, FS-323 more than the tables' margin
   outside) the frame-0 values whose `(int)` is `val`.
 
 ## 51. Validation plan (sections 49 and 50)
-The probe's `conform` (MRIconform with its result's voxels hashed, FNV-1a 64 of the bytes; MRIconformedTemplate with
-widths 0 to 256, sizes 0.5 to 2, 0, NaN and 1e10, with and without `KeepDC`; MRIgetConformMatrix), on generated
-volumes (types, frames, header-only, cosines of scanners, a slight rotation, degenerate and NaN cosines, sizes
-including NaN, the conformed grid itself), and the commands `union isect mand mxor compl edges erodenn erode erode2d
-erodeseg dilseg dtl dtli dlu dlab openn mopen mclose dil6 rlist rvonly mdiff mmask tmask mnot slv b2c nmask von vinl
-linv cent pthr cnbhd grow onfg offbg cplab cplv` (destinations new, given of the same or another extent, in place;
-label volumes with labels inside and outside the byte range; masks with the source's own geometry and other
-geometries). Expected: identical with `reproduce` but where FreeSurfer crashes, hangs or reads memory it does not own
-(FS-491, FS-493, FS-496, FS-497, and the shared FS-53, FS-58, FS-163, FS-290), counted and not compared; the
-default differs only with a notice. `MRIconform`'s resampling cases are hashed as `HEAVY` in the recorded test (too
-slow for a debug build) and compared by the probe and on Windows.
+Made ready by the spec finisher's relay 19: §69's groups `vconf`, `vset`, `vmorph`, `vmask` (seeded) and `vrules22`
+(fixed cases), on the open probe's commands (README.md says what each takes and prints): `conform` (`MRIconform`,
+whose 256^3 result's voxels are printed as their FNV-1a 64 hash, `MRIgetConformMatrix`, `MRIconformedTemplate`; the
+input printed afterwards the same way), `union`, `isect`, `mand`, `mxor`, `compl`, `edges`, `mnot`, `b2c`, `cntv`
+(`MRItotalVoxelsOn`, `MRIvoxelsInLabel`, `MRIlabelInVolume`, `MRInMask`), `cent`, `cnbhd`, `pthr`, `rlist`, `rvonly`,
+`cplab`, `cplv`, `slv`, `erodenn`, `erode`, `erode2d`, `erodeseg`, `dilseg`, `dtl` (both threshold dilations), `dlab`
+(`MRIdilateLabel`, `MRIdilateLabelUchar`), `openn` (`MRIopenN`, `MRIopen`, `MRIclose`), `dil6`, `grow`, `onfg`, `offbg`,
+`mmask` (`MRImask`, `MRImaskDifferentGeometry`), `tmask`. The volumes: bytes, ints, floats (halves, negatives, NaN) and
+shorts of one or two frames, label volumes with labels inside and outside the byte range, masks of the source's own
+geometry and of others, destinations new, the source itself, the second volume, a volume of the same extent (of any
+type) and, rarely, of another; for conforming, axis-aligned, oblique and nearly coronal geometries, special sizes and
+cosines, a good RAS or not, widths 0 to 256 and sizes 0.5 to 2, 0, -1, NaN and 1e10, with and without `KeepDC`, the
+conformed grid itself. Expected: identical with `reproduce` but where FreeSurfer crashes, hangs (the alarm ends FS-493's
+and FS-497's lines) or reads and writes memory it does not own (FS-496, and the shared FS-53, FS-58), lines the loop
+allows; the default differs only with a notice (FS-12, FS-491, FS-492, FS-494, FS-495).
 
 ## 52. Volume histograms (3.1-38: mrihisto.cpp)
 Histograms are `HISTOGRAM`s (sections 5 and 21 of `specs/freesurfer-maths.md`: `HISTOalloc`, `HISTOinit`, `HISTOclear`,

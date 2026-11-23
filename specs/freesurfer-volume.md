@@ -2266,7 +2266,7 @@ statuses are not compared): the implementations' own tests, against these sectio
   or the debug line's printed text). Returns 0 (**(observed)**: `vcov`, `vrules19`: the signs with zeros, the
   fallback `0.9 p[0]`, `log10flag` with and without outputs, masks not passed, two inputs of one and two frames).
 
-## 43. Regions (3.1-38: region.cpp)
+## 43. Regions (3.1-38)
 (Made ready for the clean room by the spec finisher's relay 16: §69.2's groups `vregion` and `vrules17`; FS-269
 as decided, by its relay 17: the group `vrules18` and `models.py region`.)
 - `REGIONalloc` zeros; `REGIONclear` sets every field to 0; `REGIONcopy` copies (into a new region when given
@@ -2315,7 +2315,7 @@ as decided, by its relay 17: the group `vrules18` and `models.py region`.)
   1 0` grown to `0 0 0  3 3 1`, by default the box `0 0 0  4 2 1`, whose `dx` of 4 is above the height 3: the error
   and `NULL`.
 
-## 44. Voxel neighbourhood measures (3.1-38: mrivoxel.cpp) and `log10`
+## 44. Voxel neighbourhood measures (3.1-38) and `log10`
 (Made ready for the clean room by the spec finisher's relay 17: §69.2's groups `vvoxel` and `vrules19`.)
 - Coordinates go through the volume's boundary index tables as §28's neighbour counts use them
   (`specs/freesurfer-mri.md` §4, step 7: an index from -500 to `extent + 499` maps to 0 below 0, `extent - 1` at or
@@ -2370,8 +2370,9 @@ as decided, by its relay 17: the group `vrules18` and `models.py region`.)
   previous value is used again, so no value is ever left unwritten (FS-486's case is not reached: a float complex
   volume, whose gradients are its real parts', gives 0, **(observed)**: `vrules19`, the same in every run). A
   `wsize` of 0 divides by 0 (an infinity or NaN).
-- `FZERO`'s threshold differs by source file: `1e-5` in `region.cpp` and `mrivoxel.cpp`, `FLT_EPSILON`
-  (1.1920929e-7) in `mri2.cpp` (measured from the official object code).
+- The near-zero tests' thresholds are given where each function uses one: `1e-5` in §43's bounding boxes and §44's
+  second derivative, `FLT_EPSILON` (1.1920929e-7) in §38's norm and §42's PCA stop (FreeSurfer's library defines
+  the threshold differently in its different parts; measured from the official object code).
 - `log10` (glibc 2.35 on x86-64, `MRIfdr2vwth`): `n = ilogb(x)` adjusted to `k + (k < 0)` with the mantissa scaled
   into [1, 2) (or [0.5, 1) for negative exponents), `z = n log10_2lo + ivln10 ln(m)` then `z + n log10_2hi`
   (`ivln10 = 0x3FDBCB7B1526E50E`, `log10_2hi = 0x3FD34413509F6000`, `log10_2lo = 0x3D59FEF311F12B36`, each

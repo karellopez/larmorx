@@ -190,8 +190,9 @@ impl Ctx<'_> {
 
 impl RegRobust {
     /// `RegPowell::computeIterativeRegistrationFull(nmax, epsit, mriS, mriT, m, scaleinit)` (`nmax`
-    /// and `epsit` unused): see the module's notes. Leaves `Mfinal`, `iscalefinal` and the
-    /// half-way maps (`mov2weights`, `dst2weights`).
+    /// and `epsit` unused): see the module's notes. Leaves `Mfinal`, `iscalefinal`, the
+    /// half-way maps (`mov2weights`, `dst2weights`) and the half-way geometry
+    /// ([`RegRobust::powell_hw`]: the byte target's header, FS-1075).
     pub(crate) fn powell_full(
         &mut self,
         g: &mut Globals,
@@ -325,6 +326,11 @@ impl RegRobust {
         note_glibc07(g, &libm, "log, exp");
         let _ = writeln!(io.out);
         let _ = writeln!(io.out, " DONE ");
+        // `MRIfree(&mriT)`: FreeSurfer frees the byte target that `tcf` still names (FS-1075);
+        // its voxels go, its header stays as the half-way geometry
+        drop(scf);
+        tcf.chunk = None;
+        self.powell_hw = Some(tcf);
         Ok(())
     }
 
@@ -351,6 +357,7 @@ impl RegRobust {
                     out: &mut Shared(&buf_out),
                     err: &mut Shared(&buf_err),
                     env: io.env,
+                    dir: io.dir,
                 };
                 match ctx.cost(g, &mut sub, x) {
                     Ok(v) => Some(v),

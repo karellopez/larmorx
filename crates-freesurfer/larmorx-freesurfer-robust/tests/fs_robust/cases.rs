@@ -2316,6 +2316,7 @@ fn rreg(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         out: a,
         err: b,
         env: &env,
+        dir: None,
     };
     r.set_source_and_target(g, &mut io, &mov, &dst, keeptype)?;
     drop(mov);

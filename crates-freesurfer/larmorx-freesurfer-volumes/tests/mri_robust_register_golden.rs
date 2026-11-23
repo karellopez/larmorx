@@ -5,7 +5,7 @@
 //! integer arithmetic (`fs_robreg/cases.rs`' `golden_cases`: fMRIPrep's call with every output, an
 //! affine registration with its half-way outputs, a short source onto a float target of
 //! anisotropic voxels, the entropy images, the Powell registration; and on 16^3 byte images the
-//! mutual information and the SB cost), the SHA-256 of each case's line (exit status, standard
+//! mutual information and the SB cost; the test mode, `--test`), the SHA-256 of each case's line (exit status, standard
 //! output and error, every file written; the time taken masked), against the value FreeSurfer
 //! 8.2.0's official
 //! program gives on the same inputs (`validation/probes/fs-robust-register/check.py --golden`,
@@ -21,10 +21,11 @@ use sha2::{Digest, Sha256};
 /// re-recorded 2026-11-23 (relay 45): 4 cases, the entropy images added; again (relay 46): 5
 /// cases, the Powell registration (`--cost NCC`) added (the same value with the decided `cabs` and
 /// `csqrt` preloaded); again (relay 47, with that preload): 7 cases, `--cost MI` and `--cost SB` on
-/// 16^3 images added.
-const OFFICIAL_SHA256: &str = "a483135a74d4d5280b52d4fcbed46d6634978d6da5e8b7e17d018af80e8fec18";
-/// The port's default on Linux x64.
-const FIX_SHA256: &str = "a483135a74d4d5280b52d4fcbed46d6634978d6da5e8b7e17d018af80e8fec18";
+/// 16^3 images added; again (relay 48, with that preload): 11 cases, the test mode (`--test 4`,
+/// `--test 5` on a float image, `--test 30`, `--test 0` on a 16^3 image) added.
+const OFFICIAL_SHA256: &str = "52064f87dd798f6a1a2eeeb724a1ec9e551afc4d8504d73f12cb7803c20eefa8";
+/// The port's default on Linux x64 (FS-1078's pattern as voxel values, FS-1076's error).
+const FIX_SHA256: &str = "22ebb567183a3b5b749a0ba67f47edc74d8e93ddfb7c0253535267522d985dcb";
 
 fn cases_digest(mode: UpstreamDefects) -> String {
     let mut h = Sha256::new();
@@ -46,11 +47,37 @@ fn fix_gives_the_recorded_outputs() {
     assert_eq!(cases_digest(UpstreamDefects::Fix), FIX_SHA256);
 }
 
-/// Prints both values (run on Linux x64 to record them: `cargo test --test
+/// The Powell registration's half-way outputs (relay 48, `cases::golden_halfway_cases`): FreeSurfer
+/// reads their geometry from memory it has freed (FS-1075), so the value is the port's on Linux x64,
+/// the same in both modes.
+const HALFWAY_SHA256: &str = "1633129d30d8fc51a906e516333ea48631d4dbc1c07c659d35f873e829fbee3c";
+
+fn halfway_digest(mode: UpstreamDefects) -> String {
+    let mut h = Sha256::new();
+    for line in cases::golden_halfway_cases() {
+        let (out, _) = cases::run_line(&line, mode);
+        h.update(out.as_bytes());
+        h.update(b"\n");
+    }
+    h.finalize().iter().map(|b| format!("{b:02x}")).collect()
+}
+
+#[test]
+fn powell_half_way_outputs_give_the_recorded_outputs() {
+    assert_eq!(halfway_digest(UpstreamDefects::Reproduce), HALFWAY_SHA256);
+    assert_eq!(halfway_digest(UpstreamDefects::Fix), HALFWAY_SHA256);
+}
+
+/// Prints the values (run on Linux x64 to record them: `cargo test --test
 /// mri_robust_register_golden -- --ignored --nocapture`).
 #[test]
 #[ignore]
 fn print_digests() {
     println!("reproduce {}", cases_digest(UpstreamDefects::Reproduce));
     println!("fix {}", cases_digest(UpstreamDefects::Fix));
+    println!(
+        "half-way reproduce {}",
+        halfway_digest(UpstreamDefects::Reproduce)
+    );
+    println!("half-way fix {}", halfway_digest(UpstreamDefects::Fix));
 }

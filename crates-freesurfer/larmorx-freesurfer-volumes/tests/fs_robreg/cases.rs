@@ -614,6 +614,12 @@ fn seeded_powell(g: &mut Gen) -> String {
 }
 
 fn seeded_powell_with(g: &mut Gen, costs: &[&str]) -> String {
+    let (files, args) = seeded_powell_parts(g, costs);
+    line(None, &files, &[], &args)
+}
+
+/// [`seeded_powell_with`]'s files and arguments.
+fn seeded_powell_parts(g: &mut Gen, costs: &[&str]) -> (Vec<(String, Vec<u8>)>, Vec<String>) {
     let flat = g.chance(8);
     let n = g.pick(&[16, 16, 17, 18]);
     let ty = g.pick(&[MRI_UCHAR, MRI_UCHAR, MRI_SHORT, MRI_FLOAT, MRI_INT]);
@@ -657,7 +663,42 @@ fn seeded_powell_with(g: &mut Gen, costs: &[&str]) -> String {
     opt(g, 8, &["--weights", "w.mgz"]);
     opt(g, 6, &["--verbose", "2"]);
     opt(g, 12, &["--iscaleout", "i.txt", "--iscale"]);
-    line(None, &files, &[], &args)
+    (files, args)
+}
+
+/// The Powell registration's half-way outputs (relay 48, FS-1075; `check.py --family halfway`):
+/// 24 cases of every Powell cost, the Powell family's random options with symmetry (its
+/// `--nosym` taken back but in the last two cases, which add it), each with a random set of the
+/// half-way outputs (`--halfmovlta` always), the highest resolution skipped (`--highit 0`), voxel
+/// transforms, the full images alone; a seed of their own.
+pub fn halfway_cases() -> Vec<String> {
+    let mut g = Gen::new(0x0068_616c);
+    let costs = [
+        "ls", "ncc", "tb", "lncc", "sad", "mi", "nmi", "ecc", "scr", "sb",
+    ];
+    (0..24)
+        .map(|k| {
+            let (files, mut args) = seeded_powell_parts(&mut g, &costs);
+            args.retain(|a| a != "--nosym");
+            args.extend(s(&["--halfmovlta", "hm.lta"]));
+            if k >= 22 {
+                args.push("--nosym".to_owned());
+            }
+            let mut opt = |g: &mut Gen, k: u64, a: &[&str]| {
+                if g.chance(k) {
+                    args.extend(s(a));
+                }
+            };
+            opt(&mut g, 2, &["--halfdstlta", "hd.lta"]);
+            opt(&mut g, 2, &["--halfmov", "hm.mgz"]);
+            opt(&mut g, 2, &["--halfdst", "hd.mgz"]);
+            opt(&mut g, 3, &["--halfweights", "hw.mgz"]);
+            opt(&mut g, 5, &["--highit", "0"]);
+            opt(&mut g, 6, &["--vox2vox"]);
+            opt(&mut g, 6, &["--nomulti"]);
+            line(None, &files, &[], &args)
+        })
+        .collect()
 }
 
 /// The entropy images' cases (relay 45, `--cost ROBENT`): byte, short and float sources, a mask
@@ -800,7 +841,8 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
 /// fMRIPrep's call with every output, an affine registration with its half-way outputs, one of a
 /// short source onto a float target with anisotropic voxels, the entropy images of a short
 /// source and a byte target (`--cost ROBENT`, both written), and the Powell registration of the
-/// short source onto the byte target (`--cost NCC`).
+/// short source onto the byte target (`--cost NCC`); the joint histogram's and SB costs on 16^3
+/// images (relay 47); four of the test mode (`--test`, relay 48).
 pub fn golden_cases() -> Vec<String> {
     let mut g = Gen::new(32);
     let mut a = Img::base(32, MRI_UCHAR);
@@ -924,10 +966,138 @@ pub fn golden_cases() -> Vec<String> {
     ];
     let mut lines = lines;
     lines.extend(more.iter().map(|args| line(None, &small, &[], args)));
+    // relay 48: the test mode (`--test`): a byte image of 32^3 (a pyramid of two levels: the test
+    // registers its 16^3 level), the rotation, translation and intensity test; the pattern of
+    // test 5 on a float image (FS-1078); the lowest level; a 16^3 image (one level: FS-1076)
+    let mut f = Img::base(32, MRI_FLOAT);
+    f.noise = 4;
+    let test_files = vec![
+        ("mov.mgz".to_owned(), files[0].1.clone()),
+        (
+            "f32.mgz".to_owned(),
+            write_as(&mut image(&mut g, &f), "f32.mgz"),
+        ),
+        ("mov16.mgz".to_owned(), small[0].1.clone()),
+    ];
+    for args in [
+        s(&["--test", "4", "mov.mgz"]),
+        s(&["--test", "5", "f32.mgz"]),
+        s(&["--test", "30", "mov.mgz"]),
+        s(&["--test", "0", "mov16.mgz"]),
+    ] {
+        lines.push(line(None, &test_files, &[], &args));
+    }
     lines
 }
 
 // ------------------------------------------------------------------ the port's answer
+
+/// The test mode's cases (relay 48, `--test <n> <image>`: `check.py --family test`): every test
+/// number (0 to 7, 9, the lowest level's 30, the unknown 8 and 10, a negative one, a word), on a
+/// byte image of 16^3 (a pyramid of one level), 34^3 images of bytes, shorts and floats (two
+/// levels), a 2-D image, a file that does not read, the arguments missing, options before it.
+pub fn test_cases() -> Vec<String> {
+    let mut g = Gen::new(0x0074_6573);
+    let mk = |g: &mut Gen, n: i32, ty: i32, name: &str| -> (String, Vec<u8>) {
+        let mut a = Img::base(n, ty);
+        a.noise = 4;
+        (name.to_owned(), write_as(&mut image(g, &a), name))
+    };
+    let mut flat = Img::base(20, MRI_UCHAR);
+    flat.dims = [20, 18, 1];
+    let files = vec![
+        mk(&mut g, 16, MRI_UCHAR, "b16.mgz"),
+        mk(&mut g, 34, MRI_UCHAR, "b34.mgz"),
+        mk(&mut g, 34, MRI_SHORT, "s34.mgz"),
+        mk(&mut g, 34, MRI_FLOAT, "f34.mgz"),
+        (
+            "flat.mgz".to_owned(),
+            write_as(&mut image(&mut g, &flat), "flat.mgz"),
+        ),
+    ];
+    let mut cases: Vec<Vec<String>> = Vec::new();
+    for n in [
+        "0", "1", "2", "3", "4", "5", "6", "7", "9", "30", "8", "10", "-1", "abc",
+    ] {
+        cases.push(s(&["--test", n, "b34.mgz"]));
+    }
+    for n in ["0", "1", "5", "30"] {
+        cases.push(s(&["--test", n, "b16.mgz"]));
+    }
+    for n in ["1", "4", "5", "6"] {
+        cases.push(s(&["--test", n, "f34.mgz"]));
+        cases.push(s(&["--test", n, "s34.mgz"]));
+    }
+    cases.push(s(&["--test", "1", "flat.mgz"]));
+    cases.push(s(&["--test", "1", "nofile.mgz"]));
+    cases.push(s(&["--test", "2"]));
+    cases.push(s(&["--test"]));
+    cases.push(s(&[
+        "--mov", "b34.mgz", "--affine", "--test", "3", "b34.mgz", "--dst", "x",
+    ]));
+    cases.iter().map(|a| line(None, &files, &[], a)).collect()
+}
+
+/// The golden cases of the Powell registration's half-way outputs (relay 48, FS-1075;
+/// `tests/mri_robust_register_golden.rs`' third test): on 16^3 byte images, `LS` with every
+/// half-way output, and with the finest level skipped and no coarser one (no half-way space).
+/// FreeSurfer's result is memory contents here: the hash is the port's (both modes).
+pub fn golden_halfway_cases() -> Vec<String> {
+    let mut g = Gen::new(48);
+    let c = Img::base(16, MRI_UCHAR);
+    let mut d = c;
+    d.shift = [3, -2, 1];
+    d.gain = 15;
+    let files = vec![
+        (
+            "mov.mgz".to_owned(),
+            write_as(&mut image(&mut g, &c), "mov.mgz"),
+        ),
+        (
+            "dst.mgz".to_owned(),
+            write_as(&mut image(&mut g, &d), "dst.mgz"),
+        ),
+    ];
+    [
+        s(&[
+            "--mov",
+            "mov.mgz",
+            "--dst",
+            "dst.mgz",
+            "--lta",
+            "reg.lta",
+            "--cost",
+            "LS",
+            "--halfmov",
+            "hm.mgz",
+            "--halfdst",
+            "hd.mgz",
+            "--halfweights",
+            "hw.mgz",
+            "--halfmovlta",
+            "hm.lta",
+            "--halfdstlta",
+            "hd.lta",
+        ]),
+        s(&[
+            "--mov",
+            "mov.mgz",
+            "--dst",
+            "dst.mgz",
+            "--lta",
+            "reg.lta",
+            "--cost",
+            "LS",
+            "--highit",
+            "0",
+            "--halfmovlta",
+            "hm.lta",
+        ]),
+    ]
+    .iter()
+    .map(|args| line(None, &files, &[], args))
+    .collect()
+}
 
 /// Text files listed with their bytes: transforms and the intensity scale.
 fn is_text(name: &str) -> bool {

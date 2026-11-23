@@ -4,8 +4,9 @@ Status: the robust cost complete (queue item 3.2-13, part 1: the command line, e
 the robust registration's path, its outputs, the exit statuses, the defects with their switches,
 the validation plan, §7); the entropy images (`--cost ROBENT`, §2.1; relay 45); the Powell
 registration with `--cost` `LS`, `NCC`, `TB`, `LNCC` and `SAD` (§2.2; relay 46); its joint-histogram
-costs `MI`, `NMI`, `ECC`, `SCR` and the `SB` cost (§2.3; relay 47); not yet specified: the Powell
-registration's half-way outputs, the test mode and the debug output (§6). Written by the replica's author (track C, relay 44) as the
+costs `MI`, `NMI`, `ECC`, `SCR` and the `SB` cost (§2.3; relay 47); the Powell registration's
+half-way outputs (§2.2, FS-1075; relay 48); the test mode (§2.4; relay 48); not yet specified:
+the debug output (§6). Written by the replica's author (track C, relay 44) as the
 spec writer: behaviour, conventions and messages, for the clean room (`larmorx-fs-volumes`), which
 works from this file, the library modules' specs (`specs/freesurfer-robust.md` §16 for the
 registration itself, `freesurfer-volume.md` for the transforms' reading, conversion, writing and
@@ -71,7 +72,7 @@ message first when it is not 0); `ErrorExit(code)` ends with `code`'s status (`E
      `<v>`: `--halfdstlta: Will output half way transform (dst) <v> !`; `MASKMOV` `<v>`: `--maskmov:
      Will apply <v> to mask mov/src !`; `MASKDST` `<v>`: `--maskdst: Will apply <v> to mask
      dst/target !`.
-   - `TEST`: `--test: TEST-MODE ` (§6). `CONFORM`: `--conform: Will conform images to 256^3 and
+   - `TEST` `<n>` `<image>`: `--test: TEST-MODE `, then the test mode (§2.4), which ends the program (the options after it are not read). `CONFORM`: `--conform: Will conform images to 256^3 and
      voxels to 1mm!` (no effect); `FLOATTYPE`: `--floattype: Use float images internally (independent
      of input)!`; `ONEMINUSW`: `--oneminusw: Will output 1-weights (zero=outlier), as in earlier
      versions!` (it switches the `1 - w` of §3 off); `NOSYM`: `--nosym: Will resample source to
@@ -199,7 +200,7 @@ unless `--floattype`), and: with `--satit`, the saturation search (§16.6) and t
 registration; with `--nomulti`, the iterations on the full images; otherwise the multiresolution
 registration (`--maxit`, `--epsit`).
 
-### 2.2 The Powell registration (`--cost` `LS`, `NCC`, `TB`, `LNCC`, `SAD`; `--powelltol`)
+### 2.2 The Powell registration (`--cost` `LS`, `NCC`, `TB`, `LNCC`, `SAD`; `--powelltol`; its half-way outputs)
 
 Every cost but `ROB` (and `ROBENT`) registers by Powell's method instead of the robust iterations.
 The images may then change type (as with `--floattype`: `setSourceAndTarget` with `keeptype =
@@ -268,7 +269,13 @@ At each level of the multiresolution registration (or once on the full images wi
    an empty line and ` DONE `.
 
 The rest as §3, with these differences: no weights (`--weights`: the warning of §3.7); the half-way
-outputs §6; with `SB` a second citation after the first (` And for the segmentation based cost
+outputs (§3.8) in the half-way space of the Powell registration: the grid of the target as the
+registration used it at the last level it registered (the destination as the registration resampled
+it; with the finest level skipped, `--highit 0`, that image's next coarser level, downsampled once;
+with `--nomulti` the full image), `--halfweights` then
+`Warning: no weights have been computed! Maybe you ran with --leastsquares??` (nothing written), and
+with no level registered (the finest skipped and no coarser one) `ERROR: no half way space created
+(not implemented for this cost function)!`; FS-1075 (§5); with `SB` a second citation after the first (` And for the segmentation based cost
 function:`, ` Multimodal image registration through simultaneous segmentation,`, ` I. Aganj and B.
 Fischl. IEEE Signal Processing Letters 24(11):1661-1665, 2017.`, ` https://doi.org/10.1109/LSP.2017.2754263`
 and an empty line).
@@ -333,6 +340,57 @@ in its place among Powell's lines (step 7).
      `P(i, j)` and `R_i`, added to `D2`; the result `(1 - D1 / v1) + (1 - D2 / v2)`.
 5. With `--debug` the evaluation's report follows the cost (§6).
 
+### 2.4 The test mode (`--test <n> <image>`)
+
+The program's own registration is not run: the options before `--test` print their lines and
+nothing else of them is used; a fresh robust registration's defaults apply (verbose level 1 until
+the registration below). The number `<n>` is read first, as C's `atoi` reads it (a word is 0): with
+no argument after `--test` FreeSurfer dies of a segmentation fault, and with the number but no image
+it aborts as FS-1070 describes for a missing name (§5: the same handling).
+
+1. ` testRobust <image>  testno: <n>`; the image read (as `--mov`'s reader, its error message on
+   standard error when it does not read); ` Read MRI <image> successfully!` in every case.
+2. Its Gaussian pyramid (verbose 1): `   - Build Gaussian Pyramid ( min: 16 max: -1 ) `; an image
+   below 16 voxels along any axis (a 2-D image included): ` Input image is smaller than min
+   dimension: 16`, ` Input dimensions (after conformalizing): <w> <h> <d>`, ` Specify larger minimum
+   ...`, status 1. Otherwise ` downsample2 `. The levels: the first is the image blurred along each
+   axis by the kernel `(1/16, 1/4, 3/8, 1/4, 1/16)` (the robust registration's pyramid blur,
+   `specs/freesurfer-robust.md`); the second level is the image blurred the same way and
+   subsampled, each later level the level before it blurred and subsampled: to half the extent
+   (integer halves) by `specs/freesurfer-robust.md` §2.4's `subSample` with its defaults (the header
+   fixed, `randpos` 0: the offsets from §2.3's table); each level keeps the image's outside value. Levels are made while the last one is
+   at least 16 voxels along every axis; the last one made (the first below 16) is dropped.
+3. The test's line and its pair of images from the pyramid's **second** level `L` (a source `S` and
+   a target `T`, written into the current folder as MGZ):
+   - `0`: `Test 0 : Identity`; both copies of `L` (`idS.mgz`, `idT.mgz`).
+   - `1`: `Test 1 : Translation`; `A` = the identity with the translation `(2.2, 0.3, 1.4)` (voxels,
+     `float`); `S` = `L` resampled by `A`, `T` = `L` resampled by `A^-1` (trilinear, the voxel
+     transform as `mri_vol2vol`'s voxel mode applies it, `specs/freesurfer-volume.md`; `transS.mgz`,
+     `transT.mgz`).
+   - `2`: `Test 2 : Rotation`; `A` = the rotation by `0.08` (a `float`) about the voxel z axis
+     (`[[c, s, 0, 0], [-s, c, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]` with `c`, `s` the cosine and sine
+     in `float`); `rotS.mgz`, `rotT.mgz`.
+   - `3`: `Test 3 : Intensity`; `S` = `L` with every voxel times `0.8` (the registration's
+     intensity scaling, rounded to the type), `T` = a copy of `L` (`iscaleS.mgz`, `iscaleT.mgz`).
+   - `4`: `Test 4 : Rotation and Translation`; `A` = test 2's rotation with test 1's translation;
+     `T` then scaled by `0.8` (`rottransS.mgz`, `rottransT.mgz`). `9`: the same line (`Test 9 :
+     Rotation and Translation`) and images, written as `rottransintS.mgz`, `rottransintT.mgz`.
+   - `5`: `Test 5 : Translation and Noise`; `A` = the translation `(0.2, 0.3, 0.4)`; `6`: `Test 6 :
+     Rotation and Noise`, `A` = the rotation by `0.02`; then voxel `(x, y, z)` of `S` with `x < w/3`,
+     `y < h/3`, `z < d/3` (integer thirds of `S`'s extent) set to `x + y + z + 1`
+     (`junktransS.mgz`/`junktransT.mgz`, `junkrotS.mgz`/`junkrotT.mgz`); FS-1078 (§5) for an image
+     that is not bytes.
+   - `7`: `Test 7 : Scaling`; `A` = `diag(1.01, 1.04, 1.06, 1)`; `scaleS.mgz`, `scaleT.mgz`.
+   - `30`: `Test 30 : Save GP lowest`; the pyramid's last level written as `gps-low.mgz`; status 0.
+   - Any other number: `Test <n>unknown!` (no blank), status 1 (no level read).
+   With a pyramid of one level (an image of 16 to 31 voxels along its smallest axis) there is no
+   second level: FS-1076 (§5).
+4. ` Transformed , now registering ...`; the robust registration with an intensity scale and no
+   geometric transform (the model of `--iscaleonly`), verbose level 2, of `S` onto `T`: §2 from
+   `setSourceAndTarget` with the images' types not kept (both made `float`), then the
+   multi-resolution registration with at most 5 iterations per level and the tolerance 0.01; then
+   status 0 (no results printed or written).
+
 ## 3. The results
 
 1. An empty line, `Final Transform:`, the final voxel transform (§16.7, with its message when the
@@ -386,7 +444,8 @@ in its place among Powell's lines (step 7).
 ## 4. Exit statuses
 
 0; 1 (the help, an unknown option or cost, a failed check, the `--mapmovhdr` write, `--uchar`'s
-change of type, FS-1070 by default, the paths of §6); 251, 252, 255 (`ErrorExit` above, and the
+change of type, FS-1070 by default, the test mode's unknown test and small or unreadable images,
+FS-1076 by default, FS-1077, the paths of §6); 251, 252, 255 (`ErrorExit` above, and the
 library's: the registration's own, `specs/freesurfer-robust.md` §16); 134 (FS-1070, FS-1071 and
 FS-1074 with `reproduce`); FS-1074 by default 1.
 
@@ -413,6 +472,30 @@ FS-1074 with `reproduce`); FS-1074 by default 1.
   `MyMRI::entropyImage: the entropy radius <r> gives no box of voxels (FreeSurfer fails here)` on
   standard error, status 1; `reproduce` the abort's two lines and 134 where the count is negative,
   the zeros in 2-D, the error otherwise; noted.
+- **FS-1075** (memory: released; rule A): the half-way outputs after a Powell registration
+  (§2.2): FreeSurfer reads the half-way space's geometry from memory it has already released, so
+  the half-way transforms' target geometry and the half-way images' grids are memory contents
+  (measured on 24 cases, three runs each: garbage sizes, voxel sizes and directions; runs of the same
+  case that differ; `MRI::Shape::Shape(): volume size must be greater than 0 in every dimension` and
+  `error: could not allocate memory for slice ...`, status 1; a size that exhausts the memory; a
+  matrix error, status 252; on a few cases, where the memory still held them, the target's grid of
+  §2.2 **(observed)**). Both modes: `Creating half way data ...` and the two maps as FreeSurfer
+  prints them (the defined part), then everything in the half-way space of §2.2, noted.
+- **FS-1076** (out of bounds; rule B): the test mode (§2.4) on an image whose pyramid has one level
+  takes the level the pyramid dropped (half the image's extent, below 16 voxels), whose
+  registration then ends with §2's minimum-size message (`Input image is smaller than min
+  dimension: <s> < 16` ..., status 1). By default, after the test's line,
+  `Registration::testRobust: the image's pyramid has one level, the test needs two (FreeSurfer
+  reads past it)` on standard error, status 1; `reproduce` as FreeSurfer; noted.
+- **FS-1077** (crash): the test mode on an image that does not read: FreeSurfer prints the reader's
+  error, ` Read MRI <image> successfully!` and the pyramid's first line, then dies of a
+  segmentation fault. Both modes then `Registration::buildGaussianPyramid: no image (FreeSurfer
+  crashes here)` on standard error, status 1, noted.
+- **FS-1078** (memory: a type confusion; rule A): tests 5 and 6 write their pattern into an image
+  that is not bytes byte by byte: value `x + y + z + 1` (modulo 256) into byte `x` of row `(y, z)`'s
+  storage (little-endian voxels of the image's type, the row's first `w/3` bytes), so the first
+  voxels of each such row change and the pattern's voxels do not. By default the values are the
+  voxels' (of any type); `reproduce` writes the bytes; noted.
 - The library's: FS-1063, FS-1073 (double precision with the intensity scale; and every Powell
   cost with the intensity scale, whose parameters always hold one more than the model's: for the
   same models as there, FS-1073, the model's first two parameters FreeSurfer's allocator's words
@@ -422,10 +505,7 @@ FS-1074 with `reproduce`); FS-1074 by default 1.
 
 ## 6. Not specified yet (the replica ends each with its own message and status 1)
 
-The Powell registration's half-way outputs
-(FreeSurfer's half-way space is then its byte copy of the target, freed by then: `mri_robust_register:
-the half-way outputs of the Powell registration are not ported yet`), the test mode (`--test`: after
-its line) and the debug output (`--debug`: the library's intermediate images and key presses; with a
+The debug output (`--debug`: the library's intermediate images and key presses; with a
 joint-histogram cost the replica ends after the first cost: `RegPowell: the debug output (--debug)
 is not ported yet`).
 
@@ -441,6 +521,18 @@ is not ported yet`).
   `SB` with the Powell family's random options, the same preload: 29 identical, 3 of FS-1063 not
   compared (**(observed)**); an empty histogram's warning among Powell's lines in its place
   (**(observed)**: one case).
+- The test mode (§2.4): a family of 31 cases (every test number, an unknown one, a negative one and a
+  word; byte images of 16^3 and 34^3, short and float images of 34^3, a 2-D image, a file that does
+  not read, the arguments missing, options before it) against the official program: 28 identical
+  with `reproduce` (FS-1076's dropped level and FS-1078's bytes included), 3 not compared (the
+  segmentation faults of FS-1070 and FS-1077, and FS-1070's abort, identical too) **(observed)**.
+- The Powell registration's half-way outputs (FS-1075): a family of 24 cases of every Powell cost
+  with the Powell family's random options and random half-way outputs (two without symmetry, some
+  with the finest level skipped), the same preload, the official program never served from a cache
+  (its result is memory contents): the cases without FS-1075 identical; in the 19 others (2 more of
+  FS-1063 not compared) standard output up to `Creating half way data ...`, standard error up to
+  the second map and every file but the half-way ones identical, and 4 identical in every byte (the
+  official program's memory still held the target's grid) **(observed)**.
 - fMRIPrep's call (`--satit --iscale --mov T1.mgz --dst <T1w> --lta <out>`) on the six recorded
   heads' `T1.mgz` onto their `rawavg.mgz` (`<workspace>/oracles/freesurfer-8.2.0/runs/<head>-classic/
   subjects/<subject>/mri/`), against the official program at one thread: the transform byte for byte,

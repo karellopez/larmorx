@@ -25,10 +25,10 @@ const SKIPPED: usize = 3;
 const NOT_PORTED: usize = 0;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 22] = [
-    "FS-1070", "FS-1071", "FS-1072", "FS-1063", "FS-1067", "FS-1068", "FS-1069", "FS-167", "FS-58",
-    "FS-288", "FS-290", "FS-294", "FS-441", "FS-302", "FS-303", "FS-304", "FS-305", "FS-306",
-    "FS-307", "FS-308", "FS-309", "FS-310",
+const SKIP: [&str; 24] = [
+    "FS-1070", "FS-1071", "FS-1072", "FS-1063", "FS-1067", "FS-1068", "FS-1069", "FS-1075",
+    "FS-1077", "FS-167", "FS-58", "FS-288", "FS-290", "FS-294", "FS-441", "FS-302", "FS-303",
+    "FS-304", "FS-305", "FS-306", "FS-307", "FS-308", "FS-309", "FS-310",
 ];
 
 /// Both modes of every case, on four threads (the cases are independent; the lines are joined in

@@ -79,6 +79,32 @@ The `cout`/`printf` lines share stdout's buffer (`sync_with_stdio`); each option
    (FS-1063's decision). Other models (rigid 2-D, translation 3-D, isotropic scale 3-D) get another
    block: FS-1063 as before (both modes the solution; `check.py` counts them apart). Probe: every
    seeded double-precision intensity case identical with `reproduce` (16 + 10 + 7 in seeds 1, 7, 13).
+6. **FS-1075** (class a: memory, released; rule A; relay 48). `RegPowell::getHalfWayGeom()` returns
+   the static `tcf`, set to the level's byte copy of the target (`mriT` after `MRISeqchangeType` or
+   `MRIcopy`, `RegPowell.cpp` 447-448), which `computeIterativeRegistrationFull` frees at its end
+   (`if (cleanupT) MRIfree(&mriT)`, 609-610: `cleanupT` is always true) without clearing `tcf`. `main`
+   (942-1129) tests the pointer (not `NULL` once a level ran), prints `Creating half way data ...` and
+   the maps, then reads the freed `MRI`'s header: `MRIvoxelXformToRasXform(P.mri_mov, mri_hwgeom,
+   ...)` (RAS to RAS) and `getVolGeom(mri_hwgeom, ...)`, and `LTAtransformInterp` allocates the
+   half-way images from that geometry. **Measured** (`validation/investigations/freesurfer-fs1075-
+   halfway/measure.py`, 24 cases of every Powell cost with random half-way outputs, three runs each,
+   never served from the cache; log `oracles/logs/fs-found-c-r48-fs1075-measure.log`, outputs
+   `<workspace>/oracles/inputs/fs1075-halfway/`): of the 21 cases that reach it (63 runs), 5 gave
+   the target's geometry in all three runs (the freed block not yet reused), the 16 others memory
+   contents: garbage sizes, voxel sizes and directions (some read as voxel values of a later image),
+   13 of them different from run to run (allocator addresses under address-space randomisation);
+   28 runs ended with status 1 (`MRI::Shape::Shape(): volume size must be greater than 0 in every
+   dimension`, `error: could not allocate memory for slice <k> out of <n>`), 3 with 252 (one case:
+   `MatrixMultiply(): m1 is null`), 8 (four cases) were killed by their 16 GiB memory box (sizes
+   of about 1.1e9 per axis: the box is the answer, not re-run), 3 cases wrote garbage geometry with
+   status 0. Rule A (the input makes sense, the
+   result is memory): both modes keep `tcf`'s header (`powell.rs`: the voxels released where
+   FreeSurfer frees the image, `RegRobust::powell_hw`) and use it, with the notice; FreeSurfer's
+   printed part (the message and the maps) as it is. `getWeights()` is `NULL` for `RegPowell`:
+   `--halfweights` prints `Warning: no weights have been computed! Maybe you ran with
+   --leastsquares??` (`main` 1149). With the finest level skipped (`--highit 0`) and no coarser one,
+   no level runs: `tcf` stays `NULL` and the program prints `ERROR: no half way space created (not
+   implemented for this cost function)!` (measured: case 10).
 5. The `--iscalein` file: `ifstream f(name); if (f.good()) f >> iscale; else ErrorExit(...)`.
    libstdc++'s `>>` (`num_get`, C locale): white space only leaves 1 (the sentry fails at the end),
    no number gives 0 (C++11), one too large `+-DBL_MAX`; a folder opens (`fopen` of a folder for
@@ -120,12 +146,8 @@ The `cout`/`printf` lines share stdout's buffer (`sync_with_stdio`); each option
 ## 4. Not ported yet (each ends with its message, status 1)
 
 - (Ported in relay 47, section 7: `RegPowell`'s joint-histogram costs and `SB`.)
-- The Powell registration's half-way outputs: `RegPowell::getHalfWayGeom` returns its static copy of
-  the target, which `computeIterativeRegistrationFull` has freed by then (`MRIfree(&mriT)` on the
-  pointer the static shares): FreeSurfer reads a freed image's header for the half-way geometry (a
-  memory defect to measure before a decision, the next ID FS-1075); the port ends with
-  `mri_robust_register: the half-way outputs of the Powell registration are not ported yet`.
-- `--test` (`RegRobust::testRobust`): ends after `--test: TEST-MODE`.
+- (Ported in relay 48, §2 item 6: the Powell registration's half-way outputs, FS-1075.)
+- (Ported in relay 48, §8: the test mode, `--test`.)
 - `--debug` (the library's intermediate images, `saveGaussianPyramid`, the key presses
   `std::cin >> ch`, the `-wcheck-est.txt` file, the debug means of the half-way images): the
   library ends with `Registration: the debug output (--debug) is not ported yet`.
@@ -248,3 +270,39 @@ took <s> seconds.`) and the target, with the mask passed in (no `MRImask` then).
   in a debug build, 620 s for the test under the NaN trap; a second recorded hash,
   `check.py`'s `official_sha256_skip_debug`); a release build compares them.
 
+
+## 8. The test mode (`--test <n> <image>`; relay 48)
+
+- `parseNextCommand`'s `TEST` (2201-2207): `RegRobust R; R.testRobust(argv[2], atoi(argv[1]));
+  exit(0)`, a fresh registration (verbose 1, the options read so far unused). With nothing after
+  `--test`, `atoi(argv[1])` of `NULL` dies of a segmentation fault (measured: status 139, nothing on
+  standard error); with the number but no image `std::string(argv[2])` of `NULL` aborts (libstdc++'s
+  `basic_string::_M_construct null not valid`, status 134): both FS-1070 (the port's `missing`).
+- `Registration::testRobust` (`Registration.cpp` 1315-1700) and `buildGaussianPyramid` (3053-3141;
+  the port's `fs.robust` `testmode.rs`): the pyramid is the image blurred (`MRIconvolveGaussian`,
+  which keeps the type) and `MyMRI::subSample(mri_tmp, NULL, true)`, whose `randpos` defaults to 0
+  (the fixed random table's offsets, not every second voxel: the first port took -1 and the probe's
+  34^3 cases differed in every second level). `max == -1` becomes `w + h + d`, so the loop that
+  subsamples the first level is never entered. `p.resize(i - 1)` drops the level below 16.
+- **FS-1076** (class a: out of bounds; rule B). `gpS[gpS.size() - level]` with `level = gpS.size() -
+  1` is always `gpS[1]`; with one level (16 to 31 voxels along the smallest axis) it is past the
+  vector's end, where `resize` left the pointer of the dropped level (libstdc++ does not clear the
+  storage of a trivially destructible element; the level is never freed): the test registers that
+  level (below 16 voxels), whose registration ends with the minimum-size message, status 1
+  (measured: `b16` cases). By default an error after the test's line; `reproduce` uses the dropped
+  level: identical with the official program (the probe's three cases).
+- **FS-1077** (class a: crash). `MRIread` failing returns `NULL`; testRobust prints ` Read MRI ...
+  successfully!` and `buildGaussianPyramid(NULL, ...)` prints its first line and reads
+  `mri_in->width`: a segmentation fault (measured). An error in both modes.
+- **FS-1078** (class c; rule A). Tests 5 and 6: `MRIvox(mriTs, rr, cc, dd) = rr + cc + dd + 1` is
+  `((BUFTYPE *) slices[dd][cc])[rr]`, a byte access, on an image of the source's type (the
+  convolution keeps it): for a short or float image the byte `rr` of the row changes (the first
+  `w/3` bytes: the first `w/6` shorts or `w/12` floats of the row get garbage), not voxel `rr`.
+  By default the values are set as voxel values (`MRIsetVoxVal`); `reproduce` writes the bytes:
+  identical with the official program on the four short and float cases.
+- **The probe** (`check.py --family test`, 31 cases, `cases::test_cases`): 28 identical with
+  `reproduce`, 0 different, 3 not compared (FS-1070's two, one of them identical, and FS-1077);
+  the default differs on 7, each with its notice (FS-1076 three, FS-1078 four). The recorded test
+  `fs_robreg_test_official.rs` holds the official hash (3.7 s in a debug build); the golden cases
+  gained four (`--test 4`, `--test 5` on a float image, `--test 30`, `--test 0` on 16^3); the
+  prelude's `--test 1 mov.mgz` (16^3: FS-1076) is compared in the seeded test now.

@@ -50,6 +50,26 @@ plan is in `specs/mri_robust_register.md` §7.
   ported (`--debug`, `--test`). The golden cases gained `--cost MI` and `--cost SB` (16^3 images).
   The summary's `official_sha256_skip_debug` is the hash the recorded test's debug build checks (the
   cases of these costs as `SLOW`: `slow_in_debug`, `cases::histogram_or_sb_cost`).
+- `check.py --family halfway` (relay 48): the Powell registration's half-way outputs, 24 cases
+  (`cases::halfway_cases`: every Powell cost with the Powell family's random options, random half-way
+  outputs, two without symmetry, some with `--highit 0`); the official program is never served from
+  the cache here (FS-1075: its half-way geometry is memory it has freed, which may change from run
+  to run). FS-1075's cases are not compared as a whole; their defined parts are
+  (`defined_before_half_way`: standard output up to `Creating half way data ...`, standard error up
+  to the second map, every file but the half-way ones). Measured 2026-11-23 with `--preload`: 3
+  identical (no half-way space: no symmetry, no level registered), 21 of FS-1075: 19 with their
+  defined parts identical (2 more of FS-1063 not compared), 4 identical in every byte (the official
+  program's memory still held the target's geometry). The measurement of the official program
+  alone: `validation/investigations/freesurfer-fs1075-halfway/`. The golden cases'
+  `golden-halfway-cases` (two) hold the port's hash (both modes).
+- `check.py --family test` (relay 48): the test mode (`--test <n> <image>`), 31 cases
+  (`cases::test_cases`: every test number, unknown ones, a word; byte images of 16^3 and 34^3,
+  short and float images of 34^3, a 2-D image, a file that does not read, missing arguments,
+  options before it). Measured 2026-11-23: 28 identical, 0 different, 3 not compared (FS-1070's
+  segmentation fault and abort, FS-1077's segmentation fault); the default differs on 7, each with
+  FS-1076's or FS-1078's notice. Its hash is in `tests/fs_robreg_test_official.rs`; the seeded
+  family's prelude case `--test 1 mov.mgz` is compared now (seed 1 x 120 with `--preload`: 111
+  identical, 0 different, 8 not compared, 1 not ported, `--debug`).
 - `record.py`: the validation record `docs/validation/freesurfer-mri-robust-register.{json,md}`
   from the summaries above (from a clean commit).
 

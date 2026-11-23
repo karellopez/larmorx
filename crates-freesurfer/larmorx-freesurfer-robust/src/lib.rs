@@ -24,4 +24,5 @@ pub mod registration;
 pub mod regression;
 pub mod regstep;
 pub mod robust_gauss;
+pub mod testmode;
 pub mod transformation;

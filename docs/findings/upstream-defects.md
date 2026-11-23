@@ -500,6 +500,10 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FS-1072 | FreeSurfer 8.2.0 `mri_robust_register` (`--ixform`) | a non-linear initial transform (a morph) is read as a linear transform array: memory it does not own | a (memory) | none | an error in both modes, noted | – |
 | FS-1073 | FreeSurfer 8.2.0 `Transformation::setParameters(vnl_vector<double>)` (`--doubleprec --iscale`; the Powell registration's `--iscale`) | FS-1063's case where glibc's allocator hands the freed block straight back (rigid 3-D, affine 2-D and 3-D, isotropic scale 2-D, translation 2-D): each step's (each Powell evaluation's) transformation has its first two parameters replaced by the allocator's words (a tiny positive number and 0: the x and y translations lost) | a (memory: the allocator's words) | none (`--doubleprec` and the Powell costs are not the defaults) | the step's solution (the evaluation's parameters) by default; `reproduce` FreeSurfer's values (any tiny positive number: it vanishes in every sum), noted | – |
 | FS-1074 | FreeSurfer 8.2.0 `MyMRI::entropyImage` (`mri_robust_register --cost ROBENT --entradius`) | an entropy radius below 0: the program aborts for a 3-D image (an uncaught `std::bad_array_new_length`, status 134) and registers images of zeros for a 2-D one; a radius whose cube of weights holds 2^31 or more entries aborts or writes past its weights | a (crash; rule B) | none (`--cost ROBENT` is not fMRIPrep's or recon-all's) | an error by default, status 1; `reproduce` the abort or the zeros, named | – |
+| FS-1075 | FreeSurfer 8.2.0 `mri_robust_register` (the half-way outputs after a registration with a cost other than ROB and ROBENT) | the half-way space's geometry is read from memory the program has already released: the half-way transforms' target geometry and the half-way images' grids are memory contents (garbage sizes and directions, runs that differ, an allocation failure with status 1 or 252, or a size that exhausts the memory; where the memory still held it, the registration's target) | a (memory: released; rule A) | none (no Powell registration in fMRIPrep or recon-all) | the registration's target at the last resolution it registered, in both modes, named | – |
+| FS-1076 | FreeSurfer 8.2.0 `mri_robust_register --test` | on an image of 16 to 31 voxels along its smallest axis the test reads past the end of its one-level image pyramid and registers the level the pyramid dropped (below 16 voxels), which then fails on its size | a (out of bounds; rule B) | none | an error by default, status 1; `reproduce` the dropped level, named | – |
+| FS-1077 | FreeSurfer 8.2.0 `mri_robust_register --test` | an image that does not read is reported as read successfully, then the program dies of a segmentation fault | a (crash) | none | an error in both modes, status 1, named | – |
+| FS-1078 | FreeSurfer 8.2.0 `mri_robust_register --test 5`, `--test 6` | the tests' integer pattern is written byte by byte into an image of shorts or floats: the first bytes of each row change instead of the pattern's voxels | c (rule A) | none | the pattern's values as voxel values by default; `reproduce` the bytes, named | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -4766,6 +4770,31 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
   (`MyMRI::entropyImage: the entropy radius <r> gives no box of voxels (FreeSurfer fails here)`, status
   1); `reproduce` the abort or the zeros; the error in both modes where FreeSurfer writes past its
   weights. fMRIPrep and recon-all: none. Found 2026-11-23 (queue 3.2-13).
+- **FS-1075** (a, memory: released; rule A; relay 48 of track C): the half-way outputs (`--halfmov`,
+  `--halfdst`, `--halfweights`, `--halfmovlta`, `--halfdstlta`) after a registration with a cost other than
+  ROB and ROBENT take the half-way space's geometry from memory the program has already released. Measured
+  on 24 cases of every such cost, three runs each (never served from a cache): of the 21 that reach it, 5
+  gave the registration's target in all three runs (the memory still held it), 16 memory contents (13 of
+  them different from run to run): runs ending with status 1 (`MRI::Shape::Shape(): volume size must be
+  greater than 0 in every dimension`, `could not allocate memory for slice ...`) or 252, sizes that exhaust
+  the memory, garbage geometry with status 0. Evidence: measured. larmorx: the registration's target at the
+  last resolution it registered (the destination as the registration resampled it), in both modes, named;
+  FreeSurfer's printed half-way maps as they are (identical on the 19 comparable cases; every byte identical
+  on the 4 whose memory held the target). fMRIPrep and recon-all: none. Found 2026-11-23 (queue 3.2-13).
+- **FS-1076** (a, out of bounds; rule B; relay 48 of track C): `--test <n> <image>` on an image of 16 to 31
+  voxels along its smallest axis: the test's image pair is made from the pyramid's second level, which a
+  one-level pyramid does not have; FreeSurfer takes the level the pyramid dropped (below 16 voxels), whose
+  registration then stops on its size (status 1). Evidence: verified (`reproduce` identical on the probe's
+  three cases). larmorx: an error by default after the test's line, status 1; `reproduce` the dropped level.
+  fMRIPrep and recon-all: none (a test mode). Found 2026-11-23 (queue 3.2-13).
+- **FS-1077** (a, crash; relay 48 of track C): `--test` on an image that does not read: FreeSurfer prints
+  the reader's error and ` Read MRI <image> successfully!`, then dies of a segmentation fault. Evidence:
+  measured. larmorx: an error in both modes, status 1. fMRIPrep and recon-all: none. Found 2026-11-23.
+- **FS-1078** (c, rule A; relay 48 of track C): `--test 5` and `--test 6` write their pattern (`x + y + z +
+  1` over the first third of each axis) byte by byte: in an image of shorts or floats (the pyramid keeps the
+  input's type) the first bytes of each row change instead of the pattern's voxels. Evidence: verified
+  (`reproduce` identical on the probe's four short and float cases). larmorx: the pattern's values as voxel
+  values by default; `reproduce` the bytes. fMRIPrep and recon-all: none. Found 2026-11-23.
 
 ### FS-809 to FS-812 zlib 1.2.11 (Ubuntu 22.04's build): deflatePrime with bytes waiting, the stored window's hash count, the dictionary past the window — (a, memory and out of bounds; rules A and B)
 - **What:** `deflatePrime` called while compressed bytes wait behind some already handed out writes its bits at the

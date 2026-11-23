@@ -33,6 +33,15 @@ plan is in `specs/mri_robust_register.md` §7.
   (`../fs-robust/complexrt.c`, CORE-MATH's correctly rounded `hypot`; the official program takes
   them from glibc). `real.py --preload` with it: all six heads identical in every byte, ds004173
   included: its last digits were glibc's `hypot` (GLIBC-07, the user's D4).
+- `check.py --family powell` (relay 46): the Powell registration's 40 cases (`LS`, `NCC`, `TB`,
+  `LNCC`, `SAD` with random models, intensity scales, symmetry or not, full images, tolerances,
+  subsampling, 2-D pairs and outputs); `--preload <library>` runs the official program with
+  `decided_complex.sh`'s library (its case folders `cases-<tag>-preload.d`; the cache keys the
+  library by its content). Measured 2026-11-23: with the preload 36 identical, 0 different, 4 not
+  compared (FS-1063); without it 4 of the 40 differ in their last printed digits (glibc's `hypot`
+  in the matrix square roots, which every Powell evaluation with symmetry takes: the D4 divergence).
+  `--seed 1 --n 120 --preload`: 105 identical, 0 different, 8 not compared, 7 not ported (`MI`,
+  `NMI`, `ECC`, `SCR`, `SB`, `--debug`, `--test`). The recorded tests hold the preloaded values.
 - `record.py`: the validation record `docs/validation/freesurfer-mri-robust-register.{json,md}`
   from the summaries above (from a clean commit).
 
@@ -40,6 +49,8 @@ Every run in a memory box (`scripts/orchestration/boxed.sh`); no case sets `DIAG
 licence check would print the licence file); the official side runs with `FS_DISABLE_LANG=1`.
 
     scripts/orchestration/boxed.sh 10 python -P validation/probes/fs-robust-register/check.py --seed 1 --n 300
+    scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-robust-register/check.py --family powell \
+        --preload <workspace>/oracles/freesurfer-8.2.0-probes/fs-complex-decided/libdecidedcomplex.so
     scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-robust-register/real.py --json real.json
     validation/probes/fs-robust-register/decided_complex.sh <workspace>
     scripts/orchestration/boxed.sh 24 python -P validation/probes/fs-robust-register/real.py \

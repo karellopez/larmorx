@@ -1,0 +1,142 @@
+{
+ "name": "freesurfer-mri-concat",
+ "tool": "mri_concat (FreeSurfer 8.2.0): every option and path",
+ "status": "experimental",
+ "larmorx_commit": "f1dd4d2c60d6",
+ "generated": "2026-11-23",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_concat/), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mri_concat) and its recon-all runs (oracles/freesurfer-8.2.0/runs/: pctsurfcon's and mri_mcadura_seg's calls)",
+ "probe": [
+  {
+   "set": "seed 1",
+   "cases": 600,
+   "identical": 569,
+   "different": 0,
+   "skipped": 31,
+   "skipped_why": {
+    "MEMORY": 21,
+    "CRASH": 10
+   },
+   "fix_different_with_notice": 64,
+   "fix_different_without_notice": 0
+  },
+  {
+   "set": "seed 2",
+   "cases": 1500,
+   "identical": 1435,
+   "different": 0,
+   "skipped": 65,
+   "skipped_why": {
+    "MEMORY": 39,
+    "CRASH": 29
+   },
+   "fix_different_with_notice": 201,
+   "fix_different_without_notice": 0
+  }
+ ],
+ "real": {
+  "calls": 30,
+  "reproduce_identical": 30,
+  "fix_identical": 30,
+  "official_is_recorded": 24,
+  "with_a_record": 24,
+  "runs": [
+   "ds000005-sub-01-classic",
+   "ds000005-sub-01-v8",
+   "ds000228-sub-pixar008-classic",
+   "ds000228-sub-pixar008-v8",
+   "ds002422-sub-02-classic",
+   "ds002422-sub-02-v8",
+   "ds004173-sub-603309-classic",
+   "ds004173-sub-603309-v8",
+   "ds005003-sub-RS001-classic",
+   "ds005003-sub-RS001-v8",
+   "ds005454-sub-16-classic",
+   "ds005454-sub-16-v8"
+  ],
+  "kinds": {
+   "pctsurfcon": 24,
+   "mcadura-sum": 6
+  }
+ },
+ "golden_sha256": {
+  "official_and_reproduce": "583298963d943406802b3991ffe4dd07565426f02b873d184939a8764e37e65c",
+  "fix": "e4af9f7a836f154b3800f3f117565048c6c9ba6b9d774c4df05efae4f5628f99"
+ },
+ "memory": [
+  {
+   "case": "frames",
+   "mode": "reproduce",
+   "larmorx_mib": 277.7,
+   "freesurfer_mib": 280.2
+  },
+  {
+   "case": "frames",
+   "mode": "fix",
+   "larmorx_mib": 278.0,
+   "freesurfer_mib": 280.2
+  },
+  {
+   "case": "mean",
+   "mode": "reproduce",
+   "larmorx_mib": 277.9,
+   "freesurfer_mib": 279.5
+  },
+  {
+   "case": "mean",
+   "mode": "fix",
+   "larmorx_mib": 277.0,
+   "freesurfer_mib": 279.5
+  },
+  {
+   "case": "std",
+   "mode": "reproduce",
+   "larmorx_mib": 341.8,
+   "freesurfer_mib": 343.7
+  },
+  {
+   "case": "std",
+   "mode": "fix",
+   "larmorx_mib": 341.9,
+   "freesurfer_mib": 343.7
+  },
+  {
+   "case": "mul",
+   "mode": "reproduce",
+   "larmorx_mib": 86.0,
+   "freesurfer_mib": 86.5
+  },
+  {
+   "case": "mul",
+   "mode": "fix",
+   "larmorx_mib": 85.8,
+   "freesurfer_mib": 86.5
+  },
+  {
+   "case": "mcadura",
+   "mode": "reproduce",
+   "larmorx_mib": 198.3,
+   "freesurfer_mib": 202.8
+  },
+  {
+   "case": "mcadura",
+   "mode": "fix",
+   "larmorx_mib": 198.0,
+   "freesurfer_mib": 202.8
+  },
+  {
+   "case": "pctsurfcon",
+   "mode": "reproduce",
+   "larmorx_mib": 7.8,
+   "freesurfer_mib": 8.2
+  },
+  {
+   "case": "pctsurfcon",
+   "mode": "fix",
+   "larmorx_mib": 8.0,
+   "freesurfer_mib": 8.2
+  }
+ ],
+ "not_ported_yet": "nothing"
+}

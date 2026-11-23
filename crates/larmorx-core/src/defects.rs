@@ -2783,6 +2783,34 @@ defects! {
         "mri_vol2vol --morph --filter (the mode filter of the morphed volume) on values below -0.5, or not a number, counts them outside its histogram (memory contents or a crash); corrected: they are counted as values of their own";
     FS_1193 = "FS-1193", "FreeSurfer", true,
         "mri_vol2vol --cost without a segmentation SUBJECTS_DIR/<subject>/mri/regseg (.nii, .nii.gz, .mgh, .mgz, .img and the like) crashes (status 139) after the resampling; corrected: ERROR: --cost: cannot find the segmentation <name>, status 1";
+    FS_1194 = "FS-1194", "FreeSurfer", true,
+        "mri_concat --f: a word of the list file of 2,000 bytes or more names an input whose name runs on into the next words (its first 2,000 bytes followed by the next input's name); corrected: each word is its own input";
+    FS_1195 = "FS-1195", "FreeSurfer", true,
+        "mri_concat --f with a list file name holding white space opens only the name's first word; corrected: the whole name is opened";
+    FS_1196 = "FS-1196", "FreeSurfer", true,
+        "mri_concat --f with an empty argument (or only white space) opens a name taken from memory contents; corrected: the empty name is opened (ERROR: opening , status 1)";
+    FS_1197 = "FS-1197", "FreeSurfer", true,
+        "mri_concat --f with a list file name of 2,009 bytes or more that opens (a name past its buffer of 2,000 bytes): the official build stops when the command line has been read (*** stack smashing detected ***: terminated, status 134); corrected: the whole name is used";
+    FS_1198 = "FS-1198", "FreeSurfer", true,
+        "mri_concat --f lists that bring the inputs past 400,000 are stored past the program's tables: it crashes (status 139); corrected: ERROR: ninputs > 400000, status 1, as for the command line's inputs";
+    FS_1200 = "FS-1200", "FreeSurfer", true,
+        "mri_concat --rms with an input whose header reads but whose voxels do not crashes (status 139) after the reader's messages; corrected: status 1";
+    FS_1241 = "FS-1241", "FreeSurfer", true,
+        "mri_concat --no-check with an input of other dimensions than the first, or with more frames in all than inputs, reads and writes past the volumes (other voxels, memory contents, a crash); corrected: ERROR: dimension mismatch between <first> and <input> (or ERROR: <input> has more frames than counted), status 1";
+    FS_1242 = "FS-1242", "FreeSurfer", true,
+        "mri_concat frame counts past 2,147,483,647 wrap around (the inputs' frames in all, --mean-div-n's frames squared from 46,341 frames, --rep's frames times replications): wrong scale factors and wrong output sizes; corrected: ERROR: <what> passes 2147483647 frames, status 1";
+    FS_1243 = "FS-1243", "FreeSurfer", true,
+        "mri_concat --no-check --w with more frames than inputs weights the frames past the weight file's rows with memory contents; corrected: refused with FS-1241's error";
+    FS_1244 = "FS-1244", "FreeSurfer", true,
+        "mri_concat --pca with an output stem of 1,990 bytes or more: the official build aborts naming its matrix files (*** buffer overflow detected ***: terminated, status 134); corrected: the whole name is used";
+    FS_1245 = "FS-1245", "FreeSurfer", true,
+        "mri_concat --pca with an output name without a volume extension (.mgz, .mgh, .nii, .nii.gz, .img, ...) writes its matrices as (null).u.mtx and (null).stats.dat (before the output itself is refused: unknown file type); corrected: <output>.u.mtx and <output>.stats.dat";
+    FS_1246 = "FS-1246", "FreeSurfer", true,
+        "mri_concat --mtx with a matrix whose columns are not the frame count prints the matrix's row count in ERROR: dimension mismatch between inputs (<n>) and matrix (<rows>); corrected: its column count, the one compared";
+    FS_1248 = "FS-1248", "FreeSurfer", true,
+        "mri_concat --mask of other dimensions than the inputs is read at the inputs' voxels by --sort, --vote, --first-non-zero and --cumsum (other voxels of the mask, memory contents, a crash); corrected: ERROR: --mask's dimensions differ from the volume's, status 1";
+    FS_1247 = "FS-1247", "FreeSurfer", true,
+        "mri_concat --zconcat with a slice count to skip that is not a number skips a count taken from memory contents; corrected: ERROR: --zconcat: nskip <x> is not a number, status 1";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

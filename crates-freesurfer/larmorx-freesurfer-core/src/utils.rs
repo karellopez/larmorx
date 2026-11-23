@@ -833,11 +833,11 @@ pub fn rusage_self() -> Option<Rusage> {
 }
 
 /// `PrintRUsage(who, pre, fp)` for `RUSAGE_SELF`: sixteen lines `<pre><name> <value>` (the times
-/// `%lf`); returns -1 (getrusage's failure) where the usage cannot be read.
+/// `%lf`); 0. Where `/proc` is missing (Windows, macOS: no platform FreeSurfer runs on, whose
+/// `getrusage` never fails) the lines are printed with every value 0, so that the output has
+/// the same lines on every platform (`mri_concat --debug`, relay 55 of track A).
 pub fn print_rusage(pre: &str, fp: &mut dyn Write) -> i32 {
-    let Some(u) = rusage_self() else {
-        return -1;
-    };
+    let u = rusage_self().unwrap_or_default();
     let _ = writeln!(fp, "{pre}utimesec    {:.6}", u.utime);
     let _ = writeln!(fp, "{pre}stimesec    {:.6}", u.stime);
     for (name, v) in [

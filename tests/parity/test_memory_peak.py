@@ -22,7 +22,7 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 (``MRI_MASK_CASES``, 2026-11-22), ``mri_cc`` (``MRI_CC_CASES``, ``MRI_CC_WM_CASES``, 2026-11-23), ``fs_temp_file``
 (``FS_TEMP_FILE_CASES``, 2026-11-22), ``getfullpath`` (``GETFULLPATH_CASES``, 2026-11-22) and
 ``mri_vol2vol`` (``MRI_VOL2VOL_CASES``, 2026-11-23; its morph and ``--gcam`` on the classic
-recording, relay 54).
+recording, relay 54) and ``mri_concat`` (``MRI_CONCAT_CASES``, 2026-11-23).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -3295,3 +3295,81 @@ def test_mri_vol2vol_replica_needs_no_more_memory_than_freesurfer(tmp_path, name
             f"mri_vol2vol {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
         )
         assert (r_dir / "out.mgz").read_bytes() == (o_dir / "out.mgz").read_bytes(), name
+
+
+#: ``mri_concat``'s calls (track A relay 55), on ds000005 sub-01's v8 recording: four of the
+#: head's 256^3 volumes concatenated (a float output of four frames), their frame mean and
+#: standard deviation (the covariance, then its square root in place), ``--mul`` in place, the
+#: dura script's kind (two segmentations summed with ``mca-dura.ctab``) and ``pctsurfcon``'s
+#: (the percent contrast of two surface overlays: the head's own, twice).
+MRI_CONCAT_CASES = [
+    ("frames", ["{mri}/nu.mgz", "{mri}/norm.mgz", "{mri}/brain.mgz", "{mri}/T1.mgz",
+                "--o", "out.mgz"]),
+    ("mean", ["{mri}/nu.mgz", "{mri}/norm.mgz", "{mri}/brain.mgz", "--mean", "--o", "out.mgz"]),
+    ("std", ["{mri}/nu.mgz", "{mri}/norm.mgz", "{mri}/brain.mgz", "--std", "--o", "out.mgz"]),
+    ("mul", ["{mri}/nu.mgz", "--mul", "100", "--o", "out.mgz"]),
+    ("mcadura", ["{mri}/aseg.mgz", "{mri}/aseg.mgz", "--sum", "--ctab",
+                 "{home}/models/mca-dura.ctab", "--o", "out.mgz"]),
+    ("pctsurfcon", ["{surf}/lh.w-g.pct.mgh", "{surf}/lh.w-g.pct.mgh", "--paired-diff-norm",
+                    "--mul", "100", "--o", "out.mgh"]),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("name", "args"), MRI_CONCAT_CASES)
+def test_mri_concat_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, args):
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    home = ws / FS_HOME if ws else None
+    exe = home / "bin" / "mri_concat" if home else None
+    subj = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / "ds000005-sub-01-v8" / "subjects" / "sub-01"
+        if ws
+        else None
+    )
+    mri = subj / "mri" if subj else None
+    if exe is None or not exe.is_file() or not (mri / "nu.mgz").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    words = [a.format(mri=mri, home=home, surf=subj / "surf") for a in args]
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        "FS_DISABLE_LANG": "1",
+        **freesurfer_env(),
+    }
+
+    def fresh(d: Path):
+        def reset() -> None:
+            if d.exists():
+                shutil.rmtree(d)
+            d.mkdir()
+
+        reset()
+        return reset
+
+    out = words[-1]
+    o_dir = tmp_path / "freesurfer"
+    code, fs_mib = _original_peak(
+        ["mri_concat", *words], env, "freesurfer", fresh(o_dir), o_dir, (), "freesurfer"
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        fresh(r_dir)
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_concat", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(f"mri_concat {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"mri_concat {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        assert (r_dir / out).read_bytes() == (o_dir / out).read_bytes(), name

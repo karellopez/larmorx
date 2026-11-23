@@ -7,7 +7,7 @@ recon-all runs ``mri_cc`` only through ``seg2cc`` (the aseg path, replayed by
 ``validation/investigations/freesurfer-mri-cc-replay/``). The white-matter path reads
 ``<subject>/mri/wm`` without a suffix and ``mri/transforms/talairach.xfm``; recon-all writes
 ``wm.mgz``, so here each recorded head's ``wm.mgz`` is written as a COR folder ``wm`` by the
-official ``mri_convert -ot cor`` (``oracles/inputs/fs-cc-real/<run>/wm``, through the
+official ``mri_convert -ot cor`` (``oracles/inputs/fs-cc-real/<run>/wm-cor``, through the
 oracle-output cache) and the run's ``talairach.xfm`` copied beside it. The official program by name
 through the cache at one thread and the port (``larmorx-freesurfer --upstream-defects
 reproduce|fix freesurfer mri_cc``, built here), each with a subjects folder of its own; compared:
@@ -120,12 +120,13 @@ def main(argv: list[str] | None = None) -> int:
     for run in a.runs.split(","):
         mri = subject_mri(ws, run)
         base = ws / "oracles" / "inputs" / "fs-cc-real" / run
-        cor = base / "wm"
-        if cor.exists():
-            shutil.rmtree(cor)
+        # the COR folder apart from the calls' folders (each call's sides copy it as mri/wm)
+        if base.exists():
+            shutil.rmtree(base)
+        cor = base / "wm-cor"
         cor.mkdir(parents=True)
         made = oracle_cache.run(
-            ["mri_convert", str(mri / "wm.mgz"), "wm", "-ot", "cor"],
+            ["mri_convert", str(mri / "wm.mgz"), "wm-cor", "-ot", "cor"],
             env=env,
             cwd=base,
             outputs=[cor],
@@ -198,6 +199,7 @@ def main(argv: list[str] | None = None) -> int:
                     verdicts["fix-identical" if not diffs else
                              ("fix-explained" if ids else "fix-unexplained")] += 1  # fmt: skip
             rows.append(row)
+            shutil.rmtree(base / kind)  # the sides' copies (16 MiB of COR slices each)
             print(f"{run} {kind}: exit {oc}, reproduce "
                   f"{'ok' if not row['reproduce']['differ'] else row['reproduce']['differ']}, fix "
                   f"{'ok' if not row['fix']['differ'] else (row['fix']['differ'], row['fix']['notices'])}",

@@ -375,6 +375,11 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
         }
     }
     let mut masks = vec![escape(d.as_bytes())];
+    if !cfg!(unix) {
+        // standard output's `\` became `/` above: the folder as given in that form too (CI's
+        // Windows runners name it by its short form, `RUNNER~1`, which the physical path is not)
+        masks.push(escape(d.replace('\\', "/").as_bytes()));
+    }
     if let Some(p) = larmorx_freesurfer_volumes::csh::physical(dir) {
         let p = if cfg!(unix) { p } else { p.replace('\\', "/") };
         masks.insert(0, escape(p.as_bytes()));

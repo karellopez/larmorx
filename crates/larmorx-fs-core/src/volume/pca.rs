@@ -40,7 +40,17 @@ fn compare_p(a: &f64, b: &f64) -> i32 {
 pub enum FdrOut {
     None,
     Itself,
-    Vol(Mri),
+    Vol(Box<Mri>),
+}
+
+/// `!(x < t)` in C: true at or above `t`, and for a NaN.
+fn not_below(x: f32, t: f32) -> bool {
+    x.partial_cmp(&t) != Some(std::cmp::Ordering::Less)
+}
+
+/// `!(x > t)` in C: true at or below `t`, and for a NaN.
+fn not_above<T: PartialOrd>(x: T, t: T) -> bool {
+    x.partial_cmp(&t) != Some(std::cmp::Ordering::Greater)
 }
 
 /// `PrintPCAStats`' lines (§42) of a row vector of singular values.
@@ -89,7 +99,7 @@ impl Process {
                     if m > 0.5 {
                         theirs += 1;
                     }
-                    if !(m < 0.5) {
+                    if not_below(m, 0.5) {
                         taken += 1;
                     }
                 }
@@ -153,7 +163,7 @@ impl Process {
             for r in 0..h {
                 for s in 0..d {
                     let ok = match mask {
-                        Some(mk) => !(self.vf(mk, (c, r, s), 0)? < 0.5),
+                        Some(mk) => not_below(self.vf(mk, (c, r, s), 0)?, 0.5),
                         None => true,
                     };
                     if ok {
@@ -353,7 +363,7 @@ impl Process {
         log10flag: bool,
         masks: Option<&[Option<Mri>]>,
         vwth: &mut f64,
-        mut outs: Option<&mut [FdrOut]>,
+        outs: Option<&mut [FdrOut]>,
         debug: bool,
     ) -> Result<i32, Stop> {
         // every input checked first
@@ -396,8 +406,8 @@ impl Process {
         }
         // the values
         let fits = |v: f32| match sign {
-            -1 => !(v > 0.0),
-            1 => !(v < 0.0),
+            -1 => not_above(v, 0.0),
+            1 => not_below(v, 0.0),
             _ => true,
         };
         let mut p = Vec::new();
@@ -458,7 +468,7 @@ impl Process {
             line.push(b'\n');
             self.put_out(&line);
         }
-        let Some(outs) = outs.as_deref_mut() else {
+        let Some(outs) = outs else {
             if log10flag {
                 *vwth = self.fdr_minus_log10(*vwth);
             }
@@ -483,7 +493,7 @@ impl Process {
                         };
                         let pass = !masked && fits(x) && {
                             let val = self.fdr_value(x, log10flag);
-                            !(val > *vwth)
+                            not_above(val, *vwth)
                         };
                         let y = if pass { x } else { other };
                         match &mut outs[i] {

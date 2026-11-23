@@ -235,7 +235,7 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
                 } else if l.take("self") {
                     FdrOut::Itself
                 } else {
-                    FdrOut::Vol(getw(p, l)?)
+                    FdrOut::Vol(Box::new(getw(p, l)?))
                 });
             }
             let fdr = l.getd();
@@ -268,7 +268,7 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
                     match o {
                         FdrOut::None => {}
                         FdrOut::Itself => putv(l, Some(&vols[i])),
-                        FdrOut::Vol(m) => putv(l, Some(m)),
+                        FdrOut::Vol(m) => putv(l, Some(m.as_ref())),
                     }
                 }
             }

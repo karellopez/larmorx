@@ -10,10 +10,16 @@
 //! - [`options`]: `parse_commandline`, `check_options`, `dump_options`, the usage and the help.
 //! - [`main`]: `main`: the program's entry point.
 //!
-//! Relay 53 ports every option's reading and checks and every path but the non-linear ones,
-//! which end the run (status 1) as not ported yet: the morphs (`--morph`, `--inv-morph`, `--m3z`:
-//! `GCAMmorphToAtlas`/`GCAMmorphFromAtlas`), `--gcam`, `--spm-warp`, `--map-point`, the affine
-//! displacement (`--disp`) and the registration cost (`--cost`).
+//! - [`gcam`]: `MRIvol2volGCAM` and `MRIvol2volGCAM0` (`--gcam`, `--gcam0`).
+//! - [`standalone`]: the options that do their work while the command line is read
+//!   (`--spm-warp`, `--gcam`, `--map-point`).
+//!
+//! Relay 53 ported every option's reading and checks and every linear path (part 1); relay 54 the
+//! non-linear paths (part 2): the morphs (`--morph`, `--inv-morph`, `--m3z`: `GCAMmorphToAtlas`,
+//! `GCAMmorphFromAtlas`) and their mode filter (`--filter`), `--gcam`, `--spm-warp`,
+//! `--map-point`, the affine displacement (`--disp`) and the registration cost (`--cost`).
 
+pub mod gcam;
 pub mod main;
 pub mod options;
+pub mod standalone;

@@ -2741,6 +2741,26 @@ defects! {
         "mri_vol2vol --reg with a tkregister register.dat (not an .lta) and a target (--targ or --fstarg) always stops with LTAchangeType: src geometry must be valid (status 252): the register.dat's matrix is never applied; corrected: the register.dat's matrix maps the target to the moving volume";
     FS_1182 = "FS-1182", "FreeSurfer", true,
         "mri_vol2vol --crop with a scale that leaves no voxel (0, or so small that a size rounds to 0) writes an empty volume with status 0, and a negative scale stops with the allocation's messages (status 1); corrected: ERROR: --crop's scale <s> leaves no voxel, status 1";
+    FS_1184 = "FS-1184", "FreeSurfer", true,
+        "mri_vol2vol --map-point with a coordinate or a coordinate kind that is not a number maps memory contents (the number is never read); corrected: ERROR: --map-point: <argument> is not a number, status 1";
+    FS_1185 = "FS-1185", "FreeSurfer", true,
+        "mri_vol2vol --cost with a regseg segmentation smaller than the resampled volume reads past the segmentation (memory contents); corrected: ERROR: SegRegCost(): regseg and f differ in size, and the cost line is not written";
+    FS_1186 = "FS-1186", "FreeSurfer", true,
+        "mri_vol2vol --cost with a cost file that cannot be opened for appending (a folder that does not exist or cannot be written) crashes (status 139) after the resampling; corrected: ERROR: could not open <file>, status 1";
+    FS_1187 = "FS-1187", "FreeSurfer", true,
+        "mri_vol2vol --cost when the cost is refused (ERROR: SegRegCost(): regseg type must be int, uchar, or float, or f type must be float, as with --precision other than float) still appends a line of eight numbers that were never computed (memory contents); corrected: no line is written and the program ends with status 1";
+    FS_1188 = "FS-1188", "FreeSurfer", true,
+        "mri_vol2vol --gcam with a source LTA and no morph (gcam 0) stops with ERROR: MRIvol2volGCAM(): neither src nor dst of Dest LTA matches the src vol geom of the Source LTA when the destination LTA's destination (not its source) is the source LTA's source, the case the check is meant to accept; corrected: the destination LTA is used as it is";
+    FS_1189 = "FS-1189", "FreeSurfer", true,
+        "mri_vol2vol --gcam with a voxel shift map and a phase-encoding direction (--vsm-pedir before --gcam) other than 1, 2 or 3: a negative direction squares the shift and writes outside the point's coordinates (a crash or memory corruption), 0 crashes, 4 changes the point's homogeneous coordinate (no effect), others write past it; corrected: -1, -2, -3 shift along that axis in the negative direction, others end with ERROR: MRIvol2volGCAM: pedir=<p>, must be +/-1, +/-2, +/-3, status 1";
+    FS_1190 = "FS-1190", "FreeSurfer", true,
+        "mri_vol2vol --gcam0 (and --gcam with MY_MORPHS_DO_NOT_CONFORM_DEAL_WITH_IT set) without a destination LTA (0, or a file that does not read) crashes (status 139); corrected: ERROR: MRIvol2volGCAM0(): a destination LTA is needed, status 1";
+    FS_1191 = "FS-1191", "FreeSurfer", true,
+        "mri_vol2vol --morph and --inv-morph with a morph name of 1,000 bytes or more (SUBJECTS_DIR/<subject>/mri/transforms/<m3z>, or the --m3z name with --noDefM3zPath): the official build aborts (*** buffer overflow detected ***: terminated, status 134); corrected: the whole name is used";
+    FS_1192 = "FS-1192", "FreeSurfer", true,
+        "mri_vol2vol --morph --filter (the mode filter of the morphed volume) on values below -0.5, or not a number, counts them outside its histogram (memory contents or a crash); corrected: they are counted as values of their own";
+    FS_1193 = "FS-1193", "FreeSurfer", true,
+        "mri_vol2vol --cost without a segmentation SUBJECTS_DIR/<subject>/mri/regseg (.nii, .nii.gz, .mgh, .mgz, .img and the like) crashes (status 139) after the resampling; corrected: ERROR: --cost: cannot find the segmentation <name>, status 1";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

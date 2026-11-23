@@ -14,7 +14,8 @@
 //! <seed>`, a time of day unless `--seed` is given), `VmPeak <kB>` and the `# created by` line of
 //! the transforms written (user and date). Pseudo-notices, which `check.py` counts, not compares:
 //! `CRASH` (a status FreeSurfer's build reaches by a signal: 134, 136, 139; its unflushed standard
-//! output is lost) and `NOTPORTED` (a path relay 53 leaves for later).
+//! output is lost), `NOTPORTED` (a path not ported yet) and `MEMORY` (a result FreeSurfer takes
+//! from memory contents: FS-931, FS-1184, FS-1185, FS-1187, FS-1192).
 #![allow(dead_code)]
 
 #[path = "../fs_info/cases.rs"]
@@ -28,6 +29,8 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::TrackedErr;
 use larmorx_freesurfer_core::matrix::Matrix;
 use larmorx_freesurfer_core::run::Environment;
+use larmorx_freesurfer_gca::gcam::gcam_alloc;
+use larmorx_freesurfer_gca::gcam_write::{gcam_init_vol_geom, gcam_write};
 use larmorx_freesurfer_mri::lta::{LINEAR_RAS_TO_RAS, LINEAR_VOX_TO_VOX, lta_alloc};
 use larmorx_freesurfer_mri::mri::{MRI_FLOAT, MRI_INT, MRI_SHORT, MRI_UCHAR, Mri};
 use larmorx_freesurfer_mri::voxel::mri_set_vox_val;
@@ -114,6 +117,17 @@ fn rows(v: &[f32; 16]) -> String {
 /// The file `lta_write` makes of an array from `src` to `dst` of `ty` with `m` (its `# created
 /// by` line fixed, so that the case's bytes never change).
 fn lta_file(src: &Mri, dst: &Mri, ty: i32, m: &[f32; 16], valid: [i32; 2]) -> Vec<u8> {
+    lta_file_vg(&src.vg, &dst.vg, ty, m, valid)
+}
+
+/// [`lta_file`] of two geometries.
+fn lta_file_vg(
+    src: &larmorx_freesurfer_mri::vol_geom::VolGeom,
+    dst: &larmorx_freesurfer_mri::vol_geom::VolGeom,
+    ty: i32,
+    m: &[f32; 16],
+    valid: [i32; 2],
+) -> Vec<u8> {
     let t = tempfile::tempdir().expect("a temporary folder");
     let mut fs = Globals::new(UpstreamDefects::Fix);
     let (mut o, mut e) = (Vec::new(), Vec::new());
@@ -121,8 +135,8 @@ fn lta_file(src: &Mri, dst: &Mri, ty: i32, m: &[f32; 16], valid: [i32; 2]) -> Ve
     lta.ltype = ty;
     lta.xforms[0].ltype = ty;
     lta.xforms[0].m_l = Some(matrix_of(m));
-    get_vol_geom(&src.vg, &mut lta.xforms[0].src);
-    get_vol_geom(&dst.vg, &mut lta.xforms[0].dst);
+    get_vol_geom(src, &mut lta.xforms[0].src);
+    get_vol_geom(dst, &mut lta.xforms[0].dst);
     lta.xforms[0].src.valid = valid[0];
     lta.xforms[0].dst.valid = valid[1];
     lta.subject.strcpy_bytes(b"s1");
@@ -441,9 +455,216 @@ fn base_inputs() -> Inputs {
         "fsl/data/standard/MNI152_T1_2mm.nii.gz",
         &mut mni,
     );
+    part2_inputs(&mut files, &m, &t, &t2, &mu);
     Inputs {
         files,
         dirs: vec!["outdir".to_owned()],
+    }
+}
+
+/// A morph (`.m3z`) from the grid of `atlas` (one node per voxel) to `image`: each node at its
+/// voxel scaled onto the image's grid, moved by up to a quarter voxel (`shift`: by a further
+/// `shift` voxels, so that some nodes fall outside the image), node `invalid` (when given) at 0
+/// (invalid when read).
+fn morph_file(
+    g: &mut Gen,
+    image: &Mri,
+    atlas: &Mri,
+    shift: f64,
+    invalid: Option<(i32, i32, i32)>,
+) -> Vec<u8> {
+    let t = tempfile::tempdir().expect("a temporary folder");
+    let mut fs = Globals::new(UpstreamDefects::Fix);
+    let (mut o, mut e) = (Vec::new(), Vec::new());
+    let (aw, ah, ad) = (atlas.vg.width, atlas.vg.height, atlas.vg.depth);
+    let mut gc = gcam_alloc(&mut fs, &mut e, aw, ah, ad).expect("a morph");
+    gcam_init_vol_geom(&mut gc, image, atlas);
+    let scale =
+        |v: i32, n: i32, m: i32| f64::from(v) * f64::from(m - 1) / f64::from((n - 1).max(1));
+    for x in 0..aw {
+        for y in 0..ah {
+            for z in 0..ad {
+                let n = gc.node_mut(x, y, z);
+                let p = [
+                    scale(x, aw, image.vg.width) + g.int(-2, 2) as f64 * 0.125 + shift,
+                    scale(y, ah, image.vg.height) + g.int(-2, 2) as f64 * 0.125,
+                    scale(z, ad, image.vg.depth) + g.int(-2, 2) as f64 * 0.125,
+                ];
+                let zero = invalid == Some((x, y, z));
+                let p = if zero { [0.0; 3] } else { p };
+                (n.x, n.y, n.z) = (p[0], p[1], p[2]);
+                (n.origx, n.origy, n.origz) = (p[0], p[1], p[2]);
+                n.label = if g.chance(3) { 2 } else { 0 };
+            }
+        }
+    }
+    let env = Environment::default();
+    gcam_write(
+        &mut fs,
+        &mut o,
+        &mut e,
+        &env,
+        Some(t.path()),
+        &mut gc,
+        "x.m3z",
+        0,
+    )
+    .expect("written");
+    std::fs::read(t.path().join("x.m3z")).expect("the morph")
+}
+
+/// A segmentation of `like`'s grid (`uchar`, or `ty`) holding the labels `regseg` counts (2, 3,
+/// 41, 42) and others.
+fn regseg(g: &mut Gen, like: &Mri, dims: [i32; 3], ty: i32) -> Mri {
+    let mut fs = Globals::new(UpstreamDefects::Fix);
+    let (mut o, mut e) = (Vec::new(), Vec::new());
+    let mut m = larmorx_freesurfer_mri::mri::mri_alloc_sequence(
+        &mut fs, &mut o, &mut e, dims[0], dims[1], dims[2], ty, 1,
+    )
+    .expect("a volume");
+    m.vg = like.vg.clone();
+    (m.vg.width, m.vg.height, m.vg.depth) = (dims[0], dims[1], dims[2]);
+    (m.width, m.height, m.depth) = (dims[0], dims[1], dims[2]);
+    for z in 0..dims[2] {
+        for y in 0..dims[1] {
+            for x in 0..dims[0] {
+                let v = g.pick(&[0.0f32, 2.0, 3.0, 41.0, 42.0, 17.0, 2.0, 3.0]);
+                mri_set_vox_val(&mut fs, &mut e, &mut m, x, y, z, 0, v, 0).expect("a voxel");
+            }
+        }
+    }
+    m
+}
+
+/// The inputs of part 2's paths (relay 54): morphs, the transforms of `--gcam`, an SPM warp, the
+/// `regseg` segmentations of `--cost`, an array of two transforms.
+fn part2_inputs(files: &mut Vec<(String, Vec<u8>)>, m: &Mri, t: &Mri, t2: &Mri, mu: &Mri) {
+    let mut g = Gen::new(0x9a27_2054);
+    let tal = morph_file(&mut g, m, t, 0.0, None);
+    files.push((
+        "subjects/s1/mri/transforms/talairach.m3z".into(),
+        tal.clone(),
+    ));
+    files.push(("x.m3z".into(), tal));
+    let xb = morph_file(&mut g, mu, t2, 1.5, Some((1, 1, 1)));
+    files.push(("subjects/s1/mri/transforms/xb.m3z".into(), xb.clone()));
+    files.push(("xb.m3z".into(), xb));
+    files.push(("a.m3z".into(), morph_file(&mut g, t, t2, 0.0, None)));
+    files.push((
+        "bad.m3z".into(),
+        b"not a morph
+"
+        .to_vec(),
+    ));
+    // --gcam's chain: the moving volume m, the anatomy t (the morph's image), the atlas t2, the
+    // destination mu
+    files.push((
+        "ta.lta".into(),
+        lta_file(t, m, LINEAR_RAS_TO_RAS, &ROT, [1, 1]),
+    ));
+    files.push((
+        "at.lta".into(),
+        lta_file(m, t, LINEAR_VOX_TO_VOX, &ROT, [1, 1]),
+    ));
+    files.push((
+        "d.lta".into(),
+        lta_file(mu, t2, LINEAR_RAS_TO_RAS, &ROT, [1, 1]),
+    ));
+    files.push((
+        "di.lta".into(),
+        lta_file(t2, mu, LINEAR_RAS_TO_RAS, &ROT, [1, 1]),
+    ));
+    // without a morph: a destination LTA ending at the source LTA's source (FS-1188), or starting
+    // there
+    files.push((
+        "dm.lta".into(),
+        lta_file(mu, t, LINEAR_RAS_TO_RAS, &ROT, [1, 1]),
+    ));
+    files.push((
+        "dms.lta".into(),
+        lta_file(t, mu, LINEAR_RAS_TO_RAS, &ROT, [1, 1]),
+    ));
+    // --gcam0's destination LTAs: a conformed source (256^3 of 1 mm, header only), none conformed
+    let mut conf = mu.vg.clone();
+    (conf.width, conf.height, conf.depth) = (256, 256, 256);
+    (conf.xsize, conf.ysize, conf.zsize) = (1.0, 1.0, 1.0);
+    files.push((
+        "c.lta".into(),
+        lta_file_vg(&conf, &mu.vg, LINEAR_RAS_TO_RAS, &ROT, [1, 1]),
+    ));
+    // an SPM VBM deformation: each voxel an RAS point of the moving volume's space
+    {
+        let mut w = build(
+            &mut g,
+            &spec(
+                MRI_FLOAT,
+                [5, 4, 6, 3],
+                [1.0, 1.0, 1.0],
+                IDENT,
+                [0.0, 0.0, 0.0],
+            ),
+        );
+        let mut fs = Globals::new(UpstreamDefects::Fix);
+        let mut e = Vec::new();
+        for z in 0..6 {
+            for y in 0..4 {
+                for x in 0..5 {
+                    for f in 0..3 {
+                        let v = g.int(-14, 14) as f32 * 0.5;
+                        mri_set_vox_val(&mut fs, &mut e, &mut w, x, y, z, f, v, 0)
+                            .expect("a voxel");
+                    }
+                }
+            }
+        }
+        files.extend(write_as(&mut w, "w.nii"));
+    }
+    // the regseg segmentations: s1 on the target's grid, s2 smaller (FS-1185), s4 of a refused
+    // type (short), s3 none (FS-1193)
+    let mut r1 = regseg(&mut g, t, [t.vg.width, t.vg.height, t.vg.depth], MRI_UCHAR);
+    files.extend(write_as(&mut r1, "subjects/s1/mri/regseg.mgz"));
+    let mut r2 = regseg(&mut g, t, [3, 3, 2], MRI_UCHAR);
+    files.extend(write_as(&mut r2, "subjects/s2/mri/regseg.mgz"));
+    let mut r4 = regseg(&mut g, t, [t.vg.width, t.vg.height, t.vg.depth], MRI_SHORT);
+    files.extend(write_as(&mut r4, "subjects/s4/mri/regseg.nii.gz"));
+    // an array of two transforms (LTA::get_matrix refuses it)
+    {
+        let tt = tempfile::tempdir().expect("a temporary folder");
+        let mut fs = Globals::new(UpstreamDefects::Fix);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let mut lta = lta_alloc(&mut fs, &mut o, &mut e, 2, None).expect("an array");
+        lta.ltype = LINEAR_RAS_TO_RAS;
+        for k in 0..2 {
+            lta.xforms[k].ltype = LINEAR_RAS_TO_RAS;
+            lta.xforms[k].m_l = Some(matrix_of(&ROT));
+            get_vol_geom(&m.vg, &mut lta.xforms[k].src);
+            get_vol_geom(&t.vg, &mut lta.xforms[k].dst);
+        }
+        let env = Environment::default();
+        lta_write(
+            &mut fs,
+            &mut o,
+            &mut e,
+            &env,
+            Some(tt.path()),
+            &lta,
+            "x.lta",
+        )
+        .expect("written");
+        let b = std::fs::read(tt.path().join("x.lta")).expect("the file");
+        let b: Vec<u8> = String::from_utf8_lossy(&b)
+            .lines()
+            .map(|l| {
+                if l.starts_with("# created by") {
+                    "# created by probe on Sun Nov 22 00:00:00 2026".to_owned()
+                } else {
+                    l.to_owned()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+            .into_bytes();
+        files.push(("two.lta".into(), [b, b"\n".to_vec()].concat()));
     }
 }
 
@@ -460,7 +681,7 @@ const BASE_ENV: [&str; 2] = ["FREESURFER_HOME=@DIR@/fsh", "SUBJECTS_DIR=@DIR@/su
 
 /// The options that read the case's own FreeSurfer, subjects or FSL folders (the other cases get
 /// none of their files: fewer files to write, a quicker recorded test on Windows).
-const FOLDER_OPTIONS: [&str; 7] = [
+const FOLDER_OPTIONS: [&str; 9] = [
     "--fstarg",
     "--tal",
     "--talxfm",
@@ -468,6 +689,8 @@ const FOLDER_OPTIONS: [&str; 7] = [
     "--morph",
     "--inv-morph",
     "--noDefM3zPath",
+    "--m3z",
+    "--cost",
 ];
 
 /// A case line: the inputs' files and folders the arguments name, and the case's own folders when
@@ -1470,12 +1693,158 @@ fn prelude() -> Vec<String> {
         ],
     );
     add(&[], &with(&["--regheader", "--soap", "none.mgz", "2"]));
-    // paths not ported yet (relay 53)
-    add(&[], &with(&["--regheader", "--disp", "d.mgz"]));
-    add(&[], &with(&["--regheader", "--cost", "cost.txt"]));
+    out.extend(part2_cases(&i));
+    out
+}
+
+/// The fixed cases of part 2's paths (relay 54): the morphs, `--filter`, `--disp`, `--cost`,
+/// `--gcam`, `--spm-warp`, `--map-point`.
+fn part2_cases(i: &Inputs) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut add = |env: &[&str], a: &[&str]| out.push(line(env, i, &s(a)));
+    let base = ["--mov", "m.mgz", "--targ", "t.mgz", "--o", "o.mgz"];
+    let with = |extra: &[&'static str]| -> Vec<&'static str> {
+        let mut v = base.to_vec();
+        v.extend_from_slice(extra);
+        v
+    };
+    // --disp
     add(
         &[],
-        &["--mov", "m.mgz", "--s", "s1", "--morph", "--o", "o.mgz"],
+        &[
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--disp",
+            "d.mgz",
+        ],
+    );
+    add(&[], &with(&["--regheader", "--disp", "d.mgz"]));
+    add(&[], &with(&["--lta", "r.lta", "--disp", "d.nii.gz"]));
+    add(
+        &[],
+        &with(&[
+            "--lta", "r.lta", "--inv", "--disp", "d.mgz", "--rot", "5", "0", "2",
+        ]),
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--disp",
+            "nodir/d.mgz",
+        ],
+    );
+    // --cost
+    let costed = [
+        "--mov",
+        "m.mgz",
+        "--targ",
+        "t.mgz",
+        "--regheader",
+        "--o",
+        "o.mgz",
+    ];
+    let cost = |extra: &[&'static str]| -> Vec<&'static str> {
+        let mut v = costed.to_vec();
+        v.extend_from_slice(extra);
+        v
+    };
+    add(&[], &cost(&["--s", "s1", "--cost", "cost.txt"]));
+    add(
+        &[],
+        &cost(&["--s", "s1", "--cost", "cost.txt", "--cost-only"]),
+    );
+    add(
+        &[],
+        &cost(&[
+            "--s", "s1", "--cost", "cost.txt", "--trans", "1", "-2", "0.5", "--rot", "3", "0",
+            "-10",
+        ]),
+    );
+    add(
+        &[],
+        &cost(&["--s", "s1", "--cost", "outdir/c.txt", "--interp", "nearest"]),
+    );
+    add(&[], &cost(&["--s", "s1", "--cost", "nodir/c.txt"]));
+    add(&[], &cost(&["--s", "s2", "--cost", "cost.txt"]));
+    add(&[], &cost(&["--s", "s3", "--cost", "cost.txt"]));
+    add(&[], &cost(&["--s", "s4", "--cost", "cost.txt"]));
+    add(
+        &[],
+        &cost(&["--s", "s1", "--cost", "cost.txt", "--precision", "uchar"]),
+    );
+    add(&[], &cost(&["--cost", "cost.txt"]));
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t2.nii.gz",
+            "--regheader",
+            "--o",
+            "o.mgz",
+            "--s",
+            "s1",
+            "--cost",
+            "cost.txt",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "seg.mgz",
+            "--lta",
+            "seg.lta",
+            "--o",
+            "o.mgz",
+            "--s",
+            "s1",
+            "--cost",
+            "cost.txt",
+            "--cost-only",
+        ],
+    );
+    // the morphs
+    let morph = ["--mov", "m.mgz", "--s", "s1", "--morph", "--o", "o.mgz"];
+    let morphed = |extra: &[&'static str]| -> Vec<&'static str> {
+        let mut v = morph.to_vec();
+        v.extend_from_slice(extra);
+        v
+    };
+    add(&[], &morph);
+    add(&[], &morphed(&["--regheader"]));
+    add(&[], &morphed(&["--regheader", "--nearest"]));
+    add(&[], &morphed(&["--regheader", "--cubic"]));
+    add(&[], &morphed(&["--regheader", "--interp", "sinc"]));
+    add(&[], &morphed(&["--regheader", "--precision", "uchar"]));
+    add(&[], &morphed(&["--lta", "r.lta"]));
+    add(&[], &morphed(&["--regheader", "--save-reg"]));
+    add(&[], &morphed(&["--regheader", "--m3z", "xb.m3z"]));
+    add(&[], &morphed(&["--regheader", "--m3z", "none.m3z"]));
+    add(&[], &morphed(&["--regheader", "--m3z", "bad.m3z"]));
+    add(
+        &[],
+        &[
+            "--mov",
+            "mu.mgz",
+            "--s",
+            "s1",
+            "--morph",
+            "--o",
+            "o.mgz",
+            "--noDefM3zPath",
+            "--m3z",
+            "xb.m3z",
+        ],
     );
     add(
         &[],
@@ -1484,21 +1853,342 @@ fn prelude() -> Vec<String> {
             "m.mgz",
             "--s",
             "s1",
-            "--inv-morph",
+            "--morph",
             "--o",
             "o.mgz",
+            "--m3z",
+            "x.m3z",
+            "--noDefM3zPath",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m4.mgz",
+            "--s",
+            "s1",
+            "--morph",
+            "--o",
+            "o.mgz",
+            "--regheader",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "seg.mgz",
+            "--s",
+            "s1",
+            "--morph",
+            "--o",
+            "o.mgz",
+            "--regheader",
+            "--nearest",
+            "--filter",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--s",
+            "s1",
+            "--morph",
+            "--o",
+            "o.mgz",
+            "--regheader",
+            "--filter",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "mu.mgz",
+            "--s",
+            "s1",
+            "--morph",
+            "--o",
+            "o.mgz",
+            "--regheader",
+            "--filter",
+            "--m3z",
+            "xb.m3z",
+        ],
+    );
+    add(
+        &[],
+        &morphed(&["--regheader", "--s", "s1", "--cost", "cost.txt"]),
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--s",
+            "nosubj",
+            "--morph",
+            "--o",
+            "o.mgz",
+            "--regheader",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--mov",
+            "m.mgz",
+            "--morph",
+            "--o",
+            "o.mgz",
+            "--noDefM3zPath",
+            "--m3z",
+            "x.m3z",
             "--targ",
             "t.mgz",
         ],
     );
-    add(&[], &with(&["--regheader", "--m3z", "x.m3z"]));
+    // the inverse morph: the atlas-space volume (--targ) back onto the moving volume's grid
+    let inv = [
+        "--mov",
+        "m.mgz",
+        "--targ",
+        "t.mgz",
+        "--s",
+        "s1",
+        "--inv-morph",
+        "--o",
+        "o.mgz",
+    ];
+    let inverted = |extra: &[&'static str]| -> Vec<&'static str> {
+        let mut v = inv.to_vec();
+        v.extend_from_slice(extra);
+        v
+    };
+    add(&[], &inverted(&["--regheader"]));
+    add(&[], &inverted(&["--regheader", "--nearest"]));
+    add(&[], &inverted(&["--regheader", "--cubic"]));
+    add(&[], &inverted(&["--lta", "r.lta"]));
+    add(&[], &inverted(&["--regheader", "--rot", "4", "0", "0"]));
+    add(&[], &inverted(&["--regheader", "--m3z", "xb.m3z"]));
     add(
         &[],
-        &["--gcam", "m.mgz", "0", "0", "r.lta", "0", "1", "o.mgz"],
+        &[
+            "--mov",
+            "mu.mgz",
+            "--targ",
+            "t2.nii.gz",
+            "--s",
+            "s1",
+            "--inv-morph",
+            "--o",
+            "o.mgz",
+            "--regheader",
+            "--m3z",
+            "xb.m3z",
+            "--filter",
+        ],
     );
-    add(&[], &["--spm-warp", "m.mgz", "0", "w.nii", "1", "o.mgz"]);
+    add(&[], &inverted(&["--regheader", "--save-reg"]));
+    // --gcam mov srclta gcam dstlta vsm interp out
+    for a in [
+        ["m.mgz", "ta.lta", "a.m3z", "d.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "ta.lta", "a.m3z", "d.lta", "0", "0", "o.mgz"],
+        ["m.mgz", "ta.lta", "a.m3z", "d.lta", "0", "5", "o.mgz"],
+        ["m.mgz", "ta.lta", "a.m3z", "d.lta", "0", "2", "o.mgz"],
+        ["m.mgz", "ta.lta", "a.m3z", "d.lta", "0", "3", "o.nii.gz"],
+        ["m.mgz", "at.lta", "a.m3z", "di.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "ta.lta", "a.m3z", "0", "0", "1", "o.mgz"],
+        ["m.mgz", "ta.lta", "a.m3z", "d.lta", "vsm.mgz", "1", "o.mgz"],
+        ["m.mgz", "ta.lta", "a.m3z", "d.lta", "vsm.mgz", "0", "o.mgz"],
+        ["m.mgz", "ta.lta", "a.m3z", "d.lta", "m4.mgz", "1", "o.mgz"],
+        ["m.mgz", "ta.lta", "0", "dms.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "ta.lta", "0", "dm.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "ta.lta", "0", "d.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "0", "0", "r.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "0", "0", "rt.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "0", "0", "d.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "0", "0", "0", "0", "1", "o.mgz"],
+        ["m.mgz", "0", "a.m3z", "0", "0", "1", "o.mgz"],
+        ["m.mgz", "0", "a.m3z", "d.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "r.lta", "a.m3z", "d.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "ta.lta", "a.m3z", "r.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "ta.lta", "x.m3z", "d.lta", "0", "1", "o.mgz"],
+        ["m4.mgz", "0", "0", "r.lta", "0", "1", "o.mgz"],
+        ["m4.mgz", "0", "0", "r.lta", "0", "0", "o.mgz"],
+        ["none.mgz", "ta.lta", "a.m3z", "d.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "none.lta", "a.m3z", "d.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "ta.lta", "none.m3z", "d.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "ta.lta", "bad.m3z", "d.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "ta.lta", "a.m3z", "none.lta", "0", "1", "o.mgz"],
+        [
+            "m.mgz", "ta.lta", "a.m3z", "d.lta", "none.mgz", "1", "o.mgz",
+        ],
+        ["m.mgz", "ta.lta", "a.m3z", "d.lta", "0", "x", "o.mgz"],
+        ["m.mgz", "ta.lta", "a.m3z", "d.lta", "0", "1", "nodir/o.mgz"],
+    ] {
+        let mut v = vec!["--gcam"];
+        v.extend_from_slice(&a);
+        add(&[], &v);
+    }
+    // the phase-encoding directions (FS-1189) and the options before --gcam
+    for p in ["-2", "-1", "3", "1", "0", "4", "5"] {
+        add(
+            &[],
+            &[
+                "--vsm-pedir",
+                p,
+                "--gcam",
+                "m.mgz",
+                "ta.lta",
+                "a.m3z",
+                "d.lta",
+                "vsm.mgz",
+                "1",
+                "o.mgz",
+            ],
+        );
+    }
     add(
         &[],
+        &[
+            "--vsm-pedir",
+            "-2",
+            "--gcam",
+            "m.mgz",
+            "ta.lta",
+            "a.m3z",
+            "d.lta",
+            "0",
+            "1",
+            "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--vg-thresh",
+            "1000",
+            "--gcam",
+            "m.mgz",
+            "r.lta",
+            "a.m3z",
+            "d.lta",
+            "0",
+            "1",
+            "o.mgz",
+        ],
+    );
+    add(
+        &[],
+        &[
+            "--debug", "--gcam", "m.mgz", "0", "0", "r.lta", "0", "1", "o.mgz", "--foo",
+        ],
+    );
+    add(
+        &[],
+        &["--GCAM", "m.mgz", "0", "0", "r.lta", "0", "1", "o.mgz"],
+    );
+    // --gcam0 (and MY_MORPHS_DO_NOT_CONFORM_DEAL_WITH_IT)
+    for a in [
+        ["m.mgz", "ta.lta", "a.m3z", "c.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "at.lta", "a.m3z", "c.lta", "vsm.mgz", "1", "o.mgz"],
+        ["m.mgz", "0", "0", "c.lta", "0", "0", "o.mgz"],
+        ["m.mgz", "ta.lta", "a.m3z", "d.lta", "0", "1", "o.mgz"],
+        ["m.mgz", "ta.lta", "a.m3z", "0", "0", "1", "o.mgz"],
+        ["m.mgz", "ta.lta", "a.m3z", "none.lta", "0", "1", "o.mgz"],
+    ] {
+        let mut v = vec!["--gcam0"];
+        v.extend_from_slice(&a);
+        add(&[], &v);
+    }
+    let deal = ["MY_MORPHS_DO_NOT_CONFORM_DEAL_WITH_IT=1"];
+    add(
+        &deal,
+        &[
+            "--gcam", "m.mgz", "ta.lta", "a.m3z", "d.lta", "0", "1", "o.mgz",
+        ],
+    );
+    add(
+        &deal,
+        &[
+            "--gcam", "m.mgz", "ta.lta", "a.m3z", "c.lta", "0", "1", "o.mgz",
+        ],
+    );
+    // --spm-warp mov movlta warp interp out
+    for a in [
+        ["m.mgz", "0", "w.nii", "1", "o.mgz"],
+        ["m.mgz", "0", "w.nii", "0", "o.nii.gz"],
+        ["m4.mgz", "0", "w.nii", "1", "o.mgz"],
+        ["m.mgz", "r.lta", "w.nii", "1", "o.mgz"],
+        ["m.mgz", "rt.lta", "w.nii", "0", "o.mgz"],
+        ["m.mgz", "0", "w.nii", "2", "o.mgz"],
+        ["m.mgz", "0", "w.nii", "5", "o.mgz"],
+        ["m.mgz", "0", "w.nii", "x", "o.mgz"],
+        ["none.mgz", "0", "w.nii", "1", "o.mgz"],
+        ["m.mgz", "none.lta", "w.nii", "1", "o.mgz"],
+        ["m.mgz", "0", "none.nii", "1", "o.mgz"],
+        ["m.mgz", "0", "w.nii", "1", "nodir/o.mgz"],
+    ] {
+        let mut v = vec!["--spm-warp"];
+        v.extend_from_slice(&a);
+        add(&[], &v);
+    }
+    add(
+        &[],
+        &[
+            "--nearest",
+            "--spm-warp",
+            "m.mgz",
+            "0",
+            "w.nii",
+            "x",
+            "o.mgz",
+        ],
+    );
+    // --map-point a b c incoords lta outcoords outfile
+    for opt in ["--map-point", "--map-point-inv-lta"] {
+        for (a, b) in [
+            ("1", "1"),
+            ("1", "2"),
+            ("1", "3"),
+            ("2", "1"),
+            ("2", "2"),
+            ("2", "3"),
+            ("3", "1"),
+            ("3", "2"),
+            ("3", "3"),
+        ] {
+            add(&[], &[opt, "1.5", "-2", "3.25", a, "r.lta", b, "nofile"]);
+        }
+    }
+    for a in [
+        ["1", "2", "3", "1", "v.lta", "3", "pt.txt"],
+        ["10", "0", "-5", "3", "rt.lta", "2", "outdir/pt.txt"],
+        ["1", "2", "3", "2", "r.lta", "2", "nodir/pt.txt"],
+        ["1", "2", "3", "4", "r.lta", "2", "nofile"],
+        ["1", "2", "3", "2", "r.lta", "0", "nofile"],
+        ["1", "2", "3", "2", "two.lta", "2", "nofile"],
+        ["1", "2", "3", "2", "none.lta", "2", "nofile"],
+        ["1", "2", "3", "2", "nos.lta", "3", "nofile"],
+        ["1", "2", "3", "3", "nod.lta", "1", "nofile"],
+        ["1e3", "-0.0", "nan", "2", "r.lta", "2", "nofile"],
+        ["x", "2", "3", "2", "r.lta", "2", "nofile"],
+        ["1", "2", "3", "y", "r.lta", "2", "nofile"],
+        ["1", "2", "3", "2", "r.lta", "z", "nofile"],
+        ["1", "2", "3", "2", "f.mat", "2", "nofile"],
+        ["1", "2", "3", "1", "r.dat", "1", "nofile"],
+    ] {
+        let mut v = vec!["--map-point"];
+        v.extend_from_slice(&a);
+        add(&[], &v);
+    }
+    add(&[], &["--map-point", "1", "2", "3", "1", "r.lta", "2"]);
+    add(
+        &["-SUBJECTS_DIR"],
         &["--map-point", "1", "2", "3", "1", "r.lta", "2", "nofile"],
     );
     out
@@ -1604,13 +2294,123 @@ fn seeded(g: &mut Gen, i: &Inputs) -> String {
     line(&[], i, &args)
 }
 
-/// The cases of `seed`: the fixed ones, then seeded ones up to `n`.
+/// A seeded command line of part 2's paths (relay 54): a morph or its inverse (registration,
+/// morph, interpolation, `--filter`, `--cost`, `--disp`, `--save-reg`), `--gcam`/`--gcam0`,
+/// `--spm-warp` or `--map-point`.
+fn seeded2(g: &mut Gen, i: &Inputs) -> String {
+    let pick_s = |g: &mut Gen, xs: &[&str]| g.pick(xs).to_owned();
+    let mut args: Vec<String> = Vec::new();
+    match g.below(5) {
+        0 | 1 => {
+            let inv = g.chance(3);
+            if inv {
+                args.extend(s(&[
+                    "--mov",
+                    g.pick(&["m.mgz", "mu.mgz"]),
+                    "--targ",
+                    g.pick(&["t.mgz", "t2.nii.gz", "seg.mgz"]),
+                ]));
+                args.push("--inv-morph".into());
+            } else {
+                args.extend(s(&[
+                    "--mov",
+                    g.pick(&["m.mgz", "mu.mgz", "seg.mgz", "m4.mgz", "ms.nii.gz"]),
+                ]));
+                args.push("--morph".into());
+            }
+            args.extend(s(&[
+                "--s",
+                "s1",
+                "--o",
+                g.pick(&["o.mgz", "o.nii.gz", "outdir/o.mgz"]),
+            ]));
+            args.extend(s(g.pick(&[
+                &["--regheader"][..],
+                &["--lta", "r.lta"],
+                &["--regheader", "--rot", "2", "0", "1"],
+            ])));
+            if g.chance(2) {
+                args.extend(s(&["--m3z", g.pick(&["xb.m3z", "talairach.m3z"])]));
+            }
+            if g.chance(3) {
+                args.extend(s(g.pick(&[
+                    &["--nearest"][..],
+                    &["--cubic"],
+                    &["--trilin"],
+                    &["--interp", "sinc"],
+                ])));
+            }
+            for _ in 0..g.below(3) {
+                args.extend(s(g.pick(&[
+                    &["--filter"][..],
+                    &["--precision", "uchar"],
+                    &["--save-reg"],
+                    &["--cost", "cost.txt"],
+                    &["--disp", "d.mgz"],
+                    &["--mul", "2"],
+                    &["--trans", "1", "0", "-1"],
+                ])));
+            }
+        }
+        2 => {
+            args.push(pick_s(g, &["--gcam", "--gcam0"]));
+            args.push(pick_s(g, &["m.mgz", "m4.mgz"]));
+            args.push(pick_s(g, &["ta.lta", "at.lta", "0", "r.lta"]));
+            args.push(pick_s(g, &["a.m3z", "0", "x.m3z"]));
+            args.push(pick_s(
+                g,
+                &[
+                    "d.lta", "di.lta", "c.lta", "0", "r.lta", "dm.lta", "dms.lta",
+                ],
+            ));
+            args.push(pick_s(g, &["0", "vsm.mgz"]));
+            args.push(pick_s(g, &["0", "1", "3", "5"]));
+            args.push(pick_s(g, &["o.mgz", "o.nii"]));
+            if g.chance(3) {
+                args.splice(
+                    0..0,
+                    s(&["--vsm-pedir", g.pick(&["1", "2", "3", "-1", "-3"])]),
+                );
+            }
+        }
+        3 => {
+            args.push("--spm-warp".into());
+            args.push(pick_s(g, &["m.mgz", "m4.mgz", "mu.mgz", "seg.mgz"]));
+            args.push(pick_s(g, &["0", "r.lta", "rt.lta", "v.lta"]));
+            args.push("w.nii".into());
+            args.push(pick_s(g, &["0", "1"]));
+            args.push(pick_s(g, &["o.mgz", "o.nii.gz"]));
+        }
+        _ => {
+            args.push(pick_s(g, &["--map-point", "--map-point-inv-lta"]));
+            for _ in 0..3 {
+                args.push(format!("{}", g.int(-200, 200) as f64 * 0.125));
+            }
+            args.push(pick_s(g, &["1", "2", "3"]));
+            args.push(pick_s(
+                g,
+                &["r.lta", "v.lta", "rt.lta", "seg.lta", "lta.txt"],
+            ));
+            args.push(pick_s(g, &["1", "2", "3"]));
+            args.push(pick_s(g, &["nofile", "pt.txt"]));
+        }
+    }
+    line(&[], i, &args)
+}
+
+/// The cases of `seed`: the fixed ones, then seeded ones up to `n` (one in four of part 2's paths,
+/// from a generator of its own, so that the others are relay 53's).
 pub fn generate(seed: u64, n: usize) -> Vec<String> {
     let mut out = prelude();
     let i = base_inputs();
     let mut g = Gen::new(seed);
+    let mut g2 = Gen::new(seed ^ 0x2054_0002);
     while out.len() < n {
-        out.push(seeded(&mut g, &i));
+        if g2.chance(4) {
+            out.push(seeded2(&mut g2, &i));
+        } else {
+            out.push(seeded(&mut g, &i));
+        }
     }
     out.truncate(n);
     out
@@ -1732,6 +2532,75 @@ pub fn golden_cases() -> Vec<String> {
             "nan",
             "0",
             "0",
+        ],
+        // part 2 (relay 54): the morphs, --filter, --gcam, --gcam0, --spm-warp, --map-point,
+        // --disp, --cost
+        &[
+            "--mov",
+            "m.mgz",
+            "--s",
+            "s1",
+            "--morph",
+            "--regheader",
+            "--o",
+            "o.mgz",
+        ],
+        &[
+            "--mov",
+            "seg.mgz",
+            "--s",
+            "s1",
+            "--morph",
+            "--regheader",
+            "--nearest",
+            "--filter",
+            "--o",
+            "o.mgz",
+        ],
+        &[
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t.mgz",
+            "--s",
+            "s1",
+            "--inv-morph",
+            "--regheader",
+            "--o",
+            "o.mgz",
+        ],
+        &[
+            "--gcam", "m.mgz", "ta.lta", "a.m3z", "d.lta", "vsm.mgz", "1", "o.mgz",
+        ],
+        &[
+            "--gcam0", "m.mgz", "ta.lta", "a.m3z", "c.lta", "0", "5", "o.mgz",
+        ],
+        &["--spm-warp", "m.mgz", "r.lta", "w.nii", "1", "o.mgz"],
+        &[
+            "--map-point",
+            "1.5",
+            "-2",
+            "3.25",
+            "3",
+            "r.lta",
+            "1",
+            "pt.txt",
+        ],
+        &[
+            "--mov", "m.mgz", "--targ", "t.mgz", "--lta", "r.lta", "--disp", "d.mgz",
+        ],
+        &[
+            "--mov",
+            "m.mgz",
+            "--targ",
+            "t.mgz",
+            "--regheader",
+            "--o",
+            "o.mgz",
+            "--s",
+            "s1",
+            "--cost",
+            "cost.txt",
         ],
     ] {
         out.push(line(&[], &i, &s(a)));
@@ -1867,6 +2736,8 @@ pub fn mask_stdout(text: &str, args: &[String]) -> String {
             out.push("SynthSeed  <seed>".to_owned());
         } else if let Some(i) = l.find("VmPeak ") {
             out.push(format!("{}VmPeak <kB>", &l[..i]));
+        } else if l.starts_with("MRIvol2volGCAM: t=") {
+            out.push("MRIvol2volGCAM: t=<t>".to_owned());
         } else {
             out.push(l.to_owned());
         }
@@ -1874,8 +2745,13 @@ pub fn mask_stdout(text: &str, args: &[String]) -> String {
     out.join("\n")
 }
 
+/// The defects whose official result depends on memory contents (FreeSurfer reads memory it
+/// never wrote or does not own: `reproduce` fills it deterministically): the pseudo-notice
+/// `MEMORY`.
+const MEMORY: [&str; 5] = ["FS-931", "FS-1184", "FS-1185", "FS-1187", "FS-1192"];
+
 /// The port's line for a case line and the defects it noted (`dir`: an empty folder), with the
-/// pseudo-notices `CRASH` and `NOTPORTED`.
+/// pseudo-notices `CRASH`, `NOTPORTED` and `MEMORY`.
 pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Vec<&'static str>) {
     let c = parse(line);
     for (name, b) in &c.files {
@@ -1930,6 +2806,9 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
     }
     if String::from_utf8_lossy(&err).contains("is not ported yet") {
         ids.push("NOTPORTED");
+    }
+    if ids.iter().any(|x| MEMORY.contains(x)) {
+        ids.push("MEMORY");
     }
     (text, ids)
 }

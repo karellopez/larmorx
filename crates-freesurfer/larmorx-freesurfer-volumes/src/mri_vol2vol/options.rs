@@ -60,15 +60,6 @@ pub const USAGE: &str = include_str!("usage.txt");
 /// `print_help()`'s text after the usage and the version.
 pub const HELP: &str = include_str!("help.txt");
 
-/// A path not ported yet (relay 53): its message on standard error, status 1.
-pub fn not_ported(r: &mut Run, what: &str) -> Fatal {
-    let _ = writeln!(
-        r.err,
-        "larmorx-freesurfer: mri_vol2vol: {what} is not ported yet"
-    );
-    Fatal::Exit(1)
-}
-
 /// `mri_vol2vol`'s settings (its file-scope variables), FreeSurfer's defaults.
 pub struct Options {
     pub debug: bool,
@@ -931,16 +922,13 @@ pub fn parse_commandline(
                 let _ = writeln!(r.out, "  --spm-warp mov movlta warp interp out");
                 return Err(argnerr(r, option, 6));
             }
-            return Err(not_ported(
-                r,
-                "--spm-warp (MRIapplySpmWarp of an SPM deformation)",
-            ));
+            return super::standalone::spm_warp(g, r, o, rest);
         } else if istringnmatch(option, "--gcam", 0) || istringnmatch(option, "--gcam0", 0) {
             if nargc < 7 {
                 let _ = writeln!(r.out, "  --gcam mov srclta gcam dstlta vsm interp out");
                 return Err(argnerr(r, option, 7));
             }
-            return Err(not_ported(r, "--gcam (MRIvol2volGCAM)"));
+            return super::standalone::gcam(g, r, o, option, rest);
         } else if istringnmatch(option, "--map-point", 0)
             || istringnmatch(option, "--map-point-inv-lta", 0)
         {
@@ -949,7 +937,7 @@ pub fn parse_commandline(
                 let _ = writeln!(r.out, "  coords: 1=tkras, 2=scannerras, 3=vox");
                 return Err(argnerr(r, option, 7));
             }
-            return Err(not_ported(r, "--map-point (LTA::get_matrix)"));
+            return super::standalone::map_point(g, r, option, rest);
         } else {
             let _ = writeln!(r.err, "ERROR: Option {option} unknown");
             if singledash(option) {

@@ -52,14 +52,15 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 
 # FreeSurfer's result is undefined: CRASH (the port's status is one FreeSurfer's build reaches by
 # a signal: an abort, a division by 0, a crash; the official run's unflushed standard output is
-# lost); NOTPORTED (a path relay 53 of track A leaves for later)
-SKIP = ("CRASH", "NOTPORTED")
+# lost); NOTPORTED (a path not ported yet); MEMORY (FreeSurfer's result comes from memory contents:
+# FS-931, FS-1184, FS-1185, FS-1187, FS-1192)
+SKIP = ("CRASH", "NOTPORTED", "MEMORY")
 
 #: mri_vol2vol prints a seed it takes from the clock (``SynthSeed``, PDFtodSeed) unless --seed is
 #: given, and the crop's ``VmPeak``: what changes from run to run without changing the result
 #: (masked when the cache compares a fresh run with its entry); a case that draws noise from the
 #: clock seed (``--synth`` without ``--seed``) is never cached
-VOLATILE = (r"SynthSeed  -?\d+", r"VmPeak \d+")
+VOLATILE = (r"SynthSeed  -?\d+", r"VmPeak \d+", r"MRIvol2volGCAM: t=[ 0-9.]+")
 CLOCK = "mri_vol2vol --synth without --seed draws its noise from the clock (PDFtodSeed)"
 
 
@@ -121,6 +122,8 @@ def mask_stdout(text: str, args: list[str]) -> str:
             out.append("SynthSeed  <seed>")
         elif "VmPeak " in line:
             out.append(line[: line.index("VmPeak ")] + "VmPeak <kB>")
+        elif line.startswith("MRIvol2volGCAM: t="):
+            out.append("MRIvol2volGCAM: t=<t>")
         else:
             out.append(line)
     return "\n".join(out)

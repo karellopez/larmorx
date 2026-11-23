@@ -21,7 +21,8 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 ``mri_robust_register`` (``MRI_ROBUST_REGISTER_CASES``, 2026-11-22), ``mri_mask``
 (``MRI_MASK_CASES``, 2026-11-22), ``mri_cc`` (``MRI_CC_CASES``, 2026-11-23), ``fs_temp_file``
 (``FS_TEMP_FILE_CASES``, 2026-11-22), ``getfullpath`` (``GETFULLPATH_CASES``, 2026-11-22) and
-``mri_vol2vol`` (``MRI_VOL2VOL_CASES``, 2026-11-23).
+``mri_vol2vol`` (``MRI_VOL2VOL_CASES``, 2026-11-23; its morph and ``--gcam`` on the classic
+recording, relay 54).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -3136,7 +3137,20 @@ MRI_VOL2VOL_CASES = [
         ["--mov", "{mri}/nu.mgz", "--targ", "{mri}/rawavg.mgz", "--regheader", "--cubic",
          "--o", "out.mgz"],
     ),
+    # part 2 (relay 54), on the classic recording (mri_ca_register's talairach.m3z)
+    (
+        "morph",
+        ["--mov", "{mri}/norm.mgz", "--s", "sub-01", "--morph", "--o", "out.mgz"],
+    ),
+    (
+        "gcam",
+        ["--gcam", "{mri}/norm.mgz", "0", "{mri}/transforms/talairach.m3z", "0", "0", "1",
+         "out.mgz"],
+    ),
 ]  # fmt: skip
+
+#: The recording each case runs on (the v8 stream's unless named here).
+MRI_VOL2VOL_RUNS = {"morph": "ds000005-sub-01-classic", "gcam": "ds000005-sub-01-classic"}
 
 
 @pytest.mark.parametrize(("name", "args"), MRI_VOL2VOL_CASES)
@@ -3151,13 +3165,14 @@ def test_mri_vol2vol_replica_needs_no_more_memory_than_freesurfer(tmp_path, name
     home = ws / FS_HOME if ws else None
     exe = home / "bin" / "mri_vol2vol" if home else None
     subj = (
-        ws / "oracles" / "freesurfer-8.2.0" / "runs" / "ds000005-sub-01-v8" / "subjects" / "sub-01"
+        ws / "oracles" / "freesurfer-8.2.0" / "runs"
+        / MRI_VOL2VOL_RUNS.get(name, "ds000005-sub-01-v8") / "subjects" / "sub-01"
         if ws
         else None
     )  # fmt: skip
     mri = subj / "mri" if subj else None
-    if exe is None or not exe.is_file() or not (mri / "nu.mgz").is_file():
-        pytest.skip("FreeSurfer 8.2.0 or the ds000005 v8 recording was not found")
+    if exe is None or not exe.is_file() or not (mri / "norm.mgz").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
     if not Path("/usr/bin/time").is_file():
         pytest.skip("/usr/bin/time was not found")
     words = [a.format(mri=mri, home=home) for a in args]
@@ -3182,14 +3197,14 @@ def test_mri_vol2vol_replica_needs_no_more_memory_than_freesurfer(tmp_path, name
         return reset
 
     o_dir = tmp_path / "freesurfer"
-    # the noise seed mri_vol2vol prints comes from the clock
+    # the noise seed mri_vol2vol prints comes from the clock; --gcam prints its time
     code, fs_mib = _original_peak(
         ["mri_vol2vol", *words],
         env,
         "freesurfer",
         fresh(o_dir),
         o_dir,
-        (r"SynthSeed  -?\d+",),
+        (r"SynthSeed  -?\d+", r"MRIvol2volGCAM: t=[ 0-9.]+"),
         "freesurfer",
     )
     assert code == 0

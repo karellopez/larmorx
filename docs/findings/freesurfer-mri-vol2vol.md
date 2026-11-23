@@ -3,7 +3,9 @@
 **Closed to FreeSurfer clean-room implementers** (written from FreeSurfer's source:
 `mri_vol2vol/mri_vol2vol.cpp`, `utils/chklc.cpp`, `utils/mri2.cpp`; the behaviour is
 `specs/mri_vol2vol.md`). Track A, relay 53 (part 1: every option's reading and checks and the
-linear paths). The replica: `crates-freesurfer/larmorx-freesurfer-volumes/src/mri_vol2vol/`.
+linear paths) and relay 54 (part 2, §6: the morphs, `--gcam`, `--spm-warp`, `--map-point`,
+`--disp`, `--cost`; also `utils/transform.cpp`, `utils/gcamorph.cpp`, `utils/gca.cpp`,
+`utils/mrifilter.cpp`). The replica: `crates-freesurfer/larmorx-freesurfer-volumes/src/mri_vol2vol/`.
 
 ## 1. The defects (their texts: `larmorx_core::defects`; the register's rows in the handoff)
 
@@ -106,7 +108,91 @@ case with `DIAG_NO` or `--gdiagno` other than `0` or `-1`.
 
 ## 5. Measured
 
-- Probe (`validation/probes/fs-vol2vol/`): seed 1, 400 cases: 387 identical with `reproduce`, 13
-  `SKIP` (5 crashes, 8 paths of part 2), 0 different; `fix` differs on 91, each with a notice; seed
-  2, 1,500 cases: 1,487 identical, 13 `SKIP`, 0 different, `fix` 208, each with a notice.
-- The recorded calls: see the record (`docs/validation/freesurfer-mri-vol2vol.md`).
+- Probe (`validation/probes/fs-vol2vol/`), relay 53 (part 1): seed 1, 400 cases: 387 identical
+  with `reproduce`, 13 `SKIP` (5 crashes, 8 paths of part 2), 0 different; seed 2, 1,500 cases:
+  1,487 identical, 13 `SKIP`, 0 different. Relay 54 (part 2): the record
+  (`docs/validation/freesurfer-mri-vol2vol.md`).
+- The recorded calls: see the record.
+
+## 6. Part 2 (relay 54)
+
+### 6.1 The defects
+
+- **FS-1184** (`--map-point`): `double a,b,c; int incoords, outcoords;` are locals read with
+  `sscanf` whose return is not checked: a word that is not a number leaves stack contents
+  (measured: `--map-point 1 2 3 y r.lta 2 nofile` prints `intype=246765545`, `... z ...`
+  `outtype=30104`). Rule B: by default an error at the word; `reproduce` 0 (the probe's `MEMORY`).
+- **FS-1185** (`SegRegCost`, `utils/transform.cpp` 4664): `// Should check that f and regseg have
+  consistent dims`: the loops run over `f`'s extent and read `MRIgetVoxVal(regseg, c, r, s, 0)`:
+  a smaller segmentation is read past its rows (the next rows' voxels), slices and slice table
+  (memory). Measured: s2's 3 x 3 x 2 segmentation against a 5 x 6 x 4 output gave 12 white-matter
+  voxels in FreeSurfer, 6 with the replica's zeros. Rule B by default.
+- **FS-1186**: `fp = fopen(SegRegCostFile,"a")` is not checked; `fprintf(NULL, ...)` crashes
+  (measured: signal 11). Rule B.
+- **FS-1187**: `main`'s `double costs[8]` is not initialised and `SegRegCost`'s refusals (`return
+  (NULL)` before writing it) are not checked: the line holds stack contents (measured: `0.6932`,
+  `0.3343`, `0.2000` among zeros). Rule B by default (status 1, nothing appended).
+- **FS-1188** (`MRIvol2volGCAM`, `mri_vol2vol.cpp` 2514-2526): the branch without a morph reads
+  `if(vg_isEqual(&dstlta->xforms[0].dst, &srcltacopy->xforms[0].src)) InvertDstLTA=0; if(vg_isEqual(
+  &dstlta->xforms[0].src, ...)) InvertDstLTA=1; else { error }`: the second `if` lacks its `else`,
+  so a destination LTA whose destination matches (the first test's case) reaches the error. Rule
+  A: by default the first match is kept (measured: `--gcam m.mgz ta.lta 0 dm.lta 0 1 o.mgz` refused
+  by FreeSurfer, written by the replica's default).
+- **FS-1189** (`MRIvol2volGCAM` 2600-2601): `if(pedir<0) dvsm *= dvsm; crsSrc->rptr[pedir][1] +=
+  dvsm;`: a negative direction squares the shift (a sign change was meant) and indexes the row
+  pointers at a negative place (inside the matrix's header: measured signal 11 for -1, -2, -3);
+  0 reads the null `rptr[0]` (signal 11), 4 the homogeneous coordinate (overwritten by the next
+  `MatrixMultiply`: no effect, measured identical), 5 and more past the row table (signal 11). The
+  program's global `pedir` (2 by default, `--vsm-pedir`, `--vsm`'s second word) is the one read
+  before `--gcam`. Rule A for -1..-3 (the sign, as `MRIvol2VolVSM`'s `FSIGN(pedir)`), rule B for
+  the others.
+- **FS-1190** (`MRIvol2volGCAM0`): `vgdst_src = &(dstlta->xforms[0].src)` with `dstlta` NULL (`0`, or
+  `LTAread`'s NULL: `--gcam` does not check `dstlta`'s read): signal 11. Rule B.
+- **FS-1191**: `sprintf(gcamfile, "%s/%s/mri/transforms/%s", ...)` and `sprintf(gcamfile, "%s",
+  m3zfile)` into the global `char gcamfile[1000]` (fortified: abort 134). The whole name by default.
+- **FS-1192** (`MRImodeFilter`, `utils/mrifilter.cpp` 5712): `histo = calloc(max_val + 1, ...)`
+  with `max_val = (int)ceil(fmax)`, indexed by `nint(value)` and `start_val` (the voxel's value
+  truncated): values below -0.5 index before the array (heap memory: `histo[start_val]` reads
+  allocator data, `histo[val]++` corrupts it); NaN gives `INT_MIN`. Measured: different labels on
+  a morphed intensity volume with negative values (cases 297, 529 of seed 1), and `CRASH 6`
+  (`free()` detecting the corruption) for an inverse morph of a float volume with `--filter`. Rule
+  A by default (bins below 0).
+- **FS-1193**: `fspec = IDnameFromStem(tmpstr)` (NULL when no file matches) is passed to `MRIread`,
+  which crashes on the null name (signal 11). Rule B.
+- **FS-931** in this program: the sinc interpolation of the inverse morph gives a first voxel whose
+  `val` (`GCAMmorphFromAtlas`'s uninitialised `double`) the official build leaves non-zero
+  (seed 2's case 586: an `o.mgz` of 110 bytes against the replica's 106); counted as memory.
+
+### 6.2 Behaviours that are not defects (kept)
+
+- **The inverse morph ignores the registration.** `GCAMapplyTransform(gcam, Rtransform)` moves the
+  nodes after `GCAMinvert` made the inverse's index volumes, and `GCAMmorphFromAtlas` samples
+  through those (the transform type of `Rtransform` is `calloc`'s 0, `LINEAR_VOX_TO_VOX`, so
+  `TransformSample` converts its RAS LTA). With `gcam->gca` set (`gcaAllocMax(1, 1, 1, <in's
+  extent>, 0, 0)`), `GCAMmorphFromAtlas` maps each voxel by `GCAsourceVoxelToPriorReal`
+  (`TransformSample` of the morph, then the prior grid of the default coronal geometry, clamped):
+  every voxel is written. Measured: the same output with `--regheader`, `--lta r.lta` and `--rot`.
+- **The forward morph ignores `R` too** (`Rtransform` is made and not used): identical outputs for
+  every registration in the probe.
+- **`--filter` keeps only frame 0** (`MRIclone` of the source, then frame 0 set): a multi-frame
+  morph output loses its other frames' values. Not a defect (a label volume has one frame).
+- **`SegRegCost` returns 0** (`return (0)`, its `costs` pointer intended): the caller ignores it.
+- **`--spm-warp`'s `argnerr(option, 6)`** asks for 6 arguments where it needs 5 (message only;
+  kept).
+- **`MRIvol2volGCAM`'s `dstlta` of `TransformRegDat2LTA(&gcam->atlas, &gcam->atlas, NULL)`**: the
+  atlas to itself, voxel to voxel (the identity).
+
+### 6.3 The library pieces added
+
+- fs.gca `ltamatrix.rs`: `LTA::get_matrix` (`transform.cpp` 66-148: the `VOL_GEOM` methods of
+  `include/mri.h` 213-218 through `MRIxfmCRS2XYZ`, `MRIxfmCRS2XYZtkreg`, `VGras2tkreg`,
+  `VGtkreg2RAS`), `SegRegCost`, `MRIaffineDisplacment` (its differences `float - float` widened to
+  `double`: a first form subtracting in `double` made 6 probe outputs differ by one ulp).
+- fs.gca `transform.rs`: `GCAMapplyTransform` (`gcamorph.cpp` 9762; the `MORPH_3D_TYPE` tail is not
+  ported, no program the port runs reaches it) and `transform_sample_gcam` (the morph half of
+  `TransformSample`, split out); `gca.rs`: `GCAsourceVoxelToPriorReal`'s end (`gca.cpp` 21878);
+  `morph.rs`: `GCAMmorphFromAtlas`'s `gcam->gca` branch (`gcamorph.cpp` 3927-3931).
+- fs.filter `mode.rs` (track D's crate, a new file): `MRImodeFilter`.
+- The real heads (`real.py`'s classic calls): `--morph` of `norm.mgz` 4.9 s against FreeSurfer's
+  2.7 s (548 against 582 MB), `--inv-morph` 28.9 s against 28.2 s (1,090 against 1,832 MB), outputs
+  identical (ds000005 classic).

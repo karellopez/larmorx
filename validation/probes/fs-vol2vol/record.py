@@ -68,7 +68,8 @@ def main(argv: list[str] | None = None) -> int:
             )  # fmt: skip
     payload = {
         "name": NAME,
-        "tool": "mri_vol2vol (FreeSurfer 8.2.0), part 1: the linear paths",
+        "tool": "mri_vol2vol (FreeSurfer 8.2.0): every path (part 1 the linear ones, part 2 the "
+        "morphs, --gcam, --spm-warp, --map-point, --disp, --cost)",
         "status": "experimental",
         "larmorx_commit": stamp,
         "generated": datetime.date.today().isoformat(),
@@ -76,7 +77,8 @@ def main(argv: list[str] | None = None) -> int:
         "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_vol2vol/), "
         "the larmorx-freesurfer program",
         "reference": "FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mri_vol2vol) and "
-        "its recon-all runs (oracles/freesurfer-8.2.0/runs/: the v8 stream's scripts' calls)",
+        "its recon-all runs (oracles/freesurfer-8.2.0/runs/: the v8 stream's scripts' calls, the "
+        "classic stream's morphs)",
         "probe": [
             {
                 "set": f"seed {p['seed']}" if p["seed"] is not None else "golden",
@@ -85,7 +87,9 @@ def main(argv: list[str] | None = None) -> int:
                 "different": p["reproduce_differ"],
                 "skipped": p["skipped"],
                 "skipped_why": {
-                    k: v for k, v in p["reproduce_notices"].items() if k in ("CRASH", "NOTPORTED")
+                    k: v
+                    for k, v in p["reproduce_notices"].items()
+                    if k in ("CRASH", "NOTPORTED", "MEMORY")
                 },
                 "fix_different_with_notice": p["fix_differ"] - p["fix_differ_without_notice"],
                 "fix_different_without_notice": p["fix_differ_without_notice"],
@@ -95,17 +99,19 @@ def main(argv: list[str] | None = None) -> int:
         "real": real,
         "golden_sha256": {"official_and_reproduce": a.golden, "fix": a.golden_fix},
         "memory": memory,
-        "not_ported_yet": "the morphs (--morph, --inv-morph, --m3z), --gcam, --spm-warp, "
-        "--map-point, --disp, --cost: part 2 (relay 54)",
+        "not_ported_yet": "nothing (GCAMapplyTransform's tail for a morph applied to a morph, "
+        "which mri_vol2vol never reaches)",
     }
     a.out.mkdir(parents=True, exist_ok=True)
     (a.out / f"{NAME}.json").write_text(json.dumps(payload, indent=1) + "\n", encoding="utf-8")
     lines = [
-        "# Validation: FreeSurfer's `mri_vol2vol` (replica, part 1)",
+        "# Validation: FreeSurfer's `mri_vol2vol` (replica)",
         "",
         f"Status `experimental`. Generated {payload['generated']} on {payload['platform']} from "
-        f"commit `{stamp}` with `validation/probes/fs-vol2vol/record.py` (queue item 3.2-38, "
-        "part 1: every option's reading and checks and every linear path; "
+        f"commit `{stamp}` with `validation/probes/fs-vol2vol/record.py` (queue item 3.2-38: "
+        "part 1, track A relay 53, every option's reading and checks and every linear path; "
+        "part 2, relay 54, the morphs and their inverse, `--filter`, `--gcam`/`--gcam0`, "
+        "`--spm-warp`, `--map-point`, `--disp`, `--cost`; not ported: "
         f"{payload['not_ported_yet']}).",
         "",
         f"- **Replica:** {payload['replica']} (`larmorx-freesurfer [--upstream-defects "
@@ -122,7 +128,10 @@ def main(argv: list[str] | None = None) -> int:
             "(`fs-synthmorph-reg`'s check, `mri_mcadura_seg`'s priors, crops and segmentations, "
             "`mri_vsinus_seg`'s prior and segmentation) on each head's own files (the scripts' "
             "temporary inputs made again by the official programs, or the head's volumes of the "
-            "same kind), and fMRIPrep's `--mov aseg.mgz --targ <T1w> --lta <lta> --interp nearest` "
+            "same kind), fMRIPrep's `--mov aseg.mgz --targ <T1w> --lta <lta> --interp nearest`, "
+            "and on the classic runs (whose `talairach.m3z` is `mri_ca_register`'s morph) "
+            "`norm.mgz` and `aseg.mgz` (nearest) onto the atlas (`--morph`), `norm.mgz` through "
+            "`--gcam` and the morphed `norm.mgz` back (`--inv-morph`) "
             f"({', '.join(real['runs'])}; by kind: {kinds}): {real['calls']} calls, `reproduce` "
             f"{real['reproduce_identical']} identical to the official program (exit status, both "
             f"streams, every file byte for byte), the default {real['fix_identical']}.",
@@ -140,10 +149,16 @@ def main(argv: list[str] | None = None) -> int:
         "`--keep-precision`, `--kernel`, `--delta`, the fills and `--downsample`, the voxel shift "
         "map, `--no-resample` and the slice operations, `--mul`, `--save-reg`, `--reg-final`, "
         "`--rot`, `--trans`, `--shear`, `--seed`, `--fstarg`, `--tal`, `--mni152reg`, `--crop`, "
-        "`--soap`; then seeded command lines. Each case in one folder (with its own FreeSurfer, "
-        "subjects and FSL folders where an option reads them); exit status, both streams and "
-        "every file written, case by case; counted apart: FreeSurfer's crashes and the paths of "
-        "part 2:",
+        "`--soap`; part 2's `--disp`, `--cost` (its segmentations, their failures), the morphs "
+        "and their inverse (every registration and method, `--m3z`, `--noDefM3zPath`, "
+        "`--filter`, morphs with nodes outside the image and an invalid node), `--gcam` and "
+        "`--gcam0` (every chain of LTAs, morph and voxel shift map, each refusal, the "
+        "phase-encoding directions), `--spm-warp`, `--map-point` (every pair of coordinate "
+        "kinds, both directions, each failure); then seeded command lines (one in four of part "
+        "2's paths). Each case in one folder (with its own FreeSurfer, subjects and FSL folders "
+        "where an option reads them); exit status, both streams and every file written, case by "
+        "case; counted apart: FreeSurfer's crashes (CRASH) and results it takes from memory "
+        "contents (MEMORY: FS-931, FS-1184, FS-1185, FS-1187, FS-1192):",
         "",
     ]
     for p in payload["probe"]:
@@ -158,17 +173,21 @@ def main(argv: list[str] | None = None) -> int:
         "",
         "## Golden cases",
         "",
-        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_vol2vol_golden.rs`: 10 cases "
+        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_vol2vol_golden.rs`: 19 cases "
         "on volumes up to 32^3 (the v8 scripts' four forms, fMRIPrep's, the voxel-to-RAS rewrite "
         "with `--save-reg` from a register.dat, a moving volume with NaN voxels by trilinear and "
-        "cubic resampling, NaN in the output and in the registration), on every platform: "
+        "cubic resampling, NaN in the output and in the registration; a morph onto its atlas "
+        "and back, a segmentation morphed and mode-filtered, `--gcam` with a voxel shift map, "
+        "`--gcam0` by cubic B-spline, an SPM warp, `--map-point` into a file, `--disp`, "
+        "`--cost`), on every platform: "
         f"`reproduce` `{a.golden}` (the official program's "
         f"value on the same inputs, `check.py --golden`), `fix` `{a.golden_fix}`.",
         "",
         "## Memory",
         "",
         "`tests/parity/test_memory_peak.py::test_mri_vol2vol_replica_needs_no_more_memory_than_"
-        "freesurfer` (ds000005 sub-01's v8 volumes read in place, one thread; the rule: at most "
+        "freesurfer` (ds000005 sub-01's v8 volumes, and its classic run's for the morph and "
+        "`--gcam`, read in place, one thread; the rule: at most "
         "10 % above FreeSurfer's peak plus 8 MiB; the output identical byte for byte):",
         "",
     ]

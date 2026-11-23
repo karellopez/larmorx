@@ -18,7 +18,11 @@ own volumes of the same kind (``nu.mgz``; ``aseg.mgz`` taken onto the crop's gri
 ``vsinus.mgz``). And fMRIPrep's call (sMRIPrep's ``ApplyVolTransform``: ``--mov aseg.mgz --targ
 <T1w> --lta <fsnative-to-T1w> --interp nearest --o seg.nii.gz``) on the same heads, its transform
 the inverse of ``rawavg2orig.lta`` (official ``lta_convert --invert``) and the T1w ``rawavg.mgz``.
-Each call: the official program through the oracle-output cache (one thread,
+And part 2's non-linear paths (relay 54) on the recorded classic runs (``*-classic``), whose
+``talairach.m3z`` is ``mri_ca_register``'s morph: ``norm.mgz`` onto the atlas (``--morph``),
+``aseg.mgz`` by nearest neighbour (``--morph --nearest``), ``norm.mgz`` through ``--gcam`` (no LTAs:
+the atlas as the output grid) and the morphed ``norm.mgz`` (made by the official program) back onto
+the head (``--inv-morph``). Each call: the official program through the oracle-output cache (one thread,
 ``FS_DISABLE_LANG=1``), the port (``--port <larmorx-freesurfer>``) with ``reproduce`` and
 ``fix``, each in a folder of its own; exit status, both streams (the noise seed and ``VmPeak``
 masked) and the files written compared byte for byte.
@@ -46,7 +50,7 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 
 #: mri_vol2vol prints a seed it takes from the clock (``SynthSeed``, PDFtodSeed) unless --seed is
 #: given, and the crop's ``VmPeak``: what changes from run to run without changing the result
-VOLATILE = (r"SynthSeed  -?\d+", r"VmPeak \d+")
+VOLATILE = (r"SynthSeed  -?\d+", r"VmPeak \d+", r"MRIvol2volGCAM: t=[ 0-9.]+")
 POLICY = oracle_cache.Policy(threads=1, family="freesurfer", formats="freesurfer",
                              volatile=VOLATILE)  # fmt: skip
 CACHED = oracle_cache.Policy(threads=1, family="freesurfer", formats="freesurfer")
@@ -55,6 +59,7 @@ CACHED = oracle_cache.Policy(threads=1, family="freesurfer", formats="freesurfer
 def mask(text: str, args: list[str]) -> str:
     seeded = any(a.lower() == "--seed" for a in args)
     text = re.sub(r"VmPeak \d+", "VmPeak <kB>", text)
+    text = re.sub(r"MRIvol2volGCAM: t=[ 0-9.]+", "MRIvol2volGCAM: t=<t>", text)
     if not seeded:
         text = re.sub(r"SynthSeed  -?\d+", "SynthSeed  <seed>", text)
     return text
@@ -67,7 +72,41 @@ def files(d: Path) -> dict[str, bytes]:
 def official(exe: Path, args: list[str], env: dict, d: Path, runner: str) -> oracle_cache.Completed:
     policy = POLICY if exe.name == "mri_vol2vol" else CACHED
     return oracle_cache.run([exe.name, *args], env=env, cwd=d, outputs=[d], policy=policy,
-                            timeout=600, runner=runner)  # fmt: skip
+                            timeout=1200, runner=runner)  # fmt: skip
+
+
+def compare(port: Path, exe: Path, env: dict, work: Path, run: str, name: str,
+            args: list[str]) -> dict:  # fmt: skip
+    """One call: the official program, the port with ``reproduce`` and ``fix``, each in a folder
+    of its own; the row (identical or not, the notices of ``fix``)."""
+    outs = {}
+    for side in ("official", "reproduce", "fix"):
+        d = work / run / name / side
+        if d.exists():
+            shutil.rmtree(d)
+        d.mkdir(parents=True)
+        if side == "official":
+            done = official(exe, args, env, d, "fs-vol2vol-real")
+            rc, so, se = done.returncode, done.stdout, done.stderr
+            ids: list[str] = []
+        else:
+            p = subprocess.run([str(port), "--upstream-defects", side, "freesurfer",
+                                "mri_vol2vol", *args], env=env, cwd=d,
+                               capture_output=True, text=True, timeout=1200,
+                               check=False)  # fmt: skip
+            lines = p.stderr.splitlines()
+            se = "".join(x + "\n" for x in lines if not x.startswith("larmorx:"))
+            ids = sorted({m[1] for x in lines
+                          for m in [re.match(r"larmorx: upstream defect (\S+)", x)] if m})  # fmt: skip
+            rc, so = p.returncode, p.stdout
+        outs[side] = (rc, mask(so, args), mask(se, args), files(d), ids)
+    o = outs["official"][:4]
+    row = {"run": run, "call": name, "status": outs["official"][0],
+           "reproduce": outs["reproduce"][:4] == o, "fix": outs["fix"][:4] == o,
+           "fix_notices": outs["fix"][4]}  # fmt: skip
+    print(json.dumps(row), flush=True)
+    shutil.rmtree(work / run / name)
+    return row
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -75,6 +114,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--port", type=lambda s: Path(s).resolve(), required=True)
     ap.add_argument("--json", type=Path)
     ap.add_argument("--runs", nargs="*", help="the v8 runs (default: all)")
+    ap.add_argument("--classic", nargs="*", help="the classic runs (default: all)")
     a = ap.parse_args(argv)
     ws = workspace()
     fsh = ws / FS_HOME
@@ -83,7 +123,16 @@ def main(argv: list[str] | None = None) -> int:
            "OMP_NUM_THREADS": "1", "FS_DISABLE_LANG": "1", "USER": "probe",
            **freesurfer_env()}  # fmt: skip
     runs_dir = ws / "oracles" / "freesurfer-8.2.0" / "runs"
-    runs = a.runs or sorted(p.name for p in runs_dir.iterdir() if p.name.endswith("-v8"))
+    runs = (
+        a.runs
+        if a.runs is not None
+        else sorted(p.name for p in runs_dir.iterdir() if p.name.endswith("-v8"))
+    )
+    classic = (
+        a.classic
+        if a.classic is not None
+        else sorted(p.name for p in runs_dir.iterdir() if p.name.endswith("-classic"))
+    )
     work = ws / "oracles" / "inputs" / "fs-vol2vol-real"
     avg = fsh / "average"
     rows = []
@@ -150,38 +199,39 @@ def main(argv: list[str] | None = None) -> int:
                                          f"seg.{h}.uncropped.mgz"]),
             ]  # fmt: skip
         for name, args in calls:
-            outs = {}
-            for side in ("official", "reproduce", "fix"):
-                d = work / run / name / side
-                if d.exists():
-                    shutil.rmtree(d)
-                d.mkdir(parents=True)
-                if side == "official":
-                    done = official(exe, args, env, d, "fs-vol2vol-real")
-                    rc, so, se = done.returncode, done.stdout, done.stderr
-                    ids: list[str] = []
-                else:
-                    p = subprocess.run([str(a.port), "--upstream-defects", side, "freesurfer",
-                                        "mri_vol2vol", *args], env=env, cwd=d,
-                                       capture_output=True, text=True, timeout=600,
-                                       check=False)  # fmt: skip
-                    lines = p.stderr.splitlines()
-                    se = "".join(x + "\n" for x in lines if not x.startswith("larmorx:"))
-                    ids = sorted({m[1] for x in lines
-                                  for m in [re.match(r"larmorx: upstream defect (\S+)", x)] if m})  # fmt: skip
-                    rc, so = p.returncode, p.stdout
-                outs[side] = (rc, mask(so, args), mask(se, args), files(d), ids)
-            o = outs["official"][:4]
-            row = {"run": run, "call": name, "status": outs["official"][0],
-                   "reproduce": outs["reproduce"][:4] == o, "fix": outs["fix"][:4] == o,
-                   "fix_notices": outs["fix"][4]}  # fmt: skip
-            rows.append(row)
-            print(json.dumps(row), flush=True)
-            shutil.rmtree(work / run / name)
+            rows.append(compare(a.port, exe, env, work, run, name, args))
+        shutil.rmtree(inter)
+    for run in classic:
+        subj = next(p for p in (runs_dir / run / "subjects").iterdir() if p.name != "fsaverage")
+        mri = subj / "mri"
+        env["SUBJECTS_DIR"] = str(subj.parent)
+        inter = work / run / "inter"
+        if inter.exists():
+            shutil.rmtree(inter)
+        inter.mkdir(parents=True)
+        done = official(exe, ["--mov", str(mri / "norm.mgz"), "--s", subj.name, "--morph", "--o",
+                              "norm.morphed.mgz"], env, inter, "fs-vol2vol-real-morphed")  # fmt: skip
+        if done.returncode != 0:
+            raise SystemExit(f"{run}: the official morph: {done.stderr}")
+        m3z = str(mri / "transforms" / "talairach.m3z")
+        calls = [
+            ("morph-norm", ["--mov", str(mri / "norm.mgz"), "--s", subj.name, "--morph", "--o",
+                            "norm.morphed.mgz"]),
+            ("morph-aseg", ["--mov", str(mri / "aseg.mgz"), "--s", subj.name, "--morph",
+                            "--nearest", "--o", "aseg.morphed.mgz"]),
+            ("gcam-norm", ["--gcam", str(mri / "norm.mgz"), "0", m3z, "0", "0", "1",
+                           "norm.gcam.mgz"]),
+            ("inv-morph-norm", ["--mov", str(mri / "norm.mgz"), "--targ",
+                                str(inter / "norm.morphed.mgz"), "--s", subj.name,
+                                "--inv-morph", "--o", "norm.back.mgz"]),
+        ]  # fmt: skip
+        for name, args in calls:
+            rows.append(compare(a.port, exe, env, work, run, name, args))
         shutil.rmtree(inter)
     summary = {
         "calls": len(rows),
         "runs": runs,
+        "classic": classic,
         "reproduce_identical": sum(r["reproduce"] for r in rows),
         "fix_identical": sum(r["fix"] for r in rows),
         "fix_differ_without_notice": sum(not r["fix"] and not r["fix_notices"] for r in rows),

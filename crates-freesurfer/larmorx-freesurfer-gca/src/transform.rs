@@ -488,49 +488,102 @@ pub fn transform_sample(
     zv: f32,
 ) -> Result<(i32, [f32; 3]), Fatal> {
     if t.is_morph() {
-        let gcam = t.gcam();
-        let Some((xi_m, yi_m, zi_m)) = index_extents(gcam) else {
-            return Ok((not_inverted(g, err), [0.0; 3]));
-        };
-        let xv = clamp_to(xv, xi_m.vg.width);
-        let yv = clamp_to(yv, yi_m.vg.height);
-        let zv = clamp_to(zv, zi_m.vg.depth);
-        let clampi = |v: i32, n: i32| {
-            if v < 0 {
-                0
-            } else if v >= n {
-                n - 1
-            } else {
-                v
-            }
-        };
-        let xi = clampi(nint(g, f64::from(xv)), xi_m.vg.width);
-        let yi = clampi(nint(g, f64::from(yv)), yi_m.vg.height);
-        let zi = clampi(nint(g, f64::from(zv)), zi_m.vg.depth);
-        let spacing = gcam.spacing as f32;
-        // FreeSurfer's nearest index values, overwritten by the trilinear samples below (their
-        // nint conversions only)
-        for m in [xi_m, yi_m, zi_m] {
-            let v = mri_get_vox_val(g, err, m, xi, yi, zi, 0, 0)?;
-            let _ = nint(g, f64::from(sse::mul(v, spacing)));
-        }
-        let (mut xd, mut yd, mut zd) = (0.0, 0.0, 0.0);
-        let (x, y, z) = (f64::from(xv), f64::from(yv), f64::from(zv));
-        sample_volume(g, err, xi_m, x, y, z, &mut xd);
-        sample_volume(g, err, yi_m, x, y, z, &mut yd);
-        sample_volume(g, err, zi_m, x, y, z, &mut zd);
-        let p = [
-            sse::mul(xd as f32, spacing),
-            sse::mul(yd as f32, spacing),
-            sse::mul(zd as f32, spacing),
-        ];
-        return Ok((NO_ERROR, p));
+        return transform_sample_gcam(g, err, t.gcam(), xv, yv, zv);
     }
     let lta = t.lta_mut();
     to_vox2vox(g, out, err, env, lta)?;
     let m = first(g, err, lta, "TransformSample")?.m_l.as_ref();
     let p = apply(g, out, err, m, xv, yv, zv)?;
     Ok((NO_ERROR, p))
+}
+
+/// [`transform_sample`]'s morph part (`TransformSample` of a `MORPH_3D_TYPE` transform holding
+/// `gcam`): the point clamped into the inverse's index volumes, their values at it sampled
+/// trilinearly (`MRIsampleVolume`) times the spacing (`float`); a morph without an inverse:
+/// [`transform_sample`]'s message and its code.
+pub fn transform_sample_gcam(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    gcam: &Gcam,
+    xv: f32,
+    yv: f32,
+    zv: f32,
+) -> Result<(i32, [f32; 3]), Fatal> {
+    let Some((xi_m, yi_m, zi_m)) = index_extents(gcam) else {
+        return Ok((not_inverted(g, err), [0.0; 3]));
+    };
+    let xv = clamp_to(xv, xi_m.vg.width);
+    let yv = clamp_to(yv, yi_m.vg.height);
+    let zv = clamp_to(zv, zi_m.vg.depth);
+    let clampi = |v: i32, n: i32| {
+        if v < 0 {
+            0
+        } else if v >= n {
+            n - 1
+        } else {
+            v
+        }
+    };
+    let xi = clampi(nint(g, f64::from(xv)), xi_m.vg.width);
+    let yi = clampi(nint(g, f64::from(yv)), yi_m.vg.height);
+    let zi = clampi(nint(g, f64::from(zv)), zi_m.vg.depth);
+    let spacing = gcam.spacing as f32;
+    // FreeSurfer's nearest index values, overwritten by the trilinear samples below (their
+    // nint conversions only)
+    for m in [xi_m, yi_m, zi_m] {
+        let v = mri_get_vox_val(g, err, m, xi, yi, zi, 0, 0)?;
+        let _ = nint(g, f64::from(sse::mul(v, spacing)));
+    }
+    let (mut xd, mut yd, mut zd) = (0.0, 0.0, 0.0);
+    let (x, y, z) = (f64::from(xv), f64::from(yv), f64::from(zv));
+    sample_volume(g, err, xi_m, x, y, z, &mut xd);
+    sample_volume(g, err, yi_m, x, y, z, &mut yd);
+    sample_volume(g, err, zi_m, x, y, z, &mut zd);
+    let p = [
+        sse::mul(xd as f32, spacing),
+        sse::mul(yd as f32, spacing),
+        sse::mul(zd as f32, spacing),
+    ];
+    Ok((NO_ERROR, p))
+}
+
+/// `GCAMapplyTransform(gcam, transform)` (`utils/gcamorph.cpp` 9762-9800): every node's current
+/// and original positions (x slowest, then y, then z) moved through the transform
+/// ([`transform_sample`] of each position narrowed to `float`; the results stored back). A morph
+/// transform then has FreeSurfer recompute the morph's properties and remove its negative nodes
+/// (`GCAMremoveNegativeNodes`): not ported yet (no program the port runs applies a morph to a
+/// morph): `larmorx-freesurfer: GCAMapplyTransform of a morph is not ported yet` and status 1.
+/// `NO_ERROR`.
+pub fn gcam_apply_transform(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    env: &Environment,
+    gcam: &mut Gcam,
+    transform: &mut Transform,
+) -> Result<i32, Fatal> {
+    for x in 0..gcam.width.max(0) {
+        for y in 0..gcam.height.max(0) {
+            for z in 0..gcam.depth.max(0) {
+                let n = gcam.node(x, y, z);
+                let (px, py, pz) = (n.x as f32, n.y as f32, n.z as f32);
+                let (ox, oy, oz) = (n.origx as f32, n.origy as f32, n.origz as f32);
+                let (_, p) = transform_sample(g, out, err, env, transform, px, py, pz)?;
+                let (_, o) = transform_sample(g, out, err, env, transform, ox, oy, oz)?;
+                let n = gcam.node_mut(x, y, z);
+                (n.x, n.y, n.z) = (f64::from(p[0]), f64::from(p[1]), f64::from(p[2]));
+                (n.origx, n.origy, n.origz) = (f64::from(o[0]), f64::from(o[1]), f64::from(o[2]));
+            }
+        }
+    }
+    if transform.is_morph() {
+        let _ = writeln!(
+            err,
+            "larmorx-freesurfer: GCAMapplyTransform of a morph is not ported yet"
+        );
+        return Err(Fatal::Exit(1));
+    }
+    Ok(NO_ERROR)
 }
 
 /// `TransformSampleReal(transform, xv, yv, zv, ...)`: as [`transform_sample`], a morph's index

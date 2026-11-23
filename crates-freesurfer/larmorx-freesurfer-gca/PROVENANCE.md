@@ -108,10 +108,15 @@ NaN a sum of two keeps); `TransformCreateDensityMap` of a transform that could n
 
 | FreeSurfer 8.2.0 | Functions | Module |
 |---|---|---|
-| `utils/gcamorph.cpp` 3900-3955, 4313-4484, 5336-5367, 9900-9934 | `GCAMmorphFromAtlas` (its inverse path: no morph read from a file has an atlas), `GCAMmorphToAtlas`, `GCAMmorphToAtlasWithDensityCorrection`, `GCAMsampleInverseMorph`, `gcamCreateJacobianImage` (FS-930, FS-931, FS-932) | `morph.rs` |
+| `utils/gcamorph.cpp` 3900-3955, 4313-4484, 5336-5367, 9900-9934 | `GCAMmorphFromAtlas` (its path without an atlas; the atlas's: relay 54, below), `GCAMmorphToAtlas`, `GCAMmorphToAtlasWithDensityCorrection`, `GCAMsampleInverseMorph`, `gcamCreateJacobianImage` (FS-930, FS-931, FS-932) | `morph.rs` |
 | `utils/gcamorph.cpp` 7647-7659, 16269-16522 | `GCAMfreeInverse`, `GCAMconcat2` (into the second morph, `TransformConcat`'s call), `GCAMconcat3`, `GCAMfillInverse` (FS-934, FS-935, FS-936, FS-17) | `concat.rs` |
 | `utils/transform.cpp` 2660-2734, 4122-4135, 5026-5090 | the morph branches of `TransformApplyType`, `TransformApply`, `TransformApplyInverse`, `TransformApplyInverseType`, `TransformCreateDensityMap`; `TransformConcat`, `TransformInvertReplace` | `transform.rs` |
 | `utils/gcamorph.cpp` 5274-5320 | `GCAMsampleMorph`'s NaN point outside the nodes (FS-933: both modes end the program) | `transform.rs` |
+| `utils/transform.cpp` 66-148; `include/mri.h` 213-218 (queue item 3.2-38 part 2, track A relay 54, for `mri_vol2vol --map-point`) | `LTA::get_matrix` (the `VOL_GEOM` methods `get_Vox2RAS`, `get_RAS2Vox`, `get_Vox2TkregRAS`, `get_TkregRAS2Vox`, `get_RAS2TkregRAS`, `get_TkregRAS2RAS` as the calls they make) | `ltamatrix.rs` |
+| `utils/transform.cpp` 4664-4742, 4750-4795 (3.2-38 part 2, relay 54, for `mri_vol2vol --cost`, `--disp`) | `SegRegCost` (FS-1185), `MRIaffineDisplacment` | `ltamatrix.rs` |
+| `utils/gcamorph.cpp` 9762-9800 (3.2-38 part 2, relay 54, for `mri_vol2vol --inv-morph`) | `GCAMapplyTransform` (its `MORPH_3D_TYPE` tail not ported yet: no program the port runs reaches it); `TransformSample`'s morph half as `transform_sample_gcam` | `transform.rs` |
+| `utils/gca.cpp` 21878-21943 (3.2-38 part 2, relay 54) | `GCAsourceVoxelToPriorReal`'s end (the template point to the prior grid, clamped) | `gca.rs` |
+| `utils/gcamorph.cpp` 3927-3931 (3.2-38 part 2, relay 54) | `GCAMmorphFromAtlas`'s branch for a morph holding an atlas (`gcam->gca`: `mri_vol2vol --inv-morph`'s `gcaAllocMax`) | `morph.rs` |
 | `utils/gcamorph.cpp` 16526-16588 (track A relay 47, `mri_convert --downsample2` of a morph) | `GCAMdownsample2` | `gcam.rs` |
 
 Relay 43 also: `GCAMmorphToAtlas`' OpenMP loop runs as one thread does (the voxels are independent; the messages and

@@ -2555,13 +2555,16 @@ value beyond the `int` range or NaN is FS-12 here too (clamped by default, NaN t
   noted; `reproduce` as FreeSurfer (**(observed)**: `vdil`; `vrules20`, the segmentation as its own mask with and
   without 0 in the list, a mask of another extent).
 - `MRIsegStats(seg, segid, mri, frame, ...)`: returns the count of the voxels (over `seg`'s extent, columns outermost)
-  whose `(int)` frame-0 label is `segid`; of `mri`'s `frame` values there: `min` and `max` (`float`, from the first;
-  both 0 when there is none), `range = max - min` (`float`), `mean = (float)(sum / n)` (0 for none) with `sum = sum + v`
+  whose `(int)` frame-0 label is `segid`; of `mri`'s `frame` values there: `min` and `max` (`float`s; both 0 when
+  there is no such voxel; the first matching value starts both, then every value, the first included, is compared
+  with them as below), `range = max - min` (`float`), `mean = (float)(sum / n)` (0 for none) with `sum = sum + v`
   and `sum2 = v v + sum2` in `double`, and for `n > 1` `std = (float)sqrt(((double)((float)n * mean * mean) - (double)(mean
   + mean) * sum + sum2) / (n - 1))` (the `float` products left to right; 0 otherwise). Of two NaN operands the left
   one's survives in each operation as written here. The values are compared as `min > v` and `max < v` (the
-  `float` widened), so a NaN value never replaces them but enters the sums (**(observed)**: `vdil`; `vrules20`, one
-  voxel, none, NaN values).
+  `float` widened), so a NaN value after the first never replaces them but enters the sums (`mean` and `std` NaN,
+  `min`, `max` and `range` those of the other values), and a NaN first value keeps both NaN to the end (all five
+  NaN) (**(observed)**: `vdil`; `vrules20`, one voxel, none, NaN values, among them a NaN first value; `vrules21`, a
+  NaN third value after two of 1).
 - `HISTOseg(seg, segid, vol, bmin, bmax, bdelta)`: `nbins = (int)(round((bmax - bmin) / bdelta) + 1)` (`round` half away
   from zero; FS-12 for the conversion, so a NaN width gives 0 bins by default and -2147483648 with `reproduce`),
   `HISTOinit(NULL, nbins, bmin, bmax)` (`specs/freesurfer-maths.md` §5; a negative count ends the program with `error:

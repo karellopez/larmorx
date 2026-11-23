@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The comparison loop of ``specs/freesurfer-volume.md`` §69 (parts 1 to 6c): seeded cases of every
+"""The comparison loop of ``specs/freesurfer-volume.md`` §69 (parts 1 to 9, §54 to §57): seeded cases of every
 group, run on the probe ``fs_volume_probe`` (FreeSurfer 8.2.0's volume functions, a black box) and on
 a candidate program that takes the same commands (README.md beside this file), compared line by
 line.
@@ -4593,6 +4593,244 @@ class Gen16(Gen15):
         L.append(f"maskup {src} 0 null 1 0 0")
         return [Batch("vrules18", "vrules18", L)]
 
+    def p9bvol(self, r: random.Random, d, t: int, nf: int, special: float = 0.0) -> str:
+        """A volume of the extent, type and frames (``p9vol``; no frames: one value, no voxels)."""
+        if nf == 0:
+            return self.lab(self.rgeo(r, d), [0.0] if t == 3 else [0], t=t, nf=0)
+        return self.p9vol(r, d, t, nf, special=special)[0]
+
+    def p9bmaskv(self, r: random.Random, d, nan: float = 0.1) -> str:
+        """``W P`` of a float mask of the extent: values 0, 1, 0.5, 2, -1, a NaN."""
+        pool = [0.0, 0.0, 1.0, 1.0, 1.0, 0.5, 2.0, -1.0]
+        vals = [QNAN if r.random() < nan else r.choice(pool) for _ in range(d[0] * d[1] * d[2])]
+        return f"{self.lab(self.rgeo(r, d), vals, t=3)} 0"
+
+    def vcov(self) -> list[Batch]:
+        """§42: MRIcovarianceMatrix and MRIpca (uchar, int, long, float, short and ushort volumes
+        of up to 4 x 4 x 3 voxels and 1 to 4 frames, a few without frames; masks of 0, 0.5, 1, 2,
+        -1 and NaN, of the volume's extent or, in a tenth, another); PrintPCAStats and
+        WritePCAStats (0 to 6 values, special ones among them; standard output, a file, a folder
+        that does not exist); MRIfdr2vwth (0 to 3 float inputs, frames 0 to one past, masks,
+        outputs none, the input itself or a volume, rates 0.01 to 0.5, signs -1, 0 and 1, log10
+        or not, debug, the lists passed or not; a few inputs or outputs of another type or extent)."""
+        r = self.rng("vcov")
+        L = []
+        types = [0, 1, 2, 3, 3, 3, 4, 10]
+
+        def dims(hi: int = 4):
+            return (r.randint(1, hi), r.randint(1, hi), r.randint(1, 3))
+
+        for cmd, count in (("cov", 110), ("mpca", 110)):
+            for _ in range(count):
+                d = dims()
+                nf = r.choice([1, 2, 2, 3, 4]) if r.random() < 0.96 else 0
+                v = self.p9bvol(r, d, r.choice(types), nf, special=0.03 if cmd == "cov" else 0.0)
+                mk = "null"
+                if r.random() < 0.6:
+                    mk = self.p9bmaskv(r, d if r.random() < 0.9 else dims())
+                L.append(f"{cmd} {v} 0 {mk}")
+        for _ in range(60):
+            n = r.choice([0, 1, 2, 3, 3, 4, 6])
+            vals = []
+            for _ in range(n):
+                k = r.random()
+                if k < 0.08:
+                    vals.append(f"{r.choice(SPECIAL):08x}")
+                elif k < 0.2:
+                    vals.append(f32(0.0))
+                else:
+                    vals.append(f32(r.uniform(-5.0, 60.0)))
+            mode = r.choice([0, 0, 0, 1, 1, 2])
+            L.append(f"pcast {n} {' '.join(vals)}{' ' if vals else ''}{mode}")
+        for _ in range(130):
+            n = r.choice([1, 1, 1, 2, 2, 3]) if r.random() < 0.97 else 0
+            lg = r.choice([0, 1])
+            parts = []
+            for _ in range(n):
+                d = dims()
+                nf = r.choice([1, 1, 2])
+                cnt = d[0] * d[1] * d[2] * nf
+                vals: list = []
+                for _ in range(cnt):
+                    k = r.random()
+                    if k < 0.03:
+                        vals.append(QNAN)
+                    elif k < 0.08:
+                        vals.append(0.0)
+                    elif lg:
+                        vals.append(r.uniform(-6.0, 6.0))
+                    else:
+                        vals.append(r.choice([1.0, -1.0]) * r.uniform(0.0, 1.0) ** 3)
+                t = 3 if r.random() < 0.97 else r.choice([0, 1, 4])
+                if t != 3:
+                    vals = [int(v) if isinstance(v, float) else 0 for v in vals]
+                w = self.lab(self.rgeo(r, d), vals, t=t, nf=nf)
+                frame = r.choice([0] * 6 + [nf - 1, nf])
+                mk = "null"
+                if r.random() < 0.5:
+                    mk = self.p9bmaskv(r, d if r.random() < 0.93 else dims(), nan=0.05)
+                q = r.random()
+                if q < 0.3:
+                    out = "new"
+                elif q < 0.5:
+                    out = "self"
+                else:
+                    od = d if r.random() < 0.94 else dims()
+                    ot = 3 if r.random() < 0.95 else 1
+                    zero = [0.0] if ot == 3 else [0]
+                    out = self.lab(self.rgeo(r, od), zero * (od[0] * od[1] * od[2]), t=ot)
+                parts.append(f"{w} 0 {frame} {mk} {out}")
+            fdr = f64(r.choice([0.01, 0.05, 0.05, 0.1, 0.2, 0.5]))
+            sign = r.choice([-1, 0, 1, 1])
+            dbg = 1 if r.random() < 0.3 else 0
+            pm = 1 if r.random() < 0.85 else 0
+            po = 1 if r.random() < 0.85 else 0
+            body = " ".join(parts)
+            L.append(f"fdr {n} {body}{' ' if body else ''}{fdr} {sign} {lg} {dbg} {pm} {po}")
+        return [Batch("vcov", "vcov", L)]
+
+    def vvoxel(self) -> list[Batch]:
+        """§44: MRIvoxelDx, Dy, Dz, MRIvoxelMean, MRIvoxelDirection and
+        MRIvoxelGradientDir2ndDerivative at a point (one per line, so that a point whose results
+        depend on memory hides no other) of uchar, int, long, float, short, ushort and float
+        complex volumes of up to 7 x 7 x 6 voxels and 1 or 2 frames: windows -3 to 8 that stay
+        inside the far faces (FS-485's windows past them read entries never written, whose
+        contents change from process to process in ways the four runs do not always show: not
+        in the probe), points inside or up to 3 before the near faces and, rarely,
+        about 500 before them; frames 0 to one past."""
+        r = self.rng("vvoxel")
+        L = []
+        types = [0, 1, 2, 3, 3, 3, 3, 4, 10, 7]
+        for _ in range(420):
+            d = (r.randint(1, 7), r.randint(1, 7), r.randint(1, 6))
+            nf = r.choice([1, 1, 2])
+            t = r.choice(types)
+            if t == 7:
+                vals = self.fvals(r, 2 * d[0] * d[1] * d[2] * nf, special=0.02, lo=-50.0, hi=100.0)
+                v = self.lab(self.rgeo(r, d), vals, t=3, nf=nf).split(" ")
+                v[3] = "7"
+                v = " ".join(v)
+            else:
+                v = self.p9vol(r, d, t, nf, special=0.03)[0]
+            w = r.choice([3, 3, 3, 3, 1, 0, 2, 5, 5, 7, 8, -1, -3])
+            h = max(int(w / 2), 0)  # C's division
+            if any(d[a] - 1 - h < 0 for a in range(3)):
+                w, h = r.choice([1, 0, -1, -3, 8]), 0  # a window that fits (8: the refused size)
+            hi = [d[a] - 1 - h for a in range(3)]  # the last place whose window stays inside
+            q = r.random()
+            if q < 0.02:
+                p = [-r.randint(500, 503) for _ in range(3)]
+            elif q < 0.9:
+                p = [r.randint(0, hi[a]) for a in range(3)]
+            else:
+                p = [r.randint(-3, hi[a]) for a in range(3)]
+            f = r.choice([0] * 8 + [nf - 1, nf])
+            L.append(f"vxn {v} 0 1 {p[0]} {p[1]} {p[2]} {w} {f}")
+        return [Batch("vvoxel", "vvoxel", L)]
+
+    def vrules19(self) -> list[Batch]:
+        """§42's and §44's fixed cases (relay 17): FS-483's counts (a mask of 0.5 only, of one 0.5
+        beside a 1, a NaN); a covariance and a PCA without frames (FS-484); a PCA of fewer voxels
+        than frames, of rank 1, of zeros; PrintPCAStats of no values, zeros, a NaN, an infinity, into
+        a file and a missing folder; MRIfdr2vwth's refusals in their order, no input, no matching
+        voxel, NaN p-values, the fallback threshold, log10 with and without outputs, the signs with
+        zeros; the MRIvoxel* measures with windows -1 to 5 that stay inside the far faces and 8; the
+        second derivative of a float complex volume (the samples the trilinear sampler refuses) and
+        of a flat one; frames one past and before; column -500 (FS-323)."""
+        L = []
+        g = self.plain((2, 2, 1))
+
+        def fl(geo, vals, nf=1):
+            return self.lab(geo, vals, t=3, nf=nf)
+
+        two = fl(g, [1.0, 2.0, 3.0, 4.0, 0.5, -1.0, 2.5, 8.0], nf=2)
+        for mvals in ([0.5] * 4, [1.0, 0.5, 0.0, QNAN], [1.0] * 4, [0.0, 0.0, 0.0, 1.0]):
+            mk = fl(g, mvals)
+            L.append(f"cov {two} 0 {mk} 0")
+            L.append(f"mpca {two} 0 {mk} 0")
+        nofr = self.lab(g, [0.0], t=3, nf=0)
+        L.append(f"cov {nofr} 0 null")
+        L.append(f"mpca {nofr} 0 null")
+        one = self.plain((1, 1, 1))
+        L.append(f"cov {fl(one, [1.0, QNAN, 3.0], nf=3)} 0 null")
+        # fewer voxels than frames; rank 1 (equal frames); zeros; a 3 x 3 x 1 volume of 3 frames
+        L.append(
+            f"mpca {fl(self.plain((2, 1, 1)), [1.0, 2.0, 3.0, 5.0, 7.0, 1.0, 2.0, 4.0], nf=4)} 0 null"
+        )
+        L.append(f"mpca {fl(g, [1.0, 2.0, 3.0, 4.0] * 3, nf=3)} 0 null")
+        L.append(f"mpca {fl(g, [0.0] * 8, nf=2)} 0 null")
+        g9 = self.plain((3, 3, 1))
+        L.append(f"mpca {fl(g9, [float((7 * i) % 11 - 3) for i in range(27)], nf=3)} 0 null")
+        # PrintPCAStats and WritePCAStats
+        for vals, mode in (
+            ([], 0),
+            ([0.0, 0.0, 0.0], 0),
+            ([3.0, 2.0, 1.0], 0),
+            ([3.0, 2.0, 1.0], 1),
+            ([3.0, 2.0, 1.0], 2),
+            ([QNAN, 1.0], 0),
+            (["7f800000", 1.0], 0),
+            ([-2.0, 1e-3, 123456.7], 1),
+        ):
+            enc = [v if isinstance(v, str) else f32(v) for v in vals]
+            L.append(f"pcast {len(vals)} {' '.join(enc)}{' ' if enc else ''}{mode}")
+        # MRIfdr2vwth
+        g4 = self.plain((4, 1, 1))
+        p4 = fl(g4, [0.001, -0.02, 0.3, 0.004])
+        z = f64(0.05)
+        L.append(f"fdr 1 {p4} 0 1 null new {z} 0 0 1 1 1")  # frame past the frames
+        L.append(f"fdr 1 {self.lab(g4, [1, 2, 3, 4], t=1)} 0 0 null new {z} 0 0 1 1 1")  # int input
+        L.append(f"fdr 1 {p4} 0 0 null {self.lab(g4, [0, 0, 0, 0], t=1)} {z} 0 0 1 1 1")
+        L.append(f"fdr 1 {p4} 0 0 null {fl(self.plain((2, 2, 1)), [0.0] * 4)} {z} 0 0 1 1 1")
+        L.append(f"fdr 1 {p4} 0 0 {fl(self.plain((2, 2, 1)), [1.0] * 4)} 0 new {z} 0 0 1 1 1")
+        # the second input refused: the first's checks passed, nothing written
+        L.append(f"fdr 2 {p4} 0 0 null self {p4} 0 3 null new {z} 0 0 1 1 1")
+        L.append(f"fdr 0 {z} 0 0 1 1 1")  # no input
+        L.append(f"fdr 1 {p4} 0 0 null self {z} 1 0 1 1 1")  # sign +1: one value below 0 left out
+        neg = fl(g4, [-0.001, -0.02, -0.3, -0.004])
+        L.append(f"fdr 1 {neg} 0 0 null self {z} 1 0 1 1 1")  # no matching voxel
+        zs = fl(g4, [0.0, -0.0, 0.01, -0.01])
+        for sign in (-1, 0, 1):
+            L.append(f"fdr 1 {zs} 0 0 null self {z} {sign} 0 1 1 1")
+        nanp = fl(g4, [0.002, QNAN, 0.001, 0.04])
+        L.append(f"fdr 1 {nanp} 0 0 null self {z} 0 0 1 1 1")
+        L.append(f"fdr 1 {fl(g4, [QNAN, 0.5, QNAN, 0.001])} 0 0 null self {z} 0 0 1 1 1")
+        big = fl(g4, [0.9, 0.95, 0.8, 0.99])
+        L.append(f"fdr 1 {big} 0 0 null self {f64(0.01)} 0 0 1 1 1")  # the fallback 0.9 p[0]
+        lgv = fl(g4, [3.0, -2.5, 0.5, 6.0])
+        L.append(f"fdr 1 {lgv} 0 0 null new {z} 0 1 1 1 0")  # log10, no outputs passed
+        L.append(f"fdr 1 {lgv} 0 0 null self {z} 0 1 1 1 1")
+        mk4 = fl(g4, [1.0, 0.5, 0.49, QNAN])
+        L.append(f"fdr 1 {lgv} 0 0 {mk4} 0 {fl(g4, [9.0] * 4)} {z} -1 1 1 1 1")
+        L.append(f"fdr 1 {lgv} 0 0 {mk4} 0 {fl(g4, [9.0] * 4)} {z} 1 1 1 0 1")  # masks not passed
+        two4 = fl(g4, [0.01, 0.02, 0.03, 0.04, 0.5, 0.001, 0.2, 0.0001], nf=2)
+        L.append(f"fdr 2 {two4} 0 1 null self {p4} 0 0 null new {f64(0.2)} 0 0 1 1 1")
+        # §44: a 5 x 5 x 5 ramp with a bump
+        g5 = self.plain((5, 5, 5))
+        ramp = [
+            float(x + 2 * y + 3 * z + (5 if (x, y, z) == (2, 2, 2) else 0))
+            for z in range(5)
+            for y in range(5)
+            for x in range(5)
+        ]
+        rv = fl(g5, ramp)
+        # windows that stay inside the far faces (FS-485's windows past them read entries never
+        # written, whose contents change from process to process in ways the four runs do not
+        # always show: not in the probe)
+        pts = [(2, 2, 2, 3), (2, 2, 2, 5), (0, 0, 0, 3), (1, 1, 1, 2), (2, 2, 2, -1), (2, 2, 2, 8)]
+        L.append(f"vxn {rv} 0 {len(pts)} " + " ".join(f"{x} {y} {z} {w} 0" for x, y, z, w in pts))
+        flat = fl(g5, [4.0] * 125)
+        L.append(f"vxn {flat} 0 2 2 2 2 3 0 1 1 1 5 0")
+        # a float complex volume: the gradients of its real parts; the second derivative's samples
+        # are the nearest one (0, its error) and trilinear ones the sampler refuses (the 0 kept)
+        cx = fl(g5, [v for x in ramp for v in (x, -x)]).split(" ")
+        cx[3] = "7"
+        L.append(f"vxn {' '.join(cx)} 0 2 2 2 2 3 0 1 2 2 3 0")
+        L.append(f"vxn {rv} 0 2 2 2 2 3 1 2 2 2 3 -1")  # frames one past and before
+        L.append(f"vxn {rv} 0 1 -500 2 2 1 0")
+        L.append(f"vxn {rv} 0 1 -500 2 2 3 0")  # the window reaches past the x table (FS-323)
+        return [Batch("vrules19", "vrules19", L)]
+
 
 GROUPS = [
     "vgblock",
@@ -4647,6 +4885,9 @@ GROUPS = [
     "vregion",
     "vrules17",
     "vrules18",
+    "vcov",
+    "vvoxel",
+    "vrules19",
 ]
 
 # ---- running ------------------------------------------------------------------------------------

@@ -15,14 +15,16 @@ use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
 /// Recorded 2026-11-22 from the official program (`check.py --seed 1 --n 120`); re-recorded
-/// 2026-11-23 (relay 45: the entropy images ported, the 17 entropy cases after the prelude): 120
-/// cases, 100 lines identical (18 of them `--cost ROBENT`), 8 hashed as `SKIP`, 12 as `NOTPORTED`
-/// (the ten Powell costs, `--debug` and `--test`); the entropy image's time masked as the
-/// registration's.
+/// 2026-11-23 (relay 45: the entropy images ported, the 17 entropy cases after the prelude); and
+/// again 2026-11-23 (relay 46: the Powell registration's `LS`, `NCC`, `TB`, `LNCC` and `SAD`
+/// ported) from the official program with the decided `cabs` and `csqrt` preloaded (`check.py
+/// --preload`, `decided_complex.sh`: the user's D4 decision, which the port's matrix square roots
+/// follow). 120 cases, 105 lines identical, 8 hashed as `SKIP`, 7 as `NOTPORTED` (`MI`, `NMI`,
+/// `ECC`, `SCR`, `SB`, `--debug` and `--test`). The Powell family: `fs_robreg_powell_official.rs`.
 const N: usize = 120;
-const OFFICIAL_SHA256: &str = "58843f03d42190d5c2e5088c23ec57878c48d32d5a28a54089013f4b84a61d94";
+const OFFICIAL_SHA256: &str = "7676ef6d88cffd44c6f1e86668f136f31e2cb1a14ea964e49f17a7af010c2bb4";
 const SKIPPED: usize = 8;
-const NOT_PORTED: usize = 12;
+const NOT_PORTED: usize = 7;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 22] = [

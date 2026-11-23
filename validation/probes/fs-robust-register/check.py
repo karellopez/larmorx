@@ -76,6 +76,11 @@ TIME = re.compile(r"Registration took \d+ minutes and \d+ seconds\.")
 # only (the cache's policy keeps TIME alone, so the recorded official runs stay its entries)
 ENTROPY_TIME = re.compile(r" Entropy computation took \d+ seconds\.")
 
+#: ``--preload``: a library for the official program's ``LD_PRELOAD`` (``decided_complex.sh``'s
+#: decided ``cabs`` and ``csqrt``: the port's square roots of matrices under the user's D4); the
+#: cache keys the library by its content.
+PRELOAD = ""
+
 MANIFEST = REPO / "crates-freesurfer" / "Cargo.toml"
 EXAMPLE = REPO / "crates-freesurfer" / "target" / "release" / "examples" / "fs_robreg_probe"
 
@@ -129,6 +134,9 @@ def official_line(exe: Path, line: str, root: Path, k: int) -> str:
     if t[1] != "-":
         key, _, val = bytes.fromhex(t[1]).decode().partition("=")
         env[key] = val
+    if PRELOAD:
+        # relay 46: the decided cabs and csqrt (decided_complex.sh), the project's D4 decision
+        env["LD_PRELOAD"] = PRELOAD
     # never a run whose licence check prints the licence file
     if any(x.startswith("DIAG_NO") or x.lower() == "diag" for x in env):
         raise SystemExit(f"case {k}: DIAG_NO would print the licence file")
@@ -192,6 +200,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--n", type=int, default=400)
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--json", type=Path)
+    ap.add_argument(
+        "--family",
+        choices=("seeded", "powell"),
+        default="seeded",
+        help="the cases: the prelude, the entropy images and seeded ones (--seed, --n), or the "
+        "Powell registration's 40 (relay 46)",
+    )
+    ap.add_argument(
+        "--preload",
+        type=Path,
+        help="a library for the official program's LD_PRELOAD (decided_complex.sh's: the decided "
+        "cabs and csqrt); its case folders apart (cases-<seed>-<n>-preload.d)",
+    )
     ap.add_argument("--show", type=int, default=5, help="differing cases to print")
     ap.add_argument(
         "--golden", action="store_true", help="the golden cases: their official SHA-256 only"
@@ -212,9 +233,19 @@ def main(argv: list[str] | None = None) -> int:
     )  # fmt: skip
     inputs = ws / "oracles" / "inputs" / "fs-robust-register"
     inputs.mkdir(parents=True, exist_ok=True)
-    tag = "golden" if a.golden else f"{a.seed}-{a.n}"
+    global PRELOAD
+    PRELOAD = str(a.preload.resolve()) if a.preload else ""
+    tag = ("golden" if a.golden else "powell" if a.family == "powell" else f"{a.seed}-{a.n}") + (
+        "-preload" if a.preload else ""
+    )
     cases_path = inputs / f"cases-{tag}.txt"
-    gen = ["golden-cases"] if a.golden else ["cases", str(a.seed), str(a.n)]
+    gen = (
+        ["golden-cases"]
+        if a.golden
+        else ["powell-cases"]
+        if a.family == "powell"
+        else ["cases", str(a.seed), str(a.n)]
+    )
     text = subprocess.run([EXAMPLE, *gen], check=True, capture_output=True, text=True).stdout
     cases_path.write_text(text, encoding="utf-8")
     cases = text.splitlines()

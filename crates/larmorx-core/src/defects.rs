@@ -1394,7 +1394,7 @@ defects! {
     FS_268 = "FS-268", "FreeSurfer", true,
         "cropping around an RAS point (MRIcropAroundRAS) gives the fields of view, which it documents in RAS order (left-right, front-back, up-down), to the voxel axes the other way round: for an orientation that moves all three axes (SRA, ASR, PIL, ASL and the like) each axis gets another axis's field of view";
     FS_269 = "FS-269", "FreeSurfer", true,
-        "the bounding box of a mask (REGIONgetBoundingBox, REGIONgetBoundingBoxM) is one voxel smaller on each axis than the voxels it should bound: without a pad after the mask (or a negative one) it leaves out the mask's last voxels on that axis, corrected by default; with a pad of 1 or more only the far side's last padding voxel, outside the mask, is missing, kept in both modes (pipelines rely on it: recon-all's SynthMorph crop)";
+        "the bounding box of a mask (REGIONgetBoundingBox, REGIONgetBoundingBoxM) is one voxel smaller on each axis than the voxels it should bound: without a pad after the mask (or a negative one) it leaves out the mask's last voxels on that axis, corrected by default for REGIONgetBoundingBox (mri_binarize --bb, mri_mask -BBEQ); with a pad of 1 or more only the far side's last padding voxel, outside the mask, is missing, kept in both modes; REGIONgetBoundingBoxM (mri_mask -bb, -crop, -crop-crs, -BBM) keeps the original's box in both modes for every pad (pipelines rely on it: recon-all's SynthMorph crop and its venous-sinus network's crop, which the corrected box moves by a voxel)";
     FS_270 = "FS-270", "FreeSurfer", true,
         "mapping a segmentation onto another grid with upsampling (MRIaseg2volMU with an upsampling factor) when the segmentation is at neither end of the registration crashes the program after the concatenation's refusal";
     FS_331 = "FS-331", "FreeSurfer", true,
@@ -3236,7 +3236,7 @@ defects! {
     FS_1062 = "FS-1062", "FreeSurfer", false,
         "a subsampled robust registration step (`--subsample`) estimates its rotation, scale and shear parameters as if every voxel position were halved; kept until measured with the registrations that reach it (rule D)";
     FS_1063 = "FS-1063", "FreeSurfer", true,
-        "the robust registration in double precision with an intensity scale (`--doubleprec --iscale`) builds each step's transformation from memory contents instead of the step's solution; larmorx uses the solution in both modes";
+        "the robust registration in double precision with an intensity scale (`--doubleprec --iscale`) builds each step's transformation from memory contents instead of the step's solution, and the Powell registration (`--cost` other than ROB) with an intensity scale (`--iscale`) builds each evaluation's transformation of some models (translation 3-D, rigid 2-D, isotropic scale 3-D) from memory contents instead of its parameters; larmorx uses the solution, and the parameters, in both modes";
     FS_1064 = "FS-1064", "FreeSurfer", true,
         "the robust registration's median and median absolute deviation of an empty list return memory contents; NaN in both modes";
     FS_1065 = "FS-1065", "FreeSurfer", true,
@@ -3254,7 +3254,7 @@ defects! {
     FS_1071 = "FS-1071", "FreeSurfer", true,
         "mri_robust_register given an --lta name of 1,024 bytes or more aborts (*** buffer overflow detected ***, status 134) after printing its results, without writing the transform; by default the name is used";
     FS_1073 = "FS-1073", "FreeSurfer", true,
-        "the robust registration in double precision with an intensity scale (`--doubleprec --iscale`) of a rigid 3-D, affine 2-D or 3-D, isotropic-scale 2-D or translation 2-D model builds each step's transformation with its first two parameters replaced by memory contents (with glibc's allocator: a tiny positive number and 0: the step's translation along x and y lost); by default the step's solution";
+        "the robust registration in double precision with an intensity scale (`--doubleprec --iscale`), and the Powell registration (`--cost` other than ROB) with an intensity scale (`--iscale`), of a rigid 3-D, affine 2-D or 3-D, isotropic-scale 2-D or translation 2-D model builds each step's (each evaluation's) transformation with its first two parameters replaced by memory contents (with glibc's allocator: a tiny positive number and 0: the translation along x and y lost); by default the step's solution (the evaluation's parameters)";
     FS_1072 = "FS-1072", "FreeSurfer", true,
         "mri_robust_register given a non-linear initial transform (--ixform of a morph) reads the morph as a linear transform array: memory it does not own; an error in both modes";
     FS_1074 = "FS-1074", "FreeSurfer", true,

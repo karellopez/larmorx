@@ -5900,8 +5900,8 @@ fn r21_pcast(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), F
     std::fs::create_dir_all(&dir).expect("a scratch folder");
     let r = match mode {
         0 => pc::print_pca_stats(&mut cx.a, &sv),
-        1 => pc::write_pca_stats(&mut cx.a, Some(&dir), "fsvol-pca.dat", &sv),
-        _ => pc::write_pca_stats(&mut cx.a, Some(&dir), "fsvol-nodir/pca.dat", &sv),
+        1 => pc::write_pca_stats(&mut cx.g, &mut cx.a, Some(&dir), "fsvol-pca.dat", &sv),
+        _ => pc::write_pca_stats(&mut cx.g, &mut cx.a, Some(&dir), "fsvol-nodir/pca.dat", &sv),
     };
     o.i(i64::from(r));
     let bytes = std::fs::read(dir.join("fsvol-pca.dat")).unwrap_or_default();

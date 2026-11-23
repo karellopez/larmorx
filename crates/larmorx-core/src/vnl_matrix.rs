@@ -361,6 +361,18 @@ pub fn matlab_print_long_diag(d: &[f64], name: &str) -> String {
     s
 }
 
+/// `vnl_matlab_print(os, v, name, vnl_matlab_print_format_long)` of a `vnl_vector<double>`
+/// (`vnl_matlab_print.hxx`): `<name> = [ `, each element (`vnl_svd::matlab_long`), ` ]` and a
+/// newline.
+pub fn matlab_print_long_vector(v: &[f64], name: &str) -> String {
+    let mut s = format!("{name} = [ ");
+    for &x in v {
+        s.push_str(&crate::vnl_svd::matlab_long(x));
+    }
+    s.push_str(" ]\n");
+    s
+}
+
 /// [`matlab_print_long`] of a `vnl_matrix<std::complex<double>>` ([`matlab_long_complex`]).
 pub fn matlab_print_long_complex(m: &VnlCMatrix, name: &str) -> String {
     let mut s = format!("{name} = [ ...\n");

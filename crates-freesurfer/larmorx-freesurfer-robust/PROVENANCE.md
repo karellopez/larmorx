@@ -74,10 +74,20 @@ Queue item 3.2-03, part 2 (track C, relay 43, 2026-11-22), of `mri_robust_regist
   `computeMultiresRegistration`, `findSatMultiRes`, `findSaturation`; VNL's fixed 4 x 4 product
   (`vnl_matrix_fixed_mat_mat_mult`, BSD, ITK 4.13.2).
 
+Relay 46 of track C (queue 3.2-13): `src/powell.rs` from `mri_robust_register/RegPowell.cpp`
+(`costFunction` 77-246, `computeIterativeRegistrationFull` 252-601, `setTransformation` 603-646, as
+`RegRobust` with `powell` set: `new_powell`, `class_name`, `set_transformation`'s second-type models, the
+stream's precision `cout_precision`) and `MyMRI::MRInorm255` (`MyMRI.cpp` 42-47); `src/costs.rs` gains
+`CostFunctions.cpp`'s `minmax` (47-61), `mean(mri, frame)` (63-123), `leastSquares` with `s1`, `s2`
+(408-487), `absDiff` (489-559), `localNCC` (646-768), `mapMRI` (770-830), `NCC` (832-910),
+`tukeyBiweight` with the half-way maps (1044-1137) and `rhoTukeyBiweight` (`CostFunctions.h` 180-189);
+the one-thread order of their OpenMP sums. `registration.rs`: the level images passed mutably (the
+change of type), the multiresolution lines at the stream's precision.
+
 Not yet: `testRobust` and `constructAb2` (`--test`) and the `debug > 0` paths (with `mri_robust_register`,
-3.2-13); not reached by either program: `flipInputs`, `init_scaling`, `buildGaussianPyramid`, `setSource`,
-`setTarget`, `RegRobust::estimateIScale`; `RegPowell` (the other costs) and the functions only one program
-reaches (their items).
+3.2-13); `JointHisto.cpp` (`MI`, `NMI`, `ECC`, `SCR`), `CostFunctions::SBCost` (`SB`, libstdc++'s
+`std::sort`); not reached by either program: `flipInputs`, `init_scaling`, `buildGaussianPyramid`, `setSource`,
+`setTarget`, `RegRobust::estimateIScale`; the functions only one program reaches (their items).
 
 ## Changes from the originals
 

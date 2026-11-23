@@ -882,4 +882,6 @@ the NaNs' bits) and both functions' NaN bits (the investigation's "libgcc's divi
 `operator_one_norm`, `vnl_diag_matrix.h`'s product), and `vnl_matlab_print`'s long format of `double`
 and `std::complex<double>` matrices (`vnl_matlab_print.hxx`, `vnl_matlab_print_scalar.cxx`), ITK 4.13.2's
 VXL (BSD-3-Clause). 2026-11-22: `vnl_matlab_print` of a `vnl_diag_matrix<double>` in the long format
-(`matlab_print_long_diag`: `<name> = diag([ `, the elements, ` ])`; `vnl_matlab_print.hxx`).
+(`matlab_print_long_diag`: `<name> = diag([ `, the elements, ` ])`; `vnl_matlab_print.hxx`). 2026-11-23:
+`vnl_matlab_print` of a `vnl_vector<double>` in the long format (`matlab_print_long_vector`: `<name> = [ `,
+the elements, ` ]`; `vnl_matlab_print.hxx`).

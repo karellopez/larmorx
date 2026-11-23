@@ -19,9 +19,10 @@ use sha2::{Digest, Sha256};
 /// the first thirteen, f3af007dd90c7e0cc0984075bc516ba8c0f1bd83bd3c7ad64c1116ec62389eb7).
 const OFFICIAL_SHA256: &str = "e3ec07a6ffc9e79e099e459680a210d9f7e96905b4250beb97f4b0d9116c3444";
 /// The port's default on Linux x64 (`cases_digest(Fix)`): no NUL byte in the error lines
-/// (FS-01), an error for `-BBEQ` without a box (FS-1133), the box of `-bb 0` holding the mask's
-/// last voxels (FS-269).
-const FIX_SHA256: &str = "20be6598c53f16ef1c90f6d63f502590d7c7cad20fa3d2d7814e249d0624542b";
+/// (FS-01), an error for `-BBEQ` without a box (FS-1133), the box of `-bb 0` FreeSurfer's in both
+/// modes with FS-269's notice (mri_mask's boxes keep FreeSurfer's size: track C's measurement of
+/// 2026-11-23, rule C; re-recorded at FreeSurfer batch 98's merge, `reproduce` unchanged).
+const FIX_SHA256: &str = "49d53f9d0f00efc92f8ca8a725804fd8f3157e5ecfba416cc894dc9a5a90cefa";
 
 fn cases_digest(mode: UpstreamDefects) -> String {
     let dir = tempfile::tempdir().expect("a folder");

@@ -119,9 +119,16 @@ The `cout`/`printf` lines share stdout's buffer (`sync_with_stdio`); each option
 
 ## 4. Not ported yet (each ends with its message, status 1)
 
-- `RegPowell` (`--cost` `LS`, `MI`, `NMI`, `ECC`, `NCC`, `SCR`, `TB`, `LNCC`, `SAD`, `SB`):
-  `RegPowell.cpp`, `CostFunctions.cpp`'s costs, `JointHisto.cpp`; the program ends before reading
-  the images (FreeSurfer reads them first).
+- `RegPowell`'s joint-histogram costs (`MI`, `NMI`, `ECC`, `SCR`: `JointHisto.cpp`) and `SB`
+  (`CostFunctions::SBCost`, which sorts with libstdc++'s `std::sort`: the project's emulation,
+  `larmorx_nc_core::stdsort`, lives in the FSL family's crate and would have to move to the main
+  package first): the program ends at the first cost (`RegPowell: the cost function <n> is not
+  ported yet`). Relay 46 ported the others (section 6).
+- The Powell registration's half-way outputs: `RegPowell::getHalfWayGeom` returns its static copy of
+  the target, which `computeIterativeRegistrationFull` has freed by then (`MRIfree(&mriT)` on the
+  pointer the static shares): FreeSurfer reads a freed image's header for the half-way geometry (a
+  memory defect to measure before a decision, the next ID FS-1075); the port ends with
+  `mri_robust_register: the half-way outputs of the Powell registration are not ported yet`.
 - `--test` (`RegRobust::testRobust`): ends after `--test: TEST-MODE`.
 - `--debug` (the library's intermediate images, `saveGaussianPyramid`, the key presses
   `std::cin >> ch`, the `-wcheck-est.txt` file, the debug means of the half-way images): the
@@ -167,3 +174,45 @@ took <s> seconds.`) and the target, with the mask passed in (no `MRImask` then).
   by default, glibc's with `reproduce`; on these cases both give the same images.
 - The time line ` Entropy computation took <s> seconds.` is masked in the probe's and `real.py`'s
   comparisons (the port's debug build takes seconds where FreeSurfer's takes none).
+
+## 6. The Powell registration (`--cost` `LS`, `NCC`, `TB`, `LNCC`, `SAD`; relay 46)
+
+- **Source**: `RegPowell.cpp` (`costFunction` 77-246 to its first `return dd`, everything after it
+  dead; `computeIterativeRegistrationFull` 252-601; `setTransformation` 603-646) and
+  `CostFunctions.cpp`'s half-way costs (`leastSquares` with `s1`, `s2` 408-487, `absDiff` 489-559,
+  `localNCC` 646-768, `mapMRI` 770-830, `NCC` 832-910, `tukeyBiweight` 1044-1137, `mean` 63-123,
+  `minmax` 47-61, `rhoTukeyBiweight` in the header) and `MyMRI::MRInorm255`. `my_cost_function`
+  overrides `fs_cost_function::f(const vnl_vector<double>&)`: the parameters reach the cost in
+  `double` (the port's `FsCostFunction::with_double`, track A's `fs_vnl.rs`, a few lines).
+- **OpenMP**: every cost's loop over slices is `#pragma omp parallel for schedule(static)
+  reduction(+:d)` (the counters `omp atomic`): the threads' partial sums meet in the order they
+  finish, so FreeSurfer's cost depends on the thread count and the run above one thread. The port
+  computes the one-thread order (each sum from the shared 0 plus the one partial sum); the probe
+  and the replays run the official program at one thread.
+- **`exit` inside a cost**: a matrix square root's internal error in `costFunction`
+  (`MyMatrix::MatrixSqrt Internal Error`, seen after 1,718 iterations of NaN values in an `LNCC` case
+  whose blocks all held a -1: `0 / 0`) ends the program at once; `fs_powell` (the port's
+  `FsPowell`) now returns when the cost reports such an end, printing nothing more (it went on for
+  2,000 iterations before).
+- **FS-1073 and FS-1063 reached by every Powell cost with `--iscale`**: `convertP2Md(p)` hands the
+  model a `vnl_vector<double>` of the model's parameters plus the intensity's log, which
+  `Transformation::setParameters` copies and resizes (the existing defects): where the two lengths
+  share glibc's size class (rigid 3-D, affine 2-D and 3-D, isotropic scale 2-D, translation 2-D, as
+  for `--doubleprec --iscale`) the model's first two parameters are the allocator's words (a positive
+  subnormal, then 0: the first two translations never move, at every evaluation): FS-1073, reproduced
+  exactly with `reproduce` (10 of the 40 probe cases noted it, all identical); otherwise (translation
+  3-D, rigid 2-D, isotropic scale 3-D) memory contents: FS-1063, not compared (4 cases).
+- **`setprecision(14)`** after ` final e = ` stays on `std::cout`: every later number the program
+  prints with C++ has 14 significant digits (the determinant, the intensity scale, the next
+  levels' lines); the port keeps the stream's precision in the registration's state.
+- **The probe** (`validation/probes/fs-robust-register/check.py --family powell`, 40 cases, and the
+  prelude's case of each cost in `--seed 1 --n 120`): against the official program as built, 36
+  identical, 4 differ only in their last printed digits (the matrix square roots' `cabs`/`csqrt`
+  through glibc's `hypot`, the user's D4 decision); with the decided `cabs`/`csqrt` preloaded
+  (`--preload`, `decided_complex.sh`): 36 identical, 0 different, 4 not compared (FS-1063); seed 1's
+  120 cases: 105 identical, 0 different, 8 not compared, 7 not ported (logs
+  `oracles/logs/fs-found-c-r46-robreg-*.log`). The recorded tests (`fs_robreg_official.rs`,
+  `fs_robreg_powell_official.rs`, the latter about 7 minutes in a debug build: run with `--release`
+  or `--ignored`) hold the decided oracle's hashes.
+- Not measured yet: the Powell registration on the recorded heads (neither recon-all nor fMRIPrep
+  runs it), its speed (sequential sums, one thread) and memory.

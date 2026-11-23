@@ -7,14 +7,19 @@
 //! Defects (`larmorx_core::defects`; the findings in `docs/findings/freesurfer-volume.md` §16):
 //! - **FS-269** (measured 2026-11-23; rules A and C): the bounding boxes' size is `max - min + 2
 //!   npad` (`REGIONgetBoundingBoxM`: `+ npad[lo] + npad[hi]`), one voxel less than the voxels from
-//!   `min - npad` to `max + npad` the box should hold. Where the pad after the mask is 0 or less
-//!   (and the start is not clamped at 0), the mask's last voxels on that axis are left out (rule
-//!   A): by default that axis's size is one more (kept in the volume as FreeSurfer keeps it);
-//!   `reproduce` FreeSurfer's; noted. With a pad of 1 or more after it, FreeSurfer's box holds
-//!   the whole mask and only its last padding voxel (outside the mask) is missing: FreeSurfer's
-//!   box in both modes (rule C: recon-all's v8 SynthMorph crop, `mri_mask -bb 3` of `orig.mgz`,
-//!   would change on every recorded head). A mask with no voxel keeps FreeSurfer's box (from
-//!   1000000, of a negative size) in both modes.
+//!   `min - npad` to `max + npad` the box should hold. `REGIONgetBoundingBox`: where the pad after
+//!   the mask is 0 or less (and the start is not clamped at 0), the mask's last voxels on that
+//!   axis are left out (rule A): by default that axis's size is one more (kept in the volume as
+//!   FreeSurfer keeps it); `reproduce` FreeSurfer's; noted. With a pad of 1 or more after it,
+//!   FreeSurfer's box holds the whole mask and only its last padding voxel (outside the mask) is
+//!   missing: FreeSurfer's box in both modes (rule C: recon-all's v8 SynthMorph crop, `mri_mask
+//!   -bb 3` of `orig.mgz`, would change on every recorded head). `REGIONgetBoundingBoxM` (whose
+//!   one caller is `mri_mask`'s `-bb`, `-crop`, `-crop-crs` and `-BBM`) keeps FreeSurfer's box in
+//!   both modes for every pad (rule C), noted where it leaves out mask voxels: recon-all's v8
+//!   `mri_vsinus_seg` places its network's 144^3 crop at the centre of `mri_mask -T .001 -crop 0`'s
+//!   box, and the corrected box moved that crop by one voxel on every recorded head, changing
+//!   553 to 1,105 voxels of `vsinus.mgz` (a network trained on crops placed by FreeSurfer's box).
+//!   A mask with no voxel keeps FreeSurfer's box (from 1000000, of a negative size) in both modes.
 
 use std::io::Write;
 
@@ -47,13 +52,22 @@ pub fn region_get_bounding_box(
 ) -> Result<MriRegion, Fatal> {
     let (lo, hi) = extremes(g, err, mask)?;
     let npad = [npad; 6];
-    Ok(padded_box(g, "REGIONgetBoundingBox", mask, lo, hi, npad))
+    Ok(padded_box(
+        g,
+        "REGIONgetBoundingBox",
+        mask,
+        lo,
+        hi,
+        npad,
+        false,
+    ))
 }
 
 /// The box from the extremes `lo`, `hi` with the pads `npad` (before and after the columns, the
 /// rows, the slices): start `max(lo - before, 0)`, size `min(hi - lo + before + after, extent -
 /// start)` (32-bit integer arithmetic), plus 1 by default on an axis whose box would end before
-/// `hi` (FS-269).
+/// `hi` (FS-269), unless `keep` (FreeSurfer's box in both modes, noted where it leaves out mask
+/// voxels: [`region_get_bounding_box_m`]).
 fn padded_box(
     g: &mut Globals,
     what: &str,
@@ -61,6 +75,7 @@ fn padded_box(
     lo: [i32; 3],
     hi: [i32; 3],
     npad: [i32; 6],
+    keep: bool,
 ) -> MriRegion {
     let extent = [mask.vg.width, mask.vg.height, mask.vg.depth];
     let start: [i32; 3] = std::array::from_fn(|a| lo[a].wrapping_sub(npad[2 * a]).max(0));
@@ -85,15 +100,24 @@ fn padded_box(
     };
     let full: [i32; 3] = std::array::from_fn(|a| if cuts(a) { size(a, 1) } else { fs[a] });
     if full != fs {
+        let kept = if keep {
+            ", FreeSurfer's kept in both modes"
+        } else {
+            ""
+        };
         g.notices.add(
             &FS_269,
             format!(
-                "{what}: the box leaves out the mask's last voxel on an axis (FreeSurfer's size {} {} {}, the voxels' {} {} {})",
+                "{what}: the box leaves out the mask's last voxel on an axis (FreeSurfer's size {} {} {}, the voxels' {} {} {}{kept})",
                 fs[0], fs[1], fs[2], full[0], full[1], full[2]
             ),
         );
     }
-    let d = if g.notices.reproduce() { fs } else { full };
+    let d = if keep || g.notices.reproduce() {
+        fs
+    } else {
+        full
+    };
     let mut region = region_alloc();
     region.x = start[0];
     region.y = start[1];
@@ -116,8 +140,9 @@ pub fn region_copy(rsrc: &MriRegion) -> MriRegion {
 
 /// `REGIONgetBoundingBoxM(mask, npad)`: [`region_get_bounding_box`] with a pad of its own on each
 /// side (`npad[0]` before and `npad[1]` after the columns, then the rows, then the slices; the
-/// size `max - min + npad[lo] + npad[hi]`, one more by default where the box would end before the
-/// mask's last voxel, FS-269).
+/// size `max - min + npad[lo] + npad[hi]`): FreeSurfer's box in both modes, noted where it ends
+/// before the mask's last voxel (FS-269, rule C: `mri_mask`'s crops place recon-all's v8
+/// networks).
 pub fn region_get_bounding_box_m(
     g: &mut Globals,
     err: &mut dyn Write,
@@ -125,7 +150,15 @@ pub fn region_get_bounding_box_m(
     npad: [i32; 6],
 ) -> Result<MriRegion, Fatal> {
     let (lo, hi) = extremes(g, err, mask)?;
-    Ok(padded_box(g, "REGIONgetBoundingBoxM", mask, lo, hi, npad))
+    Ok(padded_box(
+        g,
+        "REGIONgetBoundingBoxM",
+        mask,
+        lo,
+        hi,
+        npad,
+        true,
+    ))
 }
 
 /// The smallest and largest column, row and slice of the voxels of frame 0 not within

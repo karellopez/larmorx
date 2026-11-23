@@ -602,8 +602,11 @@ Source: `utils/region.cpp` 116-133, 299-499 (`REGIONclear`, `REGIONcopy`, `REGIO
   pair with other voxels' gradients and the tail is stack contents (the probe saw `0xffffffff`, `0xfffffed0`).
 - `MRIvoxelGradientDir2ndDerivative`: `len` via `sqrtss` (`sqrtf` for negatives); `d2I_dg2 -= val` keeps the first
   difference in `double` and rounds it when it is reloaded (the same as rounding each step); `d` is a `float`
-  counter compared with `(float)whalf`. **FS-486** (a): `double val` is uninitialised before the first
-  `MRIsampleVolume`, which leaves it for refused types.
+  counter compared with `(float)whalf`. `double val` is uninitialised before the first `MRIsampleVolume`, but
+  that call is at whole coordinates, where `MRIsampleVolume` takes `MRIsampleVolumeType`'s nearest path, which
+  writes `*pval` for every type (0 for a refused one, after its error); later trilinear samples of a refused type
+  leave the previous value. No value is ever read unwritten (relay 21 had registered it as a defect; withdrawn
+  2026-11-23, track E's relay 17, the replica's dead branch removed in track C's relay 46).
 - Layering (for the orchestrator): `cma.cpp`'s `MRIaqueductSeg` calls `clustGetClusters` (`volcluster.cpp`, fs.filter
   3.1-44) and `CTABreadDefault`; fs.filter sits above fs.volume, so it cannot be ported in this crate (as
   `MRIdistanceTransform`). `resample.cpp`'s surface functions (`vol2surf_linear`, `MRISapplyReg`, `surf2surf_nnfr`,
@@ -1211,6 +1214,25 @@ Track E's R16.5 (its spec relay 16, `specs/freesurfer-volume.md` §43, §55, §5
     hemispheres): 24 of 24 identical with FreeSurfer in both modes, as the flood fill implies (a fully outside layer
     adds no connection). Rule C (no gain, a pipeline relies on it): FreeSurfer's box in both modes there, nothing
     noted; `mriflood.rs`'s own box is unchanged.
+  - **`mri_mask -T .001 -crop 0`** (the v8 stream's `mri_vsinus_seg`, a pad of 0; measured 2026-11-23, relay 46 of track
+    C, `vsinus.py`; log `oracles/logs/fs-found-c-r46-vsinus-6.log`): the script crops the prior (mapped from MNI152 to
+    `nu.mgz` by SynthMorph's affine) to its box only for the box's centre, `mri_binarize --crop-around-ras ... cras
+    <mincrop> 0 144 144 144`, the network's 144^3 input. The prior is a temporary file the runs do not keep: made again
+    with the script's own official steps from the recorded head's files (checked against the recording's hashes at the
+    step), FreeSurfer's chain gave the recorded `vsinus.mgz` and the next step's `brain.finalsurfs.mgz` again on 6 of 6
+    heads (provenance aside), and the port's `reproduce` the official crop on 6 of 6. With the corrected box (one more
+    column, row and slice on every head: the prior never reaches the far edge) the crop's centre moves half a voxel on
+    each axis, and `MRIcropAroundCRS`'s rounded start moved by one voxel on 1 to 3 axes on 6 of 6 heads (the official
+    centres, e.g. `121 107 60.5`, `128.5 129.5 60.5`, are within rounding of a half or a whole). The network's output
+    then changed: `vsinus.mgz` 553, 666, 791, 1,049, 894 and 1,105 voxels (ds000005, ds000228, ds002422, ds004173,
+    ds005003, ds005454), each label's Dice against FreeSurfer's 0.84 to 0.98 (the straight sinus 0.84 to 0.98 of 68 to
+    1,275 voxels, the superior sinus' parts 0.86 to 0.98), and `brain.finalsurfs.mgz` (`mri_mask -oval 1 -invert` by it)
+    534 to 1,035 voxels. The network was trained on crops placed by this script with FreeSurfer's box (its help), so
+    the corrected box only moves its input one voxel away from where it was trained, with no gain to measure: **rule C**.
+    `REGIONgetBoundingBoxM`, whose one caller is `mri_mask` (`-bb`, `-crop`, `-crop-crs`, `-BBM`), keeps FreeSurfer's
+    box in both modes for every pad, noted (FS-269, `..., FreeSurfer's kept in both modes`) where it leaves out mask
+    voxels; `REGIONgetBoundingBox` (`mri_binarize --bb`, `-BBEQ`'s box, `MRIvol2VolTkRegVSM`'s crop, the surfaces' fill)
+    keeps the decision above (rule A for a pad of 0 or less).
 - **FS-270** (a, crash; rule B): `MRIaseg2volMU` (`utils/resample.cpp` 2699) with `USF != -1` passes `LTAconcat`'s
   `NULL` (the segmentation at neither end of the caller's array: `ERROR: LTAconcat(): LTAs 0 and 1 do not match`) to
   `LTAmriIsSource`, which crashes. Both modes end after the refusal's lines (`MRIaseg2volMU: the segmentation is at

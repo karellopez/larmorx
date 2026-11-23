@@ -15,13 +15,15 @@
 //!   gradients pair with the wrong offsets and the last entries were never written. With
 //!   `reproduce` FreeSurfer's pairing with 0 for the entries never written; by default the window
 //!   is not cut on those sides either (the index tables clamp it, as on the near sides), noted.
-//! - **FS-486** (memory): `MRIvoxelGradientDir2ndDerivative` subtracts samples into one `double`
-//!   that a sampler refusing the volume's type never writes: the previous sample, and at the
-//!   first a value never written. Both modes take 0 there, noted.
+//!
+//! `MRIvoxelGradientDir2ndDerivative` subtracts samples into one `double` that the trilinear
+//! sampler leaves as it was for a type it refuses: the previous sample is used again. The first
+//! sample is at whole coordinates, where the nearest-voxel path always writes (0 for a type it
+//! refuses), so no value is ever left unwritten.
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_485, FS_486};
+use larmorx_core::defects::FS_485;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
 use larmorx_freesurfer_core::sse::{add, div, mul, mul64, sqrt, sub, sub64};
@@ -269,31 +271,22 @@ pub fn mri_voxel_direction(
 const UNWRITTEN: u64 = 0x7ff4_dead_beef_0003;
 
 /// `MRIsampleVolume` into FreeSurfer's one `double val`: the sample, or the last value the
-/// sampler wrote when it writes none (a type it refuses); before any, memory contents (FS-486:
-/// 0 in both modes, noted).
+/// sampler wrote when it writes none (the trilinear path for a type it refuses). The first call
+/// is at whole coordinates (the nearest-voxel path, which always writes), so `last` always holds
+/// a written value.
 fn sampled(
     g: &mut Globals,
     err: &mut dyn Write,
     mri: &Mri,
     (x, y, z): (f64, f64, f64),
-    last: &mut Option<f64>,
+    last: &mut f64,
 ) -> f64 {
     let mut v = f64::from_bits(UNWRITTEN);
     sample_volume(g, err, mri, x, y, z, &mut v);
     if v.to_bits() != UNWRITTEN {
-        *last = Some(v);
-        return v;
+        *last = v;
     }
-    match *last {
-        Some(p) => p,
-        None => {
-            g.notices.add(
-                &FS_486,
-                "MRIvoxelGradientDir2ndDerivative uses a sample its sampler never wrote (memory contents in FreeSurfer)",
-            );
-            0.0
-        }
-    }
+    *last
 }
 
 /// `MRIvoxelGradientDir2ndDerivative(mri, x0, y0, z0, wsize)`: the voxel's gradient `g0`
@@ -301,7 +294,7 @@ fn sampled(
 /// `1e-5`, `mrivoxel.cpp`'s `FZERO`, the result is 0), the unit direction; then `(wsize - 1) v0` (the voxel's
 /// `MRIsampleVolume`) minus the samples at `p0 +- d u` for `d = 1 .. wsize / 2` (each subtraction
 /// in `double` rounded to `float`), divided by `wsize`. A sample the sampler does not write (a
-/// type it refuses) leaves the previous value (FS-486 before any).
+/// type it refuses) leaves the previous value.
 pub fn mri_voxel_gradient_dir_2nd_derivative(
     g: &mut Globals,
     err: &mut dyn Write,
@@ -323,7 +316,8 @@ pub fn mri_voxel_gradient_dir_2nd_derivative(
     odx = div(odx, len);
     ody = div(ody, len);
     odz = div(odz, len);
-    let mut last = None;
+    // the first sample is at whole coordinates: the nearest-voxel path writes it
+    let mut last = 0.0;
     let val = sampled(
         g,
         err,

@@ -198,9 +198,21 @@ impl Options {
         self.cost == CostName::Rob
     }
 
-    /// The library's cost of the robust registration.
+    /// The library's cost (`Registration::Cost`).
     pub fn library_cost(&self) -> Cost {
-        Cost::Rob
+        match self.cost {
+            CostName::Ls => Cost::Ls,
+            CostName::Rob => Cost::Rob,
+            CostName::Mi => Cost::Mi,
+            CostName::Nmi => Cost::Nmi,
+            CostName::Ecc => Cost::Ecc,
+            CostName::Ncc => Cost::Ncc,
+            CostName::Scr => Cost::Scr,
+            CostName::Tb => Cost::Tb,
+            CostName::Lncc => Cost::Lncc,
+            CostName::Sad => Cost::Sad,
+            CostName::Sb => Cost::Sb,
+        }
     }
 }
 

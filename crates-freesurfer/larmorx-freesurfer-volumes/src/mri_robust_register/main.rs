@@ -38,10 +38,17 @@
 //! half-way space, the images resampled there); the time taken (`Registration took <m> minutes and
 //! <s> seconds.`, from the clock) and the citation. Status 0.
 //!
-//! Not ported yet (each ends with its message and status 1): the Powell registration of the other
-//! costs (`--cost` `LS`, `MI`, `NMI`, `ECC`, `NCC`, `SCR`, `TB`, `LNCC`, `SAD`, `SB`:
-//! `RegPowell`, `CostFunctions`, `JointHisto`), the test mode (`--test`) and the debug output of
-//! `--debug` (the library's intermediate images and its key presses).
+//! The other costs (`--cost` `LS`, `NCC`, `TB`, `LNCC`, `SAD`): `RegPowell`
+//! ([`larmorx_freesurfer_robust::powell`]), the images allowed to change type
+//! (`P.floattype`), the tolerance of `--powelltol`, no saturation search, no weights (`Warning:
+//! no weights could be created! ...`); once Powell has printed its final error the program's
+//! numbers print with 14 digits (`setprecision(14)` stays on `std::cout`); `SB`'s second citation.
+//!
+//! Not ported yet (each ends with its message and status 1): the joint-histogram costs (`MI`,
+//! `NMI`, `ECC`, `SCR`: `JointHisto`) and `SB` (`CostFunctions::SBCost`, which sorts with
+//! libstdc++'s `std::sort`) at their first evaluation, the half-way outputs of the Powell
+//! registration (FreeSurfer's half-way geometry is then a freed image), the test mode (`--test`)
+//! and the debug output of `--debug` (the library's intermediate images and its key presses).
 //!
 //! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-robust-register.md`):
 //! - FS-1070: [`super::options`].
@@ -96,7 +103,7 @@ use larmorx_freesurfer_volume::orient::{mri_set_voxel_to_ras_xform, mri_voxel_xf
 use larmorx_freesurfer_volume::resize::mri_seq_change_type;
 use larmorx_freesurfer_volume::vgeom::get_vol_geom;
 
-use super::options::{Options, Run, parse_command_line};
+use super::options::{CostName, Options, Run, parse_command_line};
 
 /// The program's name as `argv[0]` gives it (fMRIPrep runs it by name).
 pub const NAME: &str = "mri_robust_register";
@@ -144,15 +151,13 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     parse_command_line(g, r, &mut p, &left[1..])?;
     let mut start = Timer::new();
     start.reset();
-    if !p.robust() {
-        let _ = r.out.flush();
-        let _ = writeln!(
-            r.err,
-            "mri_robust_register: the cost functions other than ROB (RegPowell) are not ported yet"
-        );
-        return Err(Fatal::Exit(1));
-    }
-    let mut reg = RegRobust::new();
+    let mut reg = if p.robust() {
+        RegRobust::new()
+    } else {
+        // the images may change type inside the registration (RegPowell makes them bytes)
+        p.floattype = true;
+        RegRobust::new_powell()
+    };
     let (mov, dst) = init_registration(g, r, &mut reg, &mut p)?;
     let (mut mov, dst) = (mov, dst);
     {
@@ -161,7 +166,7 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
             err: &mut *r.err,
             env: r.env,
         };
-        if p.satit {
+        if p.satit && p.robust() {
             reg.find_saturation(g, &mut io)?;
             reg.compute_multires_registration(g, &mut io, 0, p.iterate, p.epsit)?;
         } else if p.nomulti {
@@ -180,7 +185,7 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     let _ = write!(
         r.out,
         " Determinant : {}\n\n",
-        ostream(vnl_fixed::determinant(&flat, 4))
+        reg.os(vnl_fixed::determinant(&flat, 4))
     );
     if p.affine || p.isoscale {
         let _ = write!(r.out, " Decompose into Rot * Shear * Scale : \n\n");
@@ -196,7 +201,7 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
         let _ = writeln!(r.out, "{}", matlab_print_long_diag(&scale, "Scale"));
     }
     if reg.iscale {
-        let _ = writeln!(r.out, "Intenstiy Scale Factor: {}", ostream(md_second));
+        let _ = writeln!(r.out, "Intenstiy Scale Factor: {}", reg.os(md_second));
     }
     let _ = writeln!(r.out);
 
@@ -261,11 +266,7 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
         }
     }
     if reg.iscale && md_second > 0.0 && !p.entropy {
-        let _ = writeln!(
-            r.out,
-            "Adjusting Intensity of MOV by {}",
-            ostream(md_second)
-        );
+        let _ = writeln!(r.out, "Adjusting Intensity of MOV by {}", reg.os(md_second));
         mri_valscale(g, r.out, r.err, Pair::Same(&mut mov), md_second, 0.0)?;
     }
 
@@ -410,6 +411,14 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
                 r.out,
                 "ERROR: no half way space created (symmetry was switched off)!"
             );
+        } else if reg.powell {
+            // RegPowell's half-way geometry is its byte copy of the target, freed by then
+            let _ = r.out.flush();
+            let _ = writeln!(
+                r.err,
+                "mri_robust_register: the half-way outputs of the Powell registration are not ported yet"
+            );
+            return Err(Fatal::Exit(1));
         } else if reg.mri_weights.is_none() {
             let _ = writeln!(
                 r.out,
@@ -447,6 +456,18 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
         r.out,
         " http://reuter.mit.edu/papers/reuter-robreg10.pdf\n\n"
     );
+    if p.cost == CostName::Sb {
+        let _ = writeln!(r.out, " And for the segmentation based cost function:");
+        let _ = writeln!(
+            r.out,
+            " Multimodal image registration through simultaneous segmentation,"
+        );
+        let _ = writeln!(
+            r.out,
+            " I. Aganj and B. Fischl. IEEE Signal Processing Letters 24(11):1661-1665, 2017."
+        );
+        let _ = write!(r.out, " https://doi.org/10.1109/LSP.2017.2754263\n\n");
+    }
     Ok(())
 }
 
@@ -753,8 +774,14 @@ fn init_registration(
     reg.doubleprec = p.doubleprec;
     reg.symmetry = p.symmetry;
     reg.costfun = p.library_cost();
-    reg.sat = p.sat;
-    reg.wlimit = p.wlimit;
+    if reg.class_name() == "RegRobust" {
+        reg.sat = p.sat;
+        reg.wlimit = p.wlimit;
+    }
+    if reg.class_name() == "RegPowell" {
+        reg.xtol = p.powelltol;
+        reg.ftol = p.powelltol;
+    }
     // P.lta.rfind(".") > 0: the name without its extension (a dot at 0 keeps it)
     match p.lta.rfind('.') {
         Some(pos) if pos > 0 => reg.set_name(&p.lta[..pos]),

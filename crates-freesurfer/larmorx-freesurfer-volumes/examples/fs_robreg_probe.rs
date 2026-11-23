@@ -4,6 +4,7 @@
 //! The port's side of the fs-robust-register probe (`validation/probes/fs-robust-register/`):
 //!
 //!     fs_robreg_probe cases <seed> <n>            the case file, on standard output
+//!     fs_robreg_probe powell-cases                the Powell registration's 40 cases
 //!     fs_robreg_probe golden-cases                the golden cases
 //!                                                (`tests/mri_robust_register_golden.rs`)
 //!     fs_robreg_probe run <cases> fix|reproduce   one line per case: the output, a tab, the
@@ -24,6 +25,11 @@ fn main() {
             let seed: u64 = args[2].parse().expect("seed");
             let n: usize = args[3].parse().expect("n");
             for line in cases::generate(seed, n) {
+                println!("{line}");
+            }
+        }
+        Some("powell-cases") => {
+            for line in cases::powell_cases() {
                 println!("{line}");
             }
         }

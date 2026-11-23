@@ -357,10 +357,8 @@ it aborts as FS-1070 describes for a missing name (§5: the same handling).
    axis by the kernel `(1/16, 1/4, 3/8, 1/4, 1/16)` (the robust registration's pyramid blur,
    `specs/freesurfer-robust.md`); the second level is the image blurred the same way and
    subsampled, each later level the level before it blurred and subsampled: to half the extent
-   (integer halves) at the fixed table of random offsets the registration's subsampling uses (offset 0 or 1 per axis,
-   the table's positions from 0), its voxel sizes, slice thickness and pixel size doubled and its
-   centre the source's voxel-to-RAS image of `(w/2 + 0.5, h/2 + 0.5, d/2 + 0.5)` (`float`
-   arithmetic); each level keeps the image's outside value. Levels are made while the last one is
+   (integer halves) by `specs/freesurfer-robust.md` §2.4's `subSample` with its defaults (the header
+   fixed, `randpos` 0: the offsets from §2.3's table); each level keeps the image's outside value. Levels are made while the last one is
    at least 16 voxels along every axis; the last one made (the first below 16) is dropped.
 3. The test's line and its pair of images from the pyramid's **second** level `L` (a source `S` and
    a target `T`, written into the current folder as MGZ):

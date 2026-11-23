@@ -2036,4 +2036,15 @@ fn transform_with_matrix_nan_operands() {
     let wide = |q: u64| 0x7ff8_0000_0000_0000u64 | (q << 29);
     let got: Vec<u64> = p.iter().map(|v| v.to_bits()).collect();
     assert_eq!(got, [wide(0x1234), wide(0x1234), wide(0x5678)]);
+    // A NaN made from numbers (an infinity times 0) is x86-64's default NaN `0xffc00000` on
+    // every platform (AArch64's multiplication would give `0x7fc00000`), and of it and a NaN
+    // element met in the sum the left partial sum's is kept.
+    let mut m = Matrix::zeros(4, 4, MATRIX_REAL);
+    m.set(1, 1, f32::INFINITY);
+    m.set(2, 2, f32::INFINITY);
+    m.set(2, 4, f32::from_bits(0x7fc0_4321));
+    m.set(3, 3, f32::INFINITY);
+    let p = transform_with_matrix(&m, 0.0, 0.0, 0.0).expect("a 4 x 4 matrix");
+    let got: Vec<u64> = p.iter().map(|v| v.to_bits()).collect();
+    assert_eq!(got, [0xfff8_0000_0000_0000; 3]);
 }

@@ -170,7 +170,12 @@ impl Process {
         let seed = self.random.seed;
         let f = self.random.draw(seed);
         self.random.calls += 1;
-        let v = f64::from(f) * (hi - low) + low;
+        // In double with x86-64's NaN rules (spec §0): a NaN made from infinite bounds is the
+        // default NaN; of two NaN operands the left one as written (`hi`'s, then the product's).
+        let v = crate::sse::add64(
+            crate::sse::mul64(f64::from(f), crate::sse::sub64(hi, low)),
+            low,
+        );
         if v < low || v > hi {
             let p =
                 |x: f64| larmorx_core::cfmt::pad(&larmorx_core::cfmt::f(f64::from(x as f32), 1), 2);

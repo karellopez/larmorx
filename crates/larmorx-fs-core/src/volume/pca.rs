@@ -233,7 +233,7 @@ impl Process {
         for c in 1..=dim {
             let x = sse::mul32(s2.at(1, c), cf);
             s2.set(1, c, x);
-            s.set(1, c, x.sqrt());
+            s.set(1, c, sse::sqrt32(x));
             if x < FLT_EPSILON {
                 k = c - 1;
                 break;
@@ -245,7 +245,7 @@ impl Process {
         };
         for f in 1..=nf {
             for c in 1..=k {
-                wm.set(f, c, sse::div32(u.at(f, c), s2.at(1, c).sqrt()));
+                wm.set(f, c, sse::div32(u.at(f, c), sse::sqrt32(s2.at(1, c))));
             }
         }
         let ext = (d.geom.width, d.geom.height, d.geom.depth);
@@ -281,7 +281,7 @@ impl Process {
             }
         }
         for f in 0..k {
-            let root = sums[f as usize].sqrt();
+            let root = sse::sqrt64(sums[f as usize]);
             for &(c, r, z) in &inside {
                 let x = self.vf(&v, (c, r, z), f)?;
                 let y = sse::narrow(sse::div64(f64::from(x), root));

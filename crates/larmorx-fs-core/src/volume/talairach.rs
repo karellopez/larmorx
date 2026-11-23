@@ -55,8 +55,11 @@ impl TalPoint {
 /// `TransformWithMatrix(M, x, y, z)` (§46): each coordinate rounded to `float`, then rows 1 to 3
 /// as `((M[r][1] x + M[r][2] y) + M[r][3] z) + M[r][4]` in `float` (one rounding per
 /// operation), widened. Of two NaN operands: rows 1 and 2 keep the matrix element's of each
-/// product, row 3 the coordinate's; every sum the left partial sum's. A matrix smaller than
-/// 3 x 4 (outside the spec: FreeSurfer's callers pass 4 x 4 ones) gives none.
+/// product, row 3 the coordinate's; every sum the left partial sum's; a NaN made from numbers
+/// is `0xffc00000`. Those choices are made in code (`sse`'s operations pick the NaN operand by
+/// its bits, the left one first), never left to the multiplication: the hardware and the
+/// compiler's operand order differ between platforms and builds. A matrix smaller than 3 x 4
+/// (outside the spec: FreeSurfer's callers pass 4 x 4 ones) gives none.
 pub fn transform_with_matrix(m: &Matrix, x: f64, y: f64, z: f64) -> Option<[f64; 3]> {
     use sse::{add32, mul32};
     if m.rows < 3 || m.cols < 4 || m.is_complex() {

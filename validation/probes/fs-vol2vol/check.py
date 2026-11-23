@@ -55,6 +55,14 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # lost); NOTPORTED (a path relay 53 of track A leaves for later)
 SKIP = ("CRASH", "NOTPORTED")
 
+#: mri_vol2vol prints a seed it takes from the clock (``SynthSeed``, PDFtodSeed) unless --seed is
+#: given, and the crop's ``VmPeak``: what changes from run to run without changing the result
+#: (masked when the cache compares a fresh run with its entry); a case that draws noise from the
+#: clock seed (``--synth`` without ``--seed``) is never cached
+VOLATILE = (r"SynthSeed  -?\d+", r"VmPeak \d+")
+CLOCK = "mri_vol2vol --synth without --seed draws its noise from the clock (PDFtodSeed)"
+
+
 MANIFEST = REPO / "crates-freesurfer" / "Cargo.toml"
 EXAMPLE = REPO / "crates-freesurfer" / "target" / "release" / "examples" / "fs_vol2vol_probe"
 
@@ -173,12 +181,16 @@ def official_line(exe: Path, line: str, root: Path, k: int) -> str:
     for j, a in enumerate(args):
         if a == "--gdiagno" and j + 1 < len(args) and args[j + 1] not in ("0", "-1"):
             raise SystemExit(f"case {k}: --gdiagno above 0 would print the licence's lines")
+    synth = any(x.lower() == "--synth" for x in args) and not any(
+        x.lower() == "--seed" for x in args
+    )
     done = oracle_cache.run(
         [exe.name, *args],
         env=env,
         cwd=d,
         outputs=[d],
-        policy=oracle_cache.Policy(threads=1, family="freesurfer", formats="freesurfer"),
+        policy=oracle_cache.Policy(threads=1, family="freesurfer", formats="freesurfer",
+                                   volatile=VOLATILE, never=CLOCK if synth else ""),
         timeout=30,
         runner="fs-vol2vol-probe",
         inputs=[*inputs, layout(root)],

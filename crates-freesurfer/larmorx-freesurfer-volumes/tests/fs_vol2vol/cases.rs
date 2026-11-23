@@ -584,6 +584,12 @@ fn prelude() -> Vec<String> {
     add(&[], &with(&["--regheader", "--shear", "0.1", "0", "-0.2"]));
     add(&[], &with(&["--reg", "r.dat", "--rot", "1", "2", "3", "--trans", "4", "5", "6", "--shear", "0.01", "0.02", "0.03", "--reg-final", "final.dat"]));
     add(&[], &with(&["--regheader", "--rot", "a", "b", "c"]));
+    // NaN: in the output, in the registration
+    add(&[], &with(&["--regheader", "--mul", "+nan"]));
+    add(&[], &with(&["--regheader", "--mul", "-nan", "--precision", "short"]));
+    add(&[], &with(&["--regheader", "--trans", "nan", "0", "0"]));
+    add(&[], &with(&["--regheader", "--rot", "0", "nan", "0", "--cubic"]));
+    add(&[], &with(&["--reg", "r.lta", "--shear", "inf", "0", "0", "--nearest"]));
     add(&[], &with(&["--regheader", "--seed", "5"]));
     add(&[], &with(&["--regheader", "--seed", "7", "--synth", "--nearest"]));
     add(&[], &["--mov", "m4.mgz", "--targ", "t.mgz", "--regheader", "--o", "o.mgz", "--seed", "3"]);
@@ -775,6 +781,8 @@ pub fn golden_cases() -> Vec<String> {
         &["--mov", "m.mgz", "--targ", "t.mgz", "--reg", "r.dat", "--o", "o.mgz", "--no-resample", "--save-reg"],
         &["--mov", "nan.mgz", "--targ", "t.mgz", "--regheader", "--o", "o.mgz"],
         &["--mov", "nan.mgz", "--targ", "t2.nii.gz", "--lta", "r.lta", "--o", "o.mgz", "--cubic"],
+        &["--mov", "m.mgz", "--targ", "t.mgz", "--regheader", "--o", "o.mgz", "--mul", "+nan"],
+        &["--mov", "m.mgz", "--targ", "t2.nii.gz", "--reg", "r.lta", "--o", "o.mgz", "--trans", "nan", "0", "0"],
     ] {
         out.push(line(&[], &i, &s(a)));
     }

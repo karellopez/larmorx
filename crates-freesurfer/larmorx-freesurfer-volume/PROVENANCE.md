@@ -159,8 +159,8 @@ here); `include/macros.h`'s `MAX`; the official build's operand orders from the 
   `REGIONprint` (495-499); `FZERO`'s 1e-5 of this file.
 - `src/mrivoxel.rs` (3.1-38; relay 21): `utils/mrivoxel.cpp` `MRIvoxelDx`, `MRIvoxelDy`, `MRIvoxelDz` (55-148),
   `MRIvoxelMean` (174-205), `MRIvoxelDirection` (316-384), `MRIvoxelGradientDir2ndDerivative` (393-433); operand
-  orders from `mrivoxel.cpp.o`. Changes: FS-485 (the window not cut by default), FS-486 (0 for a sample never
-  written, both modes).
+  orders from `mrivoxel.cpp.o`. Changes: FS-485 (the window not cut by default); a sample the trilinear path
+  does not write leaves the previous one (the first is the nearest-voxel path's, always written).
 - `src/talairachex.rs` (3.1-38; relay 22): `utils/talairachex.cpp` `ModifyTalairachCRAS` (33-95),
   `MtalairachFromVoxel` (111-127), `MtalVoxelFromVoxel` (129-148), `MvoxelFromTalairach` (150-164),
   `MvoxelFromTalVoxel` (166-184), `TransformWithMatrix` (207-253), `MRIvoxelToTalairachEx` (255-263),

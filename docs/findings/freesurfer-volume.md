@@ -602,8 +602,11 @@ Source: `utils/region.cpp` 116-133, 299-499 (`REGIONclear`, `REGIONcopy`, `REGIO
   pair with other voxels' gradients and the tail is stack contents (the probe saw `0xffffffff`, `0xfffffed0`).
 - `MRIvoxelGradientDir2ndDerivative`: `len` via `sqrtss` (`sqrtf` for negatives); `d2I_dg2 -= val` keeps the first
   difference in `double` and rounds it when it is reloaded (the same as rounding each step); `d` is a `float`
-  counter compared with `(float)whalf`. **FS-486** (a): `double val` is uninitialised before the first
-  `MRIsampleVolume`, which leaves it for refused types.
+  counter compared with `(float)whalf`. `double val` is uninitialised before the first `MRIsampleVolume`, but
+  that call is at whole coordinates, where `MRIsampleVolume` takes `MRIsampleVolumeType`'s nearest path, which
+  writes `*pval` for every type (0 for a refused one, after its error); later trilinear samples of a refused type
+  leave the previous value. No value is ever read unwritten (relay 21 had registered it as a defect; withdrawn
+  2026-11-23, track E's relay 17, the replica's dead branch removed in track C's relay 46).
 - Layering (for the orchestrator): `cma.cpp`'s `MRIaqueductSeg` calls `clustGetClusters` (`volcluster.cpp`, fs.filter
   3.1-44) and `CTABreadDefault`; fs.filter sits above fs.volume, so it cannot be ported in this crate (as
   `MRIdistanceTransform`). `resample.cpp`'s surface functions (`vol2surf_linear`, `MRISapplyReg`, `surf2surf_nnfr`,

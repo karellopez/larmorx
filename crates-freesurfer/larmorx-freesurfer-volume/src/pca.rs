@@ -32,6 +32,7 @@ use larmorx_freesurfer_core::matrix::{
 };
 use larmorx_freesurfer_core::matrix_decomp::matrix_svd;
 use larmorx_freesurfer_core::sse::{add64, div, div64, mul, mul64, sqrt, sqrt64};
+use larmorx_freesurfer_io::cfile::CFile;
 use larmorx_freesurfer_mri::mri::{MRI_FLOAT, Mri, mri_alloc_sequence, mri_copy_header};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 
@@ -295,20 +296,25 @@ pub fn print_pca_stats(fp: &mut dyn Write, spca: &Matrix) -> i32 {
 /// `WritePCAStats(fname, Spca)`: [`print_pca_stats`] into the file `fname` (relative names in the
 /// program's working directory `dir`), which FreeSurfer opens and never closes (its lines reach the
 /// file when the program ends). A file that cannot be opened prints `ERROR: opening <fname>` on
-/// standard output and gives 1; else 0.
-pub fn write_pca_stats(out: &mut dyn Write, dir: Option<&Path>, fname: &str, spca: &Matrix) -> i32 {
-    let path = match dir {
-        Some(d) if !Path::new(fname).is_absolute() => d.join(fname),
-        _ => Path::new(fname).to_path_buf(),
-    };
-    match std::fs::File::create(&path) {
+/// standard output and gives 1, with `errno` left as the failed `fopen` sets it (so a later error
+/// message of the same program prints its text first, fs.core's C-style errors); else 0.
+pub fn write_pca_stats(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    dir: Option<&Path>,
+    fname: &str,
+    spca: &Matrix,
+) -> i32 {
+    match CFile::open(dir, fname, "w") {
         Ok(mut f) => {
             let mut buf = Vec::new();
             print_pca_stats(&mut buf, spca);
             let _ = f.write_all(&buf);
+            let _ = f.flush();
             0
         }
-        Err(_) => {
+        Err(e) => {
+            g.errno = e;
             let _ = writeln!(out, "ERROR: opening {fname}");
             1
         }
@@ -527,4 +533,36 @@ pub fn mri_fdr2vwth(
     };
     note_glibc07(g, if libm.differed() { &libm } else { &libm10 }, names);
     Ok(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    #[test]
+    fn write_pca_stats_leaves_fopen_errno() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut spca = Matrix::real(1, 2);
+        spca.set_relt(1, 1, 3.0);
+        spca.set_relt(1, 2, 1.0);
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            let mut g = Globals::new(mode);
+            let mut out = Vec::new();
+            // a missing folder: fopen's ENOENT stays in errno, the message on standard output
+            g.errno = 0;
+            let r = write_pca_stats(&mut g, &mut out, Some(dir.path()), "nodir/pca.dat", &spca);
+            assert_eq!((r, g.errno), (1, 2), "{mode:?}");
+            assert_eq!(out, b"ERROR: opening nodir/pca.dat\n");
+            // a file that opens: errno untouched, the statistics written
+            g.errno = 0;
+            out.clear();
+            let r = write_pca_stats(&mut g, &mut out, Some(dir.path()), "pca.dat", &spca);
+            assert_eq!((r, g.errno), (0, 0), "{mode:?}");
+            let mut want = Vec::new();
+            print_pca_stats(&mut want, &spca);
+            assert_eq!(std::fs::read(dir.path().join("pca.dat")).unwrap(), want);
+            assert!(out.is_empty());
+        }
+    }
 }

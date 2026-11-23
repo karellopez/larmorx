@@ -251,7 +251,7 @@ filled for §4.2.
 4. The rotation: the transform read again; its matrix replaced by its rotation: `R0` = the matrix
    with its translation's three elements 0; its scale `s_k` the `float` length (`VectorLen`) of
    `R0 e_k` for `k` = 1, 2, 3 (`e_k` the unit vector, fourth element 0); the diagonal matrix of
-   `1.0 / s_k` (computed in `double`, stored as `float`; 1 where `|s_k| < 0.0000001`); the rotation
+   `1.0 / s_k` (computed in `double`, stored as `float`; 1 where `|s_k|` is below `FLT_EPSILON`, 2^-23 (`FZERO`)); the rotation
    `R0` times it (`float` products), with the transform's translation put back in its fourth
    column. A header like 3's for this transform; the volume `U` (a copy of the white matter, the
    header copied over) = the white matter resampled into it (`MRItoTalairachEx`), binarized at 54

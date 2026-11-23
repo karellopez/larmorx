@@ -54,7 +54,11 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 #: or writes memory it does not own there, where the spec gives an error in both modes or fills
 #: what FreeSurfer would read past a volume (FS-53, FS-1201, FS-1206).
 NOT_COMPARABLE = frozenset({"FS-53", "FS-1201", "FS-1206"})
-POLICY = oracle_cache.Policy(threads=1, family="freesurfer", formats="freesurfer")
+#: FreeSurfer's runs compared with their entries: ``--all-info``'s report holds the run's time.
+POLICY = oracle_cache.Policy(
+    threads=1, family="freesurfer", formats="freesurfer", volatile=(r"TimeStamp: \S+",)
+)
+STAMP = re.compile(r"TimeStamp: \S+")
 TIMING = re.compile(r"^(corpus callosum segmentation took) .* minutes$", re.M)
 PEAK = re.compile(r"^#VMPC# mri_cc VmPeak .*$", re.M)
 #: Never a diagnostic setting on the official program: its licence check prints the licence file
@@ -431,8 +435,9 @@ def cases() -> list[Case]:
 
 
 def mask(text: str, port: bool, folder: Path) -> str:
-    """The messages without what differs between the sides: the time, the peak memory, the
-    case's folder, the candidate's notices."""
+    """The messages without what differs between the sides: the time (``--all-info``'s report
+    and the timing line), the peak memory, the case's folder, the candidate's notices."""
+    text = STAMP.sub("TimeStamp: <time>", text)
     text = TIMING.sub(r"\1 <time> minutes", text)
     text = PEAK.sub("#VMPC# mri_cc VmPeak <peak>", text)
     text = text.replace(str(folder), "<folder>")

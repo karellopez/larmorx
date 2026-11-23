@@ -24,6 +24,7 @@ pub mod mode;
 pub mod nonpar;
 pub mod norm;
 pub mod normalize;
+pub mod polv;
 pub mod rfa;
 pub mod segment;
 pub mod sobel;

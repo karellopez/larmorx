@@ -65,8 +65,8 @@ read-only folder). With `--heads`, 24 more: for each of the six recorded heads' 
 recon-all's call and the white-matter path.
 
 Compared for each case and mode: the exit status (a process ended by a signal as 128 + its
-number); standard output and standard error (the time and peak-memory lines, the case's folder and
-the candidate's `larmorx:` lines masked); the names of the files the run made or changed and each
+number); standard output and standard error (`--all-info`'s `TimeStamp`, the time and peak-memory
+lines, the case's folder and the candidate's `larmorx:` lines masked); the names of the files the run made or changed and each
 of them (FreeSurfer's provenance left out: `larmorx_validation.freesurfer.files`). A case whose
 `reproduce` run notes a defect of `NOT_COMPARABLE` (FreeSurfer reads or writes memory it does not
 own: FS-53, FS-1201, FS-1206; their texts are in `crates/larmorx-core/src/defects.rs`) is counted,

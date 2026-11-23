@@ -471,7 +471,11 @@ rule 10).
   their bits), and is checked with `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`
   (`NAN_TRAP_ARM=1` emulates ARM's NaN on x86) and with a debug and a release build. Debug builds
   also check integer overflow: index arithmetic on NaN coordinates (the most negative `int64_t`)
-  uses wrapping operations, as the original's x86-64 code wraps.
+  uses wrapping operations, as the original's x86-64 code wraps. Every test of a crate whose output can hold NaNs
+  runs under that emulation in debug AND release, and builds its NaN inputs from their bits (`f64::from_bits`,
+  the crate's own widening), never through a conversion between float types, whose payload Rust leaves to the
+  compiler: an optimised build folded `f64::from(<a NaN constant>)` to the preferred NaN (2026-11-23, the
+  fs.volume clean room's release-only test failure).
 - **Fixed operation order.** Port the original's order of every sum and product; reductions
   use fixed chunks, independent of the thread count. Write explicit `mul_add` where the
   original fuses, and nothing where it does not; no fast-math, no `target-cpu=native`. A

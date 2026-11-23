@@ -23,7 +23,7 @@ use larmorx_core::vnl_lbfgs::{LbfgsGlobal, lbfgs};
 use larmorx_core::vnl_minimize::{Brent, NonlinearMinimizer, ReturnCode};
 
 use crate::process::{DIAG_VERBOSE, Process, Stop, codes};
-use crate::sse::{add64, mul64, narrow, sub64, widen};
+use crate::sse::{add64, mul64, narrow, sqrt64, sub64, widen};
 
 /// A cost function: FreeSurfer's `float (*)(float *p)`, the parameters at `p[1..=n]`.
 pub type CostFn<'a> = dyn FnMut(&[f32]) -> f32 + 'a;
@@ -513,7 +513,9 @@ impl LbfgsDriver {
         self.num_evaluations = 0;
         self.num_iterations = 0;
         if self.verbose {
-            let xnorm = x.iter().map(|v| v * v).sum::<f64>().sqrt();
+            // the running sum from 0 on the left of each sum (Rust's `sum` would leave two NaNs'
+            // order to the compiler and start an empty sum from -0)
+            let xnorm = sqrt64(x.iter().fold(0.0, |s, &v| add64(s, mul64(v, v))));
             let t = format!(
                 "vnl_lbfgs: n = {n}, memory = {m}, Workspace = {wlen}[ {} MB], ErrorScale = 1, xnorm = {}\n",
                 cfmt::g(wlen as f64 / 128.0 / 1024.0, 6),

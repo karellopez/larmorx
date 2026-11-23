@@ -259,11 +259,10 @@ impl Process {
         wsize: i32,
     ) -> Result<f32, Stop> {
         let g = self.voxel_gradient(m, (x0, y0, z0))?;
-        let len = sse::add32(
+        let len = sse::sqrt32(sse::add32(
             sse::add32(sse::mul32(g[0], g[0]), sse::mul32(g[1], g[1])),
             sse::mul32(g[2], g[2]),
-        )
-        .sqrt();
+        ));
         if f64::from(len.abs()) < 1e-5 {
             return Ok(0.0);
         }

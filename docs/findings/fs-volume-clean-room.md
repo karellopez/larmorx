@@ -549,3 +549,24 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
   paths; part 7b's 16 commands and §54's changes of type; part 8's 32 commands but `tiv`, which reads files and is in the defect tests; §54's other operations, `lta54`, over pools of three geometries with mostly invertible matrices; §55 to §57's 18 commands, `segs57`, on volumes of labels with ordinary geometries; part 9's 16 commands, `part9`, with §55's upsampling and §56's shift-map resampling; part 10a's 9 commands, `part10`, with `NO_AVERAGE305` and the diagnostic bits; 0.24 s in a debug build), identical in debug and release builds on x86-64 and under the
   AArch64 NaN emulation of both (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`).
 - **How we know:** *measured* (2026-11-23, relays 10 to 18).
+
+## NaN choices made in code, and NaN test inputs made by their bits (relay 19)
+
+- **What:** every test of the crate (unit, defect, golden and the probe commands' tests: 212) passes
+  in debug and release builds, plainly and under the AArch64 NaN emulation. The one that failed,
+  `TransformWithMatrix`'s NaN-operand test (§46), failed in a release build plainly too: its row 3
+  gave `0x7ff8000000000000` instead of the coordinate's payload, because the test made its double
+  NaN with `f64::from(<a float NaN constant>)`, which an optimised build folds to the preferred NaN
+  (Rust leaves the payload of a NaN converted between float types to the compiler). The function
+  was right (its operations pick the NaN operand by its bits, in §46's order); the test now builds
+  its input with `sse::widen`. A search of every plain float operation of the crate (clippy's
+  `float_arithmetic`, 251 sites; float `min`, `max`, `clamp`, rounding and square roots besides)
+  found six, in four functions, where a NaN's bits were left to the hardware or the compiler where
+  the specs state them, now made explicit: `randomNumber`'s double arithmetic
+  (infinite bounds make the default NaN `0xfff8000000000000`; of two NaN bounds `hi`'s), the L-BFGS
+  line's `xnorm` (a running sum from 0, not Rust's iterator sum, which leaves two NaNs' order to the
+  compiler and starts an empty sum from -0), and the square roots of `MRIpca` (three) and
+  `MRIvoxelGradientDir2ndDerivative` (a negative number gives the default NaN with the sign set).
+  The probe's groups that reach them are unchanged in both modes (fs.core `random`, fs.maths
+  `minimizers`, `vtal`, `vcov`, `vrules19`, `vvoxel`: 0 unexplained).
+- **How we know:** *measured* (2026-11-23, relay 19; the earlier records' counts, group for group).

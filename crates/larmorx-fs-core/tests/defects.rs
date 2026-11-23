@@ -110,6 +110,33 @@ fn fs05_seed_not_a_long() {
     }
 }
 
+/// `randomNumber`'s double arithmetic with x86-64's NaN rules (spec §0, §9), the same bits on
+/// every platform: infinite bounds make the default NaN (sign set), and of two NaN bounds the
+/// result keeps `hi`'s (the left operand of `hi - low`, then the product's in the sum).
+#[test]
+fn random_number_nan_operands() {
+    let (mut p, _, e) = run(Environment::new(), UpstreamDefects::Fix);
+    p.set_random_seed(7);
+    for (low, hi) in [
+        (f64::INFINITY, f64::INFINITY),
+        (f64::NEG_INFINITY, f64::INFINITY),
+    ] {
+        let v = p.random_number(low, hi).unwrap();
+        assert_eq!(v.to_bits(), 0xfff8_0000_0000_0000, "{low} {hi}");
+    }
+    let (a, b) = (
+        f64::from_bits(0x7ff8_0000_0000_0123),
+        f64::from_bits(0xfff4_0000_0000_0456),
+    );
+    let v = p.random_number(a, b).unwrap();
+    assert_eq!(v.to_bits(), 0xfffc_0000_0000_0456);
+    assert!(
+        e.text().is_empty(),
+        "{}",
+        String::from_utf8_lossy(&e.text())
+    );
+}
+
 #[test]
 fn fs06_outside_the_table() {
     let quiet = |b: u32| f32::from_bits(b | 0x0040_0000);

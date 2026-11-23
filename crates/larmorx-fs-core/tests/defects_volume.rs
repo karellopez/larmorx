@@ -2015,10 +2015,14 @@ fn fs12_histoseg_a_nan_width_and_nan_values() {
 #[test]
 fn transform_with_matrix_nan_operands() {
     use larmorx_fs_core::maths::matrix::{MATRIX_REAL, Matrix};
+    use larmorx_fs_core::sse::widen;
     use larmorx_fs_core::volume::talairach::transform_with_matrix;
+    // The double coordinate is made by its bits (`widen`), not by `f64::from`: Rust leaves the
+    // payload of a NaN converted between float types to the compiler, and an optimised build
+    // folds `f64::from(<a NaN constant>)` to the preferred NaN `0x7ff8000000000000`.
     let (a, b) = (
         f32::from_bits(0x7fc0_1234),
-        f64::from(f32::from_bits(0x7fc0_5678)),
+        widen(f32::from_bits(0x7fc0_5678)),
     );
     let mut m = Matrix::zeros(4, 4, MATRIX_REAL);
     for k in 1..=4 {
@@ -2032,4 +2036,15 @@ fn transform_with_matrix_nan_operands() {
     let wide = |q: u64| 0x7ff8_0000_0000_0000u64 | (q << 29);
     let got: Vec<u64> = p.iter().map(|v| v.to_bits()).collect();
     assert_eq!(got, [wide(0x1234), wide(0x1234), wide(0x5678)]);
+    // A NaN made from numbers (an infinity times 0) is x86-64's default NaN `0xffc00000` on
+    // every platform (AArch64's multiplication would give `0x7fc00000`), and of it and a NaN
+    // element met in the sum the left partial sum's is kept.
+    let mut m = Matrix::zeros(4, 4, MATRIX_REAL);
+    m.set(1, 1, f32::INFINITY);
+    m.set(2, 2, f32::INFINITY);
+    m.set(2, 4, f32::from_bits(0x7fc0_4321));
+    m.set(3, 3, f32::INFINITY);
+    let p = transform_with_matrix(&m, 0.0, 0.0, 0.0).expect("a 4 x 4 matrix");
+    let got: Vec<u64> = p.iter().map(|v| v.to_bits()).collect();
+    assert_eq!(got, [0xfff8_0000_0000_0000; 3]);
 }

@@ -24,7 +24,10 @@ GEO = (
     + "0000000000000000 0 00000000 00000000 0 1 null null"
 )
 PRIME = 0x100000001B3
-STARTS = {"probe's 1469598103934665603": 1469598103934665603, "usual 14695981039346656037": 14695981039346656037}
+STARTS = {
+    "probe's 1469598103934665603": 1469598103934665603,
+    "usual 14695981039346656037": 14695981039346656037,
+}
 
 
 def fnv1a(b: bytes, h: int) -> int:
@@ -52,9 +55,18 @@ def main() -> None:
     batch = os.path.join(work, "conform_hash.txt")
     with open(batch, "w", encoding="utf-8") as f:
         f.write("".join(f"conform 2 {v} 0 4 3ff0000000000000 0\n" for v, _ in CASES))
-    env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "OMP_NUM_THREADS": "1", "LARMORX_UPSTREAM_DEFECTS": "reproduce"}
-    r = subprocess.run([exe, "batch", batch], env=env, cwd=work, capture_output=True, timeout=600, check=False)
-    for (_, data), line in zip(CASES, r.stdout.decode("latin-1").rstrip("\n").split("\n"), strict=False):
+    env = {
+        "PATH": "/usr/bin:/bin",
+        "LC_ALL": "C",
+        "OMP_NUM_THREADS": "1",
+        "LARMORX_UPSTREAM_DEFECTS": "reproduce",
+    }
+    r = subprocess.run(
+        [exe, "batch", batch], env=env, cwd=work, capture_output=True, timeout=600, check=False
+    )
+    for (_, data), line in zip(
+        CASES, r.stdout.decode("latin-1").rstrip("\n").split("\n"), strict=False
+    ):
         printed = line.split("|")[0].split()[-1]
         fits = [name for name, h0 in STARTS.items() if printed == f"h{fnv1a(data, h0):016x}"]
         print(data.hex(), printed, "fits:", ", ".join(fits) or "none")

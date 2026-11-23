@@ -55,8 +55,15 @@ def main() -> None:
     batch = os.path.join(work, "dilate_empty_box.txt")
     with open(batch, "w", encoding="utf-8") as f:
         f.write("\n".join(CASES) + "\n")
-    env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "OMP_NUM_THREADS": "1", "LARMORX_UPSTREAM_DEFECTS": mode}
-    r = subprocess.run([exe, "batch", batch], env=env, cwd=work, capture_output=True, timeout=600, check=False)
+    env = {
+        "PATH": "/usr/bin:/bin",
+        "LC_ALL": "C",
+        "OMP_NUM_THREADS": "1",
+        "LARMORX_UPSTREAM_DEFECTS": mode,
+    }
+    r = subprocess.run(
+        [exe, "batch", batch], env=env, cwd=work, capture_output=True, timeout=600, check=False
+    )
     for case, line in zip(CASES, r.stdout.decode("latin-1").rstrip("\n").split("\n"), strict=False):
         print(" ".join(case.split(" ")[:7]), line.split("|")[0].split()[-1])
 

@@ -20,8 +20,8 @@
 //!
 //! Cubic B-spline sampling (`SAMPLE_CUBIC_BSPLINE`) samples the source's cubic B-spline
 //! coefficients ([`crate::bspline`], `MRItoBSpline` of degree 3, made once per call). A voxel-shift
-//! transform that is not voxel-to-voxel ends with a port error (its change of type is not wired
-//! here yet).
+//! transform that is not voxel-to-voxel is changed to it on a copy (`LTAchangeType`, track A's
+//! relay 53: [`mri_vol2vol_vsm_env`]).
 //!
 //! `MRIvol2VolFill` (relay 29) maps the other way, each source voxel to its nearest target voxel,
 //! summing (or averaging) the voxels that land in one; FS-504 where `MRImaskAndUpsample` returns no

@@ -62,6 +62,9 @@ ported file is audited for third-party code first).
 | `mri_robust_register/mri_robust_register.cpp` 71-142, 592-1360, 1424-1827, 1838-2370 (queue item 3.2-13, track C relay 44) | `Parameters`, `main` (FS-1071), `printUsage`, `initRegistration` (FS-1072), `parseNextCommand` (FS-1070), `parseCommandLine`; the robust cost's path (the Powell costs, `entropyImage`, `--test`, `--debug`: "not ported yet"); the program `mri_robust_register` of `larmorx-freesurfer` | `src/mri_robust_register/main.rs`, `options.rs` |
 | `mri_robust_register/MyMRI.cpp` 580-612 (3.2-13) | `MyMRI::setTypeUCHAR`, `MyMRI::setMaxOutsideVal` | `src/mri_robust_register/main.rs` |
 | `mri_robust_register/mri_robust_register.help.xml` (3.2-13) | the help text, copied unchanged (`printUsage` renders it) | `src/mri_robust_register/mri_robust_register.help.xml` |
+| `mri_vol2vol/mri_vol2vol.cpp` 492-638, 1316-1693, 2148-2420 (queue item 3.2-38, part 1; track A relay 53) | the file statics (`Options`), `parse_commandline` (`--spm-warp`, `--gcam`/`--gcam0`, `--map-point` read their arguments and end as not ported yet), `check_options` (FS-1177, FS-1178, FS-1180, FS-1183), `dump_options`, `print_version`, `argnerr`, `singledash`, `istringnmatch`, `LoadRtal`, `LoadRfsl` | `src/mri_vol2vol/options.rs` |
+| `mri_vol2vol/mri_vol2vol.cpp` 1695-2145 (3.2-38) | `print_usage`'s and `print_help`'s texts (their `printf` literals, unescaped) | `src/mri_vol2vol/usage.txt`, `help.txt` |
+| `mri_vol2vol/mri_vol2vol.cpp` 640-1310 (3.2-38, part 1) | `main` (FS-1178, FS-1179, FS-1181, FS-1182; the morphs, `--disp` and `--cost` end as not ported yet: part 2) | `src/mri_vol2vol/main.rs` |
 
 Third-party code: none in `mri_normalize.cpp` (FreeSurfer's own file, MGH's notice). Its library
 calls are the other crates' (`larmorx-freesurfer-filter`'s normalisation, `-volume`, `-surf`,
@@ -88,6 +91,18 @@ MGH's notice). Their library calls are the other crates' (`larmorx-freesurfer-io
 `MRIreadInfo`, `MRIread`, `MRIwrite` and FreeSurfer's `.xfm` reader on `larmorx_io::xfm`, MINC's
 volume_io: MNI's notice; `-mri`'s transform matrices; `-volume`'s slice direction; `-core`'s
 version, help and error messages).
+
+Third-party code: none in `mri_vol2vol.cpp` (FreeSurfer's own, MGH's notice; Doug Greve's). Its
+library calls are the other crates' (`larmorx-freesurfer-io`'s `MRIread`, `MRIreadHeader`,
+`MRIwrite`, `regio_read_register`, `regio_write_register`, `regio_read_registermat`,
+`regio_read_mincxfm`, `CTABreadASCII`, `fio_dirname`; `-volume`'s `MRIvol2Vol`,
+`MRIvol2VolTLKernel`, `MRIvol2VolDelta`, `MRIvol2VolFill`, `MRIvol2VolVSM`, `TransformRegDat2LTA`,
+`MRIcrop`, `MRIreverseSlices`, `MRIhalfCosBias`, `MRImultiplyConst`, `MRIsetVoxelToRasXform`,
+`MRIangles2RotMat`, `DevolveXFM`, `MRIrandn`, `MRIbinarize`, the LTA reader, writer, inverse,
+change of type and geometry; `-gca`'s `TransformLTA2RegDat`; `-filter`'s `MRIsoapBubble`; `-mri`'s
+`MRItkRegMtx`, `MRIfsl2TkReg`, the voxel-to-RAS matrices, `MRIboundingBox`, `LTAalloc`; `-core`'s
+matrices, version options, `PDFtodSeed`, `GetVmPeak`, `nint`) and `larmorx-core`'s `drand48`
+(POSIX's definition).
 
 ## Changes from the originals
 
@@ -186,3 +201,13 @@ added for `Scale`, BSD-3-Clause (VXL)).
   open); FS-1070 and FS-1071 with `reproduce` print the C++ runtime's and the C library's lines and
   end with status 134 (standard output as flushed: each option's line is). The time taken comes
   from the clock (masked by the probe).
+
+- `mri_vol2vol` (relay 53): its file statics are `Options` (owned strings; `R` an owned matrix:
+  FreeSurfer's `R` points into the `--lta` array's matrix, and nothing reads the array's matrix
+  after `R` changes); `in`/`mri_template` and `mov`/`targ` are one pair of volumes (FreeSurfer's two
+  names point at the same two); the options' `setenv` calls change the program's own copy of the
+  environment; the version options keep `argc` (`handle_version_option_whole`, FS-07); the noise
+  seed's `unsigned long` is stored as an `int` (its low 32 bits); a `reproduce` abort (FS-1178)
+  prints the C library's `*** buffer overflow detected ***: terminated` and ends with status 134,
+  the crashes (FS-1179's division by 0: 136; FS-1180, FS-1181: 139) end with their statuses, the
+  unflushed standard output FreeSurfer loses there not modelled (the probe counts those cases).

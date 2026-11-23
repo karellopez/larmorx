@@ -525,8 +525,10 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     let norm = read_input(g, r, &ifname, "aseg")?;
     let mut fornix = mri_clone(g, r.out, r.err, &aseg, None)?.unwrap_new();
     let found = find_cc_with_aseg(g, r, &o, &aseg, &norm, &mut fornix)?;
+    // FS-1204: a failed write ends the run with status 1 by default only after the rest is done
+    let mut failed: Vec<String> = Vec::new();
     if o.write_lta && found.lta_unwritten {
-        unwritten(g, &o.lta_fname)?;
+        failed.push(o.lta_fname.clone());
     }
     drop(norm);
     let mut cc = found.cc;
@@ -747,7 +749,13 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     let _ = writeln!(r.out, "#VMPC# mri_cc VmPeak  {peak}");
     let _ = writeln!(r.out, "mri_cc done");
     if !written {
-        unwritten(g, &ofname)?;
+        failed.push(ofname);
     }
-    Ok(())
+    let mut status = Ok(());
+    for f in &failed {
+        if let Err(e) = unwritten(g, f) {
+            status = Err(e);
+        }
+    }
+    status
 }

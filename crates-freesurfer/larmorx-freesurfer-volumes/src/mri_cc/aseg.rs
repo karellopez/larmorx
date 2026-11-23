@@ -379,8 +379,7 @@ pub fn find_voxels_close_to_both_hemis(
     let yt = aseg.yi.as_deref().unwrap_or(&[]).to_vec();
     let zt = aseg.zi.as_deref().unwrap_or(&[]).to_vec();
     let clamping = |t: &[i32], n: i32| {
-        whalf >= 0
-            && whalf < MAX_INDEX
+        (0..MAX_INDEX).contains(&whalf)
             && (-whalf..n.saturating_add(whalf)).all(|i| {
                 let k = i64::from(i) + i64::from(MAX_INDEX);
                 k >= 0 && (k as usize) < t.len() && t[k as usize] == i.clamp(0, (n - 1).max(0))
@@ -458,7 +457,7 @@ fn widen(m: &mut [bool], dims: [usize; 3], wh: usize) {
         let total = m.len();
         for start in 0..total {
             // the first voxel of each line along `axis`
-            if (start / stride) % len != 0 {
+            if !(start / stride).is_multiple_of(len) {
                 continue;
             }
             line.clear();
@@ -1292,24 +1291,25 @@ pub fn remove_fornix_new(g: &mut Globals, r: &mut Run, slice: &Mri) -> Result<Mr
                 ystart = ystart.max(0);
                 for y1 in ystart..height {
                     if ival(g, r, &edited, x, y1)? == LABEL_IN_CC {
-                        if no_thickness && !g.notices.reproduce() {
+                        if no_thickness {
                             would_erase += 1;
-                        } else {
+                        }
+                        if !no_thickness || g.notices.reproduce() {
                             set(g, r, &mut edited, x, y1, 0, LABEL_ERASE as f32)?;
                         }
                     }
                 }
             }
         }
-        if no_thickness && (would_erase > 0 || g.notices.reproduce()) {
+        if no_thickness && would_erase > 0 {
             g.notices.add(
                 &FS_1202,
                 format!(
-                    "mri_cc: a sagittal slice's fornix gives no thickness (FreeSurfer's maximum {max_thickness}){}",
+                    "mri_cc: a sagittal slice's fornix gives no thickness (FreeSurfer's maximum {max_thickness}): {would_erase} voxels {}",
                     if g.notices.reproduce() {
-                        String::new()
+                        "shaved as FreeSurfer does"
                     } else {
-                        format!(": {would_erase} voxels FreeSurfer would shave kept")
+                        "FreeSurfer would shave kept"
                     }
                 ),
             );

@@ -2,8 +2,8 @@
  "name": "freesurfer-mri-binarize",
  "tool": "mri_binarize (FreeSurfer 8.2.0)",
  "status": "experimental",
- "larmorx_commit": "e19d329d159c",
- "generated": "2026-11-21",
+ "larmorx_commit": "d84bebf77797",
+ "generated": "2026-11-23",
  "platform": "Linux x86_64",
  "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_binarize/) and larmorx-freesurfer-deform (src/tess.rs), the larmorx-freesurfer program",
  "reference": "FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mri_binarize) and its recon-all runs' files (oracles/freesurfer-8.2.0/runs/)",
@@ -42,50 +42,50 @@
    "fix-skip": 3
   },
   "seconds": {
-   "reproduce": 207.2,
-   "fix": 216.3,
-   "official": 1.9
+   "reproduce": 212.2,
+   "fix": 222.3,
+   "official": 2.2
   }
  },
  "program": [
   {
    "seed": 1,
-   "cases": 130,
+   "cases": 133,
    "verdicts": {
-    "identical": 122,
-    "fix-identical": 107,
-    "fix-explained": 15,
+    "identical": 125,
+    "fix-identical": 106,
+    "fix-explained": 19,
     "reproduce-skip": 8,
     "fix-skip": 8
    }
   },
   {
    "seed": 2,
-   "cases": 130,
+   "cases": 133,
    "verdicts": {
-    "identical": 122,
-    "fix-identical": 107,
-    "fix-explained": 15,
+    "identical": 125,
+    "fix-identical": 106,
+    "fix-explained": 19,
     "reproduce-skip": 8,
     "fix-skip": 8
    }
   }
  ],
  "golden_sha256": {
-  "reproduce": "42a367a2dc0faa347eb31e6a315b95ac3098e1dd3f50a5b8c25691cf04d7a5d5",
-  "fix": "e2cb236f9a1c5c592df596f988a37c38adea2a1b8fc919aa52268badc6da55a8"
+  "reproduce": "76bdf3d94f233cad211f17a0e4ca5b0122fe6fc798a292543122ba4d163f0897",
+  "fix": "be04301f13838bbdf18d4ed1d06209755228937f1be1f748ddf8bb3606698216"
  },
  "memory": [
   {
    "case": "wm-mask",
    "mode": "reproduce",
-   "larmorx_mib": 133.7,
+   "larmorx_mib": 134.2,
    "freesurfer_mib": 139.5
   },
   {
    "case": "wm-mask",
    "mode": "fix",
-   "larmorx_mib": 134.5,
+   "larmorx_mib": 134.2,
    "freesurfer_mib": 139.5
   },
   {
@@ -97,7 +97,7 @@
   {
    "case": "ones",
    "mode": "fix",
-   "larmorx_mib": 86.0,
+   "larmorx_mib": 85.8,
    "freesurfer_mib": 87.5
   },
   {
@@ -109,19 +109,19 @@
   {
    "case": "wm255",
    "mode": "fix",
-   "larmorx_mib": 86.0,
+   "larmorx_mib": 85.8,
    "freesurfer_mib": 88.0
   },
   {
    "case": "surf",
    "mode": "reproduce",
-   "larmorx_mib": 141.0,
+   "larmorx_mib": 140.5,
    "freesurfer_mib": 144.8
   },
   {
    "case": "surf",
    "mode": "fix",
-   "larmorx_mib": 140.5,
+   "larmorx_mib": 141.0,
    "freesurfer_mib": 144.8
   }
  ]

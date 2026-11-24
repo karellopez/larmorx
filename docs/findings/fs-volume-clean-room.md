@@ -1,11 +1,11 @@
 # fs.volume's clean room: what black-box runs showed (unrestricted)
 
-The clean room of FreeSurfer 8.2.0's volume functions, parts 1 to 9, 10a and 10b of the spec and §54 to §57
+The clean room of FreeSurfer 8.2.0's volume functions, parts 1 to 10 of the spec and §54 to §57
 (`crates/larmorx-fs-core/src/volume/`, the rest of queue item C3.1-05), was written from
-[`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) §1 to §51 and §54 to §58 (part 9: volume-to-volume
+[`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) §1 to §53 and §54 to §58 (part 9: volume-to-volume
 resampling, frame covariance and PCA, the false discovery rate, regions, voxel neighbourhood measures;
 part 10a: the Talairach helpers, dilation and the segment helpers; part 10b: conforming, the set
-operations, morphology, masks and counts;
+operations, morphology, masks and counts; part 10c: the volume histograms;
 the operations on a transform array; segmentations onto another grid, SPM warps, segment statistics and
 shifts, crops), and checked only against
 black boxes: the prebuilt probe `fs_volume_probe` (FreeSurfer's compiled library and the C library,
@@ -387,6 +387,46 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
 - **How we know:** *validated* (`vaseg`, `vsegs`, `vcrops`, `vrules15`, `vrules16`, both modes,
   2026-11-23, relay 17; the defect tests in `tests/defects_volume.rs`).
 
+## Part 10c: the volume histograms (§52, §53)
+
+- **What:** `vhist` (605 calls) and the fixed group `vrules23` (130, one of them in its batch without
+  the guard runs; its first 34 calls are relay 20's items 119 and 121) are identical with `reproduce` in
+  every line but where FreeSurfer crashed or hung: NaN bins counted at -2147483648 (FS-498), a low
+  limit of -1 that ends in the C library's `free()` abort and a given result too small (FS-499), ints
+  and a later window's infinity in `MRIhistoSegment` (FS-501), FS-502's gray-matter limit of -2 after
+  the alarm, a region missing. `fix`: every other line identical or corrected by a noted defect (FS-499,
+  FS-500, FS-12, and fs.maths' FS-19, FS-20 and FS-22 in the histograms it calls).
+- Readings the probe decided, where the spec's text says otherwise or nothing:
+  - `MRIhistogramRegionWithThreshold` adds its samples into FreeSurfer's per-thread histogram, a new
+    `HISTOinit(NULL, nbins, min, max)` (its `max_bins` is `nbins`), whose counts are then added into
+    the result. Two things show it: a negative bin count ends the program at that histogram's
+    `HISTOalloc` (status 254) also when a histogram is given (7 `vhist` lines: counts of -1, and of
+    -2147483648 when no voxel reaches the threshold); and with a range of one value, where
+    `HISTOaddSample` places a sample by the histogram's own minimum and bin size, those are the new
+    histogram's (the empty range `[0, nbins - 1]`), not a given one's, whose `max_bins` may be larger:
+    a one-voxel window of 87 in one bin of a given histogram of 16 allocated counts 1 in bin 0 (the new
+    histogram's size is NaN, the sample's bin -2147483648 put in bin 0), where the given histogram's own
+    infinite size would put the sample exactly on bin 0 (not counted under `reproduce`, FS-20). Where the
+    result's `max_bins` is `nbins` (a new or reallocated histogram) the two readings agree, and such lines
+    show the new histogram is initialised over the range, not left at zeros: values of 15 and 44 beyond
+    5 and 20 bins land in the last bin (a zeroed one would put them in bin 0). The candidate builds that
+    histogram in both modes (fs.maths' corrections of `HISTOaddSample` then apply by default).
+  - `MRIgetEqualizeHisto`'s bins after `high` run while below the volume's histogram's bin count;
+    `MRIhistoEqualize`'s search runs while below the template's; `MRIhistoSegment`'s `DIAG_SHOW` lines
+    count the voxels of label 128 visited ("processed") and those given 255 or 1 ("labeled"); its
+    gray-matter search runs also without a white-matter peak, and its loop only when both peaks were
+    found (the readings every probed line agrees with; for the spec writer).
+- Two changes to earlier code: `MRIvalRangeRegion`'s end `x + dx` now in 32-bit wrapping arithmetic,
+  as §52 says of its regions (it saturated; no line of an earlier group changed), and fs.maths'
+  `HISTOinit` takes `n - 1` in C's `int` (a count of -2147483648 wraps instead of overflowing).
+- Not probed: FS-965 (FreeSurfer allocates gigabytes; a hand line in the defect tests: a range of
+  100,000,001 bins ends the program, status 254, in both modes) and FS-503 (larmorx sums one histogram
+  at any thread count, no notice).
+- **How we know:** *validated* (the two groups and every earlier one, both modes, 2026-11-24, relay
+  21, log `oracles/logs/fs-cleanroom-2-relay21-chain-a.log`: 66 groups, 20,600 calls, none unexplained
+  in either mode; the defect tests in `tests/defects_volume.rs`: FS-498 to FS-502 on `vrules23`'s own
+  lines, FS-965 on a line written for it).
+
 ## Part 10b: conforming, set operations, morphology, masks and counts (§49 to §51)
 
 - **What:** `vconf` (71 calls), `vset` (500), `vmorph` (340), `vmask` (110) and the fixed group
@@ -599,10 +639,10 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
   the transform files in memory, several in one process; part 5's labels, segmentation functions
   and the statistics cache's text and reading in memory; part 6a's 11 commands; part 6b's and 6c's
   13, the diagnostic bits' prints included; part 7a's 11, fs.bspline's 10 and the cubic B-spline
-  paths; part 7b's 16 commands and §54's changes of type; part 8's 32 commands but `tiv`, which reads files and is in the defect tests; §54's other operations, `lta54`, over pools of three geometries with mostly invertible matrices; §55 to §57's 18 commands, `segs57`, on volumes of labels with ordinary geometries; part 9's 16 commands, `part9`, with §55's upsampling and §56's shift-map resampling; part 10a's 9 commands, `part10`, with `NO_AVERAGE305` and the diagnostic bits; part 10b's 34 commands, `part10b` (conforming's matrix and template only: `MRIconform`'s 256^3 result is beyond rule 10's golden size, `vconf` compares it); 68 SHA-256 over 34 groups, about 0.26 s in a debug build), identical in debug and release builds on x86-64 and under the
+  paths; part 7b's 16 commands and §54's changes of type; part 8's 32 commands but `tiv`, which reads files and is in the defect tests; §54's other operations, `lta54`, over pools of three geometries with mostly invertible matrices; §55 to §57's 18 commands, `segs57`, on volumes of labels with ordinary geometries; part 9's 16 commands, `part9`, with §55's upsampling and §56's shift-map resampling; part 10a's 9 commands, `part10`, with `NO_AVERAGE305` and the diagnostic bits; part 10b's 34 commands, `part10b` (conforming's matrix and template only: `MRIconform`'s 256^3 result is beyond rule 10's golden size, `vconf` compares it); part 10c's 9 commands, `part10c`, with given histograms, regions outside, NaN and infinite floats and `MRIhistoSegment`'s diagnostic bits; 70 SHA-256 over 35 groups), identical in debug and release builds on x86-64 and under the
   AArch64 NaN emulation of both (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`).
-- **How we know:** *measured* (2026-11-23 and 24, relays 10 to 20; relay 20 ran every test of the
-  crate, 221, in the four configurations).
+- **How we know:** *measured* (2026-11-23 and 24, relays 10 to 21; relay 21 ran every test of the
+  crate, 228, in the four configurations).
 
 ## NaN choices made in code, and NaN test inputs made by their bits (relay 19)
 

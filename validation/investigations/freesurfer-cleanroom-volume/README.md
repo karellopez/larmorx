@@ -1,7 +1,7 @@
-# fs.volume's and fs.bspline's clean rooms against FreeSurfer 8.2.0, as a black box (parts 1 to 9, 10a, 10b, §54 to §57, fs.bspline)
+# fs.volume's and fs.bspline's clean rooms against FreeSurfer 8.2.0, as a black box (parts 1 to 10, §54 to §57, fs.bspline)
 
 larmorx's clean rooms of FreeSurfer's volume functions (`crates/larmorx-fs-core/src/volume/`, written
-from [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) §1 to §51 and §54 to §58 alone) and of its
+from [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) §1 to §53 and §54 to §58 alone) and of its
 B-splines (`crates/larmorx-fs-core/src/bspline/`, from
 [`specs/freesurfer-bspline.md`](../../../specs/freesurfer-bspline.md) alone) compared
 with the prebuilt probe of the open folder [`../freesurfer-volume-probe/`](../freesurfer-volume-probe/README.md)
@@ -31,10 +31,10 @@ The golden cases: `cargo test -p larmorx-fs-core --test golden_volume` (record w
 NAN_TRAP_DIR=<scratch>/nt`, the library built from `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`
 as that folder's README says. The defects' own tests: `cargo test -p larmorx-fs-core --test defects_volume`.
 
-## Results (2026-11-24, relay 20, seed 7, every group of the volume spec's §69.2 and the B-spline spec's §9; the probe's reference hashes are the specs', the probe of commit `4d00c36e`)
+## Results (2026-11-24, relay 21, seed 7, every group of the volume spec's §69.2 and the B-spline spec's §9; the probe's reference hashes are the specs', the probe of commit `fa3837bc`)
 
 `compare.py` per group: calls, identical, FreeSurfer did not finish, memory, defect corrected,
-unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay20-full.log`).
+unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay21-chain-a.log`).
 
 | Group | Calls | reproduce | fix |
 |---|---|---|---|
@@ -56,7 +56,7 @@ unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay20-full.log`).
 | vrules4 | 94 | 94 / 0 / 0 / 0 / **0** | 42 / 0 / 0 / 52 / **0** |
 | vcma | 377 | 354 / 13 / 10 / 0 / **0** | 296 / 13 / 10 / 58 / **0** |
 | vrules5 | 46 | 27 / 7 / 12 / 0 / **0** | 25 / 7 / 12 / 2 / **0** |
-| vres | 830 | 718 / 77 / 35 / 0 / **0** | 498 / 77 / 98 / 157 / **0** |
+| vres | 830 | 716 / 77 / 37 / 0 / **0** | 498 / 77 / 98 / 157 / **0** |
 | vrules6 | 16 | 15 / 1 / 0 / 0 / **0** | 13 / 1 / 0 / 2 / **0** |
 | vframes | 404 | 401 / 3 / 0 / 0 / **0** | 371 / 3 / 0 / 30 / **0** |
 | vderiv | 382 | 358 / 22 / 2 / 0 / **0** | 342 / 22 / 4 / 14 / **0** |
@@ -75,12 +75,12 @@ unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay20-full.log`).
 | vrules10 | 65 | 65 / 0 / 0 / 0 / **0** | 27 / 0 / 0 / 38 / **0** |
 | vrules11 | 28 | 28 / 0 / 0 / 0 / **0** | 28 / 0 / 0 / 0 / **0** |
 | vpvlab | 90 | 83 / 1 / 3 / 3 / **0** | 83 / 1 / 3 / 3 / **0** |
-| vfr8 | 490 | 479 / 7 / 4 / 0 / **0** | 394 / 7 / 11 / 78 / **0** |
+| vfr8 | 490 | 482 / 7 / 1 / 0 / **0** | 395 / 7 / 10 / 78 / **0** |
 | vmri2 | 390 | 384 / 3 / 3 / 0 / **0** | 321 / 3 / 4 / 62 / **0** |
 | vrules12 | 112 | 105 / 6 / 1 / 0 / **0** | 80 / 6 / 2 / 24 / **0** |
 | vrules13 | 13 | 6 / 7 / 0 / 0 / **0** | 6 / 7 / 0 / 0 / **0** |
-| vlta54 | 225 | 217 / 4 / 4 / 0 / **0** | 121 / 4 / 5 / 95 / **0** |
-| vrules14 | 109 | 96 / 4 / 9 / 0 / **0** | 51 / 4 / 9 / 45 / **0** |
+| vlta54 | 225 | 217 / 1 / 7 / 0 / **0** | 121 / 1 / 8 / 95 / **0** |
+| vrules14 | 109 | 96 / 3 / 10 / 0 / **0** | 51 / 3 / 10 / 45 / **0** |
 | vaseg | 219 | 219 / 0 / 0 / 0 / **0** | 216 / 0 / 0 / 3 / **0** |
 | vsegs | 270 | 270 / 0 / 0 / 0 / **0** | 243 / 0 / 0 / 27 / **0** |
 | vcrops | 95 | 95 / 0 / 0 / 0 / **0** | 77 / 0 / 0 / 18 / **0** |
@@ -101,8 +101,23 @@ unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay20-full.log`).
 | vset | 500 | 494 / 3 / 3 / 0 / **0** | 452 / 3 / 5 / 40 / **0** |
 | vmorph | 340 | 340 / 0 / 0 / 0 / **0** | 326 / 0 / 0 / 14 / **0** |
 | vmask | 110 | 108 / 2 / 0 / 0 / **0** | 95 / 2 / 0 / 13 / **0** |
-| vrules22 | 134 | 121 / 11 / 1 / 0 / **1** | 97 / 11 / 3 / 23 / **0** |
-| all | 19,865 | 18,663 / 947 / 227 / 27 / **1** | 14,287 / 947 / 613 / 4,018 / **0** |
+| vrules22 | 134 | 121 / 11 / 1 / 1 / **0** | 97 / 11 / 3 / 23 / **0** |
+| vhist | 605 | 582 / 23 / 0 / 0 / **0** | 397 / 23 / 4 / 181 / **0** |
+| vrules23 | 130 | 117 / 13 / 0 / 0 / **0** | 82 / 13 / 1 / 34 / **0** |
+| all | 20,600 | 19,363 / 979 / 230 / 28 / **0** | 14,767 / 979 / 621 / 4,233 / **0** |
+
+Relay 21 (66 groups, 20,600 calls): `reproduce` 19,363 identical, 979 where FreeSurfer did not finish,
+230 memory lines, 28 lines §69.3 allows (the 27 before and `vrules22`'s destination too small, now named
+by the loop's `both_lines`), **none unexplained**; `fix` 14,767 identical (979 not finished, 621 memory,
+4,233 corrected by a noted defect), none unexplained. Relay 21 followed the spec writer's answers to relay
+20's items 119 to 123 (no code change: the empty box, the conform hash's start state and §50's readings
+were the candidate's already; `vmorph`, `vmask`, `vrules21`, `vrules22` and `vrules23`'s first 34 calls
+identical with `reproduce`), then part 10c (§52, §53: `vhist` and `vrules23`, identical with `reproduce` in
+every line but where FreeSurfer crashed or hung: FS-498's NaN bins, FS-499's `free()` abort and a given
+result too small, FS-501's ints and infinity, FS-502's limit -2 after the alarm, a region missing). Of the
+earlier groups only `vres`, `vfr8`, `vlta54` and `vrules14` moved, between "identical", "memory" and "did
+not finish" (the probe's own runs). `models.py region` and `cov` with the candidate: none different. fs.mri
+(16 groups, 9,511 calls): none unexplained in either mode.
 
 Relay 20 (64 groups, 19,865 calls): `reproduce` 18,663 identical, 947 where FreeSurfer did not finish,
 227 memory lines, the same 27 lines §69.3 allows, and **one unexplained**: `vrules22`'s
@@ -179,9 +194,11 @@ run it and what it showed).
   part 10a's 9 commands, with `NO_AVERAGE305` and the diagnostic bits, the group `part10`;
   part 10b's 34 commands (conforming's matrix and template: `MRIconform`'s 256^3 result is beyond
   the golden size, `vconf` holds it), with `FS_MRIMASK_ALLOW_DIFF_GEOM` and a diagnostic bit, the
-  group `part10b`), both modes, 68 SHA-256 over 34 groups (0.26 s in a debug build). Identical in
-  debug and release builds and under the AArch64 NaN emulation of both (every test of the crate:
-  221 in each of the four configurations, relay 20).
+  group `part10b`; part 10c's 9 commands (the histograms, with given histograms, regions outside,
+  NaN and infinite floats, the diagnostic and heartbeat bits of `MRIhistoSegment`), the group
+  `part10c`), both modes, 70 SHA-256 over 35 groups. Identical in debug and release builds and
+  under the AArch64 NaN emulation of both (every test of the crate: 228 in each of the four
+  configurations, relay 21).
 - `cargo test -p larmorx-fs-core --test defects_volume`: each defect of the spec's §69.4 (FS-265,
   FS-285 to FS-318) and FS-332, FS-258 noted in both modes on a line of the comparison's own batches
   (the shortest), FS-292, FS-296, FS-297, FS-302, FS-305, FS-311 to FS-315 and FS-258 on lines
@@ -219,8 +236,12 @@ run it and what it showed).
   FS-487 (an array of no transform through `MvoxelFromTalairach`, and points through a 3 x 3 transform
   matrix), FS-488 (`MRIfromTalairachEx` without a target), FS-489 (the segmentation as its own mask,
   with and without 0 in the list), FS-490 (a histogram of no bins) and FS-12 in `HISTOseg` (a NaN width,
-  NaN values) on `vrules20`'s lines, and `TransformWithMatrix`'s NaN operands against §46's text; also
-  FS-12, FS-47, ITK-112, FS-52, FS-53 and FS-58.
+  NaN values) on `vrules20`'s lines, and `TransformWithMatrix`'s NaN operands against §46's text; part
+  10b's FS-491 to FS-497 on `vrules22`'s lines; part 10c's FS-498 (a constant volume of 300 in one bin, a
+  first window of one value), FS-499 (a low limit of -1, a given result too small), FS-500, FS-501 (ints,
+  a later window's infinity) and FS-502 (a gray-matter limit of -2) on `vrules23`'s lines and FS-965 (a
+  range of 100,000,001 bins, not probed) on a line written for it; FS-503 has no notice (one
+  histogram's sums at any thread count); also FS-12, FS-47, ITK-112, FS-52, FS-53 and FS-58.
 - Speed (part 4; the spec's plan names none): one batch line each through the probe and the
   candidate, end to end, best of 3: 20,000 points on a 32^3 float volume, trilinear 1.3x faster than
   FreeSurfer, cubic 1.1x, nearest 1.5x, windowed sinc 0.72x (the main package's `sin` and `cos`

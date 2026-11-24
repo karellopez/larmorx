@@ -26,6 +26,9 @@
 //! `cabs(z)^2` (libstdc++'s floating-point form), and every real operation that can meet a NaN
 //! with x86-64's SSE rules.
 
+// the blocks' lists are indexed as FreeSurfer's code indexes them
+#![allow(clippy::needless_range_loop)]
+
 use std::io::Write;
 
 use larmorx_core::cfmt;
@@ -346,7 +349,9 @@ fn pade(g: &mut Globals, err: &mut dyn Write, a: &VnlMatrix, m: usize) -> Result
     svd_solve(g, err, &madd(&mneg(&u), &v), &madd(&u, &v))
 }
 
-/// `expmchk`'s `theta` for `m_vals` 3, 5, 7, 9, 13.
+/// `expmchk`'s `theta` for `m_vals` 3, 5, 7, 9, 13 (FreeSurfer's literals, parsed to the nearest
+/// double as C parses them).
+#[allow(clippy::excessive_precision)]
 const THETA: [f64; 5] = [
     1.495585217958292e-002,
     2.539398330063230e-001,

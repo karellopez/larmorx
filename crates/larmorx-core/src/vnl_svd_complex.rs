@@ -57,7 +57,12 @@
 
 // The loops keep LINPACK's 1-based Fortran indices, so the port can be checked line by line
 // against zsvdc.c.
-#![allow(clippy::needless_range_loop, clippy::too_many_lines)]
+// `!(a >= b)` is the C code's test, true for a NaN
+#![allow(
+    clippy::needless_range_loop,
+    clippy::too_many_lines,
+    clippy::neg_cmp_op_on_partial_ord
+)]
 
 use crate::cplx::{C64, cabs, cxx_div, cxx_mul};
 use crate::vnl_matrix::VnlCMatrix;

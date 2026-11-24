@@ -316,6 +316,14 @@ fn lane(m: &Mat4, a: usize, v: f64, base: [f64; 3]) -> [f64; 3] {
     std::array::from_fn(|k| add64(mul64(m[k][a], v), base[k]))
 }
 
+/// [`lane`] with plain arithmetic: the sampling points of the half-way costs, which only the
+/// samplers' comparisons read (a NaN point is outside whatever its bits), so SSE's NaN choice does
+/// not show.
+#[inline(always)]
+fn lane_plain(m: &Mat4, a: usize, v: f64, base: [f64; 3]) -> [f64; 3] {
+    std::array::from_fn(|k| m[k][a] * v + base[k])
+}
+
 /// The sampling loop the half-way costs share: the target's grid from 0 below `extent - d + 1`
 /// in steps of `d` (slices, rows, columns), each frame; `term(z, vs, vt)` (`z` the slice) for every
 /// pair of samples neither of which is -1.
@@ -340,16 +348,16 @@ fn half_way_samples(
     let (bs, bt) = (ByteSampler::new(s), ByteSampler::new(t));
     let mut z = 0;
     while z < dt[2] {
-        let tz = lane(mti, 2, f64::from(z), col3(mti));
-        let sz = lane(msi, 2, f64::from(z), col3(msi));
+        let tz = lane_plain(mti, 2, f64::from(z), col3(mti));
+        let sz = lane_plain(msi, 2, f64::from(z), col3(msi));
         let mut y = 0;
         while y < dt[1] {
-            let ty = lane(mti, 1, f64::from(y), tz);
-            let sy = lane(msi, 1, f64::from(y), sz);
+            let ty = lane_plain(mti, 1, f64::from(y), tz);
+            let sy = lane_plain(msi, 1, f64::from(y), sz);
             let mut x = 0;
             while x < dt[0] {
-                let pt = lane(mti, 0, f64::from(x), ty);
-                let ps = lane(msi, 0, f64::from(x), sy);
+                let pt = lane_plain(mti, 0, f64::from(x), ty);
+                let ps = lane_plain(msi, 0, f64::from(x), sy);
                 for f in 0..dt[3] {
                     let mut vs = 0.0;
                     sample(&bs, g, err, s, ps[0], ps[1], ps[2], f, &mut vs);

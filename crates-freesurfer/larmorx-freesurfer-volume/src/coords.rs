@@ -381,6 +381,7 @@ pub fn voxel_to_talairach(
 /// `MRIindexNotInVolume(mri, col, row, slice)`: 0 inside `[0, extent - 1]` on every axis, -1
 /// within half a voxel of the edge (each coordinate rounded with `rint` to a `float` inside `[0,
 /// extent)`), 1 outside (NaN included).
+#[inline]
 pub fn index_not_in_volume(mri: &Mri, col: f64, row: f64, slice: f64) -> i32 {
     let (w, h, d) = (mri.vg.width, mri.vg.height, mri.vg.depth);
     if col >= 0.0

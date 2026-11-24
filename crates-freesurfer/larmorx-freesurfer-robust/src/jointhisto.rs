@@ -67,6 +67,18 @@ fn row(m: &Mat4, k: usize, u: f64, v: f64, w: f64) -> f64 {
     )
 }
 
+/// `(int) floor(v)` as x86-64 converts it: a number from 0 below 2^31 truncated straight (its
+/// floor), any other through `floor` and `cvttsd2si` (no call of libm's `floor` for the samples of
+/// byte images, all at or above 0).
+#[inline]
+fn floor_int(v: f64) -> i32 {
+    if (0.0..2_147_483_648.0).contains(&v) {
+        v as i32
+    } else {
+        double_to_int_x86(v.floor())
+    }
+}
+
 impl JointHisto {
     /// `JointHisto()`: 256 x 256 zeros.
     pub fn new() -> JointHisto {
@@ -135,13 +147,13 @@ impl JointHisto {
                     if vs == -1.0 {
                         continue;
                     }
-                    let ivs = double_to_int_x86(vs.floor());
+                    let ivs = floor_int(vs);
                     let mut vt = 0.0;
                     sample(&bt, g, err, t, xt, yt, zt, 0, &mut vt);
                     if vt == -1.0 {
                         continue;
                     }
-                    let ivt = double_to_int_x86(vt.floor());
+                    let ivt = floor_int(vt);
                     if ivs < 0 || ivt < 0 || ivs >= N as i32 || ivt >= N as i32 {
                         let p = |v: f64| cout.os(v);
                         let _ = writeln!(out, "ERROR at ( {} {y} {z} ) ", x - d[0]);

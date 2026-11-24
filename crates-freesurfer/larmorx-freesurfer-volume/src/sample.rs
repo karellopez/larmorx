@@ -56,17 +56,21 @@ pub const SAMPLE_CUBIC_BSPLINE: i32 = 5;
 pub const SAMPLE_VOTE: i32 = 6;
 
 /// x86-64's `(int) x` (`cvttsd2si`): `INT_MIN` for NaN and values outside the `int` range.
+#[inline]
 pub(crate) fn cvtt(x: f64) -> i32 {
     if x.is_nan() || x >= 2_147_483_648.0 || x <= -2_147_483_649.0 {
         i32::MIN
     } else {
-        x.trunc() as i32
+        // `as` truncates toward zero (no call of libm's `trunc`: x86-64's baseline has no
+        // `roundsd`)
+        x as i32
     }
 }
 
 /// `FEQUAL((int)x, x)`: `fabs((int)x - x) < FLT_EPSILON`, the difference in `double`. (The
 /// conversion is undefined for NaN and for values outside the `int` range; x86-64's `INT_MIN`
 /// and any other `int` give the same answer there: not whole.)
+#[inline]
 fn whole(x: f64) -> bool {
     (f64::from(cvtt(x)) - x).abs() < f64::from(f32::EPSILON)
 }
@@ -354,7 +358,7 @@ impl<'a> ByteSampler<'a> {
                 return NO_ERROR;
             }
             let near = |v: f64, n: i32| {
-                let v = (if v < 0.0 { v - 0.5 } else { v + 0.5 }).trunc() as i32;
+                let v = (if v < 0.0 { v - 0.5 } else { v + 0.5 }) as i32;
                 v.clamp(0, n - 1)
             };
             let (xv, yv, zv) = (near(x, w), near(y, h), near(z, d));
@@ -385,24 +389,30 @@ impl<'a> ByteSampler<'a> {
         let ymd = y - f64::from(ym as f32);
         let zmd = z - f64::from(zm as f32);
         let (xpd, ypd, zpd) = (1.0 - xmd, 1.0 - ymd, 1.0 - zmd);
-        let base = frame * d;
-        let v = |xi: i32, yi: i32, zi: i32| self.at(base + zi, yi, xi);
-        // the corners and the additions as `trilinear`'s (a byte voxel is never NaN)
-        let t1 = mul64(xpd * ypd * zpd, v(xm, ym, zm));
-        let t2 = mul64(xpd * ypd * zmd, v(xm, ym, zp));
-        let t3 = mul64(xpd * ymd * zpd, v(xm, yp, zm));
-        let t4 = mul64(xpd * ymd * zmd, v(xm, yp, zp));
-        let t5 = mul64(xmd * ypd * zpd, v(xp, ym, zm));
-        let t6 = mul64(xmd * ypd * zmd, v(xp, ym, zp));
-        let t7 = mul64(xmd * ymd * zpd, v(xp, yp, zm));
-        let t8 = mul64(xmd * ymd * zmd, v(xp, yp, zp));
-        let mut s = add64(t1, t2);
-        s = add64(s, t3);
-        s = add64(t4, s);
-        s = add64(s, t5);
-        s = add64(t6, s);
-        s = add64(t7, s);
-        s = add64(s, t8);
+        // the corners' rows (slice and row of each), then the corners and the additions as
+        // `trilinear`'s; a byte voxel and these weights are finite, so no NaN arises and the plain
+        // operations are SSE's
+        let (h, row) = (self.h as usize, self.row);
+        let base = (frame * d) as usize;
+        let r = |yi: i32, zi: i32| ((base + zi as usize) * h + yi as usize) * row;
+        let (rmm, rpm, rmp, rpp) = (r(ym, zm), r(yp, zm), r(ym, zp), r(yp, zp));
+        let (xm, xp) = (xm as usize, xp as usize);
+        let v = |o: usize| f64::from(self.data[o]);
+        let t1 = xpd * ypd * zpd * v(rmm + xm);
+        let t2 = xpd * ypd * zmd * v(rmp + xm);
+        let t3 = xpd * ymd * zpd * v(rpm + xm);
+        let t4 = xpd * ymd * zmd * v(rpp + xm);
+        let t5 = xmd * ypd * zpd * v(rmm + xp);
+        let t6 = xmd * ypd * zmd * v(rmp + xp);
+        let t7 = xmd * ymd * zpd * v(rpm + xp);
+        let t8 = xmd * ymd * zmd * v(rpp + xp);
+        let mut s = t1 + t2;
+        s += t3;
+        s = t4 + s;
+        s += t5;
+        s = t6 + s;
+        s = t7 + s;
+        s += t8;
         *pval = s;
         NO_ERROR
     }
@@ -868,4 +878,102 @@ fn sinc(
         sum_z
     };
     Ok(NO_ERROR)
+}
+
+#[cfg(test)]
+mod byte_sampler_tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+    use larmorx_freesurfer_mri::mri::mri_alloc_sequence;
+
+    /// [`ByteSampler::sample`] gives [`sample_volume_frame`]'s value bits, status and notices at
+    /// seeded points inside, on the edges, outside, at whole coordinates, at NaN (built from its
+    /// bits), at huge values and at frames the volume does not have, in both modes.
+    #[test]
+    fn the_byte_sampler_gives_the_general_samplers_bits() {
+        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+            for &(w, h, d, nf, outside) in &[
+                (7, 5, 4, 1, 0.0),
+                (6, 9, 3, 3, -1.0),
+                (1, 4, 2, 2, 7.0),
+                (5, 1, 1, 1, 0.0),
+            ] {
+                let mut g = Globals::new(mode);
+                let (mut out, mut err) = (Vec::new(), Vec::new());
+                let mut m = mri_alloc_sequence(&mut g, &mut out, &mut err, w, h, d, MRI_UCHAR, nf)
+                    .expect("a volume");
+                m.outside_val = outside;
+                let mut x: u64 = 0x5eed_0000 + (w * 100 + h * 10 + d) as u64;
+                let mut next = || {
+                    x = x
+                        .wrapping_mul(6364136223846793005)
+                        .wrapping_add(1442695040888963407);
+                    x >> 11
+                };
+                for b in m.chunk.as_mut().expect("voxels").iter_mut() {
+                    *b = (next() & 0xff) as u8;
+                }
+                let b = ByteSampler::new(&m).expect("a byte sampler");
+                let nan = f64::from_bits(0x7ff8_0000_0000_0123);
+                let neg_nan = f64::from_bits(0xfff8_0000_0000_0042);
+                let specials = [
+                    0.0,
+                    -0.0,
+                    0.5,
+                    -0.5,
+                    -0.49,
+                    -0.51,
+                    1.0,
+                    2.0,
+                    3.25,
+                    1e9,
+                    -1e9,
+                    2.5e9,
+                    -2.5e9,
+                    nan,
+                    neg_nan,
+                    f64::INFINITY,
+                    f64::NEG_INFINITY,
+                    4.000_000_1,
+                    3.999_999_9,
+                ];
+                let mut coord = |n: i32, k: u64| -> f64 {
+                    match k % 5 {
+                        0 => specials[(next() % specials.len() as u64) as usize],
+                        1 => f64::from((next() % (n as u64 + 4)) as i32 - 2),
+                        _ => (next() % 100_000) as f64 / 100_000.0 * f64::from(n + 2) - 1.0,
+                    }
+                };
+                for k in 0..4000u64 {
+                    let (px, py, pz) = (coord(w, k), coord(h, k / 5), coord(d, k / 25));
+                    let f = ((k / 7) % (nf as u64 + 2)) as i32 - (k % 13 == 0) as i32;
+                    let (mut g1, mut g2) = (Globals::new(mode), Globals::new(mode));
+                    let (mut e1, mut e2) = (Vec::new(), Vec::new());
+                    let (mut v1, mut v2) = (12.5, 12.5);
+                    let r1 = sample_volume_frame(&mut g1, &mut e1, &m, px, py, pz, f, &mut v1);
+                    let r2 = b.sample(&mut g2, &mut e2, &m, px, py, pz, f, &mut v2);
+                    assert_eq!(
+                        (r1, v1.to_bits(), e1, g1.notices.as_slice().to_vec()),
+                        (r2, v2.to_bits(), e2, g2.notices.as_slice().to_vec()),
+                        "({px}, {py}, {pz}) frame {f} of {w} x {h} x {d} x {nf}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// No sampler for a volume of another type or without voxels.
+    #[test]
+    fn only_byte_volumes_with_voxels_get_a_byte_sampler() {
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let f = mri_alloc_sequence(&mut g, &mut out, &mut err, 4, 4, 4, MRI_FLOAT, 1)
+            .expect("a volume");
+        assert!(ByteSampler::new(&f).is_none());
+        let mut u = mri_alloc_sequence(&mut g, &mut out, &mut err, 4, 4, 4, MRI_UCHAR, 1)
+            .expect("a volume");
+        assert!(ByteSampler::new(&u).is_some());
+        u.chunk = None;
+        assert!(ByteSampler::new(&u).is_none());
+    }
 }

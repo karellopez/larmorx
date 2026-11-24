@@ -988,7 +988,8 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
 /// short source onto a float target with anisotropic voxels, the entropy images of a short
 /// source and a byte target (`--cost ROBENT`, both written), and the Powell registration of the
 /// short source onto the byte target (`--cost NCC`); the joint histogram's and SB costs on 16^3
-/// images (relay 47); four of the test mode (`--test`, relay 48).
+/// images (relay 47); four of the test mode (`--test`, relay 48); two of the debug output
+/// (`--debug`, relay 49).
 pub fn golden_cases() -> Vec<String> {
     let mut g = Gen::new(32);
     let mut a = Img::base(32, MRI_UCHAR);
@@ -1133,6 +1134,46 @@ pub fn golden_cases() -> Vec<String> {
     ] {
         lines.push(line(None, &test_files, &[], &args));
     }
+    // relay 49: the debug output (`--debug`): the robust registration of the short source onto the
+    // resliced float target with the saturation search and a half-way image (its means), and the
+    // mutual information's evaluation reports (fixed numbers from then on, `shw.mgz`, `thw.mgz`)
+    lines.push(line(
+        None,
+        &files,
+        &[],
+        &s(&[
+            "--mov",
+            "smov.mgz",
+            "--dst",
+            "fdst.mgz",
+            "--lta",
+            "reg.lta",
+            "--satit",
+            "--debug",
+            "--halfmov",
+            "hm.mgz",
+        ]),
+    ));
+    lines.push(line(
+        None,
+        &small,
+        &[],
+        &s(&[
+            "--mov",
+            "mov16.mgz",
+            "--dst",
+            "dst16.mgz",
+            "--lta",
+            "reg.lta",
+            "--cost",
+            "MI",
+            "--nomulti",
+            "--transonly",
+            "--powelltol",
+            "0.01",
+            "--debug",
+        ]),
+    ));
     lines
 }
 

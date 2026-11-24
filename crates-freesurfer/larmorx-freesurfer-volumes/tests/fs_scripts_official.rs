@@ -27,6 +27,10 @@ const UNMODELLED_QUICK: usize = 0;
 /// The default's texts on Linux x64 (`check.py`'s `fix_sha256`, `fix_sha256_quick`).
 const FIX_SHA256: &str = "9054423f6a2112998a8cb3598e8ad70a3bc50a60403fe235a21be6e98e915640";
 const FIX_SHA256_QUICK: &str = "82c2bc82ac859c7780a969592e7200413a7da0963d81b13fd9ef49a22b1501c4";
+/// The default's texts of the cases without a backslash (the same on every system; Windows checks
+/// these).
+const FIX_SHA256_PORTABLE: &str =
+    "43b18637834734711f1a41fba4f2ead482d33eed7ebc180e4e4e89aad97bb9d3";
 
 fn hex(h: Sha256) -> String {
     h.finalize().iter().map(|b| format!("{b:02x}")).collect()
@@ -64,9 +68,23 @@ fn reproduce_digest(quick: bool) -> (usize, usize, String) {
     (n, unmodelled, hex(h))
 }
 
+/// Whether a case means the same on every system: no backslash in its arguments (on Windows a
+/// folder separator, elsewhere a character of a name).
+fn portable(k: usize) -> bool {
+    !cases::cases()[k].args.iter().any(|a| a.contains('\\'))
+}
+
 fn fix_digest(quick: bool) -> String {
+    fix_digest_of(quick, false)
+}
+
+/// The default's digest of the set; `portable_only`: only the cases that mean the same everywhere.
+fn fix_digest_of(quick: bool, portable_only: bool) -> String {
     let mut h = Sha256::new();
-    for k in set(quick) {
+    for k in set(quick)
+        .into_iter()
+        .filter(|&k| !portable_only || portable(k))
+    {
         let (f, ids) = cases::run_case(k, UpstreamDefects::Fix);
         if cfg!(unix) {
             let (r, _) = cases::run_case(k, UpstreamDefects::Reproduce);
@@ -99,8 +117,10 @@ fn every_case_gives_the_official_outputs() {
     if cfg!(unix) {
         let (n, u, h) = reproduce_digest(false);
         assert_eq!((n, u, h.as_str()), (N, UNMODELLED, OFFICIAL_SHA256));
+        assert_eq!(fix_digest(false), FIX_SHA256);
+    } else {
+        assert_eq!(fix_digest_of(false, true), FIX_SHA256_PORTABLE);
     }
-    assert_eq!(fix_digest(false), FIX_SHA256);
 }
 
 /// Prints both values (on Linux x64: `cargo test --release --test fs_scripts_official --
@@ -111,5 +131,19 @@ fn print_digests() {
     for quick in [true, false] {
         println!("quick {quick} reproduce {:?}", reproduce_digest(quick));
         println!("quick {quick} fix {}", fix_digest(quick));
+    }
+    println!("portable fix {}", fix_digest_of(false, true));
+}
+
+/// Prints each case's default text's digest (to compare two systems: `cargo test --release --test
+/// fs_scripts_official -- --ignored --nocapture print_case_digests`).
+#[test]
+#[ignore]
+fn print_case_digests() {
+    for k in set(false) {
+        let (f, _) = cases::run_case(k, UpstreamDefects::Fix);
+        let mut h = Sha256::new();
+        h.update(f.as_bytes());
+        println!("case {k} {}", hex(h));
     }
 }

@@ -57,7 +57,18 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 #: or writes memory it does not own there, where the spec gives an error in both modes or reads 0
 #: what FreeSurfer never wrote.
 NOT_COMPARABLE = frozenset(
-    {"FS-52", "FS-53", "FS-1216", "FS-1217", "FS-1218", "FS-1222", "FS-1223", "FS-1228", "FS-1231"}
+    {
+        "FS-52",
+        "FS-53",
+        "FS-498",
+        "FS-1216",
+        "FS-1217",
+        "FS-1218",
+        "FS-1222",
+        "FS-1223",
+        "FS-1228",
+        "FS-1231",
+    }
 )
 #: FreeSurfer's runs compared with their entries: ``--all-info``'s report holds the run's time.
 POLICY = oracle_cache.Policy(
@@ -97,14 +108,14 @@ def brain(rng: np.random.Generator, shape: tuple[int, int, int] = (N, N, N)) -> 
     edge = np.clip((r - rw) / 1.5, 0, 1)
     v = np.where(r < rw + 1.5, 110 - 40 * edge + rng.normal(0, 3, shape), v)
     # a white plate one voxel thick along the rows, out of the core
-    jc = int(round(c[1]))
-    v[2 : int(c[0]), jc, 6:26] = 110 + rng.normal(0, 2, (int(c[0]) - 2, 20))
+    jc = round(c[1])
+    v[2 : int(c[0]), jc, 6 : shape[2] - 6] = 110 + rng.normal(0, 2, (int(c[0]) - 2, shape[2] - 12))
     # a plate two voxels thick
-    v[int(c[0]) + 6 : shape[0] - 2, jc + 4 : jc + 6, 8:24] = 112
+    v[int(c[0]) + 6 : shape[0] - 2, jc + 4 : jc + 6, 8 : shape[2] - 8] = 112
     # bright spots outside the brain, and voxels touching only along an edge or a corner
     v[shape[0] - 5 : shape[0] - 2, 2:5, 14:17] = 150
     v[3, 3, 3] = v[4, 4, 3] = v[5, 5, 4] = 110
-    v[2, 28, 28] = v[3, 29, 29] = 108
+    v[2, shape[1] - 4, shape[2] - 4] = v[3, shape[1] - 3, shape[2] - 3] = 108
     v += rng.uniform(0, 2, shape) * (v == 0)
     return v
 
@@ -117,7 +128,7 @@ def labels(v: np.ndarray, shape: tuple[int, int, int]) -> np.ndarray:
     seg = np.zeros(shape, np.int32)
     seg = np.where((v >= 92) & (v < 140), np.where(left, 2, 41), seg)
     seg = np.where((v >= 50) & (v < 92), np.where(left, 3, 42), seg)
-    return seg
+    return seg.astype(np.int32)
 
 
 def with_bits(data: np.ndarray, places: list[tuple[tuple[int, int, int], int]]) -> np.ndarray:

@@ -694,6 +694,9 @@ pub fn fill_ventricles(
             "mri_segment -fillv: no ventricle found: FreeSurfer crashes; none added",
         );
         if g.notices.reproduce() {
+            // FreeSurfer's loop over the voxels goes on with no volume: its first Talairach
+            // point (an error for a volume that is not coronal, FS-1228), then the crash
+            talairach(g, out, err, mri, 0.0, 0.0, 0.0, &mut t, "-fillv")?;
             return Err(Fatal::Exit(SEGFAULT));
         }
         return Ok(());

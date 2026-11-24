@@ -26,6 +26,7 @@
 //
 //   fs_volume_probe batch <file>   one call per line of <file>, each in a child process of its own
 //                                  with an alarm; one result line per call on standard output
+#include <dirent.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -68,6 +69,9 @@ int MRIcopyVolGeomToMRI(MRI *mri, const VOL_GEOM *vg);
 int MRIcubicSampleVolumeFrame(MRI *mri, double x, double y, double z, int frame, double *pval);
 int MRIsincSampleVolumeFrame(MRI *mri, double x, double y, double z, int frame, int hw, double *pval);
 double ham_sinc(double x, double fullwidth);
+MRI *LTAinverseTransformInterp(MRI *mri_src, MRI *mri_dst, LTA *lta, int interp);
+// the threshold of vg_isEqual (a global of FreeSurfer's library)
+extern double vg_isEqual_Threshold;
 
 const char *Progname = "fs_volume_probe";
 
@@ -1037,6 +1041,105 @@ static void putvl(const VOXEL_LIST *vl, const MRI *mri, int len)
     putf(vl->vsrc[i]);
     putf(vl->vdst[i]);
   }
+}
+
+// VF, a voxel list with its fields (README.md): VL, or f <alloc> <nvox> <type> <mask> <k> and k times
+// xi yi zi fi xd yd zd vsrc vdst: VLSTalloc(alloc), VL's patterns, the first k voxels' fields as given,
+// the slope arrays of the mask (1 mx, 2 my, 4 mz, 8 t; alloc floats each, entry i: i + 0.75), then nvox
+// and type set
+static VOXEL_LIST *getvf(int *alloc)
+{
+  if (!take("f")) return getvl(alloc);
+  int n = geti(), nv = geti(), type = geti(), mask = geti(), k = geti();
+  VOXEL_LIST *vl = VLSTalloc(n);
+  for (int i = 0; i < n; i++) {
+    vl->xi[i] = 1000 + i;
+    vl->yi[i] = 2000 + i;
+    vl->zi[i] = 3000 + i;
+    vl->fi[i] = 4000 + i;
+    vl->xd[i] = (float)i + 0.5f;
+    vl->yd[i] = (float)i + 0.25f;
+    vl->zd[i] = (float)i + 0.125f;
+    vl->vsrc[i] = -1.0f - (float)i;
+    vl->vdst[i] = -2.0f - (float)i;
+  }
+  for (int i = 0; i < k; i++) {
+    int xi = geti(), yi = geti(), zi = geti(), fi = geti();
+    float xd = getf(), yd = getf(), zd = getf(), vs = getf(), vd = getf();
+    if (i >= n) continue;  // fields past the allocation are read and dropped
+    vl->xi[i] = xi;
+    vl->yi[i] = yi;
+    vl->zi[i] = zi;
+    vl->fi[i] = fi;
+    vl->xd[i] = xd;
+    vl->yd[i] = yd;
+    vl->zd[i] = zd;
+    vl->vsrc[i] = vs;
+    vl->vdst[i] = vd;
+  }
+  float **arrays[4] = {&vl->mx, &vl->my, &vl->mz, &vl->t};
+  for (int b = 0; b < 4; b++) {
+    if (!(mask & (1 << b))) continue;
+    *arrays[b] = (float *)calloc(n > 0 ? (size_t)n : 1, sizeof(float));
+    for (int i = 0; i < n; i++) (*arrays[b])[i] = (float)i + 0.75f;
+  }
+  vl->nvox = nv;
+  vl->type = type;
+  *alloc = n;
+  return vl;
+}
+// a voxel list (printed) and its slope arrays: for each of mx, my, mz, t `null`, or `given` and its first
+// `given_len` entries when it is the array the list was given with, else `new` and its first `new_len`
+static void putvf(const VOXEL_LIST *vl, const MRI *mri, int len, float *const given[4], int given_len,
+                  int new_len)
+{
+  putvl(vl, mri, len);
+  if (!vl) return;
+  const float *arrays[4] = {vl->mx, vl->my, vl->mz, vl->t};
+  for (int b = 0; b < 4; b++) {
+    if (!arrays[b]) {
+      out("null");
+      continue;
+    }
+    bool old = given && arrays[b] == given[b];
+    out(old ? "given" : "new");
+    int n = old ? given_len : new_len;
+    for (int i = 0; i < n; i++) putf(arrays[b][i]);
+  }
+}
+static void slopes_of(const VOXEL_LIST *vl, float *s[4])
+{
+  s[0] = vl ? vl->mx : NULL;
+  s[1] = vl ? vl->my : NULL;
+  s[2] = vl ? vl->mz : NULL;
+  s[3] = vl ? vl->t : NULL;
+}
+// a file or folder removed, a folder with everything in it
+static void rmtree(const std::string &p)
+{
+  struct stat st;
+  if (lstat(p.c_str(), &st) != 0) return;
+  if (S_ISDIR(st.st_mode)) {
+    std::vector<std::string> names;
+    if (DIR *d = opendir(p.c_str())) {
+      while (struct dirent *e = readdir(d)) {
+        std::string n = e->d_name;
+        if (n != "." && n != "..") names.push_back(n);
+      }
+      closedir(d);
+    }
+    for (const std::string &n : names) rmtree(p + "/" + n);
+    rmdir(p.c_str());
+  }
+  else
+    unlink(p.c_str());
+}
+static void write_file(const std::string &path, const std::string &bytes)
+{
+  FILE *fp = fopen(path.c_str(), "wb");
+  if (!fp) bad("cannot write a file of the call");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
 }
 
 // ---- the commands (README.md, "Commands") ------------------------------------------------------
@@ -3586,6 +3689,265 @@ static void call(const std::string &c)
     int len = res ? res->nvox : 0;
     if (vl && alloc > len) len = alloc;
     putvl(res, a, len);
+  }
+  // part 11b (§62 to §65): writing a transform array, a volume moved by one, the MNI and tkregister
+  // helpers, rotations and affine parameters, voxel lists; and §67: the inverse move, the conversions
+  // between voxel and RAS transforms, the composition
+  else if (c == "ltawr") {
+    int k = geti(), n = geti();
+    std::vector<std::string> dirs;
+    for (int i = 0; i < n; i++) dirs.push_back(getx());
+    LTA *l = getlta();
+    std::string name = getx();
+    for (const std::string &d : dirs) mkdir(d.c_str(), 0700);
+    unlink(name.c_str());
+    fflush(stdout);
+    int r = k ? LTAwrite(l, name.c_str()) : LTAwriteEx(l, name.c_str());
+    fflush(stdout);
+    puti(r);
+    struct stat st;
+    if (stat(name.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+      std::string s = slurp(name.c_str());
+      out(hexbytes(s.data(), s.size()));
+    }
+    else
+      out("nofile");
+    unlink(name.c_str());
+    for (size_t i = dirs.size(); i-- > 0;) rmtree(dirs[i]);
+  }
+  else if (c == "ltadvg") {
+    VOL_GEOM vg;
+    getg(&vg);
+    fflush(stdout);
+    int r = LTAdumpVolGeom(stdout, &vg);
+    fflush(stdout);
+    puti(r);
+  }
+  else if (c == "ltapt") {
+    LTA *l = getlta();
+    float x = getf(), y = getf(), z = getf();
+    MATRIX *m = getm();
+    int e0 = geti();
+    fflush(stdout);
+    errno = e0;
+    MATRIX *r = LTAtransformAtPoint(l, x, y, z, m);
+    int e = errno;
+    fflush(stdout);
+    putm_res(r, m);
+    puti(e);
+  }
+  else if (c == "ltaxf" || c == "ltaixf") {
+    MRI *a = getw();
+    paint(a);
+    MRI *d = take("new") ? NULL : getw();
+    LTA *l = getlta();
+    int interp = geti();
+    fflush(stdout);
+    MRI *res = c == "ltaixf"  ? LTAinverseTransformInterp(a, d, l, interp)
+               : interp < 0 ? LTAtransform(a, d, l)
+                            : LTAtransformInterp(a, d, l, interp);
+    fflush(stdout);
+    putres(res, a, NULL, d);
+    putlta(l);
+  }
+  else if (c == "ltacor") {
+    LTA *l = getlta();
+    fflush(stdout);
+    int r = LTAvoxelTransformToCoronalRasTransform(l);
+    fflush(stdout);
+    puti(r);
+    putlta(l);
+  }
+  else if (c == "fixmni") {
+    float x = getf(), y = getf(), z = getf();
+    float a = UNSET, b = UNSET, s = UNSET;
+    int r = FixMNITal(x, y, z, &a, &b, &s);
+    puti(r);
+    putf(a);
+    putf(b);
+    putf(s);
+  }
+  else if (c == "ltamod") {
+    LTA *l = getlta();
+    MRI *s = getwn(), *d = getwn();
+    vg_isEqual_Threshold = getd();
+    fflush(stdout);
+    int r = LTAmodifySrcDstGeom(l, s, d);
+    fflush(stdout);
+    puti(r);
+    putlta(l);
+  }
+  else if (c == "devxfm") {
+    // the subjects' folder `subjects` in the working directory: mk 0 none, 1 subjects/<subject>, 2 also
+    // its mri/transforms, the original volume (0 none, 1 orig.mgz's bytes, 2 orig.mgh's, 3 an empty
+    // folder orig) and the transform file (its bytes, or nofile) at mri/transforms/<name or talairach.xfm>
+    int mk = geti();
+    std::string subj = getx();
+    bool hsd = !take("null");
+    std::string sd = hsd ? getx() : std::string();
+    bool hname = !take("null");
+    std::string name = hname ? getx() : std::string();
+    int ok = geti();
+    std::string ob = ok == 1 || ok == 2 ? getx() : std::string();
+    bool hx = !take("nofile");
+    std::string xb = hx ? getx() : std::string();
+    MATRIX *x = getm();
+    rmtree("subjects");
+    std::string base = "subjects/" + subj;
+    if (mk >= 1) {
+      mkdir("subjects", 0700);
+      mkdir(base.c_str(), 0700);
+    }
+    if (mk >= 2) {
+      mkdir((base + "/mri").c_str(), 0700);
+      mkdir((base + "/mri/transforms").c_str(), 0700);
+      if (ok == 1) write_file(base + "/mri/orig.mgz", ob);
+      if (ok == 2) write_file(base + "/mri/orig.mgh", ob);
+      if (ok == 3) mkdir((base + "/mri/orig").c_str(), 0700);
+      if (hx) write_file(base + "/mri/transforms/" + (hname ? name : std::string("talairach.xfm")), xb);
+    }
+    fflush(stdout);
+    MATRIX *r = DevolveXFMWithSubjectsDir(subj.c_str(), x, hname ? name.c_str() : NULL, hsd ? sd.c_str() : NULL);
+    fflush(stdout);
+    putm_res(r, x);
+    rmtree("subjects");
+  }
+  else if (c == "angrm") {
+    double ang[3];
+    for (double &v : ang) v = getd();
+    putm(MRIangles2RotMat(ang));
+  }
+  else if (c == "affp2m") {
+    double p[12];
+    for (double &v : p) v = getd();
+    MATRIX *m = getm();
+    fflush(stdout);
+    MATRIX *r = TranformAffineParams2Matrix(p, m);
+    fflush(stdout);
+    putm_res(r, m);
+  }
+  else if (c == "affm2p") {
+    MATRIX *m = getm();
+    double p[12];
+    for (double &v : p) v = UNSETD;
+    fflush(stdout);
+    double *r = TranformExtractAffineParams(m, p);
+    fflush(stdout);
+    out(r == NULL ? "null" : r == p ? "given" : "other");
+    for (double v : p) putd(v);
+  }
+  else if (c == "ltarot") {
+    LTA *l = getlta();
+    fflush(stdout);
+    int r = LTAmat2RotMat(l);
+    fflush(stdout);
+    puti(r);
+    putlta(l);
+  }
+  else if (c == "rmsmj") {
+    MATRIX *a = getm(), *b = getm();
+    double rad = getd();
+    fflush(stdout);
+    double r = RMSregDiffMJ(a, b, rad);
+    fflush(stdout);
+    putd(r);
+  }
+  else if (c == "vlcre") {
+    MRI *a = getw();
+    paint(a);
+    float lo = getf(), hi = getf();
+    int alloc;
+    VOXEL_LIST *vl = getvf(&alloc);
+    int skip = geti(), border = geti();
+    float *s[4];
+    slopes_of(vl, s);
+    fflush(stdout);
+    VOXEL_LIST *res = VLSTcreate(a, lo, hi, vl, skip, border);
+    fflush(stdout);
+    out(vl && res == vl ? "given" : "new");
+    int len = res ? res->nvox : 0;
+    if (vl && res == vl && alloc > len) len = alloc;
+    putvf(res, a, len, s, alloc, 0);
+  }
+  else if (c == "vlsort") {
+    int as, ad;
+    VOXEL_LIST *src = getvf(&as);
+    VOXEL_LIST *dst = take("null") ? NULL : getvf(&ad);
+    fflush(stdout);
+    VOXEL_LIST *res = VLSTsort(src, dst);
+    fflush(stdout);
+    out(dst && res == dst ? "given" : "new");
+    putvl(res, NULL, dst && res == dst ? ad : res ? res->nvox : 0);
+    putvl(src, NULL, as);
+  }
+  else if (c == "vlfree") {
+    int a;
+    VOXEL_LIST *vl = take("null") ? NULL : getvf(&a);
+    int r = VLSTfree(&vl);
+    puti(r);
+    out(vl ? "set" : "null");
+  }
+  else if (c == "vlstat") {
+    int a;
+    VOXEL_LIST *vl = getvf(&a);
+    MRI *m = getwn();
+    vl->mri = m;
+    fflush(stdout);
+    VLSTcomputeStats(vl);
+    fflush(stdout);
+    putd(vl->mean);
+    putd(vl->std);
+  }
+  else if (c == "vlcopy") {
+    int k = geti(), as, ad = 0;
+    VOXEL_LIST *src = getvf(&as);
+    VOXEL_LIST *dst = take("null") ? NULL : getvf(&ad);
+    int start = geti(), num = geti();
+    float *s[4];
+    slopes_of(dst, s);
+    fflush(stdout);
+    VOXEL_LIST *res = k ? VLSTcopyInto(src, dst, start, num) : VLSTcopy(src, dst, start, num);
+    fflush(stdout);
+    out(dst && res == dst ? "given" : "new");
+    int len = dst && res == dst ? ad : k ? start + num : num;
+    putvf(res, NULL, len, s, ad, num);
+    putvl(src, NULL, as);
+  }
+  else if (c == "vladd") {
+    int k = geti(), a;
+    VOXEL_LIST *vl = getvf(&a);
+    int x = geti(), y = geti(), z = geti();
+    float xd = getf(), yd = getf(), zd = getf(), vs = getf(), vd = getf();
+    fflush(stdout);
+    int r = k == 0   ? VLSTadd(vl, x, y, z, xd, yd, zd)
+            : k == 1 ? VLSTaddUnique(vl, x, y, z, xd, yd, zd)
+            : k == 2 ? VLSTaddWithValue(vl, x, y, z, xd, yd, zd, vs, vd)
+                     : VLSTinList(vl, x, y, z);
+    fflush(stdout);
+    puti(r);
+    putvl(vl, NULL, a);
+  }
+  else if (c == "ltav2r" || c == "ltar2v") {
+    LTA *l = getlta();
+    MRI *s = getwn(), *d = getwn();
+    fflush(stdout);
+    int r = c == "ltav2r" ? LTAvoxelToRasXform(l, s, d) : LTArasToVoxelXform(l, s, d);
+    fflush(stdout);
+    puti(r);
+    putlta(l);
+  }
+  else if (c == "ltacmp") {
+    LTA *l = getlta();
+    MATRIX *left = getm(), *right = getm();
+    int k = geti();  // the destination: 0 none, 1 another array, 2 the array itself
+    LTA *d = k == 1 ? getlta() : k == 2 ? l : NULL;
+    fflush(stdout);
+    LTA *r = LTAcompose(l, left, right, d);
+    fflush(stdout);
+    out(r == NULL ? "null" : r == l ? "self" : r == d ? "given" : "new");
+    putlta(r);
+    if (k == 1 && r != d) putlta(d);
+    if (r != l) putlta(l);
   }
   else
     bad("unknown command");

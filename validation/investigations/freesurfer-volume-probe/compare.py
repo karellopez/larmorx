@@ -23,6 +23,7 @@ one thread, the family ``freesurfer``) when the validation package is importable
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import math
 import random
@@ -6952,6 +6953,801 @@ class Gen20(Gen19):
         ]
 
 
+def mgh_bytes(dims, t: int, sizes, cos, centre, vals, nf: int = 1, good: int = 1) -> bytes:
+    """An MGH file as FreeSurfer's documentation of the format gives it: version 1, the extent,
+    frames, type, dof 0, the good-RAS flag (16 bits), the voxel sizes, the direction cosines of the
+    columns, rows and slices, the centre, zeros to byte 284, the voxels (big-endian, frame-major),
+    then TR, flip angle, TE, TI and the field of view (zeros)."""
+    w, h, d = dims
+    head = struct.pack(">7i", 1, w, h, d, nf, t, 0) + struct.pack(">h", good)
+    head += struct.pack(">3f", *sizes) + struct.pack(">9f", *cos) + struct.pack(">3f", *centre)
+    head += bytes(284 - len(head))
+    fmt = {0: "B", 1: "i", 3: "f", 4: "h"}[t]
+    return head + struct.pack(f">{len(vals)}{fmt}", *vals) + struct.pack(">5f", *[0.0] * 5)
+
+
+#: FreeSurfer's diagnostic flags the commands of part 11b read (``+gdiag=``, hexadecimal)
+DIAG_SHOW, DIAG_HEARTBEAT, DIAG_VERBOSE = 0x40, 0x4000, 0x10000000
+#: the creation time of a written transform array: always given (the local time otherwise)
+DATES = (
+    "+env=FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING=T0 ",
+    "+env=FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING= ",
+)
+#: FreeSurfer's own variable that makes its licence check return at once, before any file is
+#: read (as LARMORX, which makes no check: specs/freesurfer-core.md §19)
+SIDEDOOR = "+env=SURFER_SIDEDOOR=1 "
+IDENT = "4 4 " + " ".join(f32(1.0 if i % 5 == 0 else 0.0) for i in range(16))
+
+
+class Gen21(Gen20):
+    """Relay 22: part 11b (§62 writing a transform array, §63 a volume moved by one and the MNI
+    and tkregister helpers, §64 rotations and affine parameters, §65 voxel lists)."""
+
+    @staticmethod
+    def gnamed(geo, name: str = "", valid: int = 1) -> str:
+        """``g_of`` with a name and any ``valid``."""
+        dims, f = geo
+        return " ".join([str(valid), *map(str, dims), *f, xs(name), "1", "null"])
+
+    @staticmethod
+    def arrn(ty: int, lts, subj: str = "", fscale: float = 1.0) -> str:
+        """An array (README.md, LTA) of the transforms lts, each (matrix, source G, destination G,
+        centre (3 floats), spread), every inverse the identity between the same geometries."""
+        fw, inv = [], []
+        for m, a, b, c, s in lts:
+            fw.append(" ".join([*c, f32(s), m, Z44, Z44, "0", "0", a, b]))
+            inv.append(" ".join([f32(0.0)] * 3 + [f32(1.0), IDENT, Z44, Z44, "0", "0", b, a]))
+        return f"{len(lts)} {ty} {f32(fscale)} {xs(subj)} {' '.join(fw + inv)}"
+
+    def vf(
+        self,
+        r: random.Random,
+        n: int,
+        nv: int | None = None,
+        k: int = 0,
+        mask: int = 0,
+        vals=None,
+        ty: int = 0,
+    ) -> str:
+        """VF (README.md): a list of n voxels, its count nv, the first k voxels' fields drawn
+        (indices 0 to 3, ties, values with ties and NaN) or vals's."""
+        nv = n if nv is None else nv
+        fl = []
+        for i in range(k):
+            if vals is not None:
+                fl += [str(x) for x in vals[i][:4]] + [
+                    f32(x) if not isinstance(x, str) else x for x in vals[i][4:]
+                ]
+                continue
+            fl += [str(r.randint(0, 3)) for _ in range(3)] + [str(r.randint(0, 1))]
+            fl += [f32(r.choice([0.5, 1.5, -2.0])) for _ in range(3)]
+            v = r.choice([1.0, 2.0, 2.0, 3.0, -1.0, 0.0, -0.0])
+            fl += [QNAN if r.random() < 0.08 else f32(v), f32(r.uniform(-3, 3))]
+        return " ".join(["f", str(n), str(nv), str(ty), str(mask), str(k), *fl])
+
+    # -- §62
+    def vltawr(self) -> list[Batch]:
+        """§62: LTAwriteEx and LTAwrite: arrays of 0 to 2 transforms between scanner-like
+        geometries (named and not), of the voxel, RAS, physical-voxel, MNI, tkregister, FSL and
+        coronal-RAS types; names ending .lta, .LTA, .xfm, .XFM, .dat, .reg, .REG, .fslmat,
+        .FSLMAT, .mat, .txt, none, two extensions, a . in a folder, a folder that does not exist;
+        USER and LOGNAME set, unset and empty; FSLOUTPUTTYPE; the diagnostic level 1; the creation
+        time given. LTAdumpVolGeom of geometries with special values."""
+        r = self.rng("vltawr")
+        pool = self.pool(r)
+        L = []
+        names = [
+            "t.lta",
+            "t.LTA",
+            "t.xfm",
+            "t.XFM",
+            "t.dat",
+            "t.reg",
+            "t.REG",
+            "t.fslmat",
+            "t.FSLMAT",
+            "t.mat",
+            "t",
+            "t.txt",
+            "t.lta.dat",
+            "t.dat.lta",
+            "d.x/t",
+            "d.x/t.xfm",
+            "no/t.lta",
+            "no/t.xfm",
+            "no/t.dat",
+            "no/t.fslmat",
+        ]
+        users = [
+            "",
+            "",
+            "+env=USER=u1 ",
+            "+env=LOGNAME=l2 ",
+            "+env=USER=u1 +env=LOGNAME=l2 ",
+            "+env=USER= ",
+        ]
+        types = [0, 1, 1, 2, 12, 14, 14, 15, 15, 21]
+        for _ in range(160):
+            ty = r.choice(types)
+            n = r.choice([1, 1, 1, 1, 2])
+            lts = []
+            for _ in range(n):
+                a, b = r.sample(range(len(pool)), 2)
+                m = self.affine(r, special=0.03) if r.random() < 0.9 else self.xmat(r)
+                if m == "null":
+                    m = self.affine(r)
+                an = r.choice(["", "src.mgz", "/data/s1/mri/orig.mgz"])
+                bn = r.choice(["", "dst.mgz"])
+                va = r.choice([1, 1, 1, 0])
+                vb = r.choice([1, 1, 1, 0])
+                lts.append(
+                    (
+                        m,
+                        self.gnamed(pool[a], an, va),
+                        self.gnamed(pool[b], bn, vb),
+                        [self.fv(r) for _ in range(3)],
+                        1.0,
+                    )
+                )
+            name = r.choice(names)
+            dirs = [xs("d.x")] if name.startswith("d.x/") else []
+            subj = r.choice(["", "bert", "fsaverage"])
+            fs = r.choice([1.0, 0.0, 0.5, -1.0])
+            arr = self.arrn(ty, lts, subj, fs)
+            pre = r.choice(DATES[:1] * 4 + DATES[1:]) + r.choice(users) + r.choice(FSLOUT)
+            if r.random() < 0.1:
+                pre += "+gdiagno=1 "
+            k = int(r.random() < 0.2)
+            L.append(f"{pre}ltawr {k} {len(dirs)} {' '.join([*dirs, arr])} {xs(name)}")
+        for _ in range(20):
+            dims = (r.randint(1, 300), r.randint(1, 300), r.randint(1, 300))
+            f = self.gfields(r, 0.2, shear=0.0)
+            v = r.choice([0, 1, 1, 2, -1])
+            g = " ".join([str(v), *map(str, dims), *f, xs(r.choice(["", "orig.mgz", "a b"]))])
+            L.append(f"ltadvg {g}")
+        return [Batch("vltawr", "vltawr", L)]
+
+    # -- §63
+    def vltaxf(self) -> list[Batch]:
+        """§63: LTAtransformInterp and LTAtransform: sources of up to 4 x 4 x 4 voxels and 2 frames
+        of bytes, ints, floats and shorts; new destinations and given ones of other extents,
+        types and frames; arrays of 0 to 3 transforms of the voxel, RAS, physical-voxel,
+        tkregister and other types, destination geometries of valid 1, 0 and 2, source
+        geometries valid or not; nearest, trilinear, sinc, cubic and B-spline sampling;
+        USE_AVERAGE305 set, empty and unset; DIAG_VERBOSE and DIAG_HEARTBEAT."""
+        r = self.rng("vltaxf")
+        L = []
+        for _ in range(200):
+            nf = r.choice([1, 1, 2])
+            sd = (r.randint(1, 4), r.randint(1, 4), r.randint(1, 4))
+            s, sg = self.p9vol(r, sd, r.choice([0, 1, 3, 3, 4]), nf)
+            td = (r.randint(1, 4), r.randint(1, 4), r.randint(1, 4))
+            tg = self.rgeo(r, td)
+            n = r.choice([1, 1, 1, 1, 1, 0, 2, 3])
+            ty = r.choice([0, 0, 1, 1, 2, 14]) if r.random() < 0.95 else r.choice([12, 15, 21])
+            lts = []
+            for _ in range(n):
+                sc = r.choice([1.0, 1.0, 0.5, 2.0])
+                m = self.affine(r) if ty == 1 and n == 1 else self.near(r, scale=sc, t=1.0)
+                if ty == 14 and r.random() < 0.9:
+                    va = vb = 1
+                else:
+                    va = r.choice([1, 1, 1, 0])
+                    vb = r.choice([1, 1, 1, 0, 2])
+                c = [f32(r.uniform(-2, 5)) for _ in range(3)]
+                lts.append(
+                    (
+                        m,
+                        self.gnamed(sg, "", va),
+                        self.gnamed(tg, "", vb),
+                        c,
+                        r.choice([1.0, 10000.0, 0.5]),
+                    )
+                )
+            arr = self.arrn(ty, lts)
+            if r.random() < 0.85:
+                out = "new"
+            else:
+                od = (r.randint(1, 4), r.randint(1, 4), r.randint(1, 4))
+                onf = r.choice([1, 2])
+                out, _ = self.p9vol(r, od, r.choice([3, 1]), onf)
+            interp = r.choice([0, 1, 1, 2, 3, 5, -1])
+            pre = ""
+            if r.random() < 0.15:
+                pre += r.choice(["+env=USE_AVERAGE305=true ", "+env=USE_AVERAGE305= "])
+            if r.random() < 0.15:
+                pre += f"+gdiag={r.choice([DIAG_VERBOSE, DIAG_HEARTBEAT, DIAG_VERBOSE | DIAG_HEARTBEAT]):x} "
+            L.append(f"{pre}ltaxf {s} 0 {out} {arr} {interp}")
+        return [Batch("vltaxf", "vltaxf", L)]
+
+    def vltamisc(self) -> list[Batch]:
+        """§63: LTAtransformAtPoint (1 to 3 transforms, centres and spreads, points near and far,
+        given matrices, errno before the call 0 and 77), LTAvoxelTransformToCoronalRasTransform,
+        FixMNITal (special values), LTAmodifySrcDstGeom (geometries equal, slightly different and
+        not valid; no volume; thresholds) and DevolveXFMWithSubjectsDir (subject folders with
+        orig.mgz, orig.mgh, an empty folder orig, none; .xfm and .lta transforms, damaged ones,
+        none; SUBJECTS_DIR, a given folder, none; a given matrix)."""
+        r = self.rng("vltamisc")
+        pool = self.pool(r)
+        L = []
+        g0 = self.gnamed(pool[0])
+        for _ in range(70):
+            n = r.choice([1, 1, 2, 3])
+            lts = []
+            for _ in range(n):
+                c = [f32(r.uniform(-20, 20)) for _ in range(3)]
+                s = r.choice([1.0, 0.5, 10000.0, 3.0, 0.01])
+                lts.append((self.affine(r, special=0.03), g0, g0, c, s))
+            arr = self.arrn(r.choice([0, 1]), lts)
+            if r.random() < 0.5:
+                c0 = lts[r.randrange(n)][3]
+                pt = [f32(struct.unpack(">f", bytes.fromhex(x))[0] + r.uniform(-2, 2)) for x in c0]
+            else:
+                pt = [
+                    f32(r.choice([0.0, 1.0, r.uniform(-30, 30), r.uniform(-3000, 3000)]))
+                    for _ in range(3)
+                ]
+            m = "null" if r.random() < 0.6 else self.mat(r)
+            L.append(f"ltapt {arr} {' '.join(pt)} {m} {r.choice([0, 77])}")
+        for _ in range(30):
+            n = r.choice([1, 1, 2])
+            lts = [(self.affine(r, special=0.05), g0, g0, [f32(0.0)] * 3, 1.0) for _ in range(n)]
+            L.append(f"ltacor {self.arrn(r.choice([0, 1, 2, 14]), lts)}")
+        for _ in range(40):
+            v = [self.fv(r, special=0.2) for _ in range(3)]
+            L.append(f"fixmni {' '.join(v)}")
+        thr = [f64(1.1920928955078125e-07), f64(10e-4), f64(0.0), f64(float("nan")), f64(10e-4)]
+        for _ in range(70):
+            n = r.choice([1, 1, 2])
+            sgeo = pool[r.randrange(len(pool))]
+            dgeo = pool[r.randrange(len(pool))]
+            lts = []
+            for _ in range(n):
+                va, vb = r.choice([1, 1, 0, 2]), r.choice([1, 1, 0])
+                lts.append(
+                    (
+                        self.affine(r),
+                        self.gnamed(sgeo, "lt.mgz", va),
+                        self.gnamed(dgeo, "", vb),
+                        [f32(0.0)] * 3,
+                        1.0,
+                    )
+                )
+            arr = self.arrn(r.choice([0, 1]), lts)
+
+            def vol(geo):
+                dims, f = geo
+                f = list(f)
+                k = r.random()
+                if k < 0.3:
+                    j = r.choice([0, 4, 15])
+                    old = struct.unpack(">f", bytes.fromhex(f[j]))[0]
+                    f[j] = f32(old + r.choice([1e-4, 1e-6]))
+                elif k < 0.45:
+                    other = pool[r.randrange(len(pool))]
+                    dims, f = other
+                n = dims[0] * dims[1] * dims[2]
+                return self.pk((dims, f), [r.randint(0, 9) for _ in range(n)], t=0) + " 0"
+
+            src = "null" if r.random() < 0.2 else vol(sgeo)
+            dst = "null" if r.random() < 0.2 else vol(dgeo)
+            L.append(f"ltamod {arr} {src} {dst} {r.choice(thr)}")
+        # DevolveXFMWithSubjectsDir
+        xfm = (
+            "MNI Transform File\n%comment\n\nTransform_Type = Linear;\nLinear_Transform =\n"
+            " 1.1 0.02 0 -2.5\n -0.01 0.95 0.1 14\n 0 -0.05 1.05 -7.25;\n"
+        )
+        for _ in range(60):
+            mk = r.choice([2] * 10 + [1, 0])
+            subj = r.choice(["bert", "s1"])
+            sd = r.choice([xs("subjects")] * 6 + ["null"] * 3 + [xs("nowhere")])
+            name = r.choice(["null", "null", xs("talairach.xfm"), xs("reg.lta"), xs("other.xfm")])
+            is_lta = name == xs("reg.lta")
+            ok = r.choice([1, 1, 1, 2, 3, 0])
+            dims = (r.randint(1, 6), r.randint(1, 6), r.randint(1, 6))
+            sizes = [r.choice([1.0, 0.5, 2.0, 1.25]) for _ in range(3)]
+            cos = r.choice(
+                [
+                    [-1, 0, 0, 0, 0, -1, 0, 1, 0],
+                    [1, 0, 0, 0, 1, 0, 0, 0, 1],
+                    [-1, 0, 0, 0, 1, 0, 0, 0, 1],
+                ]
+            )
+            centre = [r.choice([0.0, 1.5, -12.25, 30.0]) for _ in range(3)]
+            n = dims[0] * dims[1] * dims[2]
+            mgh = mgh_bytes(dims, 0, sizes, cos, centre, [0] * n, good=r.choice([1, 1, 0]))
+            if ok == 1:
+                orig = "1 " + xs(gzip.compress(mgh, mtime=0))
+            elif ok == 2:
+                orig = "2 " + xs(mgh)
+            else:
+                orig = str(ok)
+            k = r.random()
+            if k < 0.75:
+                xb = xs(self.lta_file(r)) if is_lta else xs(xfm)
+            elif k < 0.8:
+                xb = xs(xfm) if is_lta else xs(self.lta_file(r))
+            elif k < 0.85:
+                xb = xs("not a transform\n")
+            else:
+                xb = "nofile"
+            given = "null" if r.random() < 0.8 else self.affine(r)
+            pre = SIDEDOOR
+            if sd == "null" and r.random() < 0.7:
+                pre += "+env=SUBJECTS_DIR=subjects "
+            if r.random() < 0.15:
+                pre += f"+gdiag={DIAG_SHOW | DIAG_VERBOSE:x} "
+            L.append(f"{pre}devxfm {mk} {xs(subj)} {sd} {name} {orig} {xb} {given}")
+        return [Batch("vltamisc", "vltamisc", L)]
+
+    def lta_file(self, r: random.Random, ty: int | None = None) -> str:
+        """An LTA file's text of one transform (the voxel or RAS type) between two plain geometries."""
+        ty = r.choice([0, 1]) if ty is None else ty
+        rows = [
+            " ".join(
+                f"{(1.0 if i == j else 0.0) + (r.uniform(-0.05, 0.05) if j < 3 else r.uniform(-5, 5)):18.15e}"
+                for j in range(4)
+            )
+            for i in range(3)
+        ] + ["0 0 0 1"]
+        vg = (
+            "valid = 1  # volume info valid\nfilename = orig.mgz\nvolume = 4 5 3\n"
+            "voxelsize = 1 1 1\nxras   = -1 0 0\nyras   = 0 0 -1\nzras   = 0 1 0\n"
+            "cras   = 0.5 -2 3\n"
+        )
+        return (
+            f"type      = {ty}\nnxforms   = 1\nmean      = 0.0000 0.0000 0.0000\n"
+            f"sigma     = 1.0000\n1 4 4\n" + "\n".join(rows) + "\n"
+            f"src volume info\n{vg}dst volume info\n{vg}"
+        )
+
+    # -- §64
+    def vrot(self) -> list[Batch]:
+        """§64: MRIangles2RotMat (radians, special values), TranformAffineParams2Matrix (12
+        parameters, a given matrix of 4 x 4 or none), TranformExtractAffineParams (rotations,
+        scalings, shears and their products, a negative determinant, a zero column, NaN, none),
+        LTAmat2RotMat and RMSregDiffMJ (radii 70, 0, NaN, 1e300)."""
+        r = self.rng("vrot")
+        L = []
+        for _ in range(40):
+            ang = [
+                self.dv(r, special=0.1) if r.random() < 0.7 else f64(r.uniform(-7, 7))
+                for _ in range(3)
+            ]
+            L.append(f"angrm {' '.join(ang)}")
+        for _ in range(60):
+            p = [r.uniform(-100, 100) for _ in range(3)] + [r.uniform(-180, 180) for _ in range(3)]
+            p += [r.choice([1.0, 0.5, 2.0, -1.0, r.uniform(0.5, 2)]) for _ in range(3)]
+            p += [r.choice([0.0, 0.0, r.uniform(-0.3, 0.3)]) for _ in range(3)]
+            ps = [f64(x) for x in p]
+            if r.random() < 0.1:
+                ps[r.randrange(12)] = f"{r.choice(DSPECIAL):016x}"
+            m = "null" if r.random() < 0.6 else self.mat(r)
+            L.append(f"affp2m {' '.join(ps)} {m}")
+        for _ in range(60):
+            k = r.random()
+            if k < 0.5:
+                m = self.affine(r, special=0.05)
+            elif k < 0.8:
+                v = self.affine(r).split()
+                v[2], v[3], v[4] = (
+                    f32(-float(struct.unpack(">f", bytes.fromhex(x))[0])) for x in v[2:5]
+                )
+                m = " ".join(v)
+            else:
+                v = self.affine(r).split()
+                col = r.randrange(3)
+                for row in range(3):
+                    v[2 + 4 * row + col] = f32(0.0)
+                m = " ".join(v)
+            L.append(f"affm2p {m}")
+        g0 = self.gnamed(self.pool(r)[0])
+        for _ in range(40):
+            n = r.choice([1, 1, 2])
+            lts = [(self.affine(r, special=0.03), g0, g0, [f32(0.0)] * 3, 1.0) for _ in range(n)]
+            L.append(f"ltarot {self.arrn(r.choice([0, 1]), lts)}")
+        for _ in range(40):
+            rad = r.choice(
+                [f64(70.0), f64(70.0), f64(0.0), f64(float("nan")), f64(1e300), f64(-5.0)]
+            )
+            L.append(f"rmsmj {self.affine(r, special=0.05)} {self.affine(r)} {rad}")
+        return [Batch("vrot", "vrot", L)]
+
+    # -- §65
+    def vlst(self) -> list[Batch]:
+        """§65: VLSTcreate (volumes of up to 5 x 4 x 3 voxels and 2 frames of the common types,
+        ranges, no list and given lists of every capacity, skips 0 to 2, the border test, the
+        debugging voxel), VLSTsort (lists of up to 8 voxels with ties and NaN, given destinations),
+        VLSTfree, VLSTcomputeStats, VLSTcopy and VLSTcopyInto (starts, counts, capacities, slope
+        arrays) and VLSTadd, VLSTaddUnique, VLSTaddWithValue, VLSTinList."""
+        r = self.rng("vlst")
+        L = []
+        for _ in range(90):
+            d = (r.randint(1, 5), r.randint(1, 4), r.randint(1, 3))
+            nf = r.choice([1, 1, 2])
+            t = r.choice([0, 3, 3, 1, 4])
+            n = d[0] * d[1] * d[2] * nf
+            if t == 3:
+                vals = self.fvals(r, n, special=0.04, lo=-5.0, hi=10.0)
+            else:
+                vals = [r.choice([0, 0, 1, 2, 3, 5, 9]) for _ in range(n)]
+            v = self.pk(self.rgeo(r, d), vals, t=t, nf=nf)
+            lo = f32(r.choice([0.0, 1.0, 0.5, 2.0, -1.0]))
+            hi = f32(r.choice([1.0, 3.0, 9.0, 1.5, 100.0]))
+            if r.random() < 0.5:
+                vl = "null"
+            else:
+                a = r.choice([0, 1, 3, 8, 20, 60, 120])
+                vl = f"{a} {r.randint(0, a)}"
+            skip = r.choice([0, 0, 0, 1, 2])
+            border = int(r.random() < 0.3)
+            pre = ""
+            if r.random() < 0.1:
+                pre = f"+gxyz={r.randrange(d[0])},{r.randrange(d[1])},{r.randrange(d[2])} "
+            if r.random() < 0.05:
+                pre += f"+gdiag={DIAG_SHOW | DIAG_VERBOSE:x} "
+            L.append(f"{pre}vlcre {v} 0 {lo} {hi} {vl} {skip} {border}")
+        for _ in range(60):
+            n = r.randint(0, 8)
+            src = self.vf(r, n, k=n)
+            if r.random() < 0.7:
+                dst = "null"
+            else:
+                a = r.randint(max(n, 0), n + 3)
+                dst = self.vf(r, a, nv=r.choice([n, n, a]) if a >= n else n, k=a)
+            L.append(f"vlsort {src} {dst}")
+        L.append("vlfree null")
+        L.append(f"vlfree {self.vf(r, 3, k=3, mask=5)}")
+        for _ in range(40):
+            d = (r.randint(1, 4), r.randint(1, 4), r.randint(1, 3))
+            t = r.choice([0, 3, 1])
+            n = d[0] * d[1] * d[2]
+            vals = (
+                self.fvals(r, n, special=0.03, lo=-5.0, hi=10.0)
+                if t == 3
+                else [r.randint(0, 9) for _ in range(n)]
+            )
+            vol = self.pk(self.rgeo(r, d), vals, t=t) + " 0" if r.random() < 0.85 else "null"
+            m = r.randint(0, 6)
+            pts = [
+                [
+                    r.randrange(d[0]),
+                    r.randrange(d[1]),
+                    r.randrange(d[2]),
+                    0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                ]
+                for _ in range(m)
+            ]
+            L.append(
+                f"vlstat {self.vf(r, m, nv=r.choice([m, m, 0, -1]) if m else r.choice([0, -1]), k=m, vals=pts)} {vol}"
+            )
+        for _ in range(70):
+            k = r.choice([0, 1])
+            n = r.randint(1, 8)
+            src = self.vf(r, n, k=n, mask=r.choice([0, 0, 0, 1, 15, 8, 6]), ty=r.choice([0, 1]))
+            start = r.randint(0, max(n - 1, 0))
+            num = r.randint(0, n - start) if k == 0 else r.randint(0, n)
+            if r.random() < 0.5:
+                dst = "null"
+            else:
+                need = num if k == 0 else start + num
+                a = r.choice([need, need + 2, max(need - 1, 0)])
+                dst = self.vf(r, a, nv=r.randint(0, a), k=a, mask=r.choice([0, 0, 15, 1, 14]))
+            L.append(f"vlcopy {k} {src} {dst} {start} {num}")
+        for _ in range(60):
+            k = r.choice([0, 1, 2, 3])
+            a = r.randint(0, 5)
+            nv = r.choice([a, max(a - 1, 0), 0])
+            lst = self.vf(r, a, nv=nv, k=a)
+            x, y, z = (r.randint(0, 3) for _ in range(3))
+            fl = " ".join(f32(r.uniform(-4, 4)) for _ in range(5))
+            L.append(f"vladd {k} {lst} {x} {y} {z} {fl}")
+        return [Batch("vlst", "vlst", L)]
+
+    def vrules25(self) -> list[Batch]:
+        """The fixed cases of part 11b."""
+        L, H = [], []
+        P = self.plain
+        z0 = f32(0.0)
+        ga = P((3, 2, 2))
+        gb = P((2, 3, 2), sizes=(2.0, 1.0, 1.0), c=(5.0, -3.0, 1.0))
+        a, b = self.gnamed(ga, "a.mgz"), self.gnamed(gb, "b.mgz")
+        m = "4 4 " + " ".join(
+            f32(x) for x in [1, 0, 0, 2.5, 0, 0, -1, 1, 0, 1, 0, -0.5, 0, 0, 0, 1]
+        )
+        nanm = m.split()
+        nanm[2 + 3] = QNAN
+        nanm = " ".join(nanm)
+        D = DATES[0]
+
+        def one(ty, mm=m, sa=a, sb=b, subj="", fscale=1.0):
+            return self.arrn(ty, [(mm, sa, sb, [z0] * 3, 1.0)], subj, fscale)
+
+        empty = self.arrn(1, [])
+        # §62: the writer by the extension in any case, then by the type (12 MNI; 14 tkregister
+        # with any extension but lta; 15 FSL)
+        for ty, name in [
+            (15, "t.lta"),
+            (12, "t.lta"),
+            (14, "t.LTA"),
+            (14, "t.Lta"),
+            (14, "t"),
+            (12, "t.dat"),
+            (15, "t.xfm"),
+            (0, "t.xfm"),
+            (2, "t.xfm"),
+            (1, "t.XfM"),
+            (1, "t.FslMat"),
+            (0, "t.Dat"),
+        ]:
+            L.append(f"{D}ltawr 0 0 {one(ty)} {xs(name)}")
+        # an empty name; no transform (the .lta text has none; the writers that read one: FS-504)
+        L.append(f"{D}ltawr 0 0 {one(1)} {xs('')}")
+        for name in ("t.lta", "t.xfm", "t.dat", "t.fslmat"):
+            L.append(f"{D}ltawr 0 0 {empty} {xs(name)}")
+        # MNI from a voxel transform whose source geometry has a voxel size 0
+        zg = self.gnamed(P((3, 2, 2), sizes=(0.0, 1.0, 1.0)))
+        L.append(f"{D}ltawr 0 0 {one(0, sa=zg)} {xs('t.xfm')}")
+        # FSL: types the change keeps
+        for ty in (12, 13, 21, 3):
+            L.append(f"{D}ltawr 0 0 {one(ty)} {xs('t.fslmat')}")
+        # tkregister's subject and scale; NaN in every writer
+        L.append(f"{D}ltawr 0 0 {one(14, subj='bert', fscale=0.25)} {xs('t.dat')}")
+        for ty, name in ((1, "t.xfm"), (1, "t.lta"), (14, "t.dat"), (15, "t.fslmat")):
+            L.append(f"{D}ltawr 0 0 {one(ty, mm=nanm)} {xs(name)}")
+        # the user: USER, else LOGNAME, else UNKNOWN; USER empty; the time given empty
+        for pre in ("+env=USER=u +env=LOGNAME=l ", "+env=LOGNAME=l ", "", "+env=USER= "):
+            L.append(f"{D}{pre}ltawr 1 0 {one(1)} {xs('t.lta')}")
+        L.append(f"{DATES[1]}ltawr 0 0 {one(1)} {xs('t.lta')}")
+        # LTAdumpVolGeom: a NaN size, a name of spaces
+        L.append(
+            f"ltadvg 1 2 2 2 {QNAN} {f32(1.0)} {f32(-0.0)} 1 "
+            + " ".join([z0] * 15)
+            + f" {xs('  ')}"
+        )
+        # §63: LTAtransformAtPoint: no transform (FS-504); a weight's exp underflowing to 0 (ERANGE)
+        # and to a subnormal (errno kept); spread 0 at the centre (NaN) and off it (0); a share
+        # below 0.1 / n
+        g0 = self.gnamed(ga)
+
+        def pts(cs, ss):
+            return self.arrn(
+                1, [(m, g0, g0, [f32(x) for x in c], s) for c, s in zip(cs, ss, strict=True)]
+            )
+
+        L.append(f"ltapt {empty} {z0} {z0} {z0} null 77")
+        for x, s in ((40.0, 1.0), (38.5, 1.0), (0.0, 0.0), (1.0, 0.0)):
+            L.append(f"ltapt {pts([(0, 0, 0)], [s])} {f32(x)} {z0} {z0} null 77")
+        L.append(f"ltapt {pts([(0, 0, 0), (3, 0, 0)], [1.0, 1.0])} {f32(0.5)} {z0} {z0} null 0")
+        L.append(f"ltapt {pts([(0, 0, 0), (3, 0, 0)], [1.0, 1.0])} {f32(2.9)} {z0} {z0} null 0")
+        L.append(
+            f"ltapt {pts([(0, 0, 0), (60, 0, 0)], [1.0, 1.0])} {f32(30.0)} {z0} {z0} {self.mat(random.Random(5))} 77"
+        )
+        # LTAtransformInterp: no destination with the transform's destination geometry valid 1, 2
+        # (not exactly 1) and 0, with USE_AVERAGE305 and DIAG_VERBOSE
+        src = self.lab(ga, [float(i) for i in range(12)], t=3)
+        gav, gbv = self.gnamed(ga), self.gnamed(gb)
+        ga0, gb0, gb2 = self.gnamed(ga, valid=0), self.gnamed(gb, valid=0), self.gnamed(gb, valid=2)
+
+        def lt1(ty, gs, gd, mm=IDENT):
+            return self.arrn(ty, [(mm, gs, gd, [z0] * 3, 1.0)])
+
+        for g in (gbv, gb2, gb0):
+            for pre in ("", "+env=USE_AVERAGE305=1 ", f"+gdiag={DIAG_VERBOSE:x} "):
+                L.append(f"{pre}ltaxf {src} 0 new {lt1(1, gav, g)} 1")
+        # voxel transforms with a geometry missing (the INFO lines: the destination's, then the
+        # source's)
+        for gs, gd in ((ga0, gb0), (gav, gb0), (ga0, gbv)):
+            L.append(f"ltaxf {src} 0 new {lt1(0, gs, gd)} 0")
+        # tkregister and physical-voxel arrays (changed first), other types (the program ends)
+        L.append(f"ltaxf {src} 0 new {lt1(14, gav, gbv)} 1")
+        L.append(f"ltaxf {src} 0 new {lt1(2, gav, gbv)} 1")
+        for ty in (3, 12, 21):
+            L.append(f"ltaxf {src} 0 new {lt1(ty, gav, gbv)} 1")
+        # no transform: the zero inverse (every voxel the source's first); two, one singular (its
+        # voxels left as they are); the heartbeat at depths 1 and 3
+        L.append(f"ltaxf {src} 0 new {empty} 0")
+        sing = "4 4 " + " ".join([z0] * 15 + [f32(1.0)])
+        two = self.arrn(
+            1,
+            [
+                (IDENT, gav, gav, [z0] * 3, 1.0),
+                (sing, gav, gav, [f32(2.0), f32(1.0), f32(1.0)], 0.5),
+            ],
+        )
+        L.append(f"ltaxf {src} 0 new {two} 0")
+        for d in (1, 3):
+            v = self.lab(P((2, 2, d)), [1.0] * (4 * d), t=3)
+            L.append(f"+gdiag={DIAG_HEARTBEAT:x} ltaxf {v} 0 new {empty} 0")
+        # LTAvoxelTransformToCoronalRasTransform: no transform (FS-504), the identity
+        L.append(f"ltacor {empty}")
+        L.append(f"ltacor {lt1(0, gav, gbv)}")
+        # FixMNITal: -0 (the first matrix), NaN (the second), infinities
+        for x, y, zz in (
+            (1.0, 2.0, "80000000"),
+            (1.0, 2.0, QNAN),
+            (INF, NINF, f32(1.0)),
+            (z0, f32(10.0), f32(-10.0)),
+        ):
+            xx = x if isinstance(x, str) else f32(x)
+            yy = y if isinstance(y, str) else f32(y)
+            L.append(f"fixmni {xx} {yy} {zz}")
+        # LTAmodifySrcDstGeom: equal, different by 1e-6 at thresholds FLT_EPSILON and 1e-3, a NaN
+        # threshold, a transform geometry not valid, no volume
+        vol_a = self.lab(ga, [1] * 12, t=0) + " 0"
+        ga_shift = P((3, 2, 2), c=(1e-6, 0.0, 0.0))
+        vol_s = self.lab(ga_shift, [1] * 12, t=0) + " 0"
+        feps, mil = f64(1.1920928955078125e-07), f64(1e-3)
+        for arr, s, d, t in (
+            (lt1(1, gav, gav), vol_a, vol_a, feps),
+            (lt1(1, gav, gav), vol_s, vol_s, feps),
+            (lt1(1, gav, gav), vol_s, vol_s, mil),
+            (lt1(1, gav, gav), vol_a, vol_a, f64(float("nan"))),
+            (lt1(1, ga0, gb0), vol_a, vol_a, feps),
+            (lt1(1, gav, gbv), "null", "null", feps),
+        ):
+            L.append(f"ltamod {arr} {s} {d} {t}")
+        # DevolveXFMWithSubjectsDir
+        mgz = xs(
+            gzip.compress(
+                mgh_bytes(
+                    (4, 5, 3),
+                    0,
+                    (1.0, 2.0, 1.5),
+                    (-1, 0, 0, 0, 0, -1, 0, 1, 0),
+                    (10.0, -20.0, 5.0),
+                    [0] * 60,
+                ),
+                mtime=0,
+            )
+        )
+        mgz0 = xs(
+            gzip.compress(
+                mgh_bytes(
+                    (4, 5, 3),
+                    0,
+                    (1.0, 1.0, 1.0),
+                    (-1, 0, 0, 0, 0, -1, 0, 1, 0),
+                    (0.0, 0.0, 0.0),
+                    [0] * 60,
+                ),
+                mtime=0,
+            )
+        )
+        xfm = xs(
+            "MNI Transform File\n\nTransform_Type = Linear;\nLinear_Transform =\n"
+            " 1 0 0 2\n 0 1 0 -3\n 0 0 1 4;\n"
+        )
+        subj, sd = xs("bert"), xs("subjects")
+        dv = SIDEDOOR
+        sv = f"+gdiag={DIAG_SHOW | DIAG_VERBOSE:x} "
+        L.append(f"{dv}devxfm 2 {subj} null null 1 {mgz} {xfm} null")
+        L.append(f"{dv}devxfm 0 {subj} {sd} null 1 {mgz} {xfm} null")
+        L.append(f"{dv}{sv}devxfm 1 {subj} {sd} null 0 {xfm} null")
+        L.append(f"{dv}{sv}devxfm 2 {subj} {sd} null 3 {xfm} null")
+        L.append(f"{dv}devxfm 2 {subj} {sd} null 1 {mgz} nofile null")
+        L.append(f"{dv}devxfm 2 {subj} {sd} null 1 {mgz} {xs('junk')} null")
+        L.append(f"{dv}devxfm 2 {subj} {sd} null 1 {mgz} {xfm} null")
+        L.append(f"{dv}devxfm 2 {subj} {sd} null 1 {mgz0} {xfm} null")
+        L.append(f"{dv}devxfm 2 {subj} {sd} {xs('reg.xfm')} 1 {mgz} {xfm} null")
+        L.append(f"{dv}devxfm 2 {subj} {sd} null 1 {mgz} nofile {m}")
+        r0 = random.Random(25)
+        for ty in (0, 1):
+            L.append(
+                f"{dv}devxfm 2 {subj} {sd} {xs('r.lta')} 1 {mgz} {xs(self.lta_file(r0, ty))} null"
+            )
+        L.append(f"{dv}{sv}devxfm 2 {subj} {sd} null 1 {xs('not gzip')} {xfm} null")
+        # §64: angles 0, NaN, infinity, 1e300 and quarter turns
+        for ang in (
+            (0.0, 0.0, 0.0),
+            (float("nan"), 0.0, 0.0),
+            (float("inf"), 0.0, 0.0),
+            (1e300, 0.0, 0.0),
+            (math.pi / 2, math.pi, -math.pi / 2),
+        ):
+            L.append("angrm " + " ".join(f64(v) for v in ang))
+        p0 = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0]
+        L.append("affp2m " + " ".join(f64(v) for v in p0) + " null")
+        L.append("affp2m " + " ".join(f64(v) for v in [0.0] * 12) + " null")
+        L.append("affp2m " + " ".join(f64(v) for v in p0) + " " + self.mat(random.Random(3)))
+        L.append("affp2m " + " ".join(f64(v) for v in p0) + " " + self.mat(random.Random(3), 3, 3))
+        L.append(
+            "affp2m "
+            + " ".join(f64(v) for v in [1, 2, 3, 90, 45, 30, 2, 0.5, 1, 0.1, -0.2, 0.3])
+            + " null"
+        )
+        L.append("affm2p null")
+
+        def diag(*d):
+            return "4 4 " + " ".join(
+                f32(d[i // 5] if i % 5 == 0 and i < 15 else (1.0 if i == 15 else 0.0))
+                for i in range(16)
+            )
+
+        for dd in ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (2.0, -3.0, 0.5), (0.0, 0.0, 0.0)):
+            L.append(f"affm2p {diag(*dd)}")
+        L.append(f"affm2p {nanm}")
+        L.append(f"ltarot {lt1(1, gav, gav, mm=sing)}")
+        L.append(f"ltarot {lt1(1, gav, gav, mm=m)}")
+        L.append(f"rmsmj {m} {m} {f64(70.0)}")
+        L.append(f"rmsmj {m} {IDENT} {f64(float('nan'))}")
+        L.append(f"rmsmj {nanm} {IDENT} {f64(70.0)}")
+        # §65: VLSTcreate's border count (FS-888) into a list large enough (the count the interior,
+        # the border written) and into none (FS-890: past the arrays); the debugging voxel; the
+        # allocation line; a given list kept with its old fields
+        cube = [
+            1.0 if 1 <= x <= 3 and 1 <= y <= 3 and 1 <= zz <= 3 else 0.0
+            for zz in range(5)
+            for y in range(5)
+            for x in range(5)
+        ]
+        cv = self.lab(P((5, 5, 5)), cube, t=3)
+        one1 = f32(1.0)
+        L.append(f"vlcre {cv} 0 {one1} {one1} 30 30 0 1")
+        L.append(f"vlcre {cv} 0 {one1} {one1} null 0 1")
+        L.append(
+            f"+gxyz=2,2,2 +gdiag={DIAG_SHOW | DIAG_VERBOSE:x} vlcre {cv} 0 {one1} {one1} null 0 0"
+        )
+        L.append(f"vlcre {cv} 0 {one1} {one1} f 30 0 1 15 0 0 0")
+        L.append(f"vlcre {cv} 0 {f32(5.0)} {f32(6.0)} null 0 0")
+        H.append(f"@1 vlcre {cv} 0 {one1} {one1} null -1 0")
+        H.append(f"@1 vlcre {cv} 0 {one1} {one1} null -2 0")
+        # VLSTsort: ties broken by the indices, NaN, the frame index left in place (FS-891); a
+        # destination of more voxels (FS-890); a negative count with and without a destination
+        tie = [
+            [0, 0, 0, 0, 0.0, 0.0, 0.0, 2.0, 0.0],
+            [1, 0, 0, 1, 0.0, 0.0, 0.0, 2.0, 0.0],
+            [1, 1, 0, 2, 0.0, 0.0, 0.0, 2.0, 0.0],
+            [1, 1, 1, 3, 0.0, 0.0, 0.0, 2.0, 0.0],
+            [0, 0, 0, 4, 0.0, 0.0, 0.0, 5.0, 0.0],
+            [2, 0, 0, 5, 0.0, 0.0, 0.0, QNAN, 0.0],
+            [0, 0, 0, 6, 0.0, 0.0, 0.0, 2.0, 0.0],
+        ]
+        rr = random.Random(6)
+        L.append(f"vlsort {self.vf(rr, 7, k=7, vals=tie)} null")
+        L.append(f"vlsort {self.vf(rr, 3, k=3, vals=tie)} {self.vf(rr, 6, k=6, vals=tie)}")
+        L.append(f"vlsort {self.vf(rr, 3, nv=-1)} null")
+        L.append(f"vlsort {self.vf(rr, 3, nv=-1)} {self.vf(rr, 3)}")
+        L.append(f"vlfree {self.vf(rr, 2, mask=15)}")
+        # VLSTcomputeStats: no volume, no voxel, a negative count, two voxels
+        sv2 = self.lab(ga, [float(i) for i in range(12)], t=3) + " 0"
+        pts2 = [[0, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0], [2, 1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0]]
+        L.append(f"vlstat {self.vf(rr, 2, k=2, vals=pts2)} null")
+        L.append(f"vlstat {self.vf(rr, 2, nv=0, k=2, vals=pts2)} {sv2}")
+        L.append(f"vlstat {self.vf(rr, 2, nv=-1, k=2, vals=pts2)} {sv2}")
+        L.append(f"vlstat {self.vf(rr, 2, k=2, vals=pts2)} {sv2}")
+        # VLSTcopy and VLSTcopyInto: a destination too small; a source with mx and a destination
+        # without the others (FS-893) or with them all; past the source (FS-890); a negative count
+        s5 = self.vf(rr, 5, k=5, mask=1)
+        s5all = self.vf(rr, 5, k=5, mask=15)
+        L.append(f"vlcopy 0 {s5} {self.vf(rr, 2)} 0 3")
+        L.append(f"vlcopy 1 {s5} {self.vf(rr, 4)} 2 3")
+        L.append(f"vlcopy 0 {s5} {self.vf(rr, 5)} 0 3")
+        L.append(f"vlcopy 0 {s5} {self.vf(rr, 5, mask=14)} 0 3")
+        L.append(f"vlcopy 0 {s5all} null 1 3")
+        L.append(f"vlcopy 1 {s5all} null 2 3")
+        L.append(f"vlcopy 0 {self.vf(rr, 5, k=5)} null 3 4")
+        L.append(f"vlcopy 0 {self.vf(rr, 5, k=5)} null 0 -1")
+        L.append(f"vlcopy 0 {self.vf(rr, 5, k=5)} null 0 0")
+        # VLSTadd and the others: a full list, an existing voxel, the list's error code
+        full = self.vf(rr, 2)
+        part = self.vf(rr, 3, nv=1, k=1, vals=[[1, 2, 3, 0, 0.0, 0.0, 0.0, 0.0, 0.0]])
+        fl = " ".join(f32(v) for v in (0.5, 1.5, 2.5, 9.0, -9.0))
+        for k in range(4):
+            L.append(f"vladd {k} {full} 1 2 3 {fl}")
+            L.append(f"vladd {k} {part} 1 2 3 {fl}")
+            L.append(f"vladd {k} {part} 1 2 4 {fl}")
+        return [
+            Batch("vrules25", "vrules25", L),
+            Batch("vrules25", "vrules25-hang", H, guards=False),
+        ]
+
+
 GROUPS = [
     "vgblock",
     "vgcopy",
@@ -7026,6 +7822,12 @@ GROUPS = [
     "vdem",
     "vcc",
     "vrules24",
+    "vltawr",
+    "vltaxf",
+    "vltamisc",
+    "vrot",
+    "vlst",
+    "vrules25",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -7138,7 +7940,7 @@ def mask(b: Batch, line: bytes) -> bytes:
 #: file's lines at any diagnostic level above 0 once it finds the file: no line may set a level above
 #: 0 on them (the licence file never appears in an output). From the prebuilt probe's own code by
 #: ``licence_reach.py`` (README.md, "The licence check"); rebuilt probes are checked again.
-LICENCE_COMMANDS = frozenset({"bvr", "ltaread", "ltareads", "pvlab", "tiv"})
+LICENCE_COMMANDS = frozenset({"bvr", "devxfm", "ltaread", "ltareads", "pvlab", "tiv"})
 #: Variables that let the licence check find a licence file, and FreeSurfer's diagnostic level
 #: (which the probe never reads): never set by a line or a batch.
 LICENCE_VARS = frozenset({"FREESURFER_HOME", "FS_LICENSE", "DIAG_NO"})
@@ -7183,7 +7985,7 @@ def licence_guard(b: Batch) -> None:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen20) else Gen20(gen.seed)
+    gen = gen if isinstance(gen, Gen21) else Gen21(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

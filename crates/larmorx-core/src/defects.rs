@@ -2909,6 +2909,22 @@ defects! {
         "mri_label2vol --fill-ribbon without FREESURFER_HOME (or without its FreeSurferColorLUT.txt) prints the environment's message and crashes; corrected: status 1 after the message";
     FS_1273 = "FS-1273", "FreeSurfer", true,
         "mri_label2vol --fill-ribbon reads the ribbon from the environment's SUBJECTS_DIR even when --sd names another subjects folder (the surface comes from --sd's): the ribbon of another folder, or none ('(null)' in its name when SUBJECTS_DIR is not set); corrected: the ribbon from the subjects folder the program uses (--sd's, else the environment's)";
+    FS_1274 = "FS-1274", "FreeSurfer", true,
+        "seg2cc, mergeseg and fscalc print their usage (status 1) when any argument holds the text -help, and their version (status 0, nothing done) when any holds -version: a subject or file name such as sub-helper; corrected: only the arguments -help and --help (-version and --version) do";
+    FS_1275 = "FS-1275", "FreeSurfer", true,
+        "seg2cc --expert always fails: with an expert-options file that passes the check it ends with 'XOptsFiles: Undefined variable.', with one that fails it after the check's message with 'cmd: Undefined variable.' (status 1); corrected: the file is checked (the check's message and status 1 when it fails) and seg2cc goes on (the file is not used, as the option's comment says)";
+    FS_1276 = "FS-1276", "FreeSurfer", true,
+        "seg2cc --ctab is accepted and ignored: for a segmentation not conformed to its smallest voxel, the merged corpus callosum labels always get $FREESURFER_HOME/FreeSurferColorLUT.txt; corrected: the colour table --ctab names";
+    FS_1277 = "FS-1277", "FreeSurfer", true,
+        "seg2cc, mergeseg and fscalc read their arguments and some names (SUBJECTS_DIR, FREESURFER_HOME, the output's folder) again as shell words: blanks split a name, patterns (*, ?, [...]) are matched against files, braces, a leading ~ or =N expand, an empty argument vanishes: other files and folders, or the shell's errors; corrected: every name as given (D13 gap: the shell's reading is not reproduced, both modes take the names as given, with a notice)";
+    FS_1278 = "FS-1278", "FreeSurfer", true,
+        "seg2cc, mergeseg and fscalc print their lines through the shell's echo: a first word -n drops the line's end (an unrecognized flag -n, an operation -n), backslash sequences in a name (\\t, \\c, \\0nnn) become other characters or end the line; corrected: the lines as written";
+    FS_1279 = "FS-1279", "FreeSurfer", true,
+        "seg2cc with a relative --log or --tmpdir (or a relative SUBJECTS_DIR, which its default names come from) reads the name from two folders: the folder it starts in and the subject's mri folder it then enters: the log is split between two files (or lines are lost with 'tee: ... No such file or directory'), and the conformation check's answer is not found, which takes the path for a volume not conformed; corrected: the names from the folder seg2cc starts in";
+    FS_1280 = "FS-1280", "FreeSurfer", true,
+        "seg2cc with a relative SUBJECTS_DIR runs mri_cc (and for a segmentation not conformed to its smallest voxel also mri_label2vol's merge steps) inside the subject's mri folder, where the relative name does not lead to the subject: they fail; corrected: the programs get the subjects folder's absolute name";
+    FS_1341 = "FS-1341", "FreeSurfer", true,
+        "mergeseg stops with 'SUBJECTS_DIR: Undefined variable.' (status 1) when SUBJECTS_DIR is not set, after making its temporary folder, although it never uses the subjects folder; corrected: its log line 'setenv SUBJECTS_DIR' is left empty and the merge is made";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

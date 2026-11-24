@@ -1,0 +1,54 @@
+
+Frontend for the mris_calc FreeSurfer program for performing
+mathematical operations on volumes/surfaces of data. This program
+allows users to specify multiple operations on a single command line
+(mris_calc only allows one). The mris_calc help appears at the end
+of this help.
+
+This program handles many file formats including nifti, compressed
+nifti, mgh, mgz, img, bshort, bfloat. Even DICOMs can be used as
+input. Inputs can also be a constant (eg, mul 100). All inputs volumes
+must have the same dimension.
+
+All internal operations are performed in float. The ouput data type
+can be specified with --odt (uchar|short|int|float).
+
+Supported binary operations include:
+
+mul, div, mod, sub, sub0, sqd, atan2, mag, eq, lt, lte, gt, gte, upl, lrl,
+and, or, andbw, orbw, masked, sum (same as add), sratio, pctdiff, pctdiff0
+
+sub0 is the same as sub but returns 0 if either A or B are 0, same for pctdiff
+
+Supported unary operations include:
+
+sqr, sqrt, abs, sign, norm
+
+See the mris_calc help at the end of this for more info on these
+operations.
+
+Note that operations can have a dash infront of them (ie, "-mul" is
+the same as "mul")
+
+EXAMPLES:
+
+1. Compute percent difference between two volumes:
+
+  fscalc a.nii sub b.mgh div a.nii mul 100 --o pct.diff.nii.gz
+
+NOTES: different input file formats. "100" is a constant
+
+2. Compute the square of the sum of two volumes:
+
+  fscalc --o pct.diff.nii  a.nii add b.mgh sqr
+
+NOTES: Output (--o) is at the beginning. It does not matter
+where it appears on the command line
+
+3. Add 100 to each voxel in a file
+
+  fscalc a.nii add 100 --o a+100.nii
+  fscalc 100 add a.nii --o a+100.nii
+
+NOTES: constant can appear first.
+

@@ -3489,6 +3489,14 @@ defects! {
         "mri_robust_template with one 4-D input and no --inittp draws its random initial target among one name, so it always starts from frame 1; kept, noted";
     FS_1098 = "FS-1098", "FreeSurfer", true,
         "mri_robust_template --debug writes its debug files into the template's folder name cut two bytes short (out/t.mgz: into the working folder with the prefix 'ou'); by default into the template's folder";
+    FS_1099 = "FS-1099", "FreeSurfer", true,
+        "the matrix logarithm of mri_robust_template's affine mean space (--affine without --fixtp), of a transform with an eigenvalue on the nonpositive real axis (a reflection, or a zero eigenvalue): FreeSurfer prints that the principal logarithm is not defined and goes on to a logarithm that is not the principal one, which nearly always ends in its 'Result too imaginary to ignore!' error; refused with the message and status 1 by default";
+    FS_1100 = "FS-1100", "FreeSurfer", true,
+        "the matrix logarithm of mri_robust_template's affine mean space, of a transform whose eigenvalues fall into separate groups (more than 0.1 apart) one of which holds two or more eigenvalues: the triangular Sylvester equation between two groups leaves one term out of every column after the first, so the logarithm, and the mean space, are wrong; computed correctly by default";
+    FS_1311 = "FS-1311", "FreeSurfer", true,
+        "the matrix exponential of mri_robust_template's affine mean space (--affine without --fixtp) takes its Pade approximant's coefficients from memory it no longer owns (uninitialized stack memory in the official build): its result is NaN or arbitrary, and so is the mean space (memory contents); the coefficients are Higham's in both modes, noted";
+    FS_1312 = "FS-1312", "FreeSurfer", true,
+        "the matrix logarithm of mri_robust_template's affine mean space ends the program ('Result too imaginary to ignore!') when the imaginary part of its complex intermediate result passes 10 n 2^-52 times the result's one-norm, a bound below the rounding of its own complex arithmetic: about one ordinary near-identity transform in twenty is refused; by default refused only above sqrt(2^-52) times the norm";
 }
 
 /// The register entry with ID `id`.

@@ -173,6 +173,36 @@ fn svd(g: &mut Globals, a: &VnlMatrix) -> Option<Svd> {
     })
 }
 
+/// `vnl_svd<double>(a).solve(b)` (a matrix): `X = U^T B`, each row `i` times `1 / W(i)` where
+/// `W(i) != 0`, then `V X`; VNL's warning on standard error first when LINPACK does not converge
+/// (VNL goes on with the decomposition reached), the end of the program where VNL never returns
+/// (ITK-116: FreeSurfer hangs).
+pub(crate) fn svd_solve(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    a: &VnlMatrix,
+    b: &VnlMatrix,
+) -> Result<VnlMatrix, Fatal> {
+    let Some(d) = svd(g, a) else {
+        let _ = writeln!(err, "{SVD_HANGS}");
+        return Err(Fatal::Exit(1));
+    };
+    if let Some(w) = &d.warning {
+        let _ = err.write_all(w.as_bytes());
+    }
+    let mut x = d.u.transpose().mul(b);
+    for i in 0..x.rows {
+        let mut weight = d.w[i];
+        if weight != 0.0 {
+            weight = div64(1.0, weight);
+        }
+        for j in 0..x.cols {
+            *x.at_mut(i, j) = mul64(x.at(i, j), weight);
+        }
+    }
+    Ok(d.v.mul(&x))
+}
+
 /// The error the port gives where VNL's SVD never returns (FreeSurfer hangs: ITK-116).
 const SVD_HANGS: &str = "MyMatrix: VNL's singular value decomposition never returns on this matrix (an infinite or NaN entry)";
 

@@ -64,7 +64,9 @@
 
 // cabs and csqrt (LAPACK's ABS and SQRT of a complex number, std::abs and std::sqrt of
 // std::complex<double>) are linked with --wrap to complexrt.c's: the correctly rounded hypot in both
-// (the project's decision for MatrixSqrt, track C relay 41)
+// (the project's decision for MatrixSqrt, track C relay 41); clog (std::log of std::complex<double>,
+// MatrixLog's single eigenvalues) with --wrap to clogrt.c's, the decided complex logarithm (track C
+// relay 51)
 
 // the double acos of the official code (linked with --wrap=acos, build.sh): the project decided
 // the correctly rounded acos for reproduce too (glibc's is not: GLIBC-07; the decision of
@@ -847,6 +849,24 @@ void run_case()
   } else if (cmd == "sqrtm") {
     // MyMatrix::MatrixSqrt(A) of a square matrix
     ovm(MyMatrix::MatrixSqrt(get_vm()));
+  } else if (cmd == "logm") {
+    // MyMatrix::MatrixLog(A) of a square matrix (3.2-15, relay 51: the complex Schur form, its
+    // reordering by LAPACK's ztrsen, the inverse scaling and squaring, the block Parlett
+    // recurrence)
+    ovm(MyMatrix::MatrixLog(get_vm()));
+  } else if (cmd == "expm") {
+    // MyMatrix::MatrixExp(A) of a square matrix
+    ovm(MyMatrix::MatrixExp(get_vm()));
+  } else if (cmd == "geomean") {
+    // MyMatrix::GeometricMean of k 3 x 3 matrices (the affine mean space of mri_robust_template)
+    int k = geti();
+    std::vector<vnl_matrix_fixed<double, 3, 3> > vm(k);
+    for (int i = 0; i < k; i++) {
+      vnl_matrix<double> m = get_vm();
+      for (int r = 0; r < 3; r++)
+        for (int c = 0; c < 3; c++) vm[i][r][c] = m[r][c];
+    }
+    ovm(MyMatrix::GeometricMean(vm));
   } else if (cmd == "rgauss") {
     if (geti()) rgauss<double>();
     else rgauss<float>();

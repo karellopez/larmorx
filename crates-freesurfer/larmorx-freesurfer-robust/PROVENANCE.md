@@ -22,6 +22,11 @@ for third-party code: none in the functions translated (`RobustGaussian.cpp` cam
 - `src/mymri.rs`: `MyMRI::MRIvalscale`, `getPrefilter`, `getDerfilter`, `getRand` (its table),
   `subSample`, `getBlur`, `getPartials`, `findRightSize`, `getBackground`, `MRIlinearTransform`.
 - `src/costs.rs`: `CostFunctions::centroid`, `orientation`.
+- `src/mymatrix.rs` (queue item 3.2-14, track C relay 50, `MyMatrix.cpp` 1809-1880, 2263-2288,
+  2380-2496): `MyMatrix::RotationMean` (its rotation-vector mean; the older version after its `return`
+  is dead), `getRTfromM`, `getMfromRT`, `VOXmatrix2LTA` and `RASmatrix2LTA` (the `vnl_matrix_fixed`
+  overloads; the `MATRIX` `RASmatrix2LTA` stores the same `float` matrix), `LTA2VOXmatrix`,
+  `LTA2RASmatrix`; VNL's fixed 3 x 3 product and Frobenius norm as they use them.
 - `src/mymatrix.rs`: `MyMatrix::convertVNL2MATRIX` (matrix and vector), `convertMATRIX2VNL`,
   `getVNLMatrix`, `isDiag`, `PolarDecomposition`, `Polar2Decomposition`, `AffineTransDistSq`,
   `RigidTransDistSq`, `getFrobeniusDiff`, `RotMatrixLogNorm` (the `vnl_matrix` overloads), and
@@ -51,6 +56,8 @@ third-party code.
   pseudo-inverse as `getLSEst` uses it.
 - `src/quaternion.rs`: `Quaternion`'s constructors, `importRotVec` (both), `importZYXAngles`,
   `operator*`, `getNormalized`, `getRotMatrix3d`.
+  Queue item 3.2-14 (track C, relay 50): `importMatrix`, `getRotAngle` (`acos` correctly rounded in
+  both modes, the project's decision), `getRotAxis`, `getRotVec` (`Quaternion.h`).
 - `src/transformation.rs`: `Transformation` and its fifteen models (`getDOF`, `setParameters` (the three
   kinds), `setIdentity`, `getSteps`, `getMatrix`, `getGradient`). Relay 44: FS-1073, the `double`
   `setParameters` of a longer vector whose block glibc 2.35's allocator hands straight back

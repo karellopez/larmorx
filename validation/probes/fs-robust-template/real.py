@@ -25,7 +25,8 @@ through the port (``larmorx-freesurfer freesurfer mri_robust_template``) with
 The LTAs' creation line is fixed by ``FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING`` and
 ``USER`` on both sides; ``FS_DISABLE_LANG=1`` on the official side; no diagnostic level.
 
-    python -P validation/probes/fs-robust-template/real.py [--runs a,b] [--recipes a,b] [--json out.json]
+    python -P validation/probes/fs-robust-template/real.py [--runs a,b] [--recipes a,b]
+        [--preload <lib>] [--json out.json]
 """
 
 from __future__ import annotations
@@ -110,9 +111,12 @@ def files(d: Path) -> dict[str, str]:
     }
 
 
-def official(exe: Path, args: list[str], d: Path) -> dict:
+def official(exe: Path, args: list[str], d: Path, preload: Path | None) -> dict:
     env = {"PATH": f"{exe.parent}:/usr/bin:/bin", "FS_DISABLE_LANG": "1", **FIXED,
            **freesurfer_env()}  # fmt: skip
+    if preload is not None:
+        # the decided cabs and csqrt (fs-robust-register's decided_complex.sh, the user's D4)
+        env["LD_PRELOAD"] = str(preload)
     if any(k.startswith("DIAG") for k in env) or any("diag" in a.lower() for a in args):
         raise SystemExit("a diagnostic setting would print the licence file")
     if d.exists():
@@ -186,6 +190,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--parallel", type=int, default=3)
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--json", type=Path)
+    ap.add_argument(
+        "--preload",
+        type=Path,
+        help="a library for the official program's LD_PRELOAD (fs-robust-register's "
+        "decided_complex.sh: the decided cabs and csqrt); its outputs in real-preload/",
+    )
     a = ap.parse_args(argv)
     ws = workspace()
     if ws is None:
@@ -197,14 +207,14 @@ def main(argv: list[str] | None = None) -> int:
          "--manifest-path", str(MANIFEST)],
         check=True, env=env,
     )  # fmt: skip
-    root = ws / "oracles" / "inputs" / "fs-robust-template" / "real"
+    root = ws / "oracles" / "inputs" / "fs-robust-template" / ("real-preload" if a.preload else "real")
     jobs = [(run, recipe) for run in a.runs.split(",") for recipe in a.recipes.split(",")]
 
     def one(job: tuple[str, str]) -> dict:
         run, recipe = job
         args = args_of(recipe, inputs_of(ws, run))
         base = root / run / recipe
-        o = official(exe, args, base / "official")
+        o = official(exe, args, base / "official", a.preload)
         rep = port(args, base / "reproduce", "reproduce")
         fix = port(args, base / "fix", "fix")
         same = {k: o[k] == rep[k] for k in ("status", "stdout", "stderr", "files")}
@@ -212,7 +222,7 @@ def main(argv: list[str] | None = None) -> int:
         return {
             "run": run,
             "recipe": recipe,
-            "inputs": len(RUNS[run][1] * [0]),
+            "inputs": RUNS[run][1],
             "reproduce_identical": same,
             "fix_identical": fix_same,
             "reproduce_notices": rep["notices"],

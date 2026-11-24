@@ -963,8 +963,8 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
 }
 
 /// The golden cases (`tests/mri_robust_template_golden.rs`): fMRIPrep's and recon-all's calls on
-/// three 32^3 inputs, the mean space of two, the global iterations of three, and a NaN input (its
-/// NaNs made 0 on reading), each written as MGZ.
+/// 32^3 inputs, the mean space of two, the global iterations of three, a NaN input (its NaNs made 0
+/// on reading) and a 4-D input of two frames with one `--mapmov` name (FS-1090), each written as MGZ.
 pub fn golden_cases() -> Vec<String> {
     let mut g = Gen::new(0x676f_6c64);
     let three = set(&mut g, 3, 32, MRI_SHORT);
@@ -998,6 +998,13 @@ pub fn golden_cases() -> Vec<String> {
         }
     }
     files.push(("tnan.mgz".to_owned(), write_as(&mut nan_img, "tnan.mgz")));
+    // a 4-D input of two frames (FS-1090: its one --mapmov name's header)
+    let mut four = three[0];
+    four.nframes = 2;
+    files.push((
+        "f4.mgz".to_owned(),
+        write_as(&mut image(&mut g, &four), "f4.mgz"),
+    ));
     let fmriprep = s(&[
         "--satit",
         "--fixtp",
@@ -1054,6 +1061,20 @@ pub fn golden_cases() -> Vec<String> {
         "a1.lta",
         "a2.lta",
         "--mapmov",
+        "w1.mgz",
+        "w2.mgz",
+    ]);
+    let four_d = s(&[
+        "--mov",
+        "f4.mgz",
+        "--template",
+        "tp.mgz",
+        "--satit",
+        "--fixtp",
+        "--inittp",
+        "1",
+        "--noit",
+        "--mapmov",
         "w4.mgz",
     ]);
     let iterations = s(&[
@@ -1090,7 +1111,7 @@ pub fn golden_cases() -> Vec<String> {
         "a1.lta",
         "a2.lta",
     ]);
-    [fmriprep, reconall, mean_space, iterations, nan]
+    [fmriprep, reconall, mean_space, iterations, nan, four_d]
         .iter()
         .map(|a| line(None, &files, &[], a))
         .collect()

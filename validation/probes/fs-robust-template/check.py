@@ -226,6 +226,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--dump", type=Path, help="every case's official, reproduce and fix lines (JSON lines)"
     )
+    ap.add_argument(
+        "--debug-cases",
+        type=int,
+        default=45,
+        help="the recorded test's debug build compares the first K cases (the command line's own "
+        "paths and failures) and hashes the rest as SLOW: official_sha256_skip_debug",
+    )
     a = ap.parse_args(argv)
     devnull = os.open(os.devnull, os.O_RDONLY)
     os.dup2(devnull, 0)
@@ -290,20 +297,30 @@ def main(argv: list[str] | None = None) -> int:
     equal = differ = skipped = skipped_same = not_ported = 0
     fix_differ, fix_unexplained, fix_ids, rep_ids = 0, 0, Counter(), Counter()
     hashed = hashlib.sha256()
+    hashed_debug = hashlib.sha256()
     first = []
     for k, (case, c, (r, ids), (f, fids)) in enumerate(zip(cases, official, rep, fix, strict=True)):
         for x in ids:
             rep_ids[x] += 1
+        slow = k >= a.debug_cases
+        if slow:
+            hashed_debug.update(b"SLOW\n")
         if NOT_PORTED in r:
             not_ported += 1
             hashed.update(b"NOTPORTED\n")
+            if not slow:
+                hashed_debug.update(b"NOTPORTED\n")
             continue
         if any(x in ids for x in SKIP):
             skipped += 1
             skipped_same += c == r
             hashed.update(b"SKIP\n")
+            if not slow:
+                hashed_debug.update(b"SKIP\n")
             continue
         hashed.update(c.encode() + b"\n")
+        if not slow:
+            hashed_debug.update(c.encode() + b"\n")
         if c == r:
             equal += 1
         else:
@@ -333,6 +350,7 @@ def main(argv: list[str] | None = None) -> int:
         "fix_differ_without_notice": fix_unexplained,
         "fix_notices": dict(fix_ids),
         "official_sha256_skip": hashed.hexdigest(),
+        "official_sha256_skip_debug": hashed_debug.hexdigest(),
         "first_differ": first,
     }
     print(json.dumps(summary, indent=1))

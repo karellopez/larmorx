@@ -201,9 +201,9 @@ def main(argv: list[str] | None = None) -> int:
         "",
         "## Memory",
         "",
-        "`tests/parity/test_memory_peak.py` (`MRI_EDIT_WM_WITH_ASEG_CASES`: recon-all's classic "
-        "and v8 calls on ds000005 sub-01's files, one thread; the rule: at most 10 % above "
-        "FreeSurfer's peak plus 8 MiB):",
+        "`tests/parity/test_memory_peak.py` (`MRI_PRETESS_CASES`: recon-all's white-matter "
+        "and filled (255) calls on ds000005 sub-01's classic files, one thread; the rule: at most "
+        "10 % above FreeSurfer's peak plus 8 MiB):",
         "",
     ]
     for m in memory:

@@ -557,3 +557,279 @@ pub fn matrix_sqrt(
     }
     Ok(msqrt)
 }
+
+/// `vnl_matrix_fixed<double, 3, 3>`, row by row.
+pub type Mat3 = [[f64; 3]; 3];
+
+/// `vnl_matrix_fixed<double, 3, 3>`'s product (`vnl_matrix_fixed_mat_mat_mult`): each element
+/// `a(i, 0) b(0, j)`, then `+ a(i, k) b(k, j)` for `k` from 1.
+pub fn mul3(a: &Mat3, b: &Mat3) -> Mat3 {
+    let mut o = [[0.0; 3]; 3];
+    for (i, row) in o.iter_mut().enumerate() {
+        for (j, v) in row.iter_mut().enumerate() {
+            let mut acc = mul64(a[i][0], b[0][j]);
+            for k in 1..3 {
+                acc = add64(acc, mul64(a[i][k], b[k][j]));
+            }
+            *v = acc;
+        }
+    }
+    o
+}
+
+/// The transpose of a 3 x 3 matrix.
+pub fn transpose3(a: &Mat3) -> Mat3 {
+    let mut o = [[0.0; 3]; 3];
+    for i in 0..3 {
+        for j in 0..3 {
+            o[j][i] = a[i][j];
+        }
+    }
+    o
+}
+
+/// `frobenius_norm()` of a 3 x 3 matrix: the square root of the squares summed in storage order
+/// from `+0`.
+pub fn fro3(a: &Mat3) -> f64 {
+    let mut val = 0.0f64;
+    for row in a {
+        for &x in row {
+            val = add64(val, mul64(x, x));
+        }
+    }
+    larmorx_freesurfer_core::sse::sqrt64(val)
+}
+
+/// `MyMatrix::getRTfromM(m, r, t)`: the upper 3 x 3 block and the translation column.
+pub fn get_rt_from_m(m: &Mat4) -> (Mat3, [f64; 3]) {
+    let mut r = [[0.0; 3]; 3];
+    let mut t = [0.0; 3];
+    for i in 0..3 {
+        for j in 0..3 {
+            r[i][j] = m[i][j];
+        }
+        t[i] = m[i][3];
+    }
+    (r, t)
+}
+
+/// `MyMatrix::getMfromRT(r, t)`: the identity with `r` in its upper block and `t` in its last
+/// column.
+pub fn get_m_from_rt(r: &Mat3, t: &[f64; 3]) -> Mat4 {
+    let mut m = [[0.0; 4]; 4];
+    m[3][3] = 1.0;
+    for rr in 0..3 {
+        m[rr][..3].copy_from_slice(&r[rr]);
+        m[rr][3] = t[rr];
+    }
+    m
+}
+
+/// `MyMatrix::RotationMean(vm, frobnormthresh)`: each matrix's distance from a rotation (the
+/// Frobenius norm of `M M^T - I`); `Input rotation's max deviation from rotation is: <max>` on
+/// standard output; above `frobnormthresh` ` MyMatrix::RotationMean input(s) not rotation` (standard
+/// error), ` The threshold is: <t>. This can be adjusted using --frobnorm-thresh <>.` (standard
+/// output) and `exit(1)`. Otherwise the mean of the rotation vectors (`Quaternion::importMatrix`,
+/// `getRotVec`, summed in order from 0 and divided by the count) made a rotation again
+/// (`importRotVec`, `getRotMatrix3d`).
+pub fn rotation_mean(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    vm: &[Mat3],
+    frobnormthresh: f64,
+) -> Result<Mat3, Fatal> {
+    use crate::quaternion::Quaternion;
+    let mut maxnorm = 0.0f64;
+    for m in vm {
+        let mut id = mul3(m, &transpose3(m));
+        for (k, row) in id.iter_mut().enumerate() {
+            row[k] = sub64(row[k], 1.0);
+        }
+        let fnorm = fro3(&id);
+        if fnorm > maxnorm {
+            maxnorm = fnorm;
+        }
+    }
+    let _ = writeln!(
+        out,
+        "Input rotation's max deviation from rotation is: {}",
+        cfmt::ostream(maxnorm)
+    );
+    if maxnorm > frobnormthresh {
+        let _ = writeln!(err, " MyMatrix::RotationMean input(s) not rotation");
+        let _ = writeln!(
+            out,
+            " The threshold is: {}. This can be adjusted using --frobnorm-thresh <>.",
+            cfmt::ostream(frobnormthresh)
+        );
+        return Err(Fatal::Exit(1));
+    }
+    let mut mean_rv = [0.0f64; 3];
+    for m in vm {
+        let q = Quaternion::import_matrix(
+            m[0][0], m[0][1], m[0][2], m[1][0], m[1][1], m[1][2], m[2][0], m[2][1], m[2][2],
+        );
+        let v = q.rot_vec();
+        for k in 0..3 {
+            mean_rv[k] = add64(mean_rv[k], v[k]);
+        }
+    }
+    let n = vm.len() as f64;
+    for x in &mut mean_rv {
+        *x = div64(*x, n);
+    }
+    let q = Quaternion::import_rot_vec(g, mean_rv[0], mean_rv[1], mean_rv[2]);
+    let rmat = q.rot_matrix3d();
+    let mut meanr = [[0.0; 3]; 3];
+    for i in 0..3 {
+        for j in 0..3 {
+            meanr[i][j] = rmat[3 * i + j];
+        }
+    }
+    Ok(meanr)
+}
+
+/// `convertVNL2MATRIX(m.as_matrix(), lta->xforms[0].m_L)`: the transform's own 4 x 4 matrix
+/// filled with the elements converted to `float`.
+fn fill_m_l(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    lt: &mut larmorx_freesurfer_mri::lta::LinearTransform,
+    m: &Mat4,
+) -> Result<(), Fatal> {
+    if lt.m_l.is_none() {
+        lt.m_l = Some(matrix_alloc(g, out, err, 4, 4, MATRIX_REAL)?.expect("a 4 x 4 matrix"));
+    }
+    let ml = lt.m_l.as_mut().expect("the transform's matrix");
+    for (r, row) in m.iter().enumerate() {
+        for (c, &v) in row.iter().enumerate() {
+            ml.set_relt(r as i32 + 1, c as i32 + 1, v as f32);
+        }
+    }
+    Ok(())
+}
+
+/// `MyMatrix::VOXmatrix2LTA(m, src, dst)` (VNL): `LTAalloc(1, src)`, its matrix `m` (as
+/// `float`), the type `LINEAR_VOX_TO_VOX`, the geometries of `src` and `dst`.
+pub fn vox_matrix2lta(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m: &Mat4,
+    src: &larmorx_freesurfer_mri::mri::Mri,
+    dst: &larmorx_freesurfer_mri::mri::Mri,
+) -> Result<larmorx_freesurfer_mri::lta::Lta, Fatal> {
+    matrix2lta(
+        g,
+        out,
+        err,
+        m,
+        src,
+        dst,
+        larmorx_freesurfer_mri::lta::LINEAR_VOX_TO_VOX,
+    )
+}
+
+/// `MyMatrix::RASmatrix2LTA(m, src, dst)` (VNL and `MATRIX`: the `float` matrix the same): as
+/// [`vox_matrix2lta`] with the type `LINEAR_RAS_TO_RAS`.
+pub fn ras_matrix2lta(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m: &Mat4,
+    src: &larmorx_freesurfer_mri::mri::Mri,
+    dst: &larmorx_freesurfer_mri::mri::Mri,
+) -> Result<larmorx_freesurfer_mri::lta::Lta, Fatal> {
+    matrix2lta(
+        g,
+        out,
+        err,
+        m,
+        src,
+        dst,
+        larmorx_freesurfer_mri::lta::LINEAR_RAS_TO_RAS,
+    )
+}
+
+fn matrix2lta(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m: &Mat4,
+    src: &larmorx_freesurfer_mri::mri::Mri,
+    dst: &larmorx_freesurfer_mri::mri::Mri,
+    ltype: i32,
+) -> Result<larmorx_freesurfer_mri::lta::Lta, Fatal> {
+    let mut lta = larmorx_freesurfer_mri::lta::lta_alloc(g, out, err, 1, Some(src))?;
+    fill_m_l(g, out, err, &mut lta.xforms[0], m)?;
+    lta.ltype = ltype;
+    larmorx_freesurfer_volume::vgeom::get_vol_geom(&src.vg, &mut lta.xforms[0].src);
+    larmorx_freesurfer_volume::vgeom::get_vol_geom(&dst.vg, &mut lta.xforms[0].dst);
+    Ok(lta)
+}
+
+/// `MyMatrix::LTA2VOXmatrix(lta)` and `LTA2RASmatrix(lta)` (`to_vox`): the first transform's
+/// matrix of the type asked for, from the other through the geometries (`dR2I m_L sI2R` or
+/// `dI2R m_L sR2I`, `MatrixMultiply`'s `float` products), widened to `double`. A geometry without
+/// the matrix: ` MyMatrix::LTA2VOXmatrix ERROR : passed volumes did not have the info on i_to_r or
+/// r_to_i.` (or `LTA2RASmatrix ERROR:`) on standard output and `exit(1)`; another type ` MyMatrix
+/// ::LTA2VOXmatrix ERROR lta type not supported !` (both functions) and `exit(1)`.
+pub fn lta2matrix(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    lta: &larmorx_freesurfer_mri::lta::Lta,
+    to_vox: bool,
+) -> Result<VnlMatrix, Fatal> {
+    use larmorx_freesurfer_core::matrix::{matrix_copy, matrix_multiply};
+    use larmorx_freesurfer_mri::lta::{LINEAR_RAS_TO_RAS, LINEAR_VOX_TO_VOX};
+    use larmorx_freesurfer_volume::vgeom::{vg_i_to_r, vg_r_to_i};
+    let (direct, other) = if to_vox {
+        (LINEAR_VOX_TO_VOX, LINEAR_RAS_TO_RAS)
+    } else {
+        (LINEAR_RAS_TO_RAS, LINEAR_VOX_TO_VOX)
+    };
+    let lt = &lta.xforms[0];
+    if lta.ltype == other {
+        let m_l = lt.m_l.as_ref().expect("the transform's matrix");
+        let mut m_l = matrix_copy(g, out, err, Some(m_l), None)?.unwrap_new();
+        let (first, last) = if to_vox {
+            (
+                Some(vg_i_to_r(g, out, err, &lt.src)?),
+                vg_r_to_i(g, out, err, &lt.dst)?,
+            )
+        } else {
+            (
+                vg_r_to_i(g, out, err, &lt.src)?,
+                Some(vg_i_to_r(g, out, err, &lt.dst)?),
+            )
+        };
+        let (Some(first), Some(last)) = (first, last) else {
+            let which = if to_vox {
+                "LTA2VOXmatrix ERROR :"
+            } else {
+                "LTA2RASmatrix ERROR:"
+            };
+            let _ = writeln!(
+                out,
+                "MyMatrix::{which} passed volumes did not have the info on i_to_r or r_to_i."
+            );
+            return Err(Fatal::Exit(1));
+        };
+        let tmp = matrix_multiply(g, out, err, Some(&m_l), Some(&first), None)?.into_new();
+        matrix_multiply(g, out, err, Some(&last), tmp.as_ref(), Some(&mut m_l))?;
+        return Ok(convert_matrix2vnl(&m_l));
+    }
+    if lta.ltype == direct {
+        return Ok(convert_matrix2vnl(
+            lt.m_l.as_ref().expect("the transform's matrix"),
+        ));
+    }
+    let _ = writeln!(
+        out,
+        " MyMatrix::LTA2VOXmatrix ERROR lta type not supported !"
+    );
+    Err(Fatal::Exit(1))
+}

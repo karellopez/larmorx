@@ -793,6 +793,12 @@ pub fn env_of(case: &Case, dir: &Path) -> Vec<(String, Option<String>)> {
     .iter()
     .map(|(k, v)| (k.to_string(), Some(fill(v, dir))))
     .collect();
+    // the shell's folder as given (tcsh takes PWD when it names the folder it starts in: the same
+    // texts where the temporary folder's name holds a link, macOS's /var)
+    e.push((
+        "PWD".to_owned(),
+        Some(cwd_of(case, dir).to_string_lossy().into_owned()),
+    ));
     for (k, v) in &case.env {
         e.retain(|(n, _)| n != k);
         e.push((k.to_string(), v.as_ref().map(|v| fill(v, dir))));

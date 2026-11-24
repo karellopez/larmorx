@@ -498,15 +498,24 @@ impl<'a> Sh<'a> {
 
     /// The directory stack's line (`dirs`): each folder and a blank, the home folder as `~`.
     fn stack_line(&self) -> String {
-        let home = self.var("HOME").filter(|h| h.starts_with('/'));
+        let home = self.var("HOME").filter(|h| Path::new(h).is_absolute());
+        // a folder separator after the home folder's name (on Windows `\` too)
+        let sep = |c: Option<char>| c == Some('/') || (cfg!(windows) && c == Some('\\'));
         let show = |p: &Path| -> String {
             let s = p.to_string_lossy().into_owned();
             match &home {
-                Some(h) if s == *h => "~".to_owned(),
-                Some(h) if s.starts_with(&format!("{}/", h.trim_end_matches('/'))) && h != "/" => {
-                    format!("~{}", &s[h.trim_end_matches('/').len()..])
+                Some(h) => {
+                    let h = h.trim_end_matches(['/', '\\']);
+                    if s == h || s.strip_suffix(['/', '\\']) == Some(h) {
+                        "~".to_owned()
+                    } else if !h.is_empty() && s.starts_with(h) && sep(s[h.len()..].chars().next())
+                    {
+                        format!("~{}", &s[h.len()..])
+                    } else {
+                        s
+                    }
                 }
-                _ => s,
+                None => s,
             }
         };
         let mut line = String::new();
@@ -616,10 +625,9 @@ impl<'a> Sh<'a> {
         // ticks of 1/100 s
         let hund = |t: u64| format!("{}.{:02}", t / 100, t % 100);
         let r_ms = elapsed.as_millis() as u64;
-        let pct = if r_ms > 0 {
-            format!("{}%", (u + s) * 10 * 100 / r_ms)
-        } else {
-            "?%".to_owned()
+        let pct = match ((u + s) * 10 * 100).checked_div(r_ms) {
+            Some(p) => format!("{p}%"),
+            None => "?%".to_owned(),
         };
         let upt = match &loads {
             Some(l) => format!("L {l}"),
@@ -885,13 +893,7 @@ pub fn run_time_hours(seconds: i64) -> String {
     };
     let h = hundredths + u128::from(up);
     let text = format!("{}.{:02}", h / 100, h % 100);
-    if neg && h > 0 {
-        format!("-{text}")
-    } else if neg {
-        format!("-{text}")
-    } else {
-        text
-    }
+    if neg { format!("-{text}") } else { text }
 }
 
 /// Whether the 64-bit-mantissa binary number nearest to `units * 10^-places` (round half to
@@ -1043,13 +1045,21 @@ mod tests {
 
     #[test]
     fn hours_as_printf_prints_them() {
-        // 18 s: bc .00500000000000000000; the long double nearest to 0.005 is above it
-        assert_eq!(run_time_hours(18), "0.01");
-        assert_eq!(run_time_hours(0), "0.00");
-        assert_eq!(run_time_hours(3600), "1.00");
-        assert_eq!(run_time_hours(17), "0.00");
-        assert_eq!(run_time_hours(54), "0.01");
-        assert_eq!(run_time_hours(90), "0.03");
+        // measured: `printf %5.2f $(echo <s>/3600 | bc -l)` in the C locale
+        for (secs, h) in [
+            (0, "0.00"),
+            (17, "0.00"),
+            (18, "0.00"),
+            (54, "0.01"),
+            (90, "0.03"),
+            (126, "0.04"),
+            (162, "0.05"),
+            (198, "0.05"),
+            (1818, "0.50"),
+            (3600, "1.00"),
+        ] {
+            assert_eq!(run_time_hours(secs), h, "{secs} s");
+        }
     }
 
     #[test]

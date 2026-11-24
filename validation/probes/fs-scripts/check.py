@@ -96,6 +96,7 @@ def env_for(case: dict, d: Path, official: bool) -> dict[str, str]:
         "OMP_NUM_THREADS": "1",
         "PATH": "/usr/bin:/bin",
     }
+    env["PWD"] = str(d / case["cwd"]) if case["cwd"] else str(d)
     if official:
         ws = workspace()
         env["PATH"] = f"{ws / FS_HOME / 'bin'}:/usr/bin:/bin"

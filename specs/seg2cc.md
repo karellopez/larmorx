@@ -82,7 +82,7 @@ segmentation: recon-all runs it at its stage "CC Seg" in both streams, on
 - **The end lines.** `echo " "`, `Started at <date at the start> ` (a blank at the end), `Ended   at
   <date>`, `<Name>-Run-Time-Sec <whole seconds>`, `<Name>-Run-Time-Hours <h>` (`<h>`: the seconds
   divided by 3600 with 20 decimals, truncated, then rounded to 2 places as a long double: 18 s
-  gives `0.01`), `echo " "`, `<name> Done`, each through `tee -a` the log.
+  gives `0.00`, 90 s `0.03`), `echo " "`, `<name> Done`, each through `tee -a` the log.
 - **Process numbers.** `$$` is the script's process number.
 
 ## 3. The command line

@@ -40,9 +40,9 @@ the recordings (fscalc does in label-cortex's `--fix-ga`, v8).
   $SUBJECTS_DIR"`) ends the script: `<name>: Undefined variable.`, status 1.
 - GNU `time` prints `Command exited with non-zero status <n>` on its output (`-o /dev/stdout`)
   before the format line when the command fails.
-- `printf %5.2f` of `bc -l`'s `.00500000000000000000` (18 s) gives `0.01` in the C locale (the long
-  double above 0.005); the recordings' es_ES time locale gave `0,00` (an invalid number for that
-  locale's decimal comma).
+- `printf %5.2f` of `bc -l`'s `.00500000000000000000` (18 s) gives `0.00` in the C locale (the long
+  double nearest 0.005 is below it; 90 s gives `0.03`); the recordings' es_ES numeric locale gave
+  `0,00`.
 - `date` in the recordings is es_ES's (`jue 12 nov 2026 12:33:22 CET`): the port prints the C
   locale's form (the logs' dates are masked by the replay tool's comparison).
 

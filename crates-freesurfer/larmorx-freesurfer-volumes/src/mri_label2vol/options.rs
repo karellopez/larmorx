@@ -284,15 +284,14 @@ pub fn parse_commandline(g: &mut Globals, r: &mut Run, args: &[String]) -> Resul
             }
             if o.label_list.len() == LABEL_LIST_MAX {
                 // the table's 101st place is past its end (the next globals)
+                // measured on the official build: the labels past the table are used and
+                // nothing visible changes (what they overwrite is not known): both modes keep them
                 g.notices.add(
                     &FS_1259,
                     format!(
-                        "mri_label2vol: more than {LABEL_LIST_MAX} --label options: FreeSurfer's table holds {LABEL_LIST_MAX} (the next ones overwrite other settings)"
+                        "mri_label2vol: more than {LABEL_LIST_MAX} --label options: FreeSurfer's table holds {LABEL_LIST_MAX} (the next ones are written past it, into memory the program uses for something else)"
                     ),
                 );
-                if g.notices.reproduce() {
-                    return Err(Fatal::Exit(139));
-                }
             }
             o.label_list.push(rest[0].clone());
             nargsused = 1;

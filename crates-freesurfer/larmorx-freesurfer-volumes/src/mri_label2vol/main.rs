@@ -826,12 +826,14 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
                     g.notices.add(
                         &FS_1258,
                         format!(
-                            "mri_label2vol --proj: a label point at vertex {vtxno} of a surface of {} vertices (FreeSurfer reads outside the surface's vertices)",
+                            "mri_label2vol --proj: a label point at vertex {vtxno} of a surface of {} vertices (FreeSurfer reads its position outside the surface's vertices: memory contents)",
                             s.nvertices
                         ),
                     );
                     if g.notices.reproduce() {
-                        return Err(Fatal::Exit(139));
+                        // FreeSurfer's position is memory contents (measured: outside the
+                        // template): the point counts nowhere
+                        continue;
                     }
                     let _ = writeln!(
                         r.out,

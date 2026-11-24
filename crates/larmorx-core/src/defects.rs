@@ -3435,6 +3435,44 @@ defects! {
         "mri_robust_register's test modes 5 and 6 (--test 5, --test 6) write their pattern of integers as bytes into an image of floating-point numbers, so the bytes of the first voxels of each row change instead of the pattern's voxels; by default the pattern's values are written as voxel values";
     FS_1079 = "FS-1079", "FreeSurfer", true,
         "mri_robust_register --debug with a half-way image (--halfmov, --halfdst) after a registration with a cost other than ROB and ROBENT writes the image, then dies of a segmentation fault where it would print the image's means over the registration's weights (that registration has no weights); by default the means are not printed";
+    FS_1080 = "FS-1080", "FreeSurfer", true,
+        "mri_robust_template with an option that takes an argument or a list given last dies of a segmentation fault (--template aborts instead); by default an error naming the option";
+    FS_1081 = "FS-1081", "FreeSurfer", true,
+        "mri_robust_template runs the inputs' registrations on several threads when it may: its printed lines and the sums of the inputs' centres then depend on the run; larmorx always gives the one-thread order";
+    FS_1082 = "FS-1082", "FreeSurfer", true,
+        "mri_robust_template's seed from the images' centres (no --seed and no --inittp) is converted to an unsigned integer without a range check: a sum of 2^32 or more gives an arbitrary seed; by default the largest unsigned integer";
+    FS_1083 = "FS-1083", "FreeSurfer", true,
+        "mri_robust_template takes the clock as the random target's seed when the images' centres are all 0 (no --seed and no --inittp), so the target and the printed seed change from run to run; by default the seed stays 0";
+    FS_1084 = "FS-1084", "FreeSurfer", true,
+        "mri_robust_template with fewer --masks than inputs reads the missing masks' names from memory past the list; larmorx ends with an error at the first input without a mask in both modes";
+    FS_1085 = "FS-1085", "FreeSurfer", true,
+        "mri_robust_template with one 4-D input and a mask that does not read checks the input instead of the mask and dies of a segmentation fault; by default the error of an input that does not read, naming the mask";
+    FS_1086 = "FS-1086", "FreeSurfer", true,
+        "mri_robust_template with one 4-D input and more than one mask reads none of them and dies of a segmentation fault on the first frame; by default an error";
+    FS_1087 = "FS-1087", "FreeSurfer", true,
+        "mri_robust_template with an --ixforms file that does not read dies of a segmentation fault; by default the error 'could not read transform file'";
+    FS_1088 = "FS-1088", "FreeSurfer", true,
+        "mri_robust_template with a morph (.m3z) as --ixforms reads the morph as a linear transform (memory contents); larmorx ends with an error in both modes";
+    FS_1089 = "FS-1089", "FreeSurfer", true,
+        "mri_robust_template with one 4-D input and fewer --ixforms than frames applies the missing transforms through no transform and dies of a segmentation fault; by default an error";
+    FS_1090 = "FS-1090", "FreeSurfer", true,
+        "mri_robust_template --mapmov with one name writes the mapped inputs as one 4-D image whose header is a default one (1 mm voxels, a default orientation and centre), not the template's; by default the template's header";
+    FS_1091 = "FS-1091", "FreeSurfer", false,
+        "mri_robust_template --conform does not write a conformed template (256^3, 1 mm): it prints 'not implemented, yet' for each input and writes the template resampled trilinearly in its own space; kept, noted";
+    FS_1092 = "FS-1092", "FreeSurfer", true,
+        "mri_robust_template --inittp with a number larger than the number of inputs reads past its list of images (memory contents); larmorx ends with an error in both modes";
+    FS_1093 = "FS-1093", "FreeSurfer", true,
+        "mri_robust_template --inittp 0 without --ixforms, with --noit or with two inputs, maps the inputs with no transform and dies of a segmentation fault; by default an error";
+    FS_1094 = "FS-1094", "FreeSurfer", true,
+        "mri_robust_template --weights with --leastsquares and the global iterations stores each input's weights past the end of a list it never sized (heap memory); larmorx keeps no weights in both modes";
+    FS_1095 = "FS-1095", "FreeSurfer", true,
+        "mri_robust_template --average 3 builds a matrix of (inputs x voxels) rows and voxels columns, which no image of a useful size fits in memory; larmorx ends with an error above 2,048 voxels in both modes";
+    FS_1096 = "FS-1096", "FreeSurfer", true,
+        "mri_robust_template ends with status 0 when the template or one of its outputs (transforms, intensity factors, mapped inputs, weights) could not be written; by default status 1 after the program's messages";
+    FS_1097 = "FS-1097", "FreeSurfer", false,
+        "mri_robust_template with one 4-D input and no --inittp draws its random initial target among one name, so it always starts from frame 1; kept, noted";
+    FS_1098 = "FS-1098", "FreeSurfer", true,
+        "mri_robust_template --debug writes its debug files into the template's folder name cut two bytes short (out/t.mgz: into the working folder with the prefix 'ou'); by default into the template's folder";
 }
 
 /// The register entry with ID `id`.

@@ -18,7 +18,8 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 2026-11-22), ``mri_info`` (``MRI_INFO_CASES``, 2026-11-22), ``mris_calc`` (``MRIS_CALC_CASES``,
 2026-11-22), ``mri_add_xform_to_header`` (``MRI_ADD_XFORM_CASES``, 2026-11-22), ``mri_make_uchar``
 (``MRI_MAKE_UCHAR_CASES``, 2026-11-22), ``lta_convert`` (``LTA_CONVERT_CASES``, 2026-11-22),
-``mri_robust_register`` (``MRI_ROBUST_REGISTER_CASES``, 2026-11-22), ``mri_mask``
+``mri_robust_register`` (``MRI_ROBUST_REGISTER_CASES``, 2026-11-22), ``mri_robust_template``
+(``MRI_ROBUST_TEMPLATE_CASES``, 2026-11-24), ``mri_mask``
 (``MRI_MASK_CASES``, 2026-11-22), ``mri_cc`` (``MRI_CC_CASES``, ``MRI_CC_WM_CASES``, 2026-11-23), ``fs_temp_file``
 (``FS_TEMP_FILE_CASES``, 2026-11-22), ``getfullpath`` (``GETFULLPATH_CASES``, 2026-11-22) and
 ``mri_vol2vol`` (``MRI_VOL2VOL_CASES``, 2026-11-23; its morph and ``--gcam`` on the classic
@@ -3087,6 +3088,104 @@ def test_mri_robust_register_replica_needs_no_more_memory_than_freesurfer(tmp_pa
         assert (r_dir / "reg.lta").read_bytes() == (o_dir / "reg.lta").read_bytes(), (
             f"{name} ({mode})"
         )
+
+
+#: ``mri_robust_template``'s call (track C relay 50): fMRIPrep's (sMRIPrep's
+#: ``StructuralReference``: ``--satit --fixtp --inittp 1 --iscale --noit --subsample 200``) on the
+#: two N4-corrected T1w images of the ds005454 fMRIPrep oracle run (``acq-denoised``,
+#: ``acq-mp2rage``), its template as NIfTI.
+MRI_ROBUST_TEMPLATE_CASES = [
+    (
+        "fmriprep",
+        [
+            "--satit",
+            "--fixtp",
+            "--mov",
+            "{n4}/_n4_correct0/sub-16_acq-denoised_T1w_noise_corrected_corrected.nii.gz",
+            "{n4}/_n4_correct1/sub-16_acq-mp2rage_T1w_noise_corrected_corrected.nii.gz",
+            "--inittp",
+            "1",
+            "--iscale",
+            "--noit",
+            "--template",
+            "template.nii.gz",
+            "--subsample",
+            "200",
+            "--lta",
+            "tp1.lta",
+            "tp2.lta",
+        ],
+    ),
+]
+
+
+@pytest.mark.parametrize(("name", "args"), MRI_ROBUST_TEMPLATE_CASES)
+def test_mri_robust_template_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, args):
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / "mri_robust_template" if ws else None
+    n4 = (
+        ws / "oracles" / "fmriprep-25.2.6" / "ds005454-sub-16-noreconall" / "work"
+        / "fmriprep_25_2_wf" / "sub_16_wf" / "anat_fit_wf" / "anat_template_wf" / "n4_correct"
+        / "mapflow"
+        if ws
+        else None
+    )  # fmt: skip
+    words = [a.format(n4=n4) for a in args]
+    if exe is None or not exe.is_file() or not Path(words[3]).is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds005454 fMRIPrep recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        "FS_DISABLE_LANG": "1",
+        "FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING": "Thu Jan  1 00:00:00 1970",
+        **freesurfer_env(),
+    }
+
+    def fresh(d: Path):
+        def reset() -> None:
+            if d.exists():
+                shutil.rmtree(d)
+            d.mkdir()
+
+        reset()
+        return reset
+
+    o_dir = tmp_path / "freesurfer"
+    code, fs_mib = _original_peak(
+        ["mri_robust_template", *words],
+        env,
+        "freesurfer",
+        fresh(o_dir),
+        o_dir,
+        (r"registration took \d+ minutes and \d+ seconds\.",),
+        "freesurfer",
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        fresh(r_dir)
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_robust_template", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(
+            f"mri_robust_template {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}"
+        )
+        assert mib <= allowance(fs_mib), (
+            f"mri_robust_template {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        for f in ("tp1.lta", "tp2.lta", "template.nii.gz"):
+            assert (r_dir / f).read_bytes() == (o_dir / f).read_bytes(), f"{name} ({mode}) {f}"
 
 
 #: ``fs_temp_file``'s calls (track A relay 52): recon-all's (no option, before its version check)

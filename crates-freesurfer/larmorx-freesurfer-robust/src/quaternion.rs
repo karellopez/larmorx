@@ -7,9 +7,10 @@
 //!
 //! `sin`, `cos` and `sqrt` in `double`: the correctly rounded functions by default, glibc's with
 //! `reproduce` (`larmorx_core::math::Libm`; GLIBC-07 noted where the two differ); NaNs as x86-64
-//! makes them. The functions only
-//! `mri_robust_template` and the multi-image registration reach (`importMatrix`, `getRotVec`,
-//! the half rotation, the averages) come with those items.
+//! makes them. `mri_robust_template`'s rotation mean (queue 3.2-14) adds `importMatrix`,
+//! `getRotAngle` (`acos`: the correctly rounded function in both modes, the project's decision
+//! for glibc's `acos`), `getRotAxis` and `getRotVec`. The half rotation and the other averages
+//! are not reached by either program.
 
 use larmorx_core::math::Libm;
 use larmorx_freesurfer_core::cstd::note_glibc07;
@@ -136,6 +137,90 @@ impl Quaternion {
             d: dn,
             normed: self.normed && v.normed,
         }
+    }
+
+    /// `importMatrix(a00, ..., a22)`: the quaternion of a rotation matrix (`trace = a00 + a11 +
+    /// a22`; above 0.00001 `s = 0.5 / sqrt(trace + 1)`, `a = 0.25 / s` and the differences of the
+    /// off-diagonal pairs times `s`; otherwise from the largest diagonal element, `s = 2 sqrt(1 +
+    /// that - the other two)`), normalised.
+    #[allow(clippy::too_many_arguments)]
+    pub fn import_matrix(
+        a00: f64,
+        a01: f64,
+        a02: f64,
+        a10: f64,
+        a11: f64,
+        a12: f64,
+        a20: f64,
+        a21: f64,
+        a22: f64,
+    ) -> Quaternion {
+        let trace = add64(add64(a00, a11), a22);
+        let (a, b, c, d);
+        if trace > 0.00001 {
+            let s = div64(0.5, sqrt64(add64(trace, 1.0)));
+            a = div64(0.25, s);
+            b = mul64(sub64(a21, a12), s);
+            c = mul64(sub64(a02, a20), s);
+            d = mul64(sub64(a10, a01), s);
+        } else if a00 > a11 && a00 > a22 {
+            let s = mul64(2.0, sqrt64(sub64(sub64(add64(1.0, a00), a11), a22)));
+            a = div64(sub64(a21, a12), s);
+            b = mul64(0.25, s);
+            c = div64(add64(a01, a10), s);
+            d = div64(add64(a02, a20), s);
+        } else if a11 > a22 {
+            let s = mul64(2.0, sqrt64(sub64(sub64(add64(1.0, a11), a00), a22)));
+            a = div64(sub64(a02, a20), s);
+            b = div64(add64(a01, a10), s);
+            c = mul64(0.25, s);
+            d = div64(add64(a12, a21), s);
+        } else {
+            let s = mul64(2.0, sqrt64(sub64(sub64(add64(1.0, a22), a00), a11)));
+            a = div64(sub64(a10, a01), s);
+            b = div64(add64(a02, a20), s);
+            c = div64(add64(a12, a21), s);
+            d = mul64(0.25, s);
+        }
+        Quaternion {
+            a,
+            b,
+            c,
+            d,
+            normed: true,
+        }
+    }
+
+    /// `getRotAngle()`: `2 acos(a / |q|)` (`|q|` the square root of `a a + b b + c c + d d`;
+    /// `acos` correctly rounded in both modes).
+    pub fn rot_angle(&self) -> f64 {
+        let (a, b, c, d) = (self.a, self.b, self.c, self.d);
+        let l = sqrt64(add64(
+            add64(add64(mul64(a, a), mul64(b, b)), mul64(c, c)),
+            mul64(d, d),
+        ));
+        let x = div64(a, l);
+        mul64(2.0, nan_of(larmorx_core::math::acos(x), x))
+    }
+
+    /// `getRotAxis()`: `(b, c, d)` times `1 / sqrt(b b + c c + d d)`; all three 0 when one is
+    /// a NaN (the identity's axis among them).
+    pub fn rot_axis(&self) -> [f64; 3] {
+        let (b, c, d) = (self.b, self.c, self.d);
+        let l = sqrt64(add64(add64(mul64(b, b), mul64(c, c)), mul64(d, d)));
+        let l = div64(1.0, l);
+        let v = [mul64(b, l), mul64(c, l), mul64(d, l)];
+        if v.iter().any(|x| x.is_nan()) {
+            return [0.0; 3];
+        }
+        v
+    }
+
+    /// `getRotVec()`: the axis times the angle.
+    pub fn rot_vec(&self) -> [f64; 3] {
+        let v = self.rot_axis();
+        let alpha = self.rot_angle();
+        [mul64(v[0], alpha), mul64(v[1], alpha), mul64(v[2], alpha)]
     }
 
     /// `getNormalized()`: itself when normalised, else each part divided by the norm.

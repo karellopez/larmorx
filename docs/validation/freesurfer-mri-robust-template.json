@@ -1,0 +1,227 @@
+{
+ "tool": "mri_robust_template",
+ "upstream": "FreeSurfer 8.2.0",
+ "status": "experimental",
+ "queue": "3.2-14 (part 1 of mri_robust_template)",
+ "commit": "e9b605fd5bac",
+ "date": "2026-11-24",
+ "platform": "Linux x86_64",
+ "not_ported_yet": "the affine mean space (`--affine` without `--fixtp`: the matrices' geometric mean, `MyMatrix::GeometricMean`'s matrix logarithm and exponential; queue 3.2-15)",
+ "probe": [
+  {
+   "seed": 1,
+   "family": "seeded",
+   "preload": true,
+   "cases": 300,
+   "reproduce_equal": 293,
+   "reproduce_differ": 0,
+   "skipped": 6,
+   "not_ported": 1,
+   "fix_differ": 67,
+   "fix_differ_without_notice": 0,
+   "official_sha256_skip": "0ea79baa5981e2c16482362b237e688bf910be6cdefaa61a0024607e6e922d8a"
+  },
+  {
+   "seed": 7,
+   "family": "seeded",
+   "preload": true,
+   "cases": 300,
+   "reproduce_equal": 291,
+   "reproduce_differ": 0,
+   "skipped": 8,
+   "not_ported": 1,
+   "fix_differ": 76,
+   "fix_differ_without_notice": 0,
+   "official_sha256_skip": "c9e02afc803fcb6a06de0115ab67cde094b13dcf948e55494ee65ef07fc69867"
+  },
+  {
+   "seed": 13,
+   "family": "seeded",
+   "preload": true,
+   "cases": 300,
+   "reproduce_equal": 292,
+   "reproduce_differ": 0,
+   "skipped": 7,
+   "not_ported": 1,
+   "fix_differ": 73,
+   "fix_differ_without_notice": 0,
+   "official_sha256_skip": "d3b599f66d40115303b9d95ed1c01cb42eef2620aaaf454580dc082cf5eef05c"
+  }
+ ],
+ "real": [
+  {
+   "run": "ds004173-sub-603309",
+   "recipe": "fmriprep",
+   "inputs": 3,
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 75.8,
+    "reproduce": 129.2,
+    "fix": 128.0
+   },
+   "peak_mib": {
+    "official": 1879.09375,
+    "reproduce": 1658.4,
+    "fix": 1660.0
+   }
+  },
+  {
+   "run": "ds004173-sub-603309",
+   "recipe": "reconall",
+   "inputs": 3,
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 75.9,
+    "reproduce": 128.9,
+    "fix": 128.5
+   },
+   "peak_mib": {
+    "official": 1879.671875,
+    "reproduce": 1661.2,
+    "fix": 1660.0
+   }
+  },
+  {
+   "run": "ds004173-sub-603309",
+   "recipe": "longitudinal",
+   "inputs": 3,
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 269.7,
+    "reproduce": 472.1,
+    "fix": 451.8
+   },
+   "peak_mib": {
+    "official": 1996.2421875,
+    "reproduce": 1772.7,
+    "fix": 1774.2
+   }
+  },
+  {
+   "run": "ds005454-sub-16",
+   "recipe": "fmriprep",
+   "inputs": 2,
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 53.6,
+    "reproduce": 103.5,
+    "fix": 104.0
+   },
+   "peak_mib": {
+    "official": 1396.91015625,
+    "reproduce": 1375.8,
+    "fix": 1376.1
+   }
+  },
+  {
+   "run": "ds005454-sub-16",
+   "recipe": "reconall",
+   "inputs": 2,
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 55.7,
+    "reproduce": 103.2,
+    "fix": 103.7
+   },
+   "peak_mib": {
+    "official": 1396.0859375,
+    "reproduce": 1376.3,
+    "fix": 1376.3
+   }
+  },
+  {
+   "run": "ds005454-sub-16",
+   "recipe": "longitudinal",
+   "inputs": 2,
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 56.0,
+    "reproduce": 103.7,
+    "fix": 97.4
+   },
+   "peak_mib": {
+    "official": 1396.45703125,
+    "reproduce": 1375.9,
+    "fix": 1377.0
+   }
+  }
+ ],
+ "golden": {
+  "reproduce": "5ee82ce663af88dc34df36c4cea69e551aae036f8637e7f6b172daf61873fda0",
+  "fix": "cfe17db9203387f230880cae98bea9fc4a96dd152d09e2de96ff91c46dc14665"
+ },
+ "memory": [
+  {
+   "case": "fmriprep",
+   "mode": "reproduce",
+   "larmorx_mib": 1378.8,
+   "freesurfer_mib": 1397.0
+  },
+  {
+   "case": "fmriprep",
+   "mode": "fix",
+   "larmorx_mib": 1378.3,
+   "freesurfer_mib": 1397.0
+  }
+ ]
+}

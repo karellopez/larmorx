@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The comparison loop of ``specs/freesurfer-volume.md`` §69 (parts 1 to 9, 10a, §54 to §57): seeded cases of every
+"""The comparison loop of ``specs/freesurfer-volume.md`` §69 (parts 1 to 10, §54 to §57): seeded cases of every
 group, run on the probe ``fs_volume_probe`` (FreeSurfer 8.2.0's volume functions, a black box) and on
 a candidate program that takes the same commands (README.md beside this file), compared line by
 line.
@@ -6175,6 +6175,16 @@ class Gen19(Gen18):
         inf = self.lab(P((8, 1, 1)), [80.0, 110.0, 80.0, 110.0, INF, 80.0, 110.0, 80.0], t=3)
         L.append(f"hsegm {inf} 0 {self.lab(P((8, 1, 1)), [128, 0, 0, 0, 128, 0, 0, 0], t=0)} 85 130 95 3 {f32(2.0)}")
         L.append(f"hsegm {seg_src} 0 self 85 130 100 5 {f32(2.0)}")
+        # the source itself as the labels, a checkerboard of 80 and 128: the voxels of 128 are
+        # relabelled in place, and later windows read the new bytes
+        c128 = self.lab(P((6, 6, 2)), [80 if v == 80 else 128 for v in sv], t=0)
+        L.append(f"hsegm {c128} 0 self 85 140 100 5 {f32(2.0)}")
+        L.append(f"hsegm {c128} 0 {seg_lab} 85 140 100 5 {f32(2.0)}")
+        # the heartbeat bit (the percent done of each slice) at depths 2 and 1
+        L.append(f"+gdiag=4000 hsegm {seg_src} 0 {seg_lab} 85 130 100 5 {f32(2.0)}")
+        L.append(
+            f"+gdiag=4040 hsegm {self.lab(P((4, 1, 1)), [80, 110, 80, 110], t=0)} 0 {self.lab(P((4, 1, 1)), [128] * 4, t=0)} 85 130 100 3 {f32(2.0)}"
+        )
         # FS-502: a gray-matter limit below -1 with two peaks (FreeSurfer never ends: the alarm)
         H.append(f"@1 hsegm {seg_src} 0 {seg_lab} 85 130 -2 5 {f32(2.0)}")
         return [

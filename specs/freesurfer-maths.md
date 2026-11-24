@@ -331,7 +331,10 @@ Reading bin b with b < 0 or b ≥ the allocation is **FS-22** (§1's out-of-rang
   is **not** changed: its callers set it); n above `max_bins`: the program ends, code -4, `HISTOinit:
   nbins <n> bigger than max bins <max_bins>` + `\n`. When hi ≤ lo: lo = 0, hi = `max_bins - 1`.
   `min = (float) lo`, `max = (float) hi`, `bin_size = (float)((hi - lo) / (n - 1))` (double), then 1
-  when not above 0; bin b's value `(float)(lo + (double)(bin_size * (float) b))` (the product in
+  when at or below 0 (compared as `bin_size <= 0`, so a NaN size stays NaN: a NaN limit (**(observed)**: `hmake`, `hinit`
+  with the NaN limits of the double specials), or one bin over an empty range, `0 / 0`,
+  **(observed)**: the volume probe's `vhist`, `MRIhistogramVoxel` of a window of no voxels with one bin, the size
+  `ffc00000`; an infinite size, `x / 0` for one bin over a range, stays too); bin b's value `(float)(lo + (double)(bin_size * (float) b))` (the product in
   float) for b < n.
 - **Uniform bins** (n, lo, hi): a new histogram of n bins, `bin_size = (float)((hi - lo) / (n - 1))`,
   bin b's value `(float)(lo + (double)(bin_size * (float) b))`, `min`, `max` the floats of lo, hi.

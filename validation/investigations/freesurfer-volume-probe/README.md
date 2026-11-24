@@ -65,6 +65,9 @@ fs.mri probe's (its README, "Encodings"). Added here:
 | the table | the floats `00000000 80000000 3f000000 bf000000 3f800000 bf800000 40200000 437f8000 437e8000 43800000 bfc00000 501502f9 d01502f9 7f7fffff ff7fffff 00000001 7f800000 ff800000 7fc00000 ffc00000 7fc12345 7f800001 40500000 42c80000 1e3ce508 477fff80 46ffff00 c7000080 4f000000 4f800000 41200000 c1200000 3dcccccd 40490fdb` (entry 0 first): zeros, halves, ones, 2.5, 255.5, 254.5, 256, -1.5, ±1e10, the largest floats, the smallest subnormal, infinities, NaNs (both signs, a payload, a signalling one), 3.25, 100, 1e-20, 65535.5, 32767.5, -32768.5, 2^31, 2^32, ±10, 0.1, π |
 | D, a destination | `new` (none: the function makes one), `self` (the first source), `other` (the second source), or a W |
 | R, a region | `null`, or `x y z dx dy dz` |
+| H, a histogram | `null`, or `<alloc> <nbins> <bin_size> <min> <max>` then `nbins` bin values and `nbins` counts (floats but the first two; the fs.maths probe's histogram argument): `HISTOalloc(alloc)`, then `nbins` and those fields written over it (`nbins` at most `alloc`) |
+| a histogram (printed) | `null`, or `nbins max_bins bin_size min max`, then the values and then the counts of its first `min(nbins, max_bins)` bins (none when that is 0 or below) |
+| a histogram result (printed) | `given` when the returned histogram is the given one, else the histogram (printed); then, when one was given, the given histogram's state |
 | a volume (printed) | `null`, or the fs.mri probe's header (its "volume (printed)" without the index tables and frames), the colour table (CT, each entry with its count), the voxels |
 | a result (printed) | `self`, `other` or `given` when the returned volume is that one, then the volume; then, when a given destination is not the result, the destination's state |
 | unset | an output the call may leave is 7.0 before the call (`40e00000`, `401c000000000000`) |
@@ -284,6 +287,14 @@ The spec's sections in brackets.
 | `cent W P` | `MRIcomputeCentroid` [§50] | the status and the three doubles (unset: 7) |
 | `pthr W P (null\|W P) i d` | `MRIpercentThresh` (the mask or `null`, the frame, the percentage) [§50] | the threshold (a double) |
 | `cnbhd W P n (i i i i i)×n` | for each `w x y z val`, `MRIcountValInNbhd` [§50] | the count per point |
+| `hreg W P H i R` | `MRIhistogramRegion` (the given histogram, the bin count, the region) [§52] | a histogram result |
+| `hvox W P H i i i i i (null\|W P) f` | `MRIhistogramVoxel` (the given histogram, the bin count, `x0 y0 z0`, the window, the threshold volume or `null`, the threshold) [§52] | a histogram result |
+| `hthr W P H i R W P f i` | `MRIhistogramRegionWithThreshold` (the given histogram, the bin count, the region, the threshold volume, the threshold, the frame) [§52] | a histogram result |
+| `hist W P i` | `MRIhistogram` (the bin count) [§52] | the histogram |
+| `geq W P H i i i` | `MRIgetEqualizeHisto` (the given result, `low`, `high`, `norm`) [§52] | a histogram result |
+| `heq W P W P D i i` | `MRIhistoEqualize` (the source, the template, D (`other`: the template), `low`, `high`) [§52] | the result |
+| `hlr W P (self\|W P) R i i`, `hlab W P (self\|W P) i i` | `MRIhistogramLabelRegion` (the labelled volume, `self` the volume itself; the region; the label, the bin count), `MRIhistogramLabel` (the labelled volume; the label, the bin count) [§52] | the histogram |
+| `hsegm W P D i i i i f` | `MRIhistoSegment` (D, the labelled volume: `new`, `self` or a W; `wm_low wm_hi gray_hi wsize`, `sigma`) [§52] | the result |
 
 ## The models
 

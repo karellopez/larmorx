@@ -33,6 +33,7 @@ pub mod extract;
 pub mod frames;
 pub mod geomblock;
 pub mod geometry;
+pub mod histograms;
 pub mod image;
 pub mod info;
 pub mod linear;

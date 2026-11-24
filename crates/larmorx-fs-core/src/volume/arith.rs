@@ -460,7 +460,8 @@ impl Process {
             );
         }
         let r = region.unwrap_or(&whole);
-        let span = |s: i32, d: i32, e: i32| (s.max(0), s.saturating_add(d).min(e));
+        // the end `x + dx` in 32-bit wrapping arithmetic (§52's "region clipped to the volume")
+        let span = |s: i32, d: i32, e: i32| (s.max(0), s.wrapping_add(d).min(e));
         let (x0, x1) = span(r.x, r.dx, g.width);
         let (y0, y1) = span(r.y, r.dy, g.height);
         let (z0, z1) = span(r.z, r.dz, g.depth);

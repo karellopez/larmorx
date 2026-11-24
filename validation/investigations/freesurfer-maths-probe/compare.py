@@ -244,6 +244,11 @@ class Gen:
         for d in DSPECIAL[5:9]:
             L.append(f"hbins 5 {f64(0.0)} {d:016x}")
             L.append(f"hinit new 5 {d:016x} {f64(1.0)}")
+        # §5.2's n - 1 in a 32-bit int (the volume spec's §52 can give n = -2147483648): a given
+        # histogram of 4 bins, the limits 0 and 10, then the empty range
+        given = "4 2 " + " ".join(["3f800000"] + ["00000000"] * 6)
+        for n, lo, hi in ((-2147483648, 0.0, 10.0), (-2147483647, 0.0, 10.0), (-2147483648, 10.0, 0.0)):
+            L.append(f"hinit {given} {n} {f64(lo)} {f64(hi)}")
         return [Batch("hmake", "hmake", L)]
 
     def harith(self) -> list[Batch]:

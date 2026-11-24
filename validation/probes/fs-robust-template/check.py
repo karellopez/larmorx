@@ -309,7 +309,7 @@ def main(argv: list[str] | None = None) -> int:
     pade_cases = pade_unpatched_same = 0
     if a.pade:
         proot = inputs / f"cases-{tag}-pade.d"
-        for k, (r, ids) in enumerate(rep):
+        for k, (_r, ids) in enumerate(rep):
             if "FS-1311" in ids:
                 pl = official_line(a.pade.resolve(), cases[k], proot, k)
                 pade_cases += 1

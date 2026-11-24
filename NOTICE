@@ -22,7 +22,8 @@ Advanced Normalization Tools (ANTs) v2.6.5 - Apache License, Version 2.0
   Copyright 2009-2023 ConsortiumOfANTS
 
 VXL, as bundled with ITK v5.4.5 (vnl's double and float SVD, QR decomposition, error function,
-gamma function and 1-D FFT with C. Temperton's GPFA routines) - BSD-3-Clause
+gamma function and 1-D FFT with C. Temperton's GPFA routines) and ITK v4.13.2 (vnl's complex SVD,
+LINPACK's zsvdc with its BLAS and libf2c pieces, since 2026-11-24) - BSD-3-Clause
   Copyright 2000-2013 VXL Contributors
   All rights reserved.
 
@@ -66,7 +67,7 @@ HouseholderSequence and Jacobi rotations of a 4 x 4 matrix) - Mozilla Public Lic
   Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL
   was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, log10, log2, sin, cos, asin, acos, atan2, cbrt, tanh, hypot, powf, expf, logf, sinf, cosf, tanhf, cbrtf, acosf, log10f; hypot since 2026-11-11, for the confounds' part; acosf since 2026-11-13, log10 since 2026-11-14, log10f since 2026-11-16 and log2 since 2026-11-23, for FreeSurfer's foundations) - MIT License
+CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, log10, log2, log1p, sin, cos, asin, acos, atan2, cbrt, tanh, hypot, powf, expf, logf, sinf, cosf, tanhf, cbrtf, acosf, log10f; hypot since 2026-11-11, for the confounds' part; acosf since 2026-11-13, log10 since 2026-11-14, log10f since 2026-11-16, log2 since 2026-11-23 and log1p since 2026-11-24, for FreeSurfer's foundations) - MIT License
   exp.c: Copyright (c) 2022-2025 Alexei Sibidanov.
   log.c: Copyright (c) 2022 INRIA and CERN. Authors: Paul Zimmermann and Tom Hubrecht.
   dint.h: Copyright (c) 2022 CERN. Author: Tom Hubrecht.
@@ -84,6 +85,7 @@ CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, log10, log2, sin, co
   log10.c: Copyright (c) 2022-2025 INRIA and CERN. Authors: Paul Zimmermann and Tom Hubrecht.
   log10f.c: Copyright (c) 2022-2026 Alexei Sibidanov.
   log2.c: Copyright (c) 2023 Alexei Sibidanov.
+  log1p.c: Copyright (c) 2024-2026 Alexei Sibidanov.
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -538,7 +540,8 @@ dgesvd and dbdsqr's lower case, in crates/larmorx-transform/src/numpy_linalg/); 
 3.10.0 as Ubuntu 22.04's liblapack and libblas 3.10.0-2ubuntu1 build it (zgees, zgebal, zgehrd, zgehd2,
 zlarfg, zlarf, ilazlc, ilazlr, zlacpy, zunghr, zungqr, zung2r, zhseqr, zlahqr, zgebak, zlange, zlascl,
 zladiv, dladiv, dlapy3, dlamch and the BLAS zgemv, zgerc, zscal, zdscal, zcopy, zswap and dznrm2;
-crates/larmorx-core/src/lapack_zgees.rs, since 2026-11-20) - modified BSD licence
+crates/larmorx-core/src/lapack_zgees.rs, since 2026-11-20; ztrsen, ztrexc, zlartg and zrot,
+crates/larmorx-core/src/lapack_ztrsen.rs, since 2026-11-24) - modified BSD licence
   Copyright (c) 1992-2023 The University of Tennessee and The University
                           of Tennessee Research Foundation.  All rights
                           reserved.

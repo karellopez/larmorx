@@ -343,9 +343,7 @@ def main(argv: list[str] | None = None) -> int:
     heavies = skipped_hashed = 0
     first_differ = []
     pade_cases = pade_unpatched_same = 0
-    for k, (case, c, (r, ids), (f, fids)) in enumerate(
-        zip(cases, official, rep, fix, strict=True)
-    ):
+    for k, (case, c, (r, ids), (f, fids)) in enumerate(zip(cases, official, rep, fix, strict=True)):
         cmd = case.split()[0]
         if pade_official is not None and "FS-1311" in ids:
             pade_cases += 1

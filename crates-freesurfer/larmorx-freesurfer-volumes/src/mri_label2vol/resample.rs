@@ -457,18 +457,12 @@ pub fn mri_seg2seg_pvf(
     Ok(Some(out))
 }
 
-/// What [`mri_surf2vol_opt`] gives: the volume, or FreeSurfer's `NULL` after its message.
-pub enum Surf2Vol {
-    Done(Mri),
-    Null,
-}
-
 /// `MRIsurfaceLabel2VolOpt(ribbon, surf, labels, nlabels, Q, DoStatThresh, StatThresh,
 /// DoLabelStatVol, NULL)` (the program's own): an overlay of the surface's vertices (`float`, 0),
 /// each label point's vertex set to 1 (`DoLabelStatVol`: its stat; points whose stat is below the
-/// threshold skipped with `DoStatThresh`), then [`mri_surf2vol_opt`]. FS-1268 for a label that is
-/// not there (an annotation index no vertex has), FS-1269 for a point at a vertex the surface
-/// does not have.
+/// threshold skipped with `DoStatThresh`), then [`mri_surf2vol_opt`] (`None`: FreeSurfer's
+/// `NULL`). FS-1268 for a label that is not there (an annotation index no vertex has), FS-1269 for
+/// a point at a vertex the surface does not have.
 #[allow(clippy::too_many_arguments)]
 pub fn surface_label2vol_opt(
     g: &mut Globals,
@@ -480,7 +474,7 @@ pub fn surface_label2vol_opt(
     do_stat_thresh: bool,
     stat_thresh: f64,
     do_label_stat_vol: bool,
-) -> Result<Surf2Vol, Fatal> {
+) -> Result<Option<Mri>, Fatal> {
     let mut overlay = mri_alloc(g, r.out, r.err, surf.nvertices, 1, 1, MRI_FLOAT)?;
     for (nthlabel, label) in labels.iter().enumerate() {
         let Some(label) = label else {
@@ -548,7 +542,7 @@ pub fn mri_surf2vol_opt(
     surf: &Mris,
     overlay: &Mri,
     q: Option<&Lta>,
-) -> Result<Surf2Vol, Fatal> {
+) -> Result<Option<Mri>, Fatal> {
     let env = r.env.clone();
     if let Some(q) = q {
         let neither = lta_mri_is_source(g, r.err, q, ribbon)? == 0
@@ -562,7 +556,7 @@ pub fn mri_surf2vol_opt(
                 &FS_1270,
                 "mri_label2vol --fill-ribbon --lta: the ribbon is at neither end of the transform (FreeSurfer then writes the missing volume and crashes); here status 1",
             );
-            return Ok(Surf2Vol::Null);
+            return Ok(None);
         }
     }
     let q2 = match q {
@@ -578,7 +572,7 @@ pub fn mri_surf2vol_opt(
         }
     };
     let Some(mut q2) = q2 else {
-        return Ok(Surf2Vol::Null);
+        return Ok(None);
     };
     let nframes = overlay.nframes;
     let mut volsurf = mri_alloc_from_vol_geom(
@@ -594,7 +588,7 @@ pub fn mri_surf2vol_opt(
 
     // the output's voxels to the ribbon's
     let Some(mut v) = lta_copy(g, r.out, r.err, &q2, None)?.into_new() else {
-        return Ok(Surf2Vol::Null);
+        return Ok(None);
     };
     lta_change_type(g, r.out, r.err, &env, &mut v, LINEAR_VOX_TO_VOX)?;
     lta_fill_inverse(g, r.out, r.err, &mut v)?;
@@ -687,7 +681,7 @@ pub fn mri_surf2vol_opt(
                                 reg.as_ref(),
                                 mm.as_ref(),
                             )?;
-                            return Ok(Surf2Vol::Null);
+                            return Ok(None);
                         }
                         let mut io = Io {
                             out: &mut *r.out,
@@ -713,7 +707,7 @@ pub fn mri_surf2vol_opt(
         }
     }
     let _ = r.out.flush();
-    Ok(Surf2Vol::Done(volsurf))
+    Ok(Some(volsurf))
 }
 
 /// The lines `MRIsurf2VolOpt` prints before it returns `NULL` for a voxel the hash finds no vertex

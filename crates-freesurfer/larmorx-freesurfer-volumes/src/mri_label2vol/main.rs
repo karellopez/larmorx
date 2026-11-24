@@ -94,7 +94,7 @@ use super::options::{
     PROJ_TYPE_ABS, PROJ_TYPE_FRAC, check_options, dump_options, g_fmt, or_null, parse_commandline,
     usage_exit,
 };
-use super::resample::{Surf2Vol, mri_seg2seg_pvf, surface_label2vol_opt};
+use super::resample::{mri_seg2seg_pvf, surface_label2vol_opt};
 use super::surface::{
     annotation_index, annotation2label, mris_load_surf_subject, proj_norm_dist,
     proj_norm_frac_thick,
@@ -504,7 +504,7 @@ fn fill_ribbon(
         o.stat_thresh,
         false,
     )?;
-    let Surf2Vol::Done(mut outvol) = res else {
+    let Some(mut outvol) = res else {
         // FreeSurfer records the command line in the volume it did not get: a crash
         return Err(Fatal::Exit(if g.notices.reproduce() { 139 } else { 1 }));
     };
@@ -530,7 +530,7 @@ fn fill_ribbon(
             o.stat_thresh,
             true,
         )?;
-        let Surf2Vol::Done(mut statvol) = res else {
+        let Some(mut statvol) = res else {
             return Err(Fatal::Exit(if g.notices.reproduce() { 139 } else { 1 }));
         };
         let name = o.label_stat_vol_fspec.clone().unwrap_or_default();

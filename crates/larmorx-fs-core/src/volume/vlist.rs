@@ -5,9 +5,9 @@
 use larmorx_core::defects::{FS_889, FS_890};
 
 use super::deriv::Neighbours;
+use crate::mri::Mri;
 use crate::mri::Region;
 use crate::mri::geom::DIAG_SHOW;
-use crate::mri::Mri;
 use crate::process::{DIAG_VERBOSE, Process, Stop, codes};
 use crate::sse;
 

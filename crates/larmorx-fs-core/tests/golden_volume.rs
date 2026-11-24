@@ -4465,7 +4465,10 @@ fn part10c_histograms() {
 /// A binary-like volume for §59 and §60 (zeros, ones, labels, special values) of a type, painted
 /// with nothing.
 fn bin_w(g: &mut G, e: (i64, i64, i64), kind: i64, frames: i64) -> String {
-    format!("{} 0", seg_w(g, e, kind, frames, &[0, 0, 1, 1, 1, 2, 255, -1]))
+    format!(
+        "{} 0",
+        seg_w(g, e, kind, frames, &[0, 0, 1, 1, 1, 2, 255, -1])
+    )
 }
 
 /// M: `null` or a binary-like volume.
@@ -4481,7 +4484,11 @@ fn bin_m(g: &mut G, e: (i64, i64, i64)) -> String {
 /// BF, a `BinarizeMRI`'s fields.
 fn bin_fields(g: &mut G) -> String {
     let ty = pi(g, &[1, 1, 2, 3]);
-    let n = if ty == 2 || g.one_in(6) { g.int(0, 2) } else { 0 };
+    let n = if ty == 2 || g.one_in(6) {
+        g.int(0, 2)
+    } else {
+        0
+    };
     let list: Vec<String> = (0..n).map(|_| g.int(0, 2).to_string()).collect();
     let th = |g: &mut G| dbits([0.5, 1.5, f64::INFINITY, -1.0, f64::NAN][g.below(5) as usize]);
     let (lo, hi) = (th(g), th(g));

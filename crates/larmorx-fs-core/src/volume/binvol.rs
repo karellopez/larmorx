@@ -151,7 +151,9 @@ impl Process {
                     }
                     if matches!(l, 17 | 53) {
                         let m = self.mri_get_vox_val(&mask, c, r, s, 0, 0)?;
-                        if !(m > 0.5) {
+                        // not above 0.5 (a NaN is not above)
+                        let above = m > 0.5;
+                        if !above {
                             self.mri_set_vox_val(scm, c, r, s, 0, 0.0, 0)?;
                         }
                     }
@@ -317,8 +319,7 @@ impl Process {
             } else {
                 b.mritype
             };
-            let mut o =
-                self.mri_alloc_sequence(w, h, d, kind, b.fend.wrapping_sub(b.fstart))?;
+            let mut o = self.mri_alloc_sequence(w, h, d, kind, b.fend.wrapping_sub(b.fstart))?;
             self.mri_copy_header(invol, Some(&mut o))?;
             self.copy_pulse_parameters(invol, &mut o);
             own = Some(o);
@@ -409,7 +410,9 @@ impl Process {
             }
             self.note(
                 &FS_806,
-                format!("{what}: a frame equal to the number of frames refused (FreeSurfer accepts it)"),
+                format!(
+                    "{what}: a frame equal to the number of frames refused (FreeSurfer accepts it)"
+                ),
             );
             return true;
         }

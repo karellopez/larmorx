@@ -48,11 +48,7 @@ impl Process {
             for dr in -1..=1i32 {
                 for ds in -1..=1i32 {
                     let o = [dc, dr, ds];
-                    let at = [
-                        c.wrapping_add(dc),
-                        r.wrapping_add(dr),
-                        s.wrapping_add(ds),
-                    ];
+                    let at = [c.wrapping_add(dc), r.wrapping_add(dr), s.wrapping_add(ds)];
                     if let Some(mk) = mask {
                         let mv = self.mri_get_vox_val(mk, at[0], at[1], at[2], 0, 0)?;
                         if mv < 0.5 {

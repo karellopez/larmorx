@@ -95,7 +95,11 @@ impl Process {
         self.mri_clear(o)?;
         let (tw, th, td) = (vg.width, vg.height, vg.depth);
         let nt = (tw.max(0) as usize) * (th.max(0) as usize) * (td.max(0) as usize);
-        let mut hits = if conserve == 0 { vec![0.0f32; nt] } else { Vec::new() };
+        let mut hits = if conserve == 0 {
+            vec![0.0f32; nt]
+        } else {
+            Vec::new()
+        };
         let (sw, sh, sd) = (s.geom.width, s.geom.height, s.geom.depth);
         let mut p = Matrix::zeros(4, 1, MATRIX_REAL);
         p.set(4, 1, 1.0);
@@ -120,8 +124,8 @@ impl Process {
                         self.mri_set_vox_val(o, tc, tr, ts, f, sse::narrow(sum), 0)?;
                     }
                     if conserve == 0 {
-                        let k = ((ts as usize * th as usize) + tr as usize) * tw as usize
-                            + tc as usize;
+                        let k =
+                            ((ts as usize * th as usize) + tr as usize) * tw as usize + tc as usize;
                         hits[k] = sse::add32(hits[k], 1.0);
                     }
                 }
@@ -131,8 +135,8 @@ impl Process {
             for c in 0..tw {
                 for r in 0..th {
                     for sl in 0..td {
-                        let k = ((sl as usize * th as usize) + r as usize) * tw as usize
-                            + c as usize;
+                        let k =
+                            ((sl as usize * th as usize) + r as usize) * tw as usize + c as usize;
                         let n = hits[k];
                         if n == 0.0 {
                             continue;

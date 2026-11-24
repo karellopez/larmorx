@@ -304,11 +304,18 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
                 } else {
                     None
                 };
-                let r = p.dem_morph_binarized(&mut d, &a, (lo, hi), list, m.as_ref(), o.as_ref())?;
+                let r =
+                    p.dem_morph_binarized(&mut d, &a, (lo, hi), list, m.as_ref(), o.as_ref())?;
                 (r, o)
             };
             p.flush();
-            putres(l, r.map_or(VolOut::Nothing, VolOut::New), &a, None, &given_d(o));
+            putres(
+                l,
+                r.map_or(VolOut::Nothing, VolOut::New),
+                &a,
+                None,
+                &given_d(o),
+            );
             l.puti(i64::from(d.nchangestot));
         }
         // -- §64, §65 (mri_cc's)

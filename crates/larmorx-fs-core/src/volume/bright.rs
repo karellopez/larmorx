@@ -192,14 +192,7 @@ impl Process {
         self.put_out(
             format!("MRIfindBrightNonWM(): {n} bright non-wm voxels segmented.\n").as_bytes(),
         );
-        self.mri_dilate_inv_thresh_label(
-            &mut label,
-            t1,
-            Dst::Src,
-            i32::from(BRIGHT_LABEL),
-            3,
-            0,
-        )?;
+        self.mri_dilate_inv_thresh_label(&mut label, t1, Dst::Src, i32::from(BRIGHT_LABEL), 3, 0)?;
         Ok(label)
     }
 }

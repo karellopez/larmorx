@@ -1,4 +1,4 @@
-# FreeSurfer 8.2.0's volume functions and B-splines, as a black box (fs.volume parts 1 to 11a and §54 to §57, fs.bspline)
+# FreeSurfer 8.2.0's volume functions and B-splines, as a black box (fs.volume parts 1 to 11b and §54 to §57, fs.bspline)
 
 The probe behind the **(observed)** marks and the validation plan (§69) of
 [`specs/freesurfer-volume.md`](../../../specs/freesurfer-volume.md) for its parts 1 to 8 (§1 to §35, §37 to §39, and §54's changes of a transform array between the voxel, RAS-to-RAS and physical-voxel types:
@@ -10,7 +10,8 @@ planes, fills, resampling by whole factors and changes of type; the frame-range 
 kernel and splatting, derivatives, gradients, neighbour counts, linear transforms; resampling onto a
 template and replacing a value; statistics, orientation strings and voxel-to-RAS matrices; slices as 2-D
 images; neighbourhoods and labels; the partial-volume count of a label, random and constant volumes, frames,
-orders, fractions, difference lists and voxelwise operations), and of
+orders, fractions, difference lists and voxelwise operations; and the parts after it that the spec's §69 lists, to
+part 11b: §41 to §57, §59 to §65, with the commands of §67), and of
 [`specs/freesurfer-bspline.md`](../../../specs/freesurfer-bspline.md) (§9: the B-spline coefficients,
 their sampling, the transforms through them and the factor-of-two pyramids). **Open to the clean-room
 implementer of that spec**: the files here hold only calls of FreeSurfer's functions (and of the C
@@ -24,7 +25,7 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
 | `licence_reach.py` | which of a prebuilt probe's commands can reach FreeSurfer's licence check ("The licence check" below): `licence_reach.py <probe> <source.cpp> [--expect a,b]` (the same step after each build, not the implementer's: it reads the probe binary) |
-| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 50 groups of seeded cases and 23 of fixed cases (`vrules`, `vrules4` to `vrules24`, `vbsrules`; 22,238 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 55 groups of seeded cases and 24 of fixed cases (`vrules`, `vrules4` to `vrules25`, `vbsrules`; 23,595 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 | `models.py` | statements of the spec checked as models of the probe's printed results (`region`, `cov` and `bright` also a candidate's, in both modes): `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `region` (§43's boxes, FS-269 as decided: every `rgbb` line of `vregion`, `vrules17`, `vrules18` and `vrules20`, on the probe and, with `--candidate`, a candidate's lines in both modes), `cov` (§42's `MRIcovarianceMatrix`, FS-483's count as decided: every `cov` line of `vcov` and `vrules19` whose mask has the volume's extent), `bright` (§59's FS-1233: every `fbnwm` line of `vbright` and `vrules24`, the default's result from the probe's own `fbnwm` of the byte volumes §59 names and its `clone` of the T1) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
@@ -79,6 +80,8 @@ fs.mri probe's (its README, "Encodings"). Added here:
 | DF, a `DEMorphBinVol`'s fields | `morphtype topo nnbrsthresh nmorph frame mm_mritype mm_debug` (integers); `nchangestot` starts at 0, the debugging stream is standard output |
 | VL, a voxel list | `null`, or `<alloc> <nvox>`: `VLSTalloc(alloc)`, voxel i of its arrays set to `xi` 1000 + i, `yi` 2000 + i, `zi` 3000 + i, `fi` 4000 + i, `xd` i + 0.5, `yd` i + 0.25, `zd` i + 0.125, `vsrc` -1 - i, `vdst` -2 - i, then `nvox` set |
 | a voxel list (printed) | `null`, or `max_vox nvox type`, then `self` when its volume is the call's volume (`other`, `none`), then for each voxel `xi yi zi fi` (integers) `xd yd zd vsrc vdst` (floats): the first `nvox`, or, when a given list's allocation is larger, all of its allocation |
+| VF, a voxel list with its fields | VL, or `f <alloc> <nvox> <type> <mask> <k>` and k times `xi yi zi fi xd yd zd vsrc vdst` (integers and floats): `VLSTalloc(alloc)`, VL's patterns, the first k voxels' fields as given (fields past the allocation read and dropped), the spline arrays of the mask (1 `mx`, 2 `my`, 4 `mz`, 8 `t`; `alloc` floats each, entry i: i + 0.75), then `nvox` and `type` set |
+| a voxel list (printed, with its spline arrays) | the voxel list (printed), then for each of `mx`, `my`, `mz`, `t` `null`, or `given` and the entries of its allocation when it is the array the list was given with, else `new` and the entries the call allocated (`num` for `vlcopy`); the commands without a volume print `self` when the list has none |
 | I, an image | `null`, or `<rows> <cols> <format> <frames>` (`ImageAlloc`: the format's code, 0 `PFBYTE`, 1 `PFSHORT`, 2 `PFINT`, 3 `PFFLOAT`, 4 `PFCOMPLEX`, 6 `PFDOUBLE`, 35 `PFRGB`, 36 `PFRGBZ`), `<xsize> <ysize>` (floats), a fill (a seed: byte i of the pixels is (seed + 101 i) mod 256; -1 as allocated, zeros; `t<seed>`: float i is the table's entry (7 i + seed) mod 34), then `<orows> <ocols> <rows> <cols> <num_frame>` written over the header after the fill (-1 keeps the allocation's). Printed: `orows ocols rows cols format num_frame xsize ysize`, then the pixels (a string of the buffer's bytes as allocated, `null` without a buffer). A result is `given` (the given image itself, still marked as the probe's), `new` or `null` |
 
 ## Commands
@@ -316,6 +319,28 @@ The spec's sections in brackets.
 | `demm DF W P`, `demt DF W P d d M M`, `deml DF W P n i×n M M` | `morph` of a binary volume; `morph` with the thresholds `thmin thmax`; `morph` with the match list (then the mask and the output, each `null` or W P) [§60] | the result (and the given output's state), then `nchangestot` |
 | `trns k M M` | k 0 `Trns_ExtractScaleMatrix`, 1 `Trns_ExtractRotationMatrix` (the transform, the output matrix; `null` for none) [§64] | the error code, the output matrix, the transform |
 | `vlcir W P f f VL i i R` | `VLSTcreateInRegion` (the low and high values, the list, `skip`, `border_only`, the box) [§65] | `given` or `new`, then the list (printed) |
+| `ltawr k n x×n LTA x` | k 0 `LTAwriteEx`, 1 `LTAwrite`: the n folders (strings) made first (mode 0700, in order), the array, the file's name (a string; any file of that name removed first) [§62] | the result, then the file's bytes (a string) or `nofile`; the file and the folders removed after |
+| `ltadvg G` | `LTAdumpVolGeom` on standard output [§62] | its value |
+| `ltapt LTA f f f m e` | `LTAtransformAtPoint` (the point; m a matrix, the fs.mri probe's M, `null` for none), `errno` set to e first [§63] | the matrix (`given` when it is the given one), `errno` after |
+| `ltaxf W P (new\|W) LTA i` | `LTAtransformInterp` (the source, the destination, the array, the sampling method; -1 `LTAtransform`) [§63] | the result, then the array |
+| `ltacor LTA` | `LTAvoxelTransformToCoronalRasTransform` [§63] | its value, the array |
+| `fixmni f f f` | `FixMNITal` [§63] | its value, the three floats |
+| `ltamod LTA M M d` | `LTAmodifySrcDstGeom` (the array, the source and destination volumes or `null`) with `vg_isEqual_Threshold` set to d first [§63] | its value, the array |
+| `devxfm k x (null\|x) (null\|x) o (nofile\|x) m` | `DevolveXFMWithSubjectsDir` (the subject, the subjects' folder, the transform's name, the matrix m or `null`), after the folder `subjects` in the working directory is made: k 0 none, 1 `subjects/<subject>`, 2 also its `mri/transforms`, the original volume o (0 none, `1 x` the bytes of `mri/orig.mgz`, `2 x` of `mri/orig.mgh`, 3 an empty folder `mri/orig`) and the transform's bytes at `mri/transforms/<name>` (`talairach.xfm` without a name); `errno` 0 before the call [§63] | the matrix (`given` when it is the given one); the folder removed after |
+| `angrm d d d` | `MRIangles2RotMat` [§64] | the matrix |
+| `affp2m d×12 m` | `TranformAffineParams2Matrix` (m a matrix or `null`) [§64] | the matrix (`given` when it is the given one) |
+| `affm2p m` | `TranformExtractAffineParams` (m a matrix or `null`) into twelve doubles of 7.0 [§64] | `null`, `given` (the array returned) or `other`, then the twelve doubles |
+| `ltarot LTA` | `LTAmat2RotMat` [§64] | its value, the array |
+| `rmsmj m m d` | `RMSregDiffMJ` (two matrices, the radius) [§64] | the double |
+| `vlcre W P f f VF i i` | `VLSTcreate` (the low and high values, the list, `skip`, `border_only`) [§65] | `given` or `new`, then the list (printed, with its spline arrays): its count, or a given list's allocation when larger |
+| `vlsort VF (null\|VF)` | `VLSTsort` (the source, the destination) [§65] | `given` or `new`, the result (a given one's allocation, else its count), the source (its allocation) |
+| `vlfree null\|VF` | `VLSTfree` [§65] | its value, `null` or `set` (the pointer after) |
+| `vlstat VF M` | `VLSTcomputeStats` with the list's volume set to M (`null` for none) [§65] | the mean and the deviation (doubles) |
+| `vlcopy k VF (null\|VF) i i` | k 0 `VLSTcopy`, 1 `VLSTcopyInto` (the source, the destination, the start, the count) [§65] | `given` or `new`, the result (printed, with its spline arrays: a given one's allocation, else the new list's length), the source |
+| `vladd k VF i i i f f f f f` | k 0 `VLSTadd`, 1 `VLSTaddUnique`, 2 `VLSTaddWithValue`, 3 `VLSTinList` (x y z, xd yd zd, vsrc vdst; the ones a function does not take are read and dropped) [§65] | its value, the list (its allocation) |
+| `ltaixf W P (new\|W) LTA i` | `LTAinverseTransformInterp` [§67] | the result, then the array |
+| `ltav2r LTA M M`, `ltar2v LTA M M` | `LTAvoxelToRasXform`, `LTArasToVoxelXform` (the source and destination volumes or `null`) [§67] | its value, the array |
+| `ltacmp LTA m m k [LTA]` | `LTAcompose` (the left and right matrices or `null`; the destination: k 0 none, 1 the array given after, 2 the source itself) [§67] | `new`, `self`, `given` or `null`, the result, then a given destination when it is not the result, then the source when it is not |
 
 ## The models
 
@@ -347,7 +372,7 @@ default result differs from FreeSurfer's (87 of the 92 lines with FS-1233, **(ob
 ## The licence check
 
 FreeSurfer's licence check prints the licence file's lines at any diagnostic level above 0 once it finds
-the file (`FREESURFER_HOME` or `FS_LICENSE` naming it). Five commands can reach it, `bvr`, `ltaread`,
+the file (`FREESURFER_HOME` or `FS_LICENSE` naming it). Six commands can reach it, `bvr`, `devxfm`, `ltaread`,
 `ltareads`, `pvlab` and `tiv` (`licence_reach.py <probe> fs_volume_probe.cpp`, the spec writer's or the
 orchestrator's step after a build, as `build.sh`: from the prebuilt probe's own code, exact because no
 function on the way is reached otherwise than by a direct call; it prints those commands). The loop
@@ -355,7 +380,10 @@ function on the way is reached otherwise than by a direct call; it prints those 
 as the probe reads it) on one of them (`LICENCE_COMMANDS`), or where a line (`+env=`) or the batch sets
 `FREESURFER_HOME`, `FS_LICENSE` or `DIAG_NO` (the probe's runs start from `PATH`, `LC_ALL` and
 `OMP_NUM_THREADS` only, so the check never finds a licence file and ends with `FREESURFER_HOME is not
-defined`: the `bvr` line without a cache).
+defined`: the `bvr` line without a cache). The `devxfm` lines set FreeSurfer's own variable `SURFER_SIDEDOOR`
+(`+env=SURFER_SIDEDOOR=1`), which makes the check return at once, before any file is read, so that the original
+volume's header is read as with a licence (a candidate needs none: LARMORX makes no licence check,
+`specs/freesurfer-core.md` §19).
 
 ## The comparison loop
 
@@ -682,3 +710,11 @@ cached matrices as allocated, recomputed or dropped.
   bright` on the prebuilt probe built from `c62bbdb6`: 117 `fbnwm` lines (`vbright` 100, `vrules24` 17), 92 with a T1
   or white matter not of bytes (75 and 17), whose default result differs from FreeSurfer's on 87 (73 and 14); the
   probe as its own candidate: `reproduce` 117 as the model, `fix` 30 as the model and "differ" on exactly those 87.
+  Then part 11b: the prebuilt probe rebuilt from commit `ca062ad1` (the commands `ltawr` to `vladd` above and §67's
+  `ltaixf`, `ltav2r`, `ltar2v` and `ltacmp`, the encoding VF; its build in `BUILD_INFO.txt`, the same bytes twice; the
+  381a670f build kept in `<workspace>/archive/2026-11-24-fs-volume-probe-381a670f/`; `licence_reach.py`: the five
+  commands and `devxfm`): every earlier group's hash unchanged (73); the new groups `vltawr` (180 calls, §62),
+  `vltaxf` (200, §63), `vltamisc` (270, §63), `vrot` (240, §64), `vlst` (322, §65) and `vrules25` (145, their fixed
+  cases; FS-889's two lines in the batch `vrules25-hang` without the guard runs) the same cold, warm and twice without
+  the cache; the probe as its own candidate: no unexplained difference in either mode; every model as before, `bright`
+  as above (log `oracles/logs/fs-volume-probe-r22-final-2026-11-24.log`).

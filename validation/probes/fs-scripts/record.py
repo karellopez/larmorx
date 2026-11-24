@@ -65,7 +65,9 @@ def main(argv: list[str] | None = None) -> int:
         replays[mode] = c
     memory = []
     if a.memory and a.memory.is_file():
-        pat = re.compile(r"(?:^|\.)(seg2cc|mergeseg) \((\w+)\): larmorx ([\d.]+) MiB, FreeSurfer ([\d.]+)")
+        pat = re.compile(
+            r"(?:^|\.)(seg2cc|mergeseg) \((\w+)\): larmorx ([\d.]+) MiB, FreeSurfer ([\d.]+)"
+        )
         for line in a.memory.read_text(encoding="utf-8").splitlines():
             m = pat.search(line)
             if m:

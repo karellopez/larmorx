@@ -35,7 +35,10 @@ on real heads too. Queue items 3.2-28, 3.2-29 and 3.5-29 (track A, relay 58).
   reproduced, 0 without a notice. fs_time's lines identical but their figures.
 - `replay.sh`: 12 of 12 recorded steps reproduced in each mode (`aseg.auto.mgz`,
   `transforms/cc_up.lta`, `scripts/seg2cc.log`: provenance only).
-- `real.py`: see the record (`docs/validation/freesurfer-seg2cc.md`).
+- `real.py`: ds000005, ds002422, ds005454 (v8) cut to 256 x 256 x 255: identical in both modes (status
+  0; FreeSurfer 53-57 s, the port 54-57 s).
+- Memory (`tests/parity/test_memory_peak.py`, `SCRIPT_CASES`): seg2cc 329.8-330.6 MiB against
+  FreeSurfer's 345.3, mergeseg 263.9-264.5 against 274.5.
 
 The tcsh facts behind the model (`pushd`'s lines, `if`'s numbers, a pipeline's status, `$0`,
 `printf`'s rounding) were measured with small test scripts run by `/bin/tcsh -f` in scratch

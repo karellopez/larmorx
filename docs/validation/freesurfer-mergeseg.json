@@ -1,0 +1,37 @@
+{
+ "name": "freesurfer-mergeseg",
+ "tool": "mergeseg (FreeSurfer 8.2.0)",
+ "status": "experimental",
+ "larmorx_commit": "1c296beb80bd",
+ "generated": "2026-11-24",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mergeseg/, src/script.rs), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's official script ($FREESURFER_HOME/bin/mergeseg, /bin/tcsh 6.21.00, GNU coreutils 8.32, GNU time 1.9)",
+ "queue_item": "3.2-29",
+ "cases": 43,
+ "verdicts": {
+  "identical": 41,
+  "unmodelled": 2
+ },
+ "fix": {
+  "fix-identical": 35,
+  "fix-explained": 7,
+  "fix-unmodelled": 1
+ },
+ "official_sha256_all": "8ab64559e5fbe0b0786bcc743e0d0b9ff5a4638c5498f2695e7ea9bd4a2b45d7",
+ "golden_sha256": "3bb3c52c3edc783925c16d73ff2f6eddaa692f151a551a51650c03abe10950aa",
+ "memory": [
+  {
+   "program": "mergeseg",
+   "mode": "reproduce",
+   "larmorx_mib": 263.9,
+   "freesurfer_mib": 274.5
+  },
+  {
+   "program": "mergeseg",
+   "mode": "fix",
+   "larmorx_mib": 264.5,
+   "freesurfer_mib": 274.5
+  }
+ ]
+}

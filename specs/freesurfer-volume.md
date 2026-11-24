@@ -290,7 +290,10 @@ max when it is larger (a NaN never does), so a volume whose values all lie above
   (direct); another type: the error `MRIvalRange: unsupported type <type>`, `ERROR_UNSUPPORTED`, the
   range not set.
 - `MRIvalRangeRegion(mri, region)`: frame 0 over the region, its start raised to 0 and its end
-  (`x + dx`, ...) lowered to the extent; returns 0. **FS-265** (rule A): without a region FreeSurfer
+  (`x + dx`, ...) lowered to the extent, the sums in 32-bit wrapping arithmetic (an end past the `int` maximum wraps
+  to a negative end: no voxel on that axis, the range 10000 to -10000; **(observed)**: `vrules24`, a start of 1 with
+  a size of 2147483647 wraps and finds no voxel, a start of 1 with 2147483646 and of -1 with 2147483647 do not and
+  take the whole axis); returns 0. **FS-265** (rule A): without a region FreeSurfer
   crashes (**(observed)**: `vrange`, every such line, and `vrules`: `CRASH 11`, with voxels or
   without); both modes take the whole volume (the region `0 0 0 width height depth`), as
   `MRIextractRegion` does without one (§11), and note FS-265.

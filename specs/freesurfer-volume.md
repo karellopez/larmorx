@@ -3005,7 +3005,8 @@ for NaN or a quotient beyond the `int` range: by default NaN gives 0 and beyond 
   and when found its bin's value as an `int` (FS-12); the gray-matter peak likewise between 72 and `wm_peak - 10`; while
   both are found and the gray-matter peak is above `gray_hi`, the white-matter peak becomes it and the gray-matter peak
   is searched again. **FS-502** (both modes, noted): when the white-matter peak takes a value it already took
-  (FreeSurfer then never ends: a gray-matter limit below -1, with the search alternating), the program ends with
+  (FreeSurfer then never ends: with a gray-matter limit below -1, once both peaks are found, the search comes back to
+  the same peak, or finds none, -1, which stays above the limit), the program ends with
   `MRIhistoSegment: the gray-matter peak <p> stays above <gray_hi> (FreeSurfer never ends here)` (`ErrorExit`, code -4,
   status 252). The valley: -1 when a peak is missing, else `HISTOfindValley(hs, 3, gray_peak + 2, wm_peak - 2)` as an
   intensity (FS-12); above `gray_hi` it is -1. The label byte becomes 128 when there is no valley, `|in_val - valley| <=

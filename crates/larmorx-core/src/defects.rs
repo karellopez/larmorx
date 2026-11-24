@@ -2075,6 +2075,40 @@ defects! {
         "mri_cc's volume measurement file (written only with the diagnostic flags DIAG_WRITE and DIAG_VERBOSE) prints five divisions; with fewer than five (-d 1 to 4) it prints counts it never made (memory contents): larmorx prints 0 for them in both modes, with a notice";
     FS_1215 = "FS-1215", "FreeSurfer", true,
         "mri_cc -t with a half thickness that takes the callosum's slab past the volume's last column reads other voxels of the volume as the slab's (the next rows') and, further out, memory past the volume, where it crashes (a large -t: signal 11): larmorx refuses such a thickness by default";
+    FS_1216 = "FS-1216", "FreeSurfer", true,
+        "mri_segment -polvlen with more than 200 positions along a voxel's normal (a length above 24.75; a position every 0.25) writes past FreeSurfer's tables at the first ambiguous voxel it does not decide at the centre (memory corruption): larmorx refuses such a length by default and, with reproduce, ends with an error where FreeSurfer writes past them";
+    FS_1217 = "FS-1217", "FreeSurfer", true,
+        "mri_segment -polvwsize even or negative (from -16 to 16) takes each plane's median from more values than it samples, the rest memory contents: larmorx refuses such a window by default; with reproduce the values never sampled are read as 0";
+    FS_1218 = "FS-1218", "FreeSurfer", true,
+        "mri_segment -polvwsize of 17 or more (or -17 or less) writes or reads past FreeSurfer's table of a plane's 256 values at the first ambiguous voxel: larmorx refuses such a window by default and, with reproduce, ends with an error there";
+    FS_1219 = "FS-1219", "FreeSurfer", true,
+        "mri_segment given an option that takes values (-slope, -pslope, -nslope, -debug_voxel, -ghi, -glo, -wlo, -wm_low_factor, -whi, -nseg, -thicken, -seg, -polvwsize, -min-wm-mask, -polvlen, -wsizemm, -diagno, -n, -t, -p, -x, -w and the other options of those first letters) as its last arguments, without all its values, reads past its arguments and crashes (signal 11): larmorx prints that the option needs its values and the help, status 1";
+    FS_1220 = "FS-1220", "FreeSurfer", true,
+        "mri_segment -b <sigma> (any option starting with b) takes the sigma of the smoothing before the removal of voxels of the wrong direction from the option's own name (0) instead of its value: larmorx uses the value";
+    FS_1221 = "FS-1221", "FreeSurfer", true,
+        "mri_segment -seg <aseg> Qwm Qctx NdilWM NdilCtx reads aseg.presurf.mgz of the working folder whatever name it is given (it prints the name given): larmorx reads the named file";
+    FS_1222 = "FS-1222", "FreeSurfer", true,
+        "mri_segment -seg with an aseg whose dimensions differ from the input's reads the two volumes at each other's voxels (other voxels, memory outside them): larmorx ends with an error in both modes";
+    FS_1223 = "FS-1223", "FreeSurfer", true,
+        "mri_segment -min-wm-mask with a mask whose dimensions differ from the input's labels the input's voxels in the mask (past its voxels when it is smaller: memory corruption): larmorx ends with an error in both modes";
+    FS_1224 = "FS-1224", "FreeSurfer", true,
+        "mri_segment -min-wm-mask does not change the segmentation: FreeSurfer sets every voxel of the mask to 1 and then writes its first labels over it, so the mask's contents are never used (kept: the option has no effect, as in FreeSurfer)";
+    FS_1225 = "FS-1225", "FreeSurfer", true,
+        "mri_segment -min-wm-mask with a mask that is not a volume of bytes reads and writes the labels written into it byte by byte (other voxels' bytes): larmorx does not use the mask by default (it has no effect, FS-1224); with reproduce the labels are read and written as FreeSurfer does";
+    FS_1226 = "FS-1226", "FreeSurfer", true,
+        "mri_segment ends with status 0 when its output cannot be written: larmorx ends with status 1 after the writer's messages";
+    FS_1227 = "FS-1227", "FreeSurfer", true,
+        "mri_segment -fillv on a volume in which it finds no ventricle (no segment of 100 voxels or more over 7 slices or more) crashes (signal 11): larmorx adds no ventricle";
+    FS_1228 = "FS-1228", "FreeSurfer", true,
+        "mri_segment -fillbg or -fillv on a volume whose slices are not coronal uses Talairach coordinates it never computed (memory contents), after the message MRIvoxelToTalairachVoxel: unsupported slice direction: larmorx refuses such a volume by default; with reproduce the coordinates are 0";
+    FS_1229 = "FS-1229", "FreeSurfer", true,
+        "mri_segment --VERSION (its own version option, in any case other than --version) prints the placeholder Version: ##version## on standard error and ends: kept";
+    FS_1230 = "FS-1230", "FreeSurfer", true,
+        "mri_segment -thickenonly (or -thicken with a value above 1) does not thicken: it writes the input with its one-dimensional strands removed (the thickening is switched off in FreeSurfer): kept";
+    FS_1231 = "FS-1231", "FreeSurfer", true,
+        "mri_segment -seg whose relabelled aseg holds no white matter (it prints ERROR: could not find any WM voxels) goes on with the white matter's statistics 0 and the cortex's taken from memory it never set: larmorx ends with an error by default; with reproduce the cortex's are 0 too";
+    FS_1232 = "FS-1232", "FreeSurfer", true,
+        "mri_segment -wm_low_factor f sets the bottom of the white matter range to (1 - f) gray_mean + f white_mean without -seg but to f gray_mean + (1 - f) white_mean (its help's formula) with -seg: kept";
     FS_1210 = "FS-1210", "FreeSurfer", true,
         "mri_cc -a 0 whose search for the callosum's seed fails (no column of the callosum's thickness near Talairach's origin, or 'could not find valid seed for the cc') uses the seed's Talairach millimetres as a voxel position (only the printed centre and the division counts depend on it): larmorx uses the seed's voxel";
     FS_974 = "FS-974", "FreeSurfer", true,

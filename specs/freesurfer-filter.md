@@ -22,7 +22,9 @@ normalisation, the windows, the peak check, the control-point searches and files
 the gentle normalisation, the bias correction). Part 7 (§28-29): the normalisation's histogram
 steps (`MRInormFillHistograms`, `MRInormalize`, `MRInormFindControlPoints`, `MRI3dNormalize`).
 Part 8 (§30-31): the high-signal normalisation (`MRInormFindHighSignalLowStdControlPoints`,
-`MRInormalizeHighSignalLowStd`). §32: `MRIcountCSFInNbhd`. Not yet: the surface flood functions. The 2-D image reductions (`ImageConvolve1d`,
+`MRInormalizeHighSignalLowStd`). §32: `MRIcountCSFInNbhd`. Part 12 (§39-40): the planes of least
+variance and the thin strands `mri_segment` uses (`utils/mripolv.cpp`) and
+`MRIcomputeClassStatisticsSeg`. Not yet: the surface flood functions. The 2-D image reductions (`ImageConvolve1d`,
 `ImageReduce`, `ImageReduce1d`) are specified with the images in `specs/freesurfer-io.md`.
 
 ## 1. Conventions
@@ -1411,3 +1413,171 @@ Defects (each with its `reproduce` switch):
   default identical but where a noted defect it corrects changed the result. Observed (relay 34):
   seeds 7, 13 and 17, 255 cases each: 0 different in both modes; `real.py --t2mask`: 5 of 6
   identical, 1 counted (FS-290: the official program crashes; ds000005's `T1.mgz` at 120).
+
+## 39. The planes of least variance (part 12, `mri_segment`'s)
+
+Written for queue item 3.2-31 (track D, relay 56), the only program that reaches them. Labels as
+§14. A *byte read* of a volume reads frame 0's byte at a voxel (a volume of bytes: its value; any
+other type: the byte at the voxel's index in the row, FS-1225).
+
+**The directions.** 22 directions `v_k` (k = 0 to 21), each `(x, y, z)`:
+
+| k | x | y | z | k | x | y | z |
+|---|---|---|---|---|---|---|---|
+| 0 | 0 | 0 | 1 | 11 | 0.5257 | 0 | 0.8507 |
+| 1 | 0.8944 | 0 | 0.4472 | 12 | 0.6882 | -0.5 | 0.5257 |
+| 2 | 0.2764 | 0.8507 | 0.4472 | 13 | 0.1625 | 0.5 | 0.8507 |
+| 3 | -0.7236 | 0.5257 | 0.4472 | 14 | 0.6882 | 0.5 | 0.5257 |
+| 4 | -0.7236 | -0.5257 | 0.4472 | 15 | -0.2629 | 0.809 | 0.5257 |
+| 5 | 0.2764 | -0.8507 | 0.4472 | 16 | -0.5878 | 0.809 | 0 |
+| 6 | -0.4253 | -0.309 | 0.8507 | 17 | 0 | 1 | 0 |
+| 7 | -0.8507 | 0 | 0.5257 | 18 | -0.9511 | 0.309 | 0 |
+| 8 | -0.4253 | 0.309 | 0.8507 | 19 | -0.9511 | -0.309 | 0 |
+| 9 | 0.1625 | -0.5 | 0.8507 | 20 | -0.5878 | -0.809 | 0 |
+| 10 | -0.2629 | -0.809 | 0.5257 | 21 | 1 | 0 | 0 |
+
+(the decimal values as single-precision constants). Scaling `s(a)` of a vector `a`: `a` times `1 /
+m` (`float`), `m` the magnitude of `x` when it is larger than both others', else of `y` when
+larger than `z`'s, else of `z`. With `e3` the table's vector: `v_k = s(e3)`; `e1 = s((e3.z e3.z -
+e3.x e3.y, e3.x e3.x - e3.y e3.z, e3.y e3.y - e3.z e3.x))` (each product and difference in
+`float`, in that order: first `e3.z e3.z`, then `e3.x e3.y`); `e2 = s((e1.y e3.z - e1.z e3.y, e1.x
+e3.z - e1.z e3.x, e1.y e3.x - e1.x e3.y))` with the scaled `e1` and the unscaled `e3` (the second
+element's sign as written). Every function below uses these scaled `v_k`, `e1_k`, `e2_k`.
+
+**A plane's points.** For a centre `(x, y, z)` (`float`), a direction `k` and a window `w`, `h =
+(w - 1) / 2` (C's integer division), the points for `yk` from `-h` to `h` (outer) and `xk` from
+`-h` to `h` (inner): `b = (x + yk e2.x, y + yk e2.y, z + yk e2.z)` (`(float) yk` times the
+component, added, in `float`), the point `b + xk e1` (each component `b_i + (float) xk e1_i` in
+`float`).
+
+**`MRIcentralPlaneOfLeastVarianceNormalVoxel(src, w, x, y, z)`**: for each direction in order, the
+plane's points through the voxel, each rounded (`nint`) and passed through the index tables (the
+nearest voxel past an edge), its byte read; `total` and `total_sq` (`+ v`, `+ v v`) and the count
+in `float`; the variance `total_sq / n - (total / n)²` (0 for no point). The first direction whose
+variance is below the smallest so far (starting at 100000) is kept; the loop stops at the first
+direction whose variance's magnitude is below `FLT_EPSILON`. Returns the direction kept (-1 for
+none; a byte volume always has one).
+
+**`MRIcpolvMedianAtVoxel(src, k, x, y, z, w)`**: the plane's points through `(x, y, z)`, each
+sampled trilinearly (`MRIsampleVolume`, `specs/freesurfer-volume.md`; the point as `double`) and
+stored as `float` in order; then the first `w w` values of that table sorted ascending (glibc's
+`qsort`: the order of equal values as glibc's merge sort leaves them; NaNs compare equal to
+everything) and the value at `w w / 2` returned. For an even or negative `w` the table holds
+`(2h + 1)^2` samples, fewer than it sorts (FS-1217: the rest is memory never written; `reproduce`
+reads it as 0); more than 256 values (`|w| >= 17`) overrun it (FS-1218).
+
+**`MRIcpolvMedianCurveVoxel(src, labeled, x0, y0, z0, w, len, gray_hi, wm_low)`**: the direction
+`k` of the least variance plane through the voxel; its normal `n = v_k / |v_k|` (`|v_k|` the square
+root of `vx vx + vy vy + vz vz` in `float`). Then for `dist` from `-len` while `dist <= len`, adding
+`0.25` each time (`float`): the centre `(x0 + n.x dist, ...)` (`float`), the plane's median there
+(`MRIcpolvMedianAtVoxel`), kept with `dist` in tables of 200 (FS-1216: a 201st position overruns
+them). With `white_dist = gray_dist = 1000`, `what = MRI_AMBIGUOUS`, `gray_val = white_val = val =
+-1`: a median at or above `gray_hi` with `|dist| < white_dist` sets `white_val`, `white_dist =
+|dist|`; else a median at or below `wm_low` with `|dist| < gray_dist` sets `gray_val`, `gray_dist`.
+At `|dist| < FLT_EPSILON` (the centre): `val` is the median; it makes `what` white (at or above
+`gray_hi`) or not white (at or below `wm_low`), and then (unless `DIAG_WRITE` and `DIAG_VERBOSE`
+are both set) the function returns `what` at once. After the loop (with both diagnostics:
+`med.plt` in the working folder, one line `%2.2f  %2.3f` of `dist`, median per position): when
+`white_dist > len`, the medians above both `white_val` and `wm_low` raise `white_val` (in order,
+`white_dist = |dist|`), and a `white_dist` below `FLT_EPSILON` makes it white; when `gray_dist >
+len`, `gray_val = 10000` and the medians below both `gray_val` and `gray_hi` lower it (`gray_dist =
+|dist|`), and a `gray_dist` below `FLT_EPSILON` makes it not white. Still ambiguous: white when
+`white_dist < gray_dist - 0.75`, not white when `gray_dist < white_dist - 0.75` (in `double`);
+still ambiguous: not white when `white_dist > 2`, else not white when `|white_val - val| > |gray_val
+- val|` (`float`), else white.
+
+**`MRIcpolvMedianCurveSegment(src, labeled, NULL, w, len, gray_hi, wm_low)`**: prints
+`MRIcpolvMedianCurveSegment(): wsize=<d>, len=<g>, gmhi=<g>, wmlow=<g>`; a copy of the labels; for
+each slice `DiagShowPctDone(z / (d - 1), 5)`, each voxel of the source's extent whose label (byte
+read) is `MRI_AMBIGUOUS` gets `MRIcpolvMedianCurveVoxel`'s label in the copy (a byte written),
+counted white or not white. Then `  <n %8d> voxels processed (<p %2.2f>%)`, `  <n> voxels white
+(<p>%)`, `  <n> voxels non-white (<p>%)`, `p = 100 n / (w h d)` in `float`.
+
+**`MRIintensitySegmentation(src, NULL, labeled, wm_low, wm_hi, gray_hi)`**: prints
+`MRIintensitySegmentation() wm_low=<g>, wm_hi=<g>, gray_hi=<g>`; into `labeled` (a clone of the
+source when none is given), each voxel of the source's extent: `MRI_NOT_WHITE` below `wm_low` or
+above `wm_hi`, else `MRI_AMBIGUOUS` at or below `gray_hi`, else `MRI_WHITE` (`float` comparisons: a
+NaN is white); `white = <n>, nonwhite = <n>, ambig = <n>, nmask = 0`. (With a minimal mask, its
+second argument, only the mask's voxels above 0.5 would be set white and the others left; no
+program passes one.)
+
+**`MRImaskLabels(src, mask, dst)`**: each voxel of the source's extent: `MRI_AMBIGUOUS` where the
+mask is 128, the source's value where it is 255, else 0 (`float` comparisons), into `dst` (a clone
+of the source; the source itself allowed: each voxel read before it is written).
+
+**`MRIremoveIslands(src, NULL, w, t)`**: a clone of the source (zeros); `h = w / 2`; for the slices
+from `h`, their rows from `h`, every column: the voxels of the `(2h + 1)^3` window (the index
+tables; itself included) that are 0 and those that are not counted; the voxel's value is set to 0
+when it is not 0 and at least `t` are 0, to 200 (`THICKEN_FILL`) when it is 0 and at least `t` are
+not, else kept, and written into the clone. The first `h` slices and rows stay 0.
+
+**`MRIcpolvMaxWhiteAtVoxel(mri, x, y, z, w)`**: for each direction in order, the plane's points
+rounded (`nint`) through the index tables, the voxels above 0.5 counted; the last direction with
+the largest count (`>=`; 0 when all are 0).
+
+**`MRIcpolvAllQuadrantsFilled(mri, x, y, z, k, w)`**: along `+e1`, `-e1`, `+e2`, `-e2` of direction
+`k`, `dist` from 0.75 adding 0.75 while `dist <= (w - 1) / 2`, the point `(x + dist e_x, ...)` (or
+minus) in `float`, sampled trilinearly; the first sample above 0.5 ends that side; true when every
+side found one (`mri_segment` passes 5: two steps a side).
+
+**`MRIfillPlanarHoles(mri, segment, mri, mseg)`** (the volume its own destination): `B` the
+segment's image at or above 5 as 1, else 0 (`MRIbinarize`); its border `R`: `B` dilated twice
+(`MRIdilate`), then 1 where exactly one of `B` and the dilation is within 1..255 (`MRIxor`), else
+0. Then passes over the volume (slices outer) until one fills none: a voxel whose byte in the
+volume is at most 5 and whose border byte is not 0, whose direction of most strand voxels in a
+5 x 5 plane (`MRIcpolvMaxWhiteAtVoxel(B, ..., 5)`) has strand on its four sides
+(`MRIcpolvAllQuadrantsFilled(B, ..., 5)`) and whose count of face neighbours at least 1 in `B`
+equals its count of face neighbours at least 5 in the volume (`MRIneighborsOn`) becomes 200 in the
+volume, 1 in `B` and 0 in `R`. With `DIAG_WRITE` and `DIAG_VERBOSE`: `writing binary strand and
+border images...` (standard error), `binary_strand.mgh`, `strand_border.mgh`; with `DIAG_SHOW` and
+`DIAG_VERBOSE`: `<n> planar holes filled` (standard error).
+
+**`MRIthickenThinWMStrands(T1, mri, mri, thickness, nsegments, wm_hi)`** (the volume its own source
+and destination: every read of "the source" below sees the volume as it is then). Prints
+`MRIthickenThinWMStrands(): thickness=<d>, nsegments=<d>`.
+1. `C`: the volume's islands removed (`MRIremoveIslands(mri, NULL, 3, 24)`) and closed
+   (`MRIclose`).
+2. A clone `thin` (zeros): every voxel of the volume above 0 is searched along the rows (the only
+   direction: `(0, 1, 0)`): downwards, `nd` (`float`) from 0 while `nd <= thickness + 1`, the
+   sample of `C` at `(x, y - nd, z)` (trilinear: the voxel's value inside, the volume's outside
+   value past it); the first below 5 gives `down = nd - 0.5` (`double`), none `thickness + 1`;
+   upwards the same at `y + nd`. `down + up <= thickness` marks it 1 in `thin`.
+3. `thin`'s connected segments (`MRIsegment(thin, 1, 255)`), each dilated five times into the
+   volume (`MRIsegmentDilate`). With both diagnostics: the largest `nsegments` segments' images of
+   the volume written as `seg<i>.mgh` (before) and `dilated_seg<i>.mgh` (after the dilations).
+4. Total 0; for up to `nsegments` times: the largest segment not yet done (`MRIsegmentMax`; none:
+   stop); `thin` cleared and the segment's image of `C` written into it (`MRIsegmentToImage`).
+   Each of the segment's voxels (in its order) whose volume value is at least 5: the two searches
+   of step 2 in the volume itself with the limit `TOO_THIN + 1 = 3` (`nd <= 3`); while `up + down
+   <= 2`: when `up <= down` the voxel `(x, nint(y + up + 1.5), z)` must lie in the volume (else the
+   error `ERROR: MRIthickenThinWMStrands: invalid x,y,z!` and the voxel's loop ends); when it is
+   inside the T1's extent and 0 in the volume, `up` is to grow and the voxel `(x, nint(y + up +
+   0.5), z)` becomes 200 in the volume and in `thin` when the T1 there is below `wm_hi` (counted);
+   when `up >= down` the same downwards (`y - down - 1.5`, `y - down - 0.5`; no extent test beyond
+   the volume's); the grown sides add 1; `up + down <= 2` again; neither grew: the loop ends. With
+   `DIAG_SHOW` and `DIAG_VERBOSE`: `<nseg>: segment <i>, <n> voxels, filled = <f>, total = <t>`
+   (standard error). The segment is marked done. Then passes over the volume's interior (slices,
+   rows, columns from 1 to the extent - 2) until one fills none: a voxel 0 in the volume with a T1
+   below `wm_hi`, with `thin` not 0 on both sides along a row, a column or a slice, and no voxel
+   of its 3 x 3 x 3 (itself included) that is not 0 in the volume but 0 in `thin`, becomes 210
+   (`NBHD_FILL`) in both (counted). Then the planar holes (`MRIfillPlanarHoles(mri, thin, mri,
+   ...)`).
+5. `  <n %2d> segments, <total> filled`; the segments' done marks cleared. With both diagnostics:
+   `thin.mgh`.
+
+**`MRIcomputeClassStatisticsSeg(norm, seg, ...)`**: the white matter (labels 2, 41, 251 to 255) and
+the cortex (3, 42) masks of `seg` (`MRImatchSegs`), `norm`'s statistics over each (§20's
+`MRIsegStats`): `wmstats  n=<%6d>, mean=<g>, std=<g>, min=<g>, max=<g>`, then `ctxstats n=...`. An
+empty class prints `ERROR: could not find any WM voxels` (`CTX`) and ends there (its mean and
+deviation 0; for an empty white matter the cortex's are never set: FS-1231).
+
+Defects (behaviour; `larmorx_core::defects`): FS-1216, FS-1217, FS-1218, FS-1225, FS-1231 as
+above; their switches in `specs/mri_segment.md` §6.
+
+## 40. Validation plan (part 12)
+
+Through the program: `specs/mri_segment.md` §7 (the open probe
+`validation/investigations/freesurfer-mri-segment-probe/`, the recorded heads, the golden cases).
+Every function of §39 is reached by `mri_segment`'s default path on a recorded head and on the
+probe's small volumes (the thin plate one voxel thick and the two voxels thick one reach the
+thickening, the planar holes and the neighbourhood filter).

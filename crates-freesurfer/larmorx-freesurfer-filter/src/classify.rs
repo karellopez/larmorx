@@ -24,10 +24,11 @@ use larmorx_freesurfer_core::sse::{add, add64, div, div64, mul, mul64, sqrt64, s
 use larmorx_freesurfer_core::utils::nint;
 use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::mri::{MAX_INDEX, MRI_UCHAR, Mri};
-use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
+use larmorx_freesurfer_mri::voxel::mri_set_vox_val;
 use larmorx_freesurfer_volume::arith::{Pair, mri_clone, mri_val_range};
 
 use crate::mem;
+use crate::polv::vox_val;
 
 /// `MRI_AMBIGUOUS`, `MRI_WHITE`, `MRI_NOT_WHITE`.
 pub const MRI_AMBIGUOUS: i32 = 128;
@@ -133,7 +134,7 @@ pub fn mri_mark_border_voxels(
                             [(z as usize * hu + y as usize) * wu + x as usize],
                     )
                 } else {
-                    let v = mri_get_vox_val(g, err, src, x, y, z, 0, 0)?;
+                    let v = vox_val(g, err, src, x, y, z)?;
                     nint(g, f64::from(v))
                 };
                 let mut dlabel = MRI_AMBIGUOUS;
@@ -155,7 +156,7 @@ pub fn mri_mark_border_voxels(
                                             [(zi as usize * hu + yi as usize) * wu + xi as usize],
                                     )
                                 } else {
-                                    let f = mri_get_vox_val(g, err, src, xi, yi, zi, 0, 0)?;
+                                    let f = vox_val(g, err, src, xi, yi, zi)?;
                                     c_int(g, "MRImarkBorderVoxels", f)
                                 };
                                 if v == want {
@@ -231,9 +232,9 @@ pub fn mri_border_classify_voxel(
                     continue;
                 }
                 let xi = table(g, x + xk, w);
-                let f = mri_get_vox_val(g, err, src, xi, yi, zi, 0, 0)?;
+                let f = vox_val(g, err, src, xi, yi, zi)?;
                 let val = c_int(g, WHAT, f);
-                let l = mri_get_vox_val(g, err, labeled, xi, yi, zi, 0, 0)?;
+                let l = vox_val(g, err, labeled, xi, yi, zi)?;
                 if l == MRI_NOT_WHITE as f32 {
                     ng += 1;
                     // the gray squares are computed by the source and never used (the official
@@ -241,7 +242,7 @@ pub fn mri_border_classify_voxel(
                     let _ = square(g, val);
                     gmean = add(val as f32, gmean);
                 } else {
-                    let l = mri_get_vox_val(g, err, labeled, xi, yi, zi, 0, 0)?;
+                    let l = vox_val(g, err, labeled, xi, yi, zi)?;
                     if l == MRI_WHITE as f32 {
                         nw += 1;
                         let s = square(g, val);
@@ -268,7 +269,7 @@ pub fn mri_border_classify_voxel(
     let libm = Libm::new(g.mode());
     let two_var = add(wvar, wvar);
     let mut like = |g: &mut Globals, mean: f32| -> Result<f32, Fatal> {
-        let f = mri_get_vox_val(g, err, src, x, y, z, 0, 0)?;
+        let f = vox_val(g, err, src, x, y, z)?;
         let val = c_int(g, WHAT, f);
         let mut dist = sub(val as f32, mean);
         dist = mul(dist, dist);
@@ -370,9 +371,9 @@ fn reclassify_labels(
         diag_show_pct_done(g, err, div(z as f32, (d - 1) as f32), 5);
         for y in 0..h {
             for x in 0..w {
-                let sv = mri_get_vox_val(g, err, src, x, y, z, 0, 0)?;
+                let sv = vox_val(g, err, src, x, y, z)?;
                 let s = c_int(g, "MRIreclassify", sv);
-                let lv = mri_get_vox_val(g, err, lab, x, y, z, 0, 0)?;
+                let lv = vox_val(g, err, lab, x, y, z)?;
                 let mut label = c_int(g, "MRIreclassify", lv);
                 if (s as f32) > wm_low && (s as f32) < gray_hi {
                     ntested += 1;
@@ -458,13 +459,13 @@ pub fn mri_compute_class_statistics(
     for z in 0..d {
         for y in 0..h {
             for x in 0..w {
-                let lf = mri_get_vox_val(g, err, labeled, x, y, z, 0, 0)?;
+                let lf = vox_val(g, err, labeled, x, y, z)?;
                 let label = c_int(g, "MRIcomputeClassStatistics", lf);
                 if label == MRI_AMBIGUOUS {
                     continue;
                 }
-                let val = f64::from(mri_get_vox_val(g, err, t1, x, y, z, 0, 0)?);
-                let bf = mri_get_vox_val(g, err, &border, x, y, z, 0, 0)?;
+                let val = f64::from(vox_val(g, err, t1, x, y, z)?);
+                let bf = vox_val(g, err, &border, x, y, z)?;
                 let border_label = c_int(g, "MRIcomputeClassStatistics", bf);
                 let class = if border_label == MRI_WHITE {
                     (val >= f64::from(mid) || gray_low < 0.0).then_some(true)

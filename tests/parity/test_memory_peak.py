@@ -22,8 +22,9 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 (``MRI_MASK_CASES``, 2026-11-22), ``mri_cc`` (``MRI_CC_CASES``, ``MRI_CC_WM_CASES``, 2026-11-23), ``fs_temp_file``
 (``FS_TEMP_FILE_CASES``, 2026-11-22), ``getfullpath`` (``GETFULLPATH_CASES``, 2026-11-22) and
 ``mri_vol2vol`` (``MRI_VOL2VOL_CASES``, 2026-11-23; its morph and ``--gcam`` on the classic
-recording, relay 54), ``mri_concat`` (``MRI_CONCAT_CASES``, 2026-11-23) and ``mri_label2vol``
-(``MRI_LABEL2VOL_CASES``, 2026-11-24: ``defect2seg``'s two calls, the first that read a surface).
+recording, relay 54), ``mri_concat`` (``MRI_CONCAT_CASES``, 2026-11-23), ``mri_label2vol``
+(``MRI_LABEL2VOL_CASES``, 2026-11-24: ``defect2seg``'s two calls, the first that read a surface) and
+``mri_segment`` (``MRI_SEGMENT_CASES``, 2026-11-24).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -3495,3 +3496,85 @@ def test_mri_label2vol_replica_needs_no_more_memory_than_freesurfer(tmp_path, na
         assert _mgz_without_command_lines((r_dir / out).read_bytes()) == _mgz_without_command_lines(
             (o_dir / out).read_bytes()
         ), name
+
+
+#: FreeSurfer's ``mri_segment`` against the ``larmorx-freesurfer`` replica (queue item 3.2-31,
+#: 2026-11-24), on a recorded head (ds000005 sub-01's classic run), one thread, both D13 modes:
+#: recon-all's call (``-wsizemm 13 -mprage antsdn.brain.mgz wm.seg.mgz``) and ``-seg``'s path on
+#: the run's ``aseg.presurf.mgz``; the output identical to FreeSurfer's.
+MRI_SEGMENT_CASES = [
+    ("recon-all", ["-wsizemm", "13", "-mprage", "{mri}/antsdn.brain.mgz", "wm.seg.mgz"]),
+    (
+        "seg",
+        ["-seg", "aseg.presurf.mgz", "3", "3", "2", "2", "{mri}/antsdn.brain.mgz", "wm.seg.mgz"],
+    ),
+]
+
+
+@pytest.mark.parametrize(("name", "args"), MRI_SEGMENT_CASES)
+def test_mri_segment_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, args):
+    from larmorx_validation.freesurfer import files as fsfiles
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / "mri_segment" if ws else None
+    mri = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / "ds000005-sub-01-classic" / "subjects"
+        / "sub-01" / "mri"
+        if ws
+        else None
+    )  # fmt: skip
+    if exe is None or not exe.is_file() or not (mri / "antsdn.brain.mgz").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    words = [a.format(mri=mri) for a in args]
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        "FS_DISABLE_LANG": "1",
+        **freesurfer_env(),
+    }
+
+    def fresh(d: Path):
+        def reset() -> None:
+            if d.exists():
+                shutil.rmtree(d)
+            d.mkdir()
+            # -seg reads aseg.presurf.mgz of the working folder (FS-1221)
+            shutil.copyfile(mri / "aseg.presurf.mgz", d / "aseg.presurf.mgz")
+
+        reset()
+        return reset
+
+    out = words[-1]
+    o_dir = tmp_path / "freesurfer"
+    code, fs_mib = _original_peak(
+        ["mri_segment", *words],
+        env,
+        "freesurfer",
+        fresh(o_dir),
+        o_dir,
+        (r"segmentation took \S+ minutes",),
+        "freesurfer",
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        fresh(r_dir)
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_segment", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(f"mri_segment {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"mri_segment {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        c = fsfiles.compare(o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out)
+        assert c.same, f"mri_segment {name} ({mode}): {c.verdict} {c.detail}"

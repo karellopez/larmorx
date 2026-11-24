@@ -3606,6 +3606,25 @@ state (each probe call is a process of its own), FS-514's threads (the loop runs
   the voxels labelled 130; finally three dilations of label 130 into T1 voxels of exactly 0
   (`MRIdilateInvThreshLabel(label, T1, label, 130, 3, 0)`). Returns the label volume (0, 100 and 130) (**(observed)**:
   `vbright`; `vrules24`).
+  **FS-1233**, a T1 or a white-matter volume (either, or both) not of bytes: the notice in both modes; with `reproduce`
+  FreeSurfer's steps exactly as above (the volumes' bytes). By default the same steps run on byte volumes instead, and
+  the labels are written by value:
+  - the T1, when not of bytes, is replaced by a byte volume of its extent, frames and header (`MRIcloneDifferentType`,
+    section 38) holding frame 0's values (`MRIgetVoxVal`) as bytes as FS-802's default takes them (a value from 0 to
+    below 256 truncated toward zero; below 0 and NaN 0; 256 and above 255; FS-802's notice for each such value, whether
+    or not the bright test reaches its voxel); a byte T1 is used as it is;
+  - the white-matter volume, when not of bytes, is replaced by a byte volume of its own extent and header holding frame
+    0's values truncated toward zero and clamped to 0 to 255 (NaN and values of 0 or below 0, values of 255 and above
+    255; no notice); a byte one is used as it is;
+  - every step then reads those bytes: the bright test, the white-matter counts, the dilation into T1 voxels of at least
+    100 and the three dilations into T1 voxels of 0 (a `float` T1 of 99.5 is not dilated into, one of -0.5 is taken as
+    0); the label volume is a clone of the byte T1, and the count line counts its voxels of 130;
+  - the result: with a byte T1, that label volume (as FreeSurfer's for the same bytes); with a T1 of another type, a new
+    clone of the T1 (its type, extent, frames, header, zero voxels) where every nonzero voxel of the byte label volume
+    is written by value (100 or 130, `MRIsetVoxVal`) into frame 0; its other frames stay 0.
+  So a T1 and a white-matter volume whose values are whole numbers from 0 to 255 give by default the labels FreeSurfer
+  gives for the same values held as bytes, in the T1's type (checked against the probe's runs on byte volumes:
+  `models.py bright`, §69).
 - **`QuadEulerCharChange(vol, mask, c, r, s)`**: the change of the Euler characteristic of the quad mesh of the set
   voxels (value above 0.5, frame 0; a NaN is not set) if voxel `(c, r, s)` were added (its own value is not read). Over
   the 27 offsets from -1 to 1 (columns outermost, then rows, slices): with a mask, the mask's value (frame 0) at the
@@ -3734,7 +3753,12 @@ and past the volume's, masks and outputs of the extent and of another, the input
 inside and on the edges, frames -1 to the last; the `DEMorphBinVol` methods with every type, neighbourhood 0 to 4,
 threshold, pass count and frame, valid and not. Expected: identical with `reproduce` but where FreeSurfer touches memory
 it does not own (FS-803's frames past the output, FS-804, FS-806, and the shared voxel defects FS-52 and FS-53), lines
-the loop allows; the default differs only with a notice (FS-12, FS-52, FS-802, FS-803, FS-804, FS-805, FS-807, FS-808).
+the loop allows; the default differs only with a notice (FS-12, FS-52, FS-802, FS-803, FS-804, FS-805, FS-807, FS-808,
+FS-1233). FS-1233's default is checked by value: `models.py bright --candidate <program>` (README.md, "The models")
+takes every `fbnwm` line of `vbright` and `vrules24` and wants, where the T1 or the white matter is not of bytes, the
+probe's own `fbnwm` of the byte volumes §59 names, its labels written by value into the probe's `clone` of the T1 (92
+such lines, 87 of them with a default result other than FreeSurfer's, **(observed)**), and the probe's line with
+`reproduce`.
 
 ## 62. Writing a transform array (3.1-39: transform.cpp's writers, relay 34)
 The extension is the text after the name's last `.` (the whole name: a `.` in a folder counts), compared in any case.
@@ -4726,6 +4750,7 @@ process to process); no unexplained difference in either mode (log `oracles/logs
 | FS-802 | 59 | FS-803 | 60 | FS-804 | 60 |
 | FS-805 | 60 | FS-806 | 60 | FS-807 | 60 |
 | FS-808 | 60 | FS-889 | 65 | FS-890 | 65 |
+| FS-1233 | 59 | | | | |
 
 Others' defects these parts meet: FS-12 (`nint`, `specs/freesurfer-core.md`), FS-52 (§35's second volumes), FS-53 and FS-58
 (`specs/freesurfer-mri.md`; FS-252, its header copy without cached matrices, in part 4), FS-47 and

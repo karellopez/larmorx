@@ -25,7 +25,7 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
 | `licence_reach.py` | which of a prebuilt probe's commands can reach FreeSurfer's licence check ("The licence check" below): `licence_reach.py <probe> <source.cpp> [--expect a,b]` (the same step after each build, not the implementer's: it reads the probe binary) |
 | `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 50 groups of seeded cases and 23 of fixed cases (`vrules`, `vrules4` to `vrules24`, `vbsrules`; 22,238 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
-| `models.py` | statements of the spec checked as models of the probe's printed results (`region` and `cov` also a candidate's, in both modes): `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `region` (§43's boxes, FS-269 as decided: every `rgbb` line of `vregion`, `vrules17`, `vrules18` and `vrules20`, on the probe and, with `--candidate`, a candidate's lines in both modes), `cov` (§42's `MRIcovarianceMatrix`, FS-483's count as decided: every `cov` line of `vcov` and `vrules19` whose mask has the volume's extent) |
+| `models.py` | statements of the spec checked as models of the probe's printed results (`region`, `cov` and `bright` also a candidate's, in both modes): `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `region` (§43's boxes, FS-269 as decided: every `rgbb` line of `vregion`, `vrules17`, `vrules18` and `vrules20`, on the probe and, with `--candidate`, a candidate's lines in both modes), `cov` (§42's `MRIcovarianceMatrix`, FS-483's count as decided: every `cov` line of `vcov` and `vrules19` whose mask has the volume's extent), `bright` (§59's FS-1233: every `fbnwm` line of `vbright` and `vrules24`, the default's result from the probe's own `fbnwm` of the byte volumes §59 names and its `clone` of the T1) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
 runs use the fs.maths probe's guard allocator, `guard_malloc.so` beside it
@@ -329,14 +329,20 @@ PYTHONPATH=validation/src scripts/orchestration/boxed.sh 4 python -P \
 many it leaves out (FreeSurfer crashed or read memory it does not own) and how many differ; exit
 status 1 when one differs.
 
-`region` and `cov` also take the clean room's program. `region`: `models.py region --probe <the probe> --candidate <the candidate>
+`region`, `cov` and `bright` also take the clean room's program. `region`: `models.py region --probe <the probe> --candidate <the candidate>
 --scratch <scratch>/models` checks every `rgbb` line of `vregion`, `vrules17`, `vrules18` and `vrules20` on the probe (FreeSurfer's
 box, §43), on the candidate with `reproduce` (FreeSurfer's box) and with `fix` (the box FS-269's decision gives:
 the loop allows those lines with their notice but does not check their values). The probe as its own candidate gives
 "differ" on exactly the lines where the decided box differs from FreeSurfer's (77), its own `fix` lines being
 FreeSurfer's. `cov`: every `cov` line of `vcov` and `vrules19` whose types it decodes and whose mask has the
 volume's extent, with `reproduce` against FreeSurfer's count and with `fix` against FS-483's decided count (the
-voxels the sums take); a NaN's payload is outside the model.
+voxels the sums take); a NaN's payload is outside the model. `bright`: every `fbnwm` line of `vbright` and
+`vrules24`; on the candidate with `reproduce` the probe's line, and with `fix` §59's FS-1233 default where the T1 or the
+white matter is not of bytes: the probe's `fbnwm` of the byte volumes (the T1's values as FS-802's default takes them,
+the white matter's truncated and clamped to 0 to 255; whole words in the `i` fill, the voxels past the last whole word
+painted), its labels written by value into the probe's `clone` of the T1 when the T1 is not of bytes; lines of two
+byte volumes the probe's in both modes. The probe as its own candidate gives "differ" on exactly the lines whose
+default result differs from FreeSurfer's (87 of the 92 lines with FS-1233, **(observed)**).
 
 ## The licence check
 
@@ -672,3 +678,7 @@ cached matrices as allocated, recomputed or dropped.
   `vrules24` (123, their fixed cases; FS-889's line in the batch `vrules24-hang` without the guard runs) the same cold,
   warm and twice without the cache; the probe as its own candidate: no unexplained difference in either mode; every
   model as before (log `oracles/logs/fs-volume-probe-r21-final-2026-11-24.log`).
+- Relay 22 (2026-11-24): §59's FS-1233 (a T1 or white matter not of bytes, decided by track D's relay 57): `models.py
+  bright` on the prebuilt probe built from `c62bbdb6`: 117 `fbnwm` lines (`vbright` 100, `vrules24` 17), 92 with a T1
+  or white matter not of bytes (75 and 17), whose default result differs from FreeSurfer's on 87 (73 and 14); the
+  probe as its own candidate: `reproduce` 117 as the model, `fix` 30 as the model and "differ" on exactly those 87.

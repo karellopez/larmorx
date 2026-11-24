@@ -2828,11 +2828,11 @@ defects! {
     FS_1256 = "FS-1256", "FreeSurfer", true,
         "mri_label2vol --proj none never sets the projected points: every point lands at a position taken from memory contents; corrected: ERROR: --proj none projects nothing, status 1";
     FS_1257 = "FS-1257", "FreeSurfer", true,
-        "mri_label2vol --proj whose stop is infinite, or whose step is too small for the depth ever to pass the stop, never ends; corrected: ERROR: --proj never reaches its end, status 1";
+        "mri_label2vol --proj whose stop is infinite, or whose step is too small for the depth ever to pass the stop, never ends; both modes: ERROR: --proj never reaches its end, status 1";
     FS_1258 = "FS-1258", "FreeSurfer", true,
-        "mri_label2vol --proj with a label point at a vertex the surface does not have (other than -1) reads outside the surface's vertices (memory contents or a crash); corrected: ERROR: the label point is not one of the surface's vertices, status 1";
+        "mri_label2vol --proj with a label point at a vertex the surface does not have (other than -1) reads the point's position from outside the surface's vertices (memory contents; measured: the point lands nowhere); corrected: ERROR: the label point is not one of the surface's vertices, status 1";
     FS_1259 = "FS-1259", "FreeSurfer", true,
-        "mri_label2vol with more than 100 --label options writes past its table of labels into the program's other settings; corrected: any number of labels";
+        "mri_label2vol with more than 100 --label options writes the extra labels past its table, into memory the program uses for something else (measured: no visible effect); both modes take every label";
     FS_1260 = "FS-1260", "FreeSurfer", true,
         "mri_label2vol with a segmentation (--seg or --aparc+aseg) and --fill-ribbon but no --temp maps the segmentation onto a template it never read and crashes; corrected: ERROR: a segmentation needs a template volume, status 1";
     FS_1262 = "FS-1262", "FreeSurfer", true,

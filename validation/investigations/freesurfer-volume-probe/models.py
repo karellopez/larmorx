@@ -1491,11 +1491,14 @@ def as_bytes(w: list[str], conv) -> str | None:
     vv = vol_values(" ".join(w))
     if vv is None or vv[0][3] != 1:
         return None
-    (x, y, z, _f), vals = vv
+    (x, y, _z, _f), vals = vv
     b = [conv(v) for v in vals]
     n = len(b)
     pad = b + [0] * (-n % 4) if n else [0, 0, 0, 0]
-    words = [pad[i] | pad[i + 1] << 8 | pad[i + 2] << 16 | pad[i + 3] << 24 for i in range(0, len(pad), 4)]
+    words = [
+        pad[i] | pad[i + 1] << 8 | pad[i + 2] << 16 | pad[i + 3] << 24
+        for i in range(0, len(pad), 4)
+    ]
     out = list(w)
     out[3], out[6] = "0", C.lfill(words)
     tail = [(i, b[i]) for i in range(n - n % 4, n)]
@@ -1565,7 +1568,7 @@ def bright(runner, scratch: Path, candidate: Path | None = None) -> int:
                     for j, v in enumerate(labels):
                         if v:
                             vox[j * size : (j + 1) * size] = struct.pack(LABFMT[t1type], v)
-                    want_fix = (" ".join(cres[:-1] + ["x" + vox.hex()]), lso.decode("latin-1"))
+                    want_fix = (" ".join([*cres[:-1], "x" + vox.hex()]), lso.decode("latin-1"))
                 tally[f"{group}: the default changes the result"] += want_fix != fs
             if memory[i]:
                 tally[f"{group}: memory"] += 1

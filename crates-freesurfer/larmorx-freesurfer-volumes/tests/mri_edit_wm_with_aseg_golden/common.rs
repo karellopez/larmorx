@@ -33,7 +33,8 @@ const IO: [&str; 4] = ["wm.seg.mgz", "brain.mgz", "aseg.presurf.mgz", "out.mgz"]
 /// table of random colours takes seconds in a debug build; the stand-alone fills cover its fill),
 /// the segmentation as bytes (the search for paths to cortex runs: FS-1234), the stand-alone
 /// entorhinal fill, one hemisphere with the lesions kept and the edits of an earlier output,
-/// `-keep-hailvcp` into a missing folder (FS-1238, FS-1240), `-wmsa` with the other hemisphere and
+/// `-keep-hailvcp` with negative values (FreeSurfer's unknown options) into a missing folder
+/// (FS-1238, FS-1240), `-wmsa` with the other hemisphere and
 /// a `float` T1 with NaNs, an option without its value (FS-1239: a crash), `-fix-scm-ha-only`.
 pub fn cases() -> Vec<Vec<String>> {
     let v8 = [
@@ -79,8 +80,8 @@ pub fn cases() -> Vec<Vec<String>> {
         ],
         vec![
             "-keep-hailvcp",
-            "100",
-            "200",
+            "-5",
+            "-6",
             "wm.seg.mgz",
             "brain.mgz",
             "aseg.presurf.mgz",

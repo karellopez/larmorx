@@ -16,11 +16,10 @@ use sha2::{Digest, Sha256};
 
 /// Recorded 2026-11-24 by `prog.py --golden` from the official program on Linux x64 (the port's
 /// `reproduce` gave the same): nine cases.
-const OFFICIAL_SHA256: &str = "0000000000000000000000000000000000000000000000000000000000000000";
-/// The port's default on Linux x64 (`cases_digest(Fix)`): FS-1237's neighbour, `-keep-hailvcp`'s
-/// values taken (FS-1238), no crash for an option without its value (FS-1239), status 1 for the
-/// unwritten output (FS-1240).
-const FIX_SHA256: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+const OFFICIAL_SHA256: &str = "edc6586833df4f36563a735d576040f1f25b041a4c3132b2cc5cd9a5130d56ef";
+/// The port's default on Linux x64 (`cases_digest(Fix)`): `-keep-hailvcp`'s values taken (FS-1238),
+/// no crash for an option without its value (FS-1239), status 1 for the unwritten output (FS-1240).
+const FIX_SHA256: &str = "2731d00eaae2120fd385068587d8a6d7c01f98bafe63d61face3b2fd73e8d130";
 
 fn cases_digest(mode: UpstreamDefects) -> String {
     let dir = tempfile::tempdir().expect("a folder");

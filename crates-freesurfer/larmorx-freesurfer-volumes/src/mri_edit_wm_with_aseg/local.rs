@@ -154,7 +154,7 @@ pub fn set_vox(g: &mut Globals, m: &mut Mri, x: i32, y: i32, z: i32, v: u8) {
 /// kept as `float`s; an index outside the volume through `MRIgetVoxVal` itself (FS-52, FS-53).
 pub struct Seg<'a> {
     pub m: &'a Mri,
-    v: Vec<f32>,
+    pub(crate) v: Vec<f32>,
 }
 
 impl<'a> Seg<'a> {
@@ -236,6 +236,26 @@ pub fn neighbor_label(
     label: i32,
 ) -> Result<bool, Fatal> {
     let l = label as f32;
+    let (w, h, d) = (seg.m.vg.width, seg.m.vg.height, seg.m.vg.depth);
+    if x - whalf >= 0
+        && y - whalf >= 0
+        && z - whalf >= 0
+        && x + whalf < w
+        && y + whalf < h
+        && z + whalf < d
+    {
+        // the window inside the volume: the index tables give each index itself
+        for zi in z - whalf..=z + whalf {
+            for yi in y - whalf..=y + whalf {
+                let row = (zi as usize * h as usize + yi as usize) * w as usize;
+                let r = &seg.v[row + (x - whalf) as usize..=row + (x + whalf) as usize];
+                if r.contains(&l) {
+                    return Ok(true);
+                }
+            }
+        }
+        return Ok(false);
+    }
     for zk in -whalf..=whalf {
         let zi = ix(g, seg.m, Ax::Z, z + zk);
         for yk in -whalf..=whalf {
@@ -249,6 +269,52 @@ pub fn neighbor_label(
         }
     }
     Ok(false)
+}
+
+impl Seg<'_> {
+    /// `nint(MRIgetVoxVal(seg, x, y, z, 0)) == label` for every voxel of frame 0, as bytes (the
+    /// counts of `MRIlabelsInNbhd`).
+    pub fn is_label(&self, g: &mut Globals, label: i32) -> Vec<u8> {
+        self.v
+            .iter()
+            .map(|&v| {
+                let n = if v.is_finite() && v.abs() < 1.0e9 {
+                    let f = f64::from(v);
+                    (if f < 0.0 { f - 0.5 } else { f + 0.5 }) as i32
+                } else {
+                    larmorx_freesurfer_core::utils::nint(g, f64::from(v))
+                };
+                u8::from(n == label)
+            })
+            .collect()
+    }
+
+    /// For row `y` of slice `z`, each column `x`'s count of `is` (from [`Seg::is_label`]) over the
+    /// window's rows and slices (`yi[y + yk]`, `zi[z + zk]` for `yk`, `zk` from `-whalf` to
+    /// `whalf`): `MRIlabelsInNbhd` is then the sum of the columns `xi[x + xk]`.
+    pub fn column_counts(
+        &self,
+        g: &mut Globals,
+        is: &[u8],
+        y: i32,
+        z: i32,
+        whalf: i32,
+        out: &mut Vec<i32>,
+    ) {
+        let (w, h) = (self.m.vg.width as usize, self.m.vg.height as usize);
+        out.clear();
+        out.resize(w, 0);
+        for zk in -whalf..=whalf {
+            let zi = ix(g, self.m, Ax::Z, z + zk) as usize;
+            for yk in -whalf..=whalf {
+                let yi = ix(g, self.m, Ax::Y, y + yk) as usize;
+                let row = &is[(zi * h + yi) * w..(zi * h + yi + 1) * w];
+                for (o, &b) in out.iter_mut().zip(row) {
+                    *o += i32::from(b);
+                }
+            }
+        }
+    }
 }
 
 /// `distance_to_label(seg, label, x, y, z, dx, dy, dz, max_dist)`: the first step `d` (1 to

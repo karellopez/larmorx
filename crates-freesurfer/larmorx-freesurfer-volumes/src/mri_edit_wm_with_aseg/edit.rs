@@ -15,7 +15,6 @@ use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_mri::mri::Mri;
 use larmorx_freesurfer_volume::arith::mri_clone;
 use larmorx_freesurfer_volume::cma::*;
-use larmorx_freesurfer_volume::labels::mri_labels_in_nbhd;
 
 use super::local::{
     AUTO_FILL, Ax, Seg, WM_MIN_VAL, anterior_edge_of_amygdala, at_debug, distance_to_label,
@@ -71,7 +70,11 @@ pub fn edit_segmentation(
     };
     let on = |g: &mut Globals, m: &Mri, x, y, z| vox(g, m, x, y, z) >= WM_MIN_VAL;
 
-    // the first pass: erase, fill and spackle by label
+    // the first pass: erase, fill and spackle by label (MRIlabelsInNbhd's counts of unknown
+    // voxels from each row's column counts)
+    let unknown = seg.is_label(g, Unknown);
+    let mut columns: Vec<i32> = Vec::new();
+    let mut counted = (-1, -1);
     for z in 0..depth {
         for y in (1..=height - 2).rev() {
             for x in 1..width - 1 {
@@ -86,8 +89,15 @@ pub fn edit_segmentation(
                 match label {
                     Unknown => {
                         // erased when only unknowns surround it
-                        erase = mri_labels_in_nbhd(g, err, seg.m, x, y, z, 2, Unknown)?
-                            >= 5 * 5 * 5 - 1;
+                        if counted != (y, z) {
+                            seg.column_counts(g, &unknown, y, z, 2, &mut columns);
+                            counted = (y, z);
+                        }
+                        let mut n = 0;
+                        for xk in -2..=2 {
+                            n += columns[ix(g, seg.m, Ax::X, x + xk) as usize];
+                        }
+                        erase = n >= 5 * 5 * 5 - 1;
                     }
                     Left_Cerebellum_White_Matter
                     | Left_Cerebellum_Exterior

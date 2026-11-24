@@ -7105,7 +7105,9 @@ class Gen21(Gen20):
             v = r.choice([0, 1, 1, 2, -1])
             g = " ".join([str(v), *map(str, dims), *f, xs(r.choice(["", "orig.mgz", "a b"]))])
             L.append(f"ltadvg {g}")
-        return [Batch("vltawr", "vltawr", L)]
+        # FS-504, FS-890: FreeSurfer reads a transform the array does not hold, or past a voxel
+        # list's arrays (the same bytes in every run where the runs agree): an error in both modes
+        return [Batch("vltawr", "vltawr", L, both="FS-504")]
 
     # -- §63
     def vltaxf(self) -> list[Batch]:
@@ -7149,6 +7151,9 @@ class Gen21(Gen20):
                 out = "new"
             else:
                 od = (r.randint(1, 4), r.randint(1, 4), r.randint(1, 4))
+                if n != 1 and r.random() < 0.7:
+                    # the octree walks the source's extent: a destination of it
+                    od = sd
                 onf = r.choice([1, 2])
                 out, _ = self.p9vol(r, od, r.choice([3, 1]), onf)
             interp = r.choice([0, 1, 1, 2, 3, 5, -1])
@@ -7158,7 +7163,9 @@ class Gen21(Gen20):
             if r.random() < 0.15:
                 pre += f"+gdiag={r.choice([DIAG_VERBOSE, DIAG_HEARTBEAT, DIAG_VERBOSE | DIAG_HEARTBEAT]):x} "
             L.append(f"{pre}ltaxf {s} 0 {out} {arr} {interp}")
-        return [Batch("vltaxf", "vltaxf", L)]
+        # FS-504, FS-890: FreeSurfer reads a transform the array does not hold, or past a voxel
+        # list's arrays (the same bytes in every run where the runs agree): an error in both modes
+        return [Batch("vltaxf", "vltaxf", L, both="FS-504")]
 
     def vltamisc(self) -> list[Batch]:
         """§63: LTAtransformAtPoint (1 to 3 transforms, centres and spreads, points near and far,
@@ -7278,7 +7285,9 @@ class Gen21(Gen20):
             if r.random() < 0.15:
                 pre += f"+gdiag={DIAG_SHOW | DIAG_VERBOSE:x} "
             L.append(f"{pre}devxfm {mk} {xs(subj)} {sd} {name} {orig} {xb} {given}")
-        return [Batch("vltamisc", "vltamisc", L)]
+        # FS-504, FS-890: FreeSurfer reads a transform the array does not hold, or past a voxel
+        # list's arrays (the same bytes in every run where the runs agree): an error in both modes
+        return [Batch("vltamisc", "vltamisc", L, both="FS-504")]
 
     def lta_file(self, r: random.Random, ty: int | None = None) -> str:
         """An LTA file's text of one transform (the voxel or RAS type) between two plain geometries."""
@@ -7351,7 +7360,9 @@ class Gen21(Gen20):
                 [f64(70.0), f64(70.0), f64(0.0), f64(float("nan")), f64(1e300), f64(-5.0)]
             )
             L.append(f"rmsmj {self.affine(r, special=0.05)} {self.affine(r)} {rad}")
-        return [Batch("vrot", "vrot", L)]
+        # FS-504, FS-890: FreeSurfer reads a transform the array does not hold, or past a voxel
+        # list's arrays (the same bytes in every run where the runs agree): an error in both modes
+        return [Batch("vrot", "vrot", L, both="FS-504")]
 
     # -- §65
     def vlst(self) -> list[Batch]:
@@ -7447,7 +7458,9 @@ class Gen21(Gen20):
             x, y, z = (r.randint(0, 3) for _ in range(3))
             fl = " ".join(f32(r.uniform(-4, 4)) for _ in range(5))
             L.append(f"vladd {k} {lst} {x} {y} {z} {fl}")
-        return [Batch("vlst", "vlst", L)]
+        # FS-504, FS-890: FreeSurfer reads a transform the array does not hold, or past a voxel
+        # list's arrays (the same bytes in every run where the runs agree): an error in both modes
+        return [Batch("vlst", "vlst", L, both="FS-890")]
 
     def vrules25(self) -> list[Batch]:
         """The fixed cases of part 11b."""
@@ -7743,7 +7756,7 @@ class Gen21(Gen20):
             L.append(f"vladd {k} {part} 1 2 3 {fl}")
             L.append(f"vladd {k} {part} 1 2 4 {fl}")
         return [
-            Batch("vrules25", "vrules25", L),
+            Batch("vrules25", "vrules25", L, both="FS-504,FS-890"),
             Batch("vrules25", "vrules25-hang", H, guards=False),
         ]
 

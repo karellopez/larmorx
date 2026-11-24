@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// A black-box probe of FreeSurfer 8.2.0's volume functions (specs/freesurfer-volume.md, parts 1 to 5:
+// A black-box probe of FreeSurfer 8.2.0's volume functions (specs/freesurfer-volume.md, parts 1 to 11b and §67:
 // the volume-geometry text block and its copies, matrices, comparison and printer; the voxel
 // arithmetic; coordinates, orientation, centre of mass, principal components, the running average,
 // the header comparison and dump; the samplers, moves, the head's box and the transform reader; the
@@ -14,8 +14,10 @@
 // rate, regions and voxel neighbourhood measures (part 9, §41 to §44); the Talairach helpers, dilation
 // and segment helpers, conforming, set operations, morphology, masks and counts, and the volume
 // histograms (part 10, §46 to §52); filling a coarser grid, bright voxels outside the white matter,
-// voxel topology and the binary-volume classes (part 11a, §59 and §60); the rotation and scale of a
-// transform (§64) and voxel lists of a region (§65); fs.bspline: the
+// voxel topology and the binary-volume classes (part 11a, §59 and §60); writing a transform array, a
+// volume moved by one, the MNI and tkregister helpers, rotations and affine parameters, voxel lists
+// (part 11b, §62 to §65); the inverse move, the conversions between voxel and RAS transforms and the
+// composition (§67); fs.bspline: the
 // B-spline coefficients, their sampling, transforms and factor-of-two pyramids,
 // specs/freesurfer-bspline.md), linked against the unit oracle's libutils.a (GCC 8.4.0,
 // FreeSurfer's flags). It holds only calls of FreeSurfer's functions (and of the C library's) by name
@@ -3702,6 +3704,7 @@ static void call(const std::string &c)
     for (const std::string &d : dirs) mkdir(d.c_str(), 0700);
     unlink(name.c_str());
     fflush(stdout);
+    errno = 0;  // as the call starts in a program: the probe's own set-up leaves none
     int r = k ? LTAwrite(l, name.c_str()) : LTAwriteEx(l, name.c_str());
     fflush(stdout);
     puti(r);
@@ -3807,6 +3810,7 @@ static void call(const std::string &c)
       if (hx) write_file(base + "/mri/transforms/" + (hname ? name : std::string("talairach.xfm")), xb);
     }
     fflush(stdout);
+    errno = 0;  // as the call starts in a program: the probe's own set-up leaves none
     MATRIX *r = DevolveXFMWithSubjectsDir(subj.c_str(), x, hname ? name.c_str() : NULL, hsd ? sd.c_str() : NULL);
     fflush(stdout);
     putm_res(r, x);

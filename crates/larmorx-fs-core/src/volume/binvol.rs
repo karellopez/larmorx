@@ -655,18 +655,21 @@ impl Process {
         let reproduce = self.mode().reproduce();
         let mut copied = None;
         if invol.nframes > 1 {
-            let kind = if reproduce {
+            // FreeSurfer's copy is `copyFrame`'s: of `mm_mritype`, bytes for -1 (observed:
+            // `vdem`, `mm_mritype` 1 and 3 keep ints and floats)
+            let theirs = if d.mm_mritype == -1 {
                 types::UCHAR
             } else {
-                invol.kind
+                d.mm_mritype
             };
-            if invol.kind != types::UCHAR {
+            let kind = if reproduce { theirs } else { invol.kind };
+            if theirs != invol.kind {
                 self.note(
                     &FS_808,
                     if reproduce {
-                        "DEMorphBinVol::morph(): the frame copied into bytes before it is binarized"
+                        "DEMorphBinVol::morph(): the frame copied into the working type (bytes by default) before it is binarized"
                     } else {
-                        "DEMorphBinVol::morph(): the frame copied in the input's type before it is binarized (FreeSurfer copies into bytes)"
+                        "DEMorphBinVol::morph(): the frame copied in the input's type before it is binarized (FreeSurfer copies into its working type, bytes by default)"
                     },
                 );
             }

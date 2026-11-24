@@ -72,9 +72,9 @@ impl Process {
                         (q, t)
                     };
                     let (kind, change) = if nnz == 1 {
-                        let k = o.iter().position(|&d| d != 0).expect("one offset");
-                        let (q, t) = face(k);
-                        if self.topo_set(vol, q, t)? {
+                        // the face neighbour is the offset's (diagonal) voxel: tested on all
+                        // three axes (observed: `vtopo`, centres outside on another axis)
+                        if self.topo_set(vol, at, [true; 3])? {
                             ("face", -1)
                         } else {
                             ("face", 1)

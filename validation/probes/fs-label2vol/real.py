@@ -100,8 +100,8 @@ def compare(port: Path, exe: Path, env: dict, work: Path, run: str, name: str,
            "fix_notices": outs["fix"][4]}  # fmt: skip
     if recorded is not None:
         out = outs["official"][5] / args[-2] if args[0] == "--defects" else None
-        row["official_image_is_recorded"] = (
-            out is not None and image(out.read_bytes()) == image(recorded.read_bytes())
+        row["official_image_is_recorded"] = out is not None and image(out.read_bytes()) == image(
+            recorded.read_bytes()
         )
     print(json.dumps(row), flush=True)
     return row

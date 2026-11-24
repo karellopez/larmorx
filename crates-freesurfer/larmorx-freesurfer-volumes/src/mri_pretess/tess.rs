@@ -48,6 +48,10 @@ pub struct Tess<'a> {
 /// `(x, y, z)` offsets.
 type Off = (i32, i32, i32);
 
+/// An edge direction: its tag, the diagonal neighbour and the two voxels between them (the first
+/// chosen when brighter).
+type Edge<'t> = (&'t str, Off, Off, Off);
+
 fn add(p: Off, q: Off) -> Off {
     (p.0 + q.0, p.1 + q.1, p.2 + q.2)
 }
@@ -140,10 +144,7 @@ impl<'a> Tess<'a> {
         &mut self,
         g: &mut Globals,
         err: &mut dyn Write,
-        tag: &str,
-        diag: Off,
-        a: Off,
-        b: Off,
+        (tag, diag, a, b): Edge,
         total: &mut i32,
     ) -> Result<(), Fatal> {
         let (x0, x1) = span(self.w, diag.0);
@@ -194,8 +195,7 @@ impl<'a> Tess<'a> {
         c.edges += 1;
         let _ = write!(err, "\nIteration Number : {}", c.edges);
         let mut total = 0;
-        // (tag, the diagonal neighbour, the two voxels between them, the first chosen when brighter)
-        let dirs: [(&str, Off, Off, Off); 6] = [
+        let dirs: [Edge; 6] = [
             ("xy+", (1, 1, 0), (0, 1, 0), (1, 0, 0)),
             ("xy-", (-1, 1, 0), (0, 1, 0), (-1, 0, 0)),
             ("yz+", (0, 1, 1), (0, 1, 0), (0, 0, 1)),
@@ -203,8 +203,8 @@ impl<'a> Tess<'a> {
             ("xz+", (1, 0, 1), (1, 0, 0), (0, 0, 1)),
             ("xz-", (-1, 0, 1), (-1, 0, 0), (0, 0, 1)),
         ];
-        for (tag, diag, a, b) in dirs {
-            self.edge_direction(g, err, tag, diag, a, b, &mut total)?;
+        for e in dirs {
+            self.edge_direction(g, err, e, &mut total)?;
         }
         Ok(total)
     }

@@ -1,11 +1,13 @@
 # fs.volume's clean room: what black-box runs showed (unrestricted)
 
-The clean room of FreeSurfer 8.2.0's volume functions, parts 1 to 10 of the spec and §54 to §57
+The clean room of FreeSurfer 8.2.0's volume functions, parts 1 to 11a of the spec and §54 to §57
 (`crates/larmorx-fs-core/src/volume/`, the rest of queue item C3.1-05), was written from
-[`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) §1 to §53 and §54 to §58 (part 9: volume-to-volume
+[`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) §1 to §53, §54 to §61 and §64's and §65's functions of `mri_cc` (part 9: volume-to-volume
 resampling, frame covariance and PCA, the false discovery rate, regions, voxel neighbourhood measures;
 part 10a: the Talairach helpers, dilation and the segment helpers; part 10b: conforming, the set
-operations, morphology, masks and counts; part 10c: the volume histograms;
+operations, morphology, masks and counts; part 10c: the volume histograms; part 11a: filling a coarser grid,
+bright voxels outside the white matter, voxel topology, the binary-volume classes, the transform factors and
+voxel lists of `mri_cc`;
 the operations on a transform array; segmentations onto another grid, SPM warps, segment statistics and
 shifts, crops), and checked only against
 black boxes: the prebuilt probe `fs_volume_probe` (FreeSurfer's compiled library and the C library,
@@ -19,6 +21,12 @@ fs.bspline's clean room, which the cubic B-spline paths of §29 and §31 use, ha
 
 ## The comparison
 
+- **Relay 22 (2026-11-24):** the 73 groups of parts 1 to 11a (22,238 calls; part 11a's `vfill`, `vbright`,
+  `vtopo`, `vbin`, `vdem`, `vcc` and the fixed group `vrules24` added; the probe of commit `ca062ad1`, whose
+  part 11b groups wait for the next relay). `reproduce`: 20,947 identical, 996 where FreeSurfer did not finish,
+  267 memory lines, the same 28 lines §69.3 allows, none unexplained. `fix`: 16,195 identical, 996 not
+  finished, 682 memory, 4,365 corrected by a noted defect, none other. fs.mri's 16 groups: none unexplained
+  in either mode; `models.py region`, `cov` and `bright` with the candidate: none different.
 - **Relay 20 (2026-11-24):** the 64 groups (19,865 calls; part 10b's `vconf`, `vset`, `vmorph`,
   `vmask` and the fixed groups `vrules21` and `vrules22` added; the probe of commit `4d00c36e`).
   `reproduce`: 18,663 identical, 947 where FreeSurfer did not finish, 227 memory lines, the same 27
@@ -387,6 +395,39 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
 - **How we know:** *validated* (`vaseg`, `vsegs`, `vcrops`, `vrules15`, `vrules16`, both modes,
   2026-11-23, relay 17; the defect tests in `tests/defects_volume.rs`).
 
+## Part 11a: filling a coarser grid, bright voxels, voxel topology, binary volumes (§59 to §61), with §64's and §65's functions of `mri_cc`
+
+- **What:** `vfill` (140 calls), `vbright` (100), `vtopo` (380), `vbin` (340), `vdem` (355), `vcc` (200) and
+  the fixed group `vrules24` (123, one of them in its batch without the guard runs) are identical with
+  `reproduce` in every line but where FreeSurfer crashed or hung (FS-803's writes into the input's frame
+  number past a binarized output, FS-889's negative skip after the alarm) and the probe's memory lines
+  (`QuadEulerCharChange`'s masks and centres outside, FS-804's and FS-806's frames past a one-frame copy,
+  FS-890's second frame written past the list). `fix`: every other line identical or corrected by a noted
+  defect (FS-802 to FS-808, FS-1233, FS-195 in the fill's copy of the array, and the shared FS-12, FS-52,
+  FS-53). `models.py bright` with the candidate: all 117 `fbnwm` lines of `vbright` and `vrules24` as the
+  model in both modes; FS-1233's default (the steps on byte copies of a T1 or white matter not of bytes,
+  the labels written by value into the T1's clone) differs from FreeSurfer's result on 87 of the 92 lines
+  it changes.
+- Readings the probe decided, where the spec's text says otherwise or nothing:
+  - `QuadEulerCharChange`'s face neighbour (one offset) is tested on all three axes, as the edges' and
+    corners' diagonal voxel is: a centre outside the volume on another axis finds that neighbour unset
+    (two `vtopo` lines, centres `(-1, 3, 0)` of a 2 x 3 x 2 volume and `(2, 6, 5)` of a 2 x 7 x 6 one,
+    where a read through the voxel functions would land on another voxel that is set). The other face
+    voxels of an edge or a corner are tested on their own axis, and a corner's three edge voxels on their
+    two axes (no probed line tells those apart).
+  - `BinarizeMRI::binarize` prints its dump again with `m_debug` after the on and off values' swap also
+    without `invert` (`vrules24` lines 62, 63 and 98 to 100: two dumps, the second with the stored frame
+    range).
+  - `DEMorphBinVol`'s thresholded and matched morphs copy a volume of several frames with `copyFrame`,
+    in its working type `mm_mritype` (bytes for -1): `vdem`'s copies into ints and floats keep the values
+    (a NaN passes thresholds of 99.5 and 60 into the binarized volume) where a copy into bytes would not.
+    FS-808 (bytes by default) is the working type's default; the candidate's default copies in the input's
+    type and notes FS-808 when the working type differs.
+- **How we know:** *validated* (the seven groups and every earlier one, both modes, 2026-11-24, relay 22,
+  log `oracles/logs/fs-cleanroom-2-relay22-chain-a.log`: 73 groups, 22,238 calls, none unexplained in either
+  mode; the defect tests in `tests/defects_volume.rs`: FS-802 to FS-808, FS-1233, FS-889 and FS-890 on
+  `vrules24`'s own lines).
+
 ## Part 10c: the volume histograms (§52, §53)
 
 - **What:** `vhist` (605 calls) and the fixed group `vrules23` (130, one of them in its batch without
@@ -639,10 +680,10 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
   the transform files in memory, several in one process; part 5's labels, segmentation functions
   and the statistics cache's text and reading in memory; part 6a's 11 commands; part 6b's and 6c's
   13, the diagnostic bits' prints included; part 7a's 11, fs.bspline's 10 and the cubic B-spline
-  paths; part 7b's 16 commands and §54's changes of type; part 8's 32 commands but `tiv`, which reads files and is in the defect tests; §54's other operations, `lta54`, over pools of three geometries with mostly invertible matrices; §55 to §57's 18 commands, `segs57`, on volumes of labels with ordinary geometries; part 9's 16 commands, `part9`, with §55's upsampling and §56's shift-map resampling; part 10a's 9 commands, `part10`, with `NO_AVERAGE305` and the diagnostic bits; part 10b's 34 commands, `part10b` (conforming's matrix and template only: `MRIconform`'s 256^3 result is beyond rule 10's golden size, `vconf` compares it); part 10c's 9 commands, `part10c`, with given histograms, regions outside, NaN and infinite floats and `MRIhistoSegment`'s diagnostic bits; 70 SHA-256 over 35 groups), identical in debug and release builds on x86-64 and under the
+  paths; part 7b's 16 commands and §54's changes of type; part 8's 32 commands but `tiv`, which reads files and is in the defect tests; §54's other operations, `lta54`, over pools of three geometries with mostly invertible matrices; §55 to §57's 18 commands, `segs57`, on volumes of labels with ordinary geometries; part 9's 16 commands, `part9`, with §55's upsampling and §56's shift-map resampling; part 10a's 9 commands, `part10`, with `NO_AVERAGE305` and the diagnostic bits; part 10b's 34 commands, `part10b` (conforming's matrix and template only: `MRIconform`'s 256^3 result is beyond rule 10's golden size, `vconf` compares it); part 10c's 9 commands, `part10c`, with given histograms, regions outside, NaN and infinite floats and `MRIhistoSegment`'s diagnostic bits; part 11a's 19 commands, `part11a`; 72 SHA-256 over 36 groups), identical in debug and release builds on x86-64 and under the
   AArch64 NaN emulation of both (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`).
-- **How we know:** *measured* (2026-11-23 and 24, relays 10 to 21; relay 21 ran every test of the
-  crate, 228, in the four configurations).
+- **How we know:** *measured* (2026-11-23 and 24, relays 10 to 22; relay 22 ran every test of the
+  crate, 231, in the four configurations).
 
 ## NaN choices made in code, and NaN test inputs made by their bits (relay 19)
 

@@ -966,8 +966,10 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
 /// 32^3 inputs, the mean space of two, the global iterations of three, a NaN input (its NaNs made 0
 /// on reading) and a 4-D input of two frames with one `--mapmov` name (FS-1090), each written as MGZ.
 pub fn golden_cases() -> Vec<String> {
-    let mut g = Gen::new(0x676f_6c64);
-    let three = set(&mut g, 3, 32, MRI_SHORT);
+    // 16^3 (the registrations' smallest size; one pyramid level, as at 32^3) keeps the debug
+    // build's test fast; the seed gives the same converged and not-converged pairs as 32^3 did
+    let mut g = Gen::new(1);
+    let three = set(&mut g, 3, 16, MRI_SHORT);
     let mut files = files_of(&mut g, &three, ".mgz");
     // the NaN input: the second's voxels with some made NaN from their bits
     let mut nan_img = image(&mut g, &{

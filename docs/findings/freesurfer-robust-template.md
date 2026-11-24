@@ -106,9 +106,13 @@ CORE-MATH's `acos`, glibc's for a NaN argument) into the official program. Measu
   compared (`SKIP`: FS-1065, FS-1083, FS-1084, FS-1092, FS-1094, the readers' FS-309), 1 not ported each
   (the affine mean space); the default differs only with notices. The recorded test
   `tests/fs_robtmpl_official.rs` holds seed 1 x 150 (debug builds: the first 45 cases).
-- The golden cases (6 on 32^3: fMRIPrep's call on three inputs, recon-all's on two, the mean space,
-  one global iteration with weights, NaN voxels from their bits, a 4-D input's one `--mapmov`):
-  official = reproduce `5ee82ce6...`; the default `cfe17db9...` (FS-1090).
+- The golden cases (6 on 16^3 since relay 51, 32^3 before: fMRIPrep's call on three inputs,
+  recon-all's on two, the mean space, one global iteration with weights, NaN voxels from their bits, a
+  4-D input's one `--mapmov`): official = reproduce `c22789e3...` (32^3: `5ee82ce6...`); the default
+  `9b573b7c...` (32^3: `cfe17db9...`; FS-1090). On 16^3 every registration takes the paths it took on
+  32^3 (one pyramid level; the same pairs converge and do not), but `--satit` also prints its
+  `image might be too small` warning; the debug build's test went from 78 s to about 4 s (the cases
+  side by side).
 - fMRIPrep's recorded calls (`real.py`; first with fs-robust-register's complex pair only, then for the
   record, from the clean commit e9b605fd, with `libdecidedtemplate.so`: the same verdicts and times within a
   few seconds): ds004173's three N4-corrected T1w and ds005454's two, the

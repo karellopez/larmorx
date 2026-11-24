@@ -46,12 +46,20 @@ part 1, track A relay 56: every option and path but `--new-aseg2vol` and `--fill
   `<inputs>/fs-label2vol-real/`.
 - `record.py`: `docs/validation/freesurfer-mri-label2vol.{json,md}`.
 
-## Results (relay 56; the record `docs/validation/freesurfer-mri-label2vol.md`)
+## Results (relay 56; the record `docs/validation/freesurfer-mri-label2vol.md`, from 880c6687)
 
-See the record for the numbers of the clean commit. Before it (relay 56's runs): seed 1, 600
-cases: 589 identical with `reproduce`, 11 `SKIP`, 0 different; seed 2, 1,500 cases: 1,489
-identical, 11 `SKIP`, 0 different; `fix` differs only with a notice. Golden: 9 cases, `aeabe265...`
-(official and `reproduce`), `9cb289bf...` (`fix`).
+Seed 1, 600 cases: 589 identical with `reproduce`, 11 `SKIP` (4 CRASH, 6 MEMORY, 1 HANG), 0
+different; `fix` differs on 119, each with a notice. Seed 2, 1,500 cases: 1,489 identical, 11
+`SKIP`, 0 different; `fix` differs on 292, each with a notice. The recorded calls: 36 on 12 runs
+(`defect2seg`'s 24, `seg2cc`'s form 12 on the v8 runs), all identical in both modes, the 12
+official defect volumes' header and voxels equal to the runs' recorded `surface.defects.mgz`.
+Recorded test: `tests/fs_label2vol_official.rs` (seed 1, 600 cases, 11 `SKIP`, `47e3dc16...`).
+Golden: 9 cases, `aeabe265...` (official and `reproduce`), `9cb289bf...` (`fix`). Memory: the five
+calls of `test_memory_peak.py` within the rule (`defect2seg`'s left call 242.4 MiB, FreeSurfer's
+226.1). The Windows cross-check (`validation/investigations/windows-cross-check/`): the 600 lines of
+seed 1 identical to Linux's once a NIfTI output's voxel offset and extension size are masked with
+its command lines, and fs.volume rounds without the C library's `roundf` (MinGW's rounds 0.49999997
+up).
 
     scripts/orchestration/boxed.sh 20 python -P validation/probes/fs-label2vol/check.py --seed 1 --n 600
     scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-label2vol/check.py --golden

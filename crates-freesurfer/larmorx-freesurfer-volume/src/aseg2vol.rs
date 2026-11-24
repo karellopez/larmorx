@@ -78,9 +78,29 @@ fn compare_av(a: &AvIndex, b: &AvIndex) -> i32 {
     0
 }
 
-/// `(int) round(x)` of a `float` (C's `round`, half away from zero, then `cvttsd2si`).
+/// `(int) round(x)` of a `float` (C's `round`, half away from zero, then `cvttsd2si`), computed
+/// without the C library: the optimiser may turn `f64::from(x).round()` into a call of the C
+/// library's `roundf`, and MinGW's rounds 0.49999997 up to 1 (track A's relay 56, the Windows
+/// cross-check of `mri_label2vol --seg`; glibc's, macOS's and Microsoft's are right).
 fn iround(x: f32) -> i32 {
-    cvtt(f64::from(x).round())
+    cvtt(round_half_away(f64::from(x)))
+}
+
+/// C's `round` of a `double` (half away from zero) by its integer part: exact for every value
+/// (beyond 2^52, NaN and infinities the value itself).
+fn round_half_away(v: f64) -> f64 {
+    if !(v.abs() < 4_503_599_627_370_496.0) {
+        return v;
+    }
+    let t = v as i64 as f64;
+    let d = v - t;
+    if d >= 0.5 {
+        t + 1.0
+    } else if d <= -0.5 {
+        t - 1.0
+    } else {
+        t
+    }
 }
 
 /// FS-509: an error in both modes.

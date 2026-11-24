@@ -2935,10 +2935,13 @@ for NaN or a quotient beyond the `int` range: by default NaN gives 0 and beyond 
   `nbins` 0 becomes the range's bin count; a maximum equal to the minimum becomes 255 (after the count); a new
   histogram, `HISTOinit(h, nbins, min, max)`; every voxel of every frame (frames, z, y, x; `MRIgetVoxVal` as a
   `double`) counts 1 in bin `nint((float)(v - min) / bin_size)` (the difference in `double`, rounded to `float`, divided
-  in `float`), with no bound (FS-498) (**(observed)**: `vhist`; `vrules23`, a constant volume of 5 (one bin, the range
-  5 to 255, its bin size infinite and its value NaN, every voxel counted), a constant of 300 (the range 300 to 255,
-  emptied to `[0, 0]`: the size 0 / 0 and FreeSurfer's crash), bin counts 1, 2, 3 and -1 (status 254), three frames,
-  NaN values (`CRASH 11`)).
+  in `float`; `min` is the range's minimum, not the histogram's: for a constant volume of 255 or more `HISTOinit`'s empty
+  range sets the histogram's minimum to 0 and its maximum to `nbins - 1`, and every voxel goes to bin 0), with no bound
+  (FS-498) (**(observed)**: `vhist`; `vrules23`, a constant volume of 5 (one bin, the range 5 to 255, its bin size
+  infinite and its value NaN, every voxel counted), a constant of 300 (the range 300 to 255, emptied to `[0, 0]`: the
+  size 0 / 0 and FreeSurfer's crash), bin counts 1, 2, 3 and -1 (status 254), three frames, NaN values (`CRASH 11`);
+  `vrules24`, constants of 300 with 2 and 4 bins and of 255 with 3 (the range `[0, nbins - 1]`, bin size 1, every voxel
+  in bin 0), of 254 with 3 (the range 254 to 255, bin size 0.5, every voxel in bin 0)).
 - **`MRIgetEqualizeHisto(mri, histo_eq, low, high, norm)`**: `MRIhistogram(mri, 0)`; the result is `histo_eq` (never
   reallocated) or a new histogram of as many bins; `high` above the histogram's `max` (compared in `float`) becomes
   `(int)max` (FS-12). `total_pix` is the sum of the counts from `low` to `high`, accumulated in an `int` (each step
@@ -2947,8 +2950,10 @@ for NaN or a quotient beyond the `int` range: by default NaN gives 0 and beyond 
   (float)total_pix)` (in `float`) with `norm`, else `total` (as a `float`); **FS-500**: FreeSurfer sets these bins'
   values (to their numbers) in the volume's histogram instead of the result, whose values there stay what they were
   (0 in a new one, the given one's); by default the result's are set (rule A), with `reproduce` they stay; noted
-  where a value differs from its number. Bins `high + 1` to the histogram's bin count: the count at `high` plus the
-  bin's number (in `float`), the value the bin's number. The result's bin count becomes the histogram's. The
+  where a value differs from its number. Bins from `high + 1` while below the volume's histogram's bin count (`high + 1`
+  to `nbins - 1`, none when `high + 1` is not below it): the result's count at `high` (the same value for every such bin:
+  these writes never reach bin `high`; FS-499 below when `high` lies outside the result's allocation) plus the bin's
+  number (in `float`), the value the bin's number. The result's bin count becomes the histogram's. The
   histograms are indexed by intensity (bin `i` is read as intensity `i`, whatever the volume's minimum); **FS-499**
   (both modes, noted): a read of a bin outside a histogram's allocation (a negative `low`, `high` past it, a given
   result of fewer bins) gives 0, a write there is dropped, where FreeSurfer reads memory contents and writes memory it
@@ -2958,12 +2963,15 @@ for NaN or a quotient beyond the `int` range: by default NaN gives 0 and beyond 
 - **`MRIhistoEqualize(src, template, dst, low, high)`**: `dst` (or a clone of `src`) frame 0 over `src`'s extent (z, y,
   x): with the two normalised cumulative histograms (`MRIgetEqualizeHisto(.., NULL, low, high, 1)` of `src`, then of
   `template`), both made before any voxel is written (so `dst` may be `src` or `template`), each voxel's `sval = (int)`
-  of its value (FS-12); when `low <= sval <= high`, the first index from `low` up to the template's bin count whose
-  template count is at or above the source's count at `sval` becomes the value (as a `float`, `MRIsetVoxVal`), else
-  `sval` itself; a `dst` of another extent is written as the voxel functions write outside a volume (fs.mri §5). With
-  `DIAG_WRITE` and `DIAG_VERBOSE` in `Gdiag`, the two histograms are plotted to `cum_src.plt` and `cum_template.plt`
-  (`HISTOplot`; the probe does not compare those files). FS-499 as above (**(observed)**: `vhist`; `vrules23`, into a
-  new volume, the source, the template and a given float volume, limits 0 to 9 and 3 to 6).
+  of its value (FS-12); when `low <= sval <= high`, the indices from `low` while below the template's cumulative
+  histogram's bin count (`low` to `nbins - 1`) are searched in order, and the first whose template count is at or above
+  the source's count at `sval` becomes the value (as a `float`, `MRIsetVoxVal`); when none is (no index there, or no
+  count high enough: a template with no voxel between the limits has the counts `nint` of `0 / 0` there, FS-12) the
+  value is `sval` itself, as it is for a voxel outside the limits; a `dst` of another extent is written as the voxel
+  functions write outside a volume (fs.mri §5). With `DIAG_WRITE` and `DIAG_VERBOSE` in `Gdiag`, the two histograms are
+  plotted to `cum_src.plt` and `cum_template.plt` (`HISTOplot`; the probe does not compare those files). FS-499 as above
+  (**(observed)**: `vhist`; `vrules23`, into a new volume, the source, the template and a given float volume, limits 0
+  to 9 and 3 to 6; `vrules24`, a template with no voxel between the limits 3 and 6: every voxel keeps its value).
 - **`MRIhistogramLabelRegion(mri, labeled, region, label, nbins)`**: the region's range (`MRIvalRangeRegion`); `bmin =
   (int)min`; `nbins` 0 or below becomes the range's bin count; a new histogram, `HISTOinit(h, nbins, min, max)`; a range
   within `FLT_EPSILON`: bin size 1, `MRIhistogramLabelRegion: constant image` (`ERROR_BADPARM`, returning) and that
@@ -3019,22 +3027,29 @@ for NaN or a quotient beyond the `int` range: by default NaN gives 0 and beyond 
   voxel whose label byte is 128 (`MRI_AMBIGUOUS`): the region histogram of `src` with bin count 0 over the
   `wsize`-wide window from `x - wsize / 2` (one histogram reused from voxel to voxel); smoothed (`HISTOsmooth`, `sigma`;
   one smoothed histogram reused); the white-matter peak `HISTOfindLastPeakInRegion(hs, 11, 0.15, wm_low, wm_hi - 7)`,
-  and when found its bin's value as an `int` (FS-12); the gray-matter peak likewise between 72 and `wm_peak - 10`; while
-  both are found and the gray-matter peak is above `gray_hi`, the white-matter peak becomes it and the gray-matter peak
-  is searched again. **FS-502** (both modes, noted): when the white-matter peak takes a value it already took
+  and when found its bin's value as an `int` (FS-12); the gray-matter peak likewise between 72 and `wm_peak - 10`,
+  searched also when no white-matter peak was found (`wm_peak` -1: the limits 72 and -11, searched as fs.maths §5.5
+  searches any limits; what it finds then changes no label, as below). A peak counts as found when it is at or above 0
+  after that conversion (-1 when the search finds none). Only
+  when both are found, a loop whose only condition is that the gray-matter peak is above `gray_hi`: the white-matter
+  peak becomes it and the gray-matter peak is searched again (between 72 and the new `wm_peak - 10`; -1 when none is
+  found, which ends the loop only for a `gray_hi` of -1 or above). **FS-502** (both modes, noted): when the white-matter peak takes a value it already took
   (FreeSurfer then never ends: with a gray-matter limit below -1, once both peaks are found, the search comes back to
   the same peak, or finds none, -1, which stays above the limit), the program ends with
   `MRIhistoSegment: the gray-matter peak <p> stays above <gray_hi> (FreeSurfer never ends here)` (`ErrorExit`, code -4,
   status 252). The valley: -1 when a peak is missing, else `HISTOfindValley(hs, 3, gray_peak + 2, wm_peak - 2)` as an
-  intensity (FS-12); above `gray_hi` it is -1. The label byte becomes 128 when there is no valley, `|in_val - valley| <=
+  intensity (FS-12; the search's -1 when it finds none is kept as -1); above `gray_hi` it is -1. "No valley" is a valley
+  below 0: -1, or a valley bin whose value is a negative intensity (only a source with negative values can give one;
+  the probe's sources hold none). The label byte becomes 128 when there is no valley, `|in_val - valley| <=
   2`, or the valley is at or above `gray_hi`; else 255 (`MRI_WHITE`) when `in_val >= valley` and 1 (`MRI_NOT_WHITE`)
   below. **FS-501** (both modes, noted): a source type the region histogram refuses (ints, longs) leaves no histogram
   to smooth, where FreeSurfer crashes; the program ends with `MRIhistoSegment: no region histogram to smooth (FreeSurfer
   crashes here)` (`ErrorExit`, code -3, status 253). A window of one value in the first histogram (one bin allocated)
   is FS-498 for bytes (FreeSurfer's crash). `DiagShowPctDone((float)z / (float)(depth - 1), 5)` each slice
   (`specs/freesurfer-core.md` §5's percent done: lines only with the heartbeat bit `0x4000`); with `DIAG_SHOW`, two
-  lines on standard error: `              %8d voxels processed (%2.2f%%)` and `... voxels labeled ...`, the
-  percentages `100.0f * n / (float)(width * height * depth)` in `float` (the product of the extents in 32-bit
+  lines on standard error: `              %8d voxels processed (%2.2f%%)` and `... voxels labeled ...` (the first
+  count is the voxels of label byte 128 visited, each of which takes a histogram; the second those of them given 255 or
+  1), the percentages `100.0f * n / (float)(width * height * depth)` in `float` (the product of the extents in 32-bit
   wrapping arithmetic) (**(observed)**: `vhist`; `vrules23`, checkerboards of 80 and 110 with `gray_hi` 100 and 95,
   sigmas -1, 1 and 2, windows 1 and 5, a source of halves (FreeSurfer's crash), the diagnostic lines with and without
   labels to change, the heartbeat bit at depths 1 and 2 (`0.0% finished` and `100.0% finished` at depth 2, none at depth 1: the

@@ -1,6 +1,6 @@
 # Validation: FreeSurfer's `mri_segment` (replica)
 
-Status `experimental`. Generated 2026-11-24 on Linux x86_64 from commit `6a16d3987fdb` with `validation/probes/fs-segment/record.py` (queue item 3.2-31; the whole program).
+Status `experimental`. Generated 2026-11-24 on Linux x86_64 from commit `3cc0205e3bc5` with `validation/probes/fs-segment/record.py` (queue item 3.2-31; the whole program).
 
 - **Replica:** crates-freesurfer/larmorx-freesurfer-volumes (src/mri_segment/) on larmorx-freesurfer-filter (src/polv.rs, classify.rs, nonpar.rs), the larmorx-freesurfer program (`larmorx-freesurfer [--upstream-defects reproduce|fix] freesurfer mri_segment ...`).
 - **Reference:** FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mri_segment) and its recon-all runs' recorded mri_segment steps (oracles/freesurfer-8.2.0/runs/).
@@ -9,8 +9,8 @@ Status `experimental`. Generated 2026-11-24 on Linux x86_64 from commit `6a16d39
 
 recon-all's call (both streams: `mri_segment -wsizemm 13 -mprage antsdn.brain.mgz wm.seg.mgz`) replayed by the replay tool on each recorded run (`wm.seg.mgz` and `segment.dat` compared, FreeSurfer's provenance aside):
 
-- `reproduce`: 12 steps of 12 runs, **12 reproduced**, 0 not; at one thread 785 s in all (recorded 512 s).
-- `fix`: 12 steps of 12 runs, **12 reproduced**, 0 not; at one thread 785 s in all (recorded 512 s).
+- `reproduce`: 12 steps of 12 runs, **12 reproduced**, 0 not; at one thread 782 s in all (recorded 512 s).
+- `fix`: 12 steps of 12 runs, **12 reproduced**, 0 not; at one thread 781 s in all (recorded 512 s).
 
 ## The whole program against the official binary (the open probe)
 
@@ -22,13 +22,13 @@ recon-all's call (both streams: `mri_segment -wsizemm 13 -mprage antsdn.brain.mg
 
 ## Golden cases
 
-`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_segment_golden.rs`: eleven cases on 32^3 volumes made with integer arithmetic (recon-all's call, the defaults, a `float` input with NaNs and infinities by their bits, `-noauto -thicken 0`, `-seg`, `-fillbg -fillv` (FS-1227), `-thickenonly`, `-keep`, `-b 0.5 -polvlen 2` (FS-1220), an output into a missing folder (FS-1226), an option without its value (FS-1219)), on every platform: `reproduce` `d4ca21c0af962e596f0b091da61a58fa0b866ac78327b361ced6e8d3b139b34c`, the official program's value on the same inputs (`prog.py --golden`); the default `735f6cf680c9bb93d3c0fb7c50c2b9e19c3722cb827add8e8d116017254665a3`.
+`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_segment_golden.rs`: eight cases on 32^3 volumes made with integer arithmetic (recon-all's call, a `float` input with NaNs and infinities by their bits on `-thickenonly`, `-noauto -thicken 0`, `-seg`, `-fillbg -fillv` (FS-1227), `-keep` with `-b 0.5 -polvlen 2` (FS-1220), an output into a missing folder (FS-1226), an option without its value (FS-1219)), on every platform: `reproduce` `17f6257bbee705bc739dffa5d80c6545aefb99cf282f9a0f0c6009546cb38501`, the official program's value on the same inputs (`prog.py --golden`); the default `e3ff2e21bef7d31c481dda27bcfdcb2b0384bd58ea95392a86745eec8ae22207`.
 
 ## Memory
 
 `tests/parity/test_memory_peak.py` (`MRI_SEGMENT_CASES`: recon-all's call and `-seg`'s path on ds000005 sub-01's classic files, one thread; the rule: at most 10 % above FreeSurfer's peak plus 8 MiB):
 
-- mri_segment recon-all (reproduce): 135 MiB, FreeSurfer 139 MiB.
+- mri_segment recon-all (reproduce): 134 MiB, FreeSurfer 139 MiB.
 - mri_segment recon-all (fix): 134 MiB, FreeSurfer 139 MiB.
-- mri_segment seg (reproduce): 330 MiB, FreeSurfer 346 MiB.
-- mri_segment seg (fix): 330 MiB, FreeSurfer 346 MiB.
+- mri_segment seg (reproduce): 331 MiB, FreeSurfer 346 MiB.
+- mri_segment seg (fix): 331 MiB, FreeSurfer 346 MiB.

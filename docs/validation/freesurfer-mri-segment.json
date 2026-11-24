@@ -2,7 +2,7 @@
  "name": "freesurfer-mri-segment",
  "tool": "mri_segment (FreeSurfer 8.2.0)",
  "status": "experimental",
- "larmorx_commit": "6a16d3987fdb",
+ "larmorx_commit": "3cc0205e3bc5",
  "generated": "2026-11-24",
  "platform": "Linux x86_64",
  "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_segment/) on larmorx-freesurfer-filter (src/polv.rs, classify.rs, nonpar.rs), the larmorx-freesurfer program",
@@ -29,7 +29,7 @@
    },
    "seconds": {
     "recorded": 511.7,
-    "replayed": 784.8
+    "replayed": 782.3
    }
   },
   "fix": {
@@ -53,7 +53,7 @@
    },
    "seconds": {
     "recorded": 511.7,
-    "replayed": 785.3
+    "replayed": 781.3
    }
   }
  },
@@ -96,32 +96,32 @@
   }
  ],
  "golden_sha256": {
-  "reproduce": "d4ca21c0af962e596f0b091da61a58fa0b866ac78327b361ced6e8d3b139b34c",
-  "fix": "735f6cf680c9bb93d3c0fb7c50c2b9e19c3722cb827add8e8d116017254665a3"
+  "reproduce": "17f6257bbee705bc739dffa5d80c6545aefb99cf282f9a0f0c6009546cb38501",
+  "fix": "e3ff2e21bef7d31c481dda27bcfdcb2b0384bd58ea95392a86745eec8ae22207"
  },
  "memory": [
   {
    "case": "mri_segment recon-all",
    "mode": "reproduce",
-   "larmorx_mib": 134.8,
+   "larmorx_mib": 133.8,
    "freesurfer_mib": 139.0
   },
   {
    "case": "mri_segment recon-all",
    "mode": "fix",
-   "larmorx_mib": 133.8,
+   "larmorx_mib": 134.2,
    "freesurfer_mib": 139.0
   },
   {
    "case": "mri_segment seg",
    "mode": "reproduce",
-   "larmorx_mib": 330.4,
+   "larmorx_mib": 330.7,
    "freesurfer_mib": 346.0
   },
   {
    "case": "mri_segment seg",
    "mode": "fix",
-   "larmorx_mib": 330.2,
+   "larmorx_mib": 331.3,
    "freesurfer_mib": 346.0
   }
  ]

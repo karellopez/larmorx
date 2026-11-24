@@ -2187,7 +2187,8 @@ fn is_text(name: &str) -> bool {
 
 /// A written volume's bytes as the probe compares them: a gzip file decompressed (`gzread`), then
 /// every command line it records (from the 8-byte length before `ProgramName: ` to the NUL after
-/// it) as `<CMD>`.
+/// it) as `<CMD>`; a NIfTI-1 file's voxel offset and extension size masked too (they hold the
+/// lines' lengths: the user's and the machine's names).
 pub fn canon(path: &Path, b: &[u8]) -> Vec<u8> {
     let raw = if b.starts_with(&[0x1f, 0x8b]) {
         let name = path.to_string_lossy().into_owned();
@@ -2206,6 +2207,31 @@ pub fn canon(path: &Path, b: &[u8]) -> Vec<u8> {
     } else {
         b.to_vec()
     };
+    // a NIfTI-1 file: the voxels' offset and the extension's size (which the masked lines' length
+    // decides) masked, the extension's padding zeros left out
+    if raw.len() >= 352 && raw[..4] == 348i32.to_le_bytes() && &raw[344..348] == b"n+1\0" {
+        let vox = f32::from_le_bytes([raw[108], raw[109], raw[110], raw[111]]) as usize;
+        let vox = vox.clamp(352, raw.len());
+        let mut out = raw[..108].to_vec();
+        out.extend_from_slice(b"<VOX>");
+        out.extend_from_slice(&raw[112..352]);
+        if vox >= 360 {
+            out.extend_from_slice(b"<ESIZE>");
+            let mut ext = mask_command_lines(&raw[356..vox]);
+            while ext.last() == Some(&0) {
+                ext.pop();
+            }
+            out.extend_from_slice(&ext);
+        }
+        out.extend_from_slice(&raw[vox..]);
+        return out;
+    }
+    mask_command_lines(&raw)
+}
+
+/// Each command line in `raw` (from the 8-byte length before `ProgramName: ` to the NUL after it)
+/// as `<CMD>`.
+fn mask_command_lines(raw: &[u8]) -> Vec<u8> {
     let key = b"ProgramName: ";
     let mut out = Vec::with_capacity(raw.len());
     let mut i = 0;

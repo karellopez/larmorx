@@ -18,7 +18,7 @@ use sha2::{Digest, Sha256};
 /// Recorded 2026-11-24 from the official program (`check.py --seed 1 --n 600`, relay 56): 600
 /// cases, 589 lines identical, 11 hashed as `SKIP`.
 const N: usize = 600;
-const OFFICIAL_SHA256: &str = "13fcedc0b9459741c1db01802d0b8adcba182be6651c8537bc053acc2308755c";
+const OFFICIAL_SHA256: &str = "47e3dc1662b4b0813b63b5442a77cdf8f58f05ea445496f3356925104be84152";
 const SKIPPED: usize = 11;
 
 /// `check.py`'s `SKIP` (the port's pseudo-notices).

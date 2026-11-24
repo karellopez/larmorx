@@ -37,6 +37,7 @@ import hashlib
 import json
 import os
 import shutil
+import struct
 import subprocess
 import sys
 from collections import Counter
@@ -90,12 +91,27 @@ def collect(d: Path, prefix: str = "") -> list[tuple[str, bytes | None]]:
 
 def canon(b: bytes) -> bytes:
     """A written volume as the probe compares it: decompressed when gzip, then each command line
-    it records (the 8-byte length before ``ProgramName: `` to the NUL after it) as ``<CMD>``."""
+    it records (the 8-byte length before ``ProgramName: `` to the NUL after it) as ``<CMD>``; a
+    NIfTI-1 file's voxel offset and extension size masked too, its padding zeros left out (they
+    follow the lines' lengths: the user's and the machine's names)."""
     if b[:2] == b"\x1f\x8b":
         try:
             b = gzip.decompress(b)
         except (OSError, EOFError):
             b = b""
+    if len(b) >= 352 and b[:4] == (348).to_bytes(4, "little") and b[344:348] == b"n+1\0":
+        v = struct.unpack("<f", b[108:112])[0]
+        vox = 352 if v != v else len(b) if v > len(b) else max(int(v), 352)
+        out = b[:108] + b"<VOX>" + b[112:352]
+        if vox >= 360:
+            out += b"<ESIZE>" + mask_command_lines(b[356:vox]).rstrip(b"\0")
+        return out + b[vox:]
+    return mask_command_lines(b)
+
+
+def mask_command_lines(b: bytes) -> bytes:
+    """Each command line (the 8-byte length before ``ProgramName: `` to the NUL after it) as
+    ``<CMD>``."""
     out = bytearray()
     i = 0
     key = b"ProgramName: "

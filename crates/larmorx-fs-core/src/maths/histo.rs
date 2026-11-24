@@ -207,7 +207,7 @@ impl Process {
         }
     }
 
-    fn histo_realloc_in(&mut self, h: &mut Histogram, n: i32) -> Result<(), Stop> {
+    pub(crate) fn histo_realloc_in(&mut self, h: &mut Histogram, n: i32) -> Result<(), Stop> {
         let fresh = self.histo_alloc_named(n, "HISTOrealloc")?;
         h.bins = fresh.bins;
         h.counts = fresh.counts;
@@ -398,7 +398,8 @@ impl Process {
         }
         h.min = sse::narrow(lo);
         h.max = sse::narrow(hi);
-        let mut size = sse::narrow(sse::div64(sse::sub64(hi, lo), f64::from(n - 1)));
+        // `n - 1` in C's `int` (a count of -2147483648 wraps, as the build computes it)
+        let mut size = sse::narrow(sse::div64(sse::sub64(hi, lo), f64::from(n.wrapping_sub(1))));
         // `<= 0` (a NaN size stays)
         if size <= 0.0 {
             size = 1.0;

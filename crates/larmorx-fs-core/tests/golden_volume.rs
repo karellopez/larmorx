@@ -293,6 +293,14 @@ const GOLDEN: &[(&str, &str)] = &[
         "part10b.reproduce",
         "791be1f5596d4af53232de9ddb39c72d91b232bc5201a59fa205030ed61dce13",
     ),
+    (
+        "part10c.fix",
+        "e9383ae410dc37f88ab78653883fd1d3bc028884bce54da54ab628ed39f00b40",
+    ),
+    (
+        "part10c.reproduce",
+        "4dda0a62e8665c8d22b32d3b607b67cef03683cfdd59c1c9f42ce250b8186972",
+    ),
 ];
 
 fn check(name: &str, bytes: &[u8]) {
@@ -4218,4 +4226,230 @@ const PART10B: &[(&str, Make)] = &[
 #[test]
 fn part10b_conforming_sets_morphology_masks() {
     group("part10b", PART10B, 3);
+}
+
+/// A volume of §52: its buffer's words from values of its type (bytes and shorts packed, floats
+/// with NaNs and an infinity now and then), an ordinary geometry.
+fn hist_w(g: &mut G, (w, h, d): (i64, i64, i64), kind: i64, frames: i64, seg: bool) -> String {
+    let n = (w * h * d * frames).max(1) as usize;
+    let words: Vec<String> = (0..n)
+        .map(|_| match kind {
+            0 => {
+                let v: &[u32] = if seg {
+                    &[80, 110, 80, 110, 128, 90, 120]
+                } else {
+                    &[0, 1, 2, 5, 80, 110, 200, 255]
+                };
+                (0..4)
+                    .map(|k| v[g.below(v.len() as u64) as usize] << (8 * k))
+                    .fold(0u32, |a, b| a | b)
+                    .to_string()
+            }
+            4 | 10 => {
+                let v: &[i64] = if kind == 4 {
+                    &[-5, 0, 1, 2, 50, 300]
+                } else {
+                    &[0, 1, 2, 50, 300]
+                };
+                let a = v[g.below(v.len() as u64) as usize] as u32 & 0xffff;
+                let b = v[g.below(v.len() as u64) as usize] as u32 & 0xffff;
+                (a | (b << 16)).to_string()
+            }
+            3 => {
+                const V: [u32; 10] = [
+                    0x0000_0000,
+                    0x3f80_0000,
+                    0x4020_0000,
+                    0x42c8_0000,
+                    0xc040_0000,
+                    0x437a_0000,
+                    0x42a0_0000,
+                    0x42dc_0000,
+                    0x7fc0_0000,
+                    0xffc1_2345,
+                ];
+                if g.one_in(40) {
+                    return 0x7f80_0000u32.to_string();
+                }
+                let k = if g.one_in(6) { g.below(10) } else { g.below(8) };
+                V[k as usize].to_string()
+            }
+            _ => g.int(-3, 9).to_string(),
+        })
+        .collect();
+    let mut f = vec![g.size(false), g.size(false), g.size(false), "1".to_owned()];
+    f.extend(g.cosines(false));
+    f.extend((0..3).map(|_| g.f(false)));
+    f.extend(["00000000"; 3].map(str::to_owned));
+    let z11 = ["00000000"; 11].join(" ");
+    format!(
+        "{w} {h} {d} {kind} {frames} 0 i{} {} 1 {d} {z11} 0000000000000000 0 00000000 00000000 0 1 null null",
+        words.join(","),
+        f.join(" ")
+    )
+}
+
+/// H, a given histogram (or `null`): a few bins allocated, some in use, old contents.
+fn hist_h(g: &mut G) -> String {
+    if g.one_in(2) {
+        return "null".to_owned();
+    }
+    let alloc = pi(g, &[0, 1, 4, 16, 40]);
+    let nb = g.int(0, alloc);
+    let mut p = vec![
+        alloc.to_string(),
+        nb.to_string(),
+        g.pick(&["3f000000", "3f800000"]).to_owned(),
+        format!("{:08x}", (g.int(-5, 5) as f32).to_bits()),
+        format!("{:08x}", (g.int(5, 50) as f32).to_bits()),
+    ];
+    p.extend((0..nb).map(|_| format!("{:08x}", (g.int(-10, 300) as f32).to_bits())));
+    p.extend((0..nb).map(|_| format!("{:08x}", (g.int(0, 9) as f32).to_bits())));
+    p.join(" ")
+}
+
+/// R, a region of the extent: inside, overlapping or outside, sometimes empty.
+fn hist_r(g: &mut G, (w, h, d): (i64, i64, i64)) -> String {
+    let mut a = Vec::new();
+    for e in [w, h, d] {
+        a.push(g.int(-1, e));
+    }
+    for e in [w, h, d] {
+        a.push(g.int(-1, e + 1));
+    }
+    a.iter().map(i64::to_string).collect::<Vec<_>>().join(" ")
+}
+
+/// One of the histogram volumes' types (the region histogram refuses ints and longs).
+fn hist_kind(g: &mut G) -> i64 {
+    pi(g, &[0, 0, 3, 3, 4, 10, 1, 2])
+}
+
+/// Part 10c (§52).
+const PART10C: &[(&str, Make)] = &[
+    ("hreg", |g| {
+        let e = ext(g, 1, 3);
+        let (k, f) = (hist_kind(g), g.int(1, 2));
+        let w = hist_w(g, e, k, f, false);
+        let h = hist_h(g);
+        let nb = g.pick(&["0", "0", "1", "3", "-1"]);
+        format!("{w} 0 {h} {nb} {}", hist_r(g, e))
+    }),
+    ("hvox", |g| {
+        let e = ext(g, 1, 3);
+        let k = hist_kind(g);
+        let w = hist_w(g, e, k, 1, false);
+        let h = hist_h(g);
+        let nb = g.pick(&["0", "0", "2", "-1"]);
+        let (x, y, z) = (g.int(-1, e.0), g.int(-1, e.1), g.int(-1, e.2));
+        let ws = g.int(0, 3);
+        let t = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            let k = pi(g, &[0, 3]);
+            format!("{} 0", hist_w(g, e, k, 1, false))
+        };
+        let th = g.pick(&["00000000", "42480000", "7fc00000"]);
+        format!("{w} 0 {h} {nb} {x} {y} {z} {ws} {t} {th}")
+    }),
+    ("hthr", |g| {
+        let e = ext(g, 1, 3);
+        let (k, f) = (hist_kind(g), g.int(1, 2));
+        let w = hist_w(g, e, k, f, false);
+        let h = hist_h(g);
+        let nb = g.pick(&["0", "2", "5"]);
+        let r = hist_r(g, e);
+        let tk = pi(g, &[0, 3]);
+        let t = hist_w(g, e, tk, f, false);
+        let th = g.pick(&["00000000", "42480000", "7fc00000"]);
+        format!("{w} 0 {h} {nb} {r} {t} 0 {th} {}", g.int(0, f))
+    }),
+    ("hist", |g| {
+        let e = ext(g, 1, 3);
+        let (k, f) = (hist_kind(g), g.int(1, 3));
+        let w = hist_w(g, e, k, f, false);
+        format!("{w} 0 {}", g.pick(&["0", "0", "1", "2", "5"]))
+    }),
+    ("geq", |g| {
+        let e = ext(g, 1, 3);
+        let k = pi(g, &[0, 0, 3, 4, 1]);
+        let w = hist_w(g, e, k, 1, false);
+        let h = hist_h(g);
+        let lo = g.pick(&["0", "1", "-1", "3"]);
+        let hi = g.pick(&["5", "300", "2"]);
+        format!("{w} 0 {h} {lo} {hi} {}", g.int(0, 1))
+    }),
+    ("heq", |g| {
+        let e = ext(g, 1, 3);
+        let (ka, kb) = (pi(g, &[0, 0, 3, 1]), pi(g, &[0, 3]));
+        let (a, b) = (hist_w(g, e, ka, 1, false), hist_w(g, e, kb, 1, false));
+        let d = match g.int(0, 3) {
+            0 => "new".to_owned(),
+            1 => "self".to_owned(),
+            2 => "other".to_owned(),
+            _ => format!("{} 0", seg_w(g, e, 3, 1, &[0])),
+        };
+        format!(
+            "{a} 0 {b} 0 {d} {} {}",
+            g.pick(&["0", "1"]),
+            g.pick(&["255", "100", "40"])
+        )
+    }),
+    ("hlr", |g| {
+        let e = ext(g, 1, 3);
+        let k = hist_kind(g);
+        let w = hist_w(g, e, k, 1, false);
+        let lab = if g.one_in(4) {
+            "self".to_owned()
+        } else {
+            let k = pi(g, &[0, 3, 1]);
+            format!("{} 0", seg_w(g, e, k, 1, &[1, 2, 3]))
+        };
+        let r = hist_r(g, e);
+        format!(
+            "{w} 0 {lab} {r} {} {}",
+            g.int(0, 3),
+            g.pick(&["0", "0", "-1", "3"])
+        )
+    }),
+    ("hlab", |g| {
+        let e = ext(g, 1, 3);
+        let k = hist_kind(g);
+        let w = hist_w(g, e, k, 1, false);
+        let lab = if g.one_in(4) {
+            "self".to_owned()
+        } else {
+            let k = pi(g, &[0, 3, 1]);
+            format!("{} 0", seg_w(g, e, k, 1, &[0, 1, 2, 3]))
+        };
+        format!("{w} 0 {lab} {} {}", g.int(1, 3), g.pick(&["0", "-1", "3"]))
+    }),
+    ("hsegm", |g| {
+        let e = ext(g, 2, 3);
+        let k = pi(g, &[0, 0, 3]);
+        let w = hist_w(g, e, k, 1, true);
+        let d = match g.int(0, 3) {
+            0 => "new".to_owned(),
+            1 => "self".to_owned(),
+            _ => format!("{} 0", seg_w(g, e, 0, 1, &[128, 128, 0, 255])),
+        };
+        format!(
+            "{w} 0 {d} {} {} {} {} {}",
+            g.pick(&["85", "90"]),
+            g.pick(&["125", "130"]),
+            g.pick(&["95", "100"]),
+            g.pick(&["1", "3", "2"]),
+            g.pick(&["bf800000", "3f800000", "40000000"])
+        )
+    }),
+    ("+gdiag=4040 hsegm", |g| {
+        let e = ext(g, 2, 3);
+        let w = hist_w(g, e, 0, 1, true);
+        format!("{w} 0 self 85 130 100 3 40000000")
+    }),
+];
+
+#[test]
+fn part10c_histograms() {
+    group("part10c", PART10C, 4);
 }

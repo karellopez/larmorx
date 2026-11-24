@@ -2871,6 +2871,30 @@ defects! {
         "mri_label2vol with a segmentation (--seg or --aparc+aseg) and --fill-ribbon but no --temp maps the segmentation onto a template it never read and crashes; corrected: ERROR: a segmentation needs a template volume, status 1";
     FS_1262 = "FS-1262", "FreeSurfer", true,
         "mri_label2vol --offset large enough that a label's code (its number plus the offset) passes the int range writes a wrapped code; corrected: ERROR: the label codes pass the range of an int, status 1";
+    FS_1261 = "FS-1261", "FreeSurfer", true,
+        "mri_label2vol --fill-ribbon with a label that is not in tkregister coordinates (and --tkr-template given) crashes after 'Converting to TkRegister RAS'; corrected: the label is converted and mapped (only its vertices and stats are used)";
+    FS_1263 = "FS-1263", "FreeSurfer", true,
+        "mri_label2vol --new-aseg2vol with a segmentation holding labels below 0 keeps their frames in memory it does not own (memory contents: a wrong frame, damaged memory or a crash); corrected: each such label has its own frame, as every other label";
+    FS_1264 = "FS-1264", "FreeSurfer", true,
+        "mri_label2vol --new-aseg2vol --ttype (or --ttype+head) with a segmentation label that the colour table of $FREESURFER_HOME does not hold crashes at the first output voxel whose label no fraction of 0.5 or more decides; corrected: ERROR: MRIseg2SegPVF(): the segmentation's label <n> is not in the colour table, status 1";
+    FS_1265 = "FS-1265", "FreeSurfer", true,
+        "mri_label2vol --new-aseg2vol --ttype with a segmentation label that has no tissue type in the schema adds its fraction outside the tissue types' votes (memory contents) at output voxels no fraction of 0.5 or more decides; corrected: such a label does not vote";
+    FS_1266 = "FS-1266", "FreeSurfer", true,
+        "mri_label2vol --new-aseg2vol with an upsampling factor that rounds to 0 (a --resmm between -0.5 and 0, or by default a segmentation whose column size is below 0.5 mm) samples no point of an output voxel: the fractions are 0 (with --ttype every voxel takes the first label); corrected: one sample per voxel";
+    FS_1267 = "FS-1267", "FreeSurfer", true,
+        "mri_label2vol --new-aseg2vol with a --resmm whose samples per voxel side, upsampling factor or samples per voxel (the three sides' counts multiplied) pass 2,147,483,647 (--resmm -inf, 1e-300, ...) counts no sample (an int's lowest value) or divides by a wrapped number; corrected: ERROR: MRIseg2SegPVF(): resmm <r> asks for <the count>, status 1";
+    FS_1268 = "FS-1268", "FreeSurfer", true,
+        "mri_label2vol --fill-ribbon --annot with an annotation index (below the largest) that no vertex has crashes after 'Mapping'; corrected: the index maps nothing";
+    FS_1269 = "FS-1269", "FreeSurfer", true,
+        "mri_label2vol --fill-ribbon with a label point at a vertex the surface does not have (-1 for a volume label, or past its vertices) writes outside the surface's values (memory the program does not own); corrected: ERROR: label point <n> is at vertex <v>, not one of the surface's <n> vertices, status 1";
+    FS_1270 = "FS-1270", "FreeSurfer", true,
+        "mri_label2vol --fill-ribbon --lta with a transform whose source and destination are both other than the ribbon prints 'ERROR: MRIsurf2VolOpt(): ribbon is neither source nor target' and crashes; corrected: status 1 after the message";
+    FS_1271 = "FS-1271", "FreeSurfer", true,
+        "mri_label2vol --fill-ribbon with a ribbon voxel (3 or 42) farther from the surface than its quick search reaches (a search of the neighbouring cells of a 16 mm grid) prints 'ERROR: MRIsurf2VolOpt(): No Match', the search's details and crashes; corrected: the voxel takes the value of the surface's closest vertex (a full search), as every other ribbon voxel";
+    FS_1272 = "FS-1272", "FreeSurfer", true,
+        "mri_label2vol --fill-ribbon without FREESURFER_HOME (or without its FreeSurferColorLUT.txt) prints the environment's message and crashes; corrected: status 1 after the message";
+    FS_1273 = "FS-1273", "FreeSurfer", true,
+        "mri_label2vol --fill-ribbon reads the ribbon from the environment's SUBJECTS_DIR even when --sd names another subjects folder (the surface comes from --sd's): the ribbon of another folder, or none ('(null)' in its name when SUBJECTS_DIR is not set); corrected: the ribbon from the subjects folder the program uses (--sd's, else the environment's)";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

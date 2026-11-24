@@ -17,4 +17,5 @@
 
 pub mod main;
 pub mod options;
+pub mod resample;
 pub mod surface;

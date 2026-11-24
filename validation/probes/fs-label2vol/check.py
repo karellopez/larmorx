@@ -36,6 +36,7 @@ import gzip
 import hashlib
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -57,6 +58,10 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # FS-1258, FS-1259);
 # HANG (FS-1257: FreeSurfer never ends)
 SKIP = ("CRASH", "MEMORY", "HANG")
+
+#: ``--new-aseg2vol``'s time (``MRIseg2SegPVF(): done t = <seconds>, ...``): masked in the lines
+#: and volatile in the cache
+TIME = re.compile(r"(?<=MRIseg2SegPVF\(\): done t = )[^,]*(?=,)")
 
 MANIFEST = REPO / "crates-freesurfer" / "Cargo.toml"
 EXAMPLE = REPO / "crates-freesurfer" / "target" / "release" / "examples" / "fs_label2vol_probe"
@@ -200,7 +205,9 @@ def official_line(exe: Path, line: str, root: Path, k: int) -> str:
         env=env,
         cwd=d,
         outputs=[d],
-        policy=oracle_cache.Policy(threads=1, family="freesurfer", formats="freesurfer"),
+        policy=oracle_cache.Policy(
+            threads=1, family="freesurfer", formats="freesurfer", volatile=(TIME.pattern,)
+        ),
         timeout=30,
         runner="fs-label2vol-probe",
         inputs=[*inputs, layout(root)],
@@ -211,7 +218,7 @@ def official_line(exe: Path, line: str, root: Path, k: int) -> str:
 
     def mask(s: str | bytes) -> str:
         b = s.encode("utf-8", "surrogateescape") if isinstance(s, str) else s
-        return escape(b).replace(dd, "<DIR>")
+        return TIME.sub("<T>", escape(b).replace(dd, "<DIR>"))
 
     out = done.stdout_bytes
     files = written(d, given, dirs)

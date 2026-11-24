@@ -272,6 +272,18 @@ fn lta_text() -> Vec<u8> {
 /// A segmentation of `dims` whose labels are 0, 2, 3, 17, 41 in blocks (a seeded pick per block of
 /// two voxels).
 fn seg_volume(g: &mut Gen, ty: i32, dims: [i32; 3], size: [f32; 3], ctab: bool) -> Mri {
+    seg_volume_of(g, ty, dims, size, ctab, &[0.0f32, 2.0, 3.0, 17.0, 41.0])
+}
+
+/// A segmentation of `dims` whose labels are `labels` in blocks of two voxels (a seeded pick each).
+fn seg_volume_of(
+    g: &mut Gen,
+    ty: i32,
+    dims: [i32; 3],
+    size: [f32; 3],
+    ctab: bool,
+    labels: &[f32],
+) -> Mri {
     let mut m = build(
         g,
         &Spec {
@@ -281,9 +293,8 @@ fn seg_volume(g: &mut Gen, ty: i32, dims: [i32; 3], size: [f32; 3], ctab: bool) 
     );
     let mut fs = Globals::new(UpstreamDefects::Fix);
     let mut e = Vec::new();
-    let labels = [0.0f32, 2.0, 3.0, 17.0, 41.0];
     let nb = ((dims[0] + 1) / 2 * ((dims[1] + 1) / 2) * ((dims[2] + 1) / 2)) as usize;
-    let picks: Vec<f32> = (0..nb).map(|_| g.pick(&labels)).collect();
+    let picks: Vec<f32> = (0..nb).map(|_| g.pick(labels)).collect();
     for z in 0..dims[2] {
         for y in 0..dims[1] {
             for x in 0..dims[0] {
@@ -475,8 +486,132 @@ pub fn base_inputs() -> Inputs {
     files.push(("x.lta".into(), lta_text()));
     files.push(("notvol.txt".into(), b"not a volume\n".to_vec()));
     files.push(("fsh/FreeSurferColorLUT.txt".into(), LUT.to_vec()));
+    part2_inputs(&mut files, &v, &f, &thick);
     let dirs = vec!["outdir".into()];
     Inputs { files, dirs }
+}
+
+/// The colour table of the tissue-type cases with labels the schema gives no type (1) and
+/// another of white matter (77).
+const LUT2: &[u8] = b"0 Unknown 0 0 0 0\n1 Left-Cerebral-Exterior 70 130 180 0\n2 Left-Cerebral-White-Matter 245 245 245 0\n3 Left-Cerebral-Cortex 205 62 78 0\n17 Left-Hippocampus 220 216 20 0\n41 Right-Cerebral-White-Matter 0 225 0 0\n77 WM-hypointensities 200 70 255 0\n";
+
+/// A dense colour table (indices 0, 1, 2) for an annotation whose every index has vertices.
+const LUT3: &[u8] = b"0 Unknown 0 0 0 0\n1 lh-one 10 20 30 0\n2 lh-two 40 50 60 0\n";
+
+/// `lut` in FreeSurfer's binary form (an annotation's table).
+fn binary_of(lut: &[u8]) -> Vec<u8> {
+    let t = tempfile::tempdir().expect("a temporary folder");
+    std::fs::write(t.path().join("lut.txt"), lut).expect("the table");
+    let mut fs = Globals::new(UpstreamDefects::Fix);
+    let (mut o, mut e) = (Vec::new(), Vec::new());
+    let ct = ctab_read_ascii(&mut fs, &mut o, &mut e, Some(t.path()), "lut.txt");
+    {
+        let mut fp = CFile::open(Some(t.path()), "ct.bin", "w").expect("a file");
+        ctab_write_into_binary(&mut fs, &mut o, &mut e, ct.as_ref(), Some(&mut fp));
+    }
+    std::fs::read(t.path().join("ct.bin")).expect("the table's bytes")
+}
+
+/// A transform file of type `ty` from geometry `src` to `dst` (each `(dims, sizes)` with the
+/// probe's direction cosines and centre) with `rows` as its matrix.
+fn lta_of(ty: i32, rows: [[f64; 4]; 4], src: ([i32; 3], [f64; 3]), dst: ([i32; 3], [f64; 3])) -> Vec<u8> {
+    let geom = |(d, z): ([i32; 3], [f64; 3])| {
+        format!(
+            "valid = 1  # volume info valid\nfilename = vol.mgz\nvolume = {} {} {}\nvoxelsize = {:.15e} {:.15e} {:.15e}\nxras   = -1.000000000000000e+00 0.000000000000000e+00 0.000000000000000e+00\nyras   = 0.000000000000000e+00 0.000000000000000e+00 -1.000000000000000e+00\nzras   = 0.000000000000000e+00 1.000000000000000e+00 0.000000000000000e+00\ncras   = 1.500000000000000e+00 -2.000000000000000e+00 5.000000000000000e-01\n",
+            d[0], d[1], d[2], z[0], z[1], z[2]
+        )
+    };
+    let mut m = String::new();
+    for r in rows {
+        m += &format!("{:.15e} {:.15e} {:.15e} {:.15e}\n", r[0], r[1], r[2], r[3]);
+    }
+    format!(
+        "# transform file probe.lta\n# created by probe on Sun Nov 22 00:00:00 2026\n\ntype      = {ty} # LINEAR_VOX_TO_VOX\nnxforms   = 1\nmean      = 0.0000 0.0000 0.0000\nsigma     = 1.0000\n1 4 4\n{m}src volume info\n{}dst volume info\n{}subject subj\nfscale 0.100000\n",
+        geom(src),
+        geom(dst)
+    )
+    .into_bytes()
+}
+
+/// Part 2's inputs (relay 57, a generator of their own so that part 1's stay as they were): the
+/// ribbons (`<subject>/mri/ribbon.mgz`: 3 and 42 with other values; one of 8 mm voxels far from
+/// the surface), a second subjects folder, transforms with the ribbon at the source, at the
+/// destination and at neither end, segmentations with labels below 0 and NaN (from their bits), a
+/// large label, labels without a tissue type or not in the colour table, one of 0.4 mm voxels,
+/// a dense annotation and one with gaps.
+fn part2_inputs(
+    files: &mut Vec<(String, Vec<u8>)>,
+    v: &[[f32; 3]],
+    f: &[[i32; 3]],
+    thick: &[f32],
+) {
+    let mut g = Gen::new(0x1abe_1270_0057);
+    let put = |files: &mut Vec<(String, Vec<u8>)>, name: &str, m: &mut Mri| {
+        files.extend(write_as(m, name));
+    };
+    let ribvals = [0.0f32, 3.0, 3.0, 42.0, 42.0, 2.0, 41.0];
+    let mut rib = seg_volume_of(&mut g, MRI_UCHAR, [12, 12, 12], [1.0, 1.0, 1.0], true, &ribvals);
+    put(files, "subj/mri/ribbon.mgz", &mut rib);
+    let mut rib2 = seg_volume_of(&mut g, MRI_INT, [12, 12, 12], [1.0, 1.0, 1.0], false, &ribvals);
+    put(files, "sd2/subj/mri/ribbon.mgz", &mut rib2);
+    let (v2, _) = sphere(3.0, [-0.5, 0.75, -0.25]);
+    files.push(("sd2/subj/surf/lh.white".into(), triangle_file(&v2, f, true)));
+    files.push((
+        "sd2/subj/surf/lh.thickness".into(),
+        curv_file(thick, f.len() as i32),
+    ));
+    let mut far = seg_volume_of(&mut g, MRI_UCHAR, [8, 8, 8], [8.0, 8.0, 8.0], false, &[3.0, 3.0, 42.0]);
+    put(files, "subjfar/mri/ribbon.mgz", &mut far);
+    files.push(("subjfar/surf/lh.white".into(), triangle_file(v, f, true)));
+    files.push((
+        "subjfar/surf/lh.thickness".into(),
+        curv_file(thick, f.len() as i32),
+    ));
+    // transforms: the ribbon at the destination (from t.mgz's grid), at neither end
+    let shift = [
+        [1.0, 0.0, 0.0, 2.0],
+        [0.0, 1.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0, 3.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ];
+    files.push((
+        "y.lta".into(),
+        lta_of(0, shift, ([6, 5, 4], [1.0, 1.5, 2.0]), ([12, 12, 12], [1.0, 1.0, 1.0])),
+    ));
+    files.push((
+        "z.lta".into(),
+        lta_of(0, shift, ([6, 5, 4], [1.0, 1.5, 2.0]), ([4, 4, 3], [2.0, 2.0, 2.0])),
+    ));
+    // segmentations of odd labels
+    let nan = f32::from_bits(0x7fc0_0000);
+    let mut sneg = seg_volume_of(&mut g, MRI_FLOAT, [12, 12, 12], [1.0, 1.0, 1.0], true, &[0.0, 2.0, -1.0, 17.0, -3.0, 41.0]);
+    put(files, "segneg.mgz", &mut sneg);
+    let mut snan = seg_volume_of(&mut g, MRI_FLOAT, [6, 5, 4], [1.0, 1.5, 2.0], false, &[0.0, 2.0, nan, 3.0]);
+    put(files, "segnan.mgz", &mut snan);
+    let mut sbig = seg_volume_of(&mut g, MRI_INT, [6, 5, 4], [1.0, 1.5, 2.0], false, &[0.0, 3.0, 1_000_000.0, 41.0]);
+    put(files, "segbig.mgz", &mut sbig);
+    let mut su = seg_volume_of(&mut g, MRI_INT, [12, 12, 12], [1.0, 1.0, 1.0], true, &[0.0, 1.0, 3.0, 17.0, 41.0, 77.0]);
+    put(files, "segu.mgz", &mut su);
+    let mut sx = seg_volume_of(&mut g, MRI_INT, [12, 12, 12], [1.0, 1.0, 1.0], false, &[0.0, 3.0, 99.0, 41.0]);
+    put(files, "segx.mgz", &mut sx);
+    let mut sq = seg_volume_of(&mut g, MRI_INT, [12, 12, 12], [0.4, 0.4, 0.4], true, &[0.0, 2.0, 3.0, 17.0]);
+    put(files, "segq.mgz", &mut sq);
+    let mut s0 = seg_volume_of(&mut g, MRI_INT, [6, 5, 4], [1.0, 1.5, 2.0], false, &[0.0]);
+    put(files, "seg0.mgz", &mut s0);
+    files.push(("fsh2/FreeSurferColorLUT.txt".into(), LUT2.to_vec()));
+    // annotations: every index of a dense table, and one with gaps
+    let dense = [annot_of(0, 0, 0), annot_of(10, 20, 30), annot_of(40, 50, 60)];
+    let ann: Vec<i32> = (0..v.len()).map(|_| g.pick(&dense)).collect();
+    let mut b = Vec::new();
+    be4(&mut b, ann.len() as i32);
+    for (k, &a) in ann.iter().enumerate() {
+        be4(&mut b, k as i32);
+        be4(&mut b, a);
+    }
+    be4(&mut b, 1);
+    b.extend_from_slice(&binary_of(LUT3));
+    files.push(("subj/label/lh.dense.annot".into(), b));
+    files.push(("subj/label/rh.dense.annot".into(), files.last().expect("the annotation").1.clone()));
 }
 
 /// Whether argument `a` names file `f` (or a folder holding it).
@@ -494,10 +629,15 @@ pub fn line(env: &[&str], i: &Inputs, args: &[String]) -> String {
             "--subject" | "--annot" | "--proj" | "--aparc+aseg" | "--lta" | "--fill-ribbon"
         )
     });
+    let far = args.iter().any(|a| a == "subjfar");
     let files: Vec<&(String, Vec<u8>)> = i
         .files
         .iter()
-        .filter(|(f, _)| (subj && f.starts_with("subj/")) || args.iter().any(|a| names(a, f)))
+        .filter(|(f, _)| {
+            (subj && f.starts_with("subj/"))
+                || (far && f.starts_with("subjfar/"))
+                || args.iter().any(|a| names(a, f))
+        })
         .collect();
     let dirs: Vec<&String> = i
         .dirs
@@ -507,14 +647,16 @@ pub fn line(env: &[&str], i: &Inputs, args: &[String]) -> String {
                 .any(|a| names(a, d) || a.starts_with(&format!("{d}/")))
         })
         .collect();
-    let ttype = args.iter().any(|a| a == "--ttype" || a == "--ttype+head");
+    // the default colour table the tissue types and --fill-ribbon's environment read
+    let ttype = args
+        .iter()
+        .any(|a| a == "--ttype" || a == "--ttype+head" || a == "--fill-ribbon");
+    let fsh2 = env.iter().any(|e| e.contains("@DIR@/fsh2"));
     let files: Vec<&(String, Vec<u8>)> = files
         .into_iter()
-        .chain(
-            i.files
-                .iter()
-                .filter(|(f, _)| ttype && f.starts_with("fsh/")),
-        )
+        .chain(i.files.iter().filter(|(f, _)| {
+            (ttype && f.starts_with("fsh/")) || (fsh2 && f.starts_with("fsh2/"))
+        }))
         .collect();
     let mut all_env: Vec<&str> = vec!["SUBJECTS_DIR=@DIR@", "FREESURFER_SEED=1234"];
     if ttype {
@@ -1912,6 +2054,7 @@ fn prelude() -> Vec<String> {
             ".",
         ],
     );
+    part2_prelude(&mut add_env);
     // more than 100 labels
     let mut many = Vec::new();
     for _ in 0..101 {
@@ -1924,6 +2067,111 @@ fn prelude() -> Vec<String> {
     a.extend(["--o", "o.mgz", "--temp", "t.mgz", "--identity"]);
     add_env(&[], &a);
     out
+}
+
+/// Part 2's fixed cases (relay 57): `--new-aseg2vol` and `--fill-ribbon`, every path.
+fn part2_prelude(add_env: &mut dyn FnMut(&[&str], &[&str])) {
+    let nseg = |seg: &str, temp: &str, extra: &[&str]| -> Vec<String> {
+        let mut a = s(&["--seg", seg, "--temp", temp, "--regheader", "--new-aseg2vol"]);
+        a.extend(s(extra));
+        a.extend(s(&["--o", "o.mgz"]));
+        a
+    };
+    let cases: Vec<(Vec<&str>, Vec<String>)> = vec![
+        (vec![], nseg("seg.mgz", "t2.mgz", &[])),
+        (vec![], nseg("seg.mgz", "t.mgz", &[])),
+        (vec![], nseg("seg.mgz", "t1.mgz", &["--resmm", "0.5"])),
+        (vec![], nseg("seg.mgz", "t2.mgz", &["--ttype"])),
+        (vec![], nseg("seg.mgz", "t1.mgz", &["--ttype", "--resmm", "1"])),
+        (vec![], nseg("seg.mgz", "t1.mgz", &["--ttype+head", "--resmm", "2"])),
+        (vec![], nseg("seg.mgz", "t3.nii.gz", &["--resmm", "-2.7"])),
+        (vec![], nseg("seg.mgz", "t2.mgz", &["--resmm", "-2.4"])),
+        (vec![], nseg("seg.mgz", "t2.mgz", &["--resmm", "-0.3"])),
+        (vec![], nseg("seg.mgz", "t2.mgz", &["--resmm", "-0.3", "--ttype"])),
+        (vec![], nseg("seg.mgz", "t2.mgz", &["--resmm", "nan"])),
+        (vec![], nseg("seg.mgz", "t2.mgz", &["--resmm", "inf"])),
+        (vec![], nseg("seg.mgz", "t2.mgz", &["--resmm", "-inf"])),
+        (vec![], nseg("seg.mgz", "t2.mgz", &["--upsample", "0"])),
+        (vec![], nseg("seg.mgz", "t2.mgz", &["--upsample", "3"])),
+        (vec![], nseg("seg.mgz", "t2.mgz", &["--upsample", "-2"])),
+        (vec![], nseg("segh.mgz", "orig.mgz", &[])),
+        (vec![], nseg("segq.mgz", "t2.mgz", &[])),
+        (vec![], nseg("segq.mgz", "t2.mgz", &["--ttype"])),
+        (vec![], nseg("segn.mgz", "orig.mgz", &["--hits", "h.mgz", "--pvf", "p.mgz"])),
+        (vec![], nseg("segneg.mgz", "t2.mgz", &[])),
+        (vec![], nseg("segnan.mgz", "t.mgz", &[])),
+        (vec![], nseg("segbig.mgz", "t2.mgz", &["--resmm", "0.5"])),
+        (vec![], nseg("segu.mgz", "t1.mgz", &["--ttype", "--resmm", "1"])),
+        (vec!["FREESURFER_HOME=@DIR@/fsh2"], nseg("segu.mgz", "t1.mgz", &["--ttype", "--resmm", "1"])),
+        (vec!["FREESURFER_HOME=@DIR@/fsh2"], nseg("segu.mgz", "t2.mgz", &["--ttype+head", "--resmm", "0.5"])),
+        (vec![], nseg("segx.mgz", "t1.mgz", &["--ttype", "--resmm", "1"])),
+        (vec![], nseg("seg.mgz", "t3.nii.gz", &["--ttype", "--resmm", "0.5"])),
+        (vec![], nseg("seg.mgz", "t.mgz", &["--ttype+head", "--resmm", "0.25"])),
+        (vec![], nseg("segh.mgz", "t3.nii.gz", &["--ttype", "--resmm", "1"])),
+        (vec![], nseg("segx.mgz", "t3.nii.gz", &["--ttype", "--resmm", "0.5"])),
+        (vec![], nseg("segu.mgz", "t3.nii.gz", &["--ttype", "--resmm", "0.5"])),
+        (vec!["FREESURFER_HOME=@DIR@/fsh2"], nseg("segu.mgz", "t3.nii.gz", &["--ttype", "--resmm", "0.5"])),
+        (vec![], nseg("segbig.mgz", "t3.nii.gz", &["--ttype", "--resmm", "0.5"])),
+        (vec![], nseg("seg.mgz", "t3.nii.gz", &["--resmm", "0.5"])),
+        (vec![], nseg("seg0.mgz", "t2.mgz", &[])),
+        (vec![], nseg("seg0.mgz", "t2.mgz", &["--ttype"])),
+        (vec![], nseg("seg.mgz", "tnan.mgz", &[])),
+        (vec![], s(&["--seg", "seg.mgz", "--temp", "t.mgz", "--identity", "--new-aseg2vol", "--o", "o.nii.gz"])),
+        (vec![], s(&["--seg", "seg.mgz", "--temp", "t.mgz", "--reg", "reg.dat", "--new-aseg2vol", "--o", "o.mgz"])),
+        (vec![], s(&["--seg", "seg.mgz", "--temp", "t.mgz", "--regheader", "--new-aseg2vol", "--o", "nodir/o.mgz"])),
+        (vec![], s(&["--seg", "seg.mgz", "--fill-ribbon", "--new-aseg2vol", "--regheader", "--o", "o.mgz", "--subject", "subj", "--hemi", "lh"])),
+        (vec![], s(&["--aparc+aseg", "--subject", "subj", "--temp", "t.mgz", "--regheader", "subj/mri/aparc+aseg.mgz", "--new-aseg2vol", "--o", "o.mgz"])),
+    ];
+    for (env, a) in &cases {
+        let a: Vec<&str> = a.iter().map(String::as_str).collect();
+        add_env(env, &a);
+    }
+    let rib = |extra: &[&str]| -> Vec<String> {
+        let mut a = s(&["--fill-ribbon", "--subject", "subj", "--hemi", "lh", "--identity"]);
+        a.extend(s(extra));
+        a.extend(s(&["--o", "o.mgz"]));
+        a
+    };
+    let cases: Vec<(Vec<&str>, Vec<String>)> = vec![
+        (vec![], rib(&["--label", "s.label"])),
+        (vec![], rib(&["--label", "s.label", "--label", "lh.cortex.label"])),
+        (vec![], rib(&["--label", "s.label", "--label-stat", "st.mgz"])),
+        (vec![], rib(&["--label", "s.label", "--label-stat", "st.mgz", "--stat-thresh", "0"])),
+        (vec![], rib(&["--label", "s.label", "--temp", "t2.mgz"])),
+        (vec![], rib(&["--label", "s.label", "--surf", "orig"])),
+        (vec![], rib(&["--label", "s.label", "--hits", "h.mgz", "--pvf", "p.mgz"])),
+        (vec![], rib(&["--annot", "subj/label/lh.dense.annot"])),
+        (vec![], rib(&["--annot", "subj/label/lh.a.annot"])),
+        (vec![], rib(&["--annot", "subj/label/lh.zero.annot"])),
+        (vec![], rib(&["--label", "scan.label"])),
+        (vec![], rib(&["--label", "scan.label", "--tkr-template", "orig.mgz"])),
+        (vec![], rib(&["--label", "sbad.label"])),
+        (vec![], rib(&["--label", "sneg.label"])),
+        (vec![], rib(&["--label", "a.label"])),
+        (vec![], rib(&["--label", "nofile.label"])),
+        (vec![], rib(&["--label", "s.label", "--lta", "x.lta"])),
+        (vec![], rib(&["--label", "s.label", "--lta", "y.lta"])),
+        (vec![], rib(&["--label", "s.label", "--lta", "z.lta"])),
+        (vec![], rib(&["--label", "s.label", "--lta", "y.lta", "--label-stat", "st.mgz"])),
+        (vec![], rib(&["--label", "s.label", "--sd", "."])),
+        (vec![], rib(&["--label", "s.label", "--sd", "sd2"])),
+        (vec!["-SUBJECTS_DIR"], rib(&["--label", "s.label", "--sd", "."])),
+        (vec!["SUBJECTS_DIR=@DIR@/nowhere"], rib(&["--label", "s.label", "--sd", "."])),
+        (vec!["FREESURFER_HOME=@DIR@/nowhere"], rib(&["--label", "s.label"])),
+        (vec![], rib(&["--label", "s.label", "--o", "nodir/o.mgz"])),
+        (vec![], rib(&["--label", "s.label", "--label-stat", "nodir/st.mgz"])),
+        (vec![], rib(&["--label", "s.label", "--o", "o.nii.gz"])),
+        (vec![], s(&["--fill-ribbon", "--subject", "subj", "--hemi", "rh", "--identity", "--annot", "subj/label/rh.dense.annot", "--o", "o.mgz"])),
+        (vec![], s(&["--fill-ribbon", "--subject", "subjfar", "--hemi", "lh", "--identity", "--label", "s.label", "--o", "o.mgz"])),
+        (vec![], s(&["--fill-ribbon", "--subject", "nosubj", "--hemi", "lh", "--identity", "--label", "s.label", "--o", "o.mgz"])),
+        (vec![], s(&["--fill-ribbon", "--hemi", "lh", "--identity", "--label", "s.label", "--o", "o.mgz"])),
+        (vec![], s(&["--fill-ribbon", "--subject", "subj", "--identity", "--label", "s.label", "--o", "o.mgz"])),
+        (vec![], s(&["--fill-ribbon", "--subject", "subj", "--hemi", "lh", "--label", "s.label", "--o", "o.mgz"])),
+    ];
+    for (env, a) in &cases {
+        let a: Vec<&str> = a.iter().map(String::as_str).collect();
+        add_env(env, &a);
+    }
 }
 
 /// The options a seeded case draws from.
@@ -1960,10 +2208,97 @@ const EXTRAS: &[&[&str]] = &[
 const DEFECT_FILES: &[&str] = &["lh.defect_labels", "lh.defect_nan", "lh.defect_neg"];
 const DEFECT_TEMPS: &[&str] = &["orig.mgz", "origi.mgz", "origf.mgz", "origb.mgz"];
 const SEGS: &[&str] = &["seg.mgz", "segn.mgz", "segh.mgz"];
+const SEGS2: &[&str] = &[
+    "seg.mgz",
+    "seg.mgz",
+    "segn.mgz",
+    "segh.mgz",
+    "segq.mgz",
+    "segneg.mgz",
+    "segnan.mgz",
+    "segbig.mgz",
+    "segu.mgz",
+];
+const RIBBON_LABELS: &[&str] = &[
+    "s.label",
+    "s.label",
+    "lh.cortex.label",
+    "scan.label",
+    "sbad.label",
+];
 
 fn seeded(g: &mut Gen, i: &Inputs) -> String {
     let mut args: Vec<String> = Vec::new();
-    match g.below(10) {
+    let mut env: Vec<&str> = Vec::new();
+    match g.below(14) {
+        10 | 11 => {
+            // part 2: --new-aseg2vol
+            args.extend(s(&["--seg", g.pick(SEGS2), "--temp", g.pick(TEMPS)]));
+            args.extend(s(g.pick(&[
+                &["--regheader"][..],
+                &["--identity"],
+                &["--reg", "reg.dat"],
+            ])));
+            args.push("--new-aseg2vol".into());
+            if g.chance(2) {
+                args.extend(s(&[
+                    "--resmm",
+                    g.pick(&["0", "0.5", "0.25", "1", "2", "-1", "-2", "-2.7", "-0.3", "3"]),
+                ]));
+            }
+            if g.chance(3) {
+                args.extend(s(&["--upsample", g.pick(&["2", "3", "0", "-2"])]));
+            }
+            if g.chance(3) {
+                args.push(g.pick(&["--ttype", "--ttype+head"]).to_owned());
+                if g.chance(3) {
+                    env.push("FREESURFER_HOME=@DIR@/fsh2");
+                }
+            }
+            if g.chance(4) {
+                args.extend(s(&["--hits", "h.mgz"]));
+            }
+            args.extend(s(&["--o", g.pick(&["o.mgz", "o.nii.gz"])]));
+        }
+        12 | 13 => {
+            // part 2: --fill-ribbon
+            if g.chance(3) {
+                args.extend(s(&["--annot", g.pick(&["subj/label/lh.dense.annot", "subj/label/lh.a.annot"])]));
+            } else {
+                for _ in 0..g.int(1, 2) {
+                    args.extend(s(&["--label", g.pick(RIBBON_LABELS)]));
+                }
+                if g.chance(4) {
+                    args.extend(s(&["--label-stat", "st.mgz"]));
+                }
+            }
+            args.extend(s(&["--fill-ribbon", "--subject", g.pick(&["subj", "subj", "subj", "subjfar"])]));
+            args.extend(s(&["--hemi", "lh"]));
+            args.extend(s(g.pick(&[
+                &["--identity"][..],
+                &["--regheader", "t.mgz"],
+                &["--reg", "reg.dat"],
+            ])));
+            if g.chance(3) {
+                args.extend(s(&["--temp", g.pick(TEMPS)]));
+            }
+            if g.chance(3) {
+                args.extend(s(&["--lta", g.pick(&["x.lta", "y.lta", "z.lta"])]));
+            }
+            if g.chance(4) {
+                args.extend(s(&["--stat-thresh", g.pick(&["0", "-2", "4"])]));
+            }
+            if g.chance(5) {
+                args.extend(s(&["--surf", "orig"]));
+            }
+            if g.chance(6) {
+                args.extend(s(&["--sd", g.pick(&[".", "sd2"])]));
+            }
+            if g.chance(5) {
+                args.extend(s(&["--tkr-template", "orig.mgz"]));
+            }
+            args.extend(s(&["--o", g.pick(&["o.mgz", "o.nii.gz"])]));
+        }
         0 | 1 => {
             // the defects
             args.extend(s(&["--defects", "lh.orig.nofix", g.pick(DEFECT_FILES)]));
@@ -2042,7 +2377,7 @@ fn seeded(g: &mut Gen, i: &Inputs) -> String {
         let k = args.len();
         args.rotate_left(k - 2);
     }
-    line(&[], i, &args)
+    line(&env, i, &args)
 }
 
 /// The cases of `seed`: the fixed ones, then seeded ones up to `n`.
@@ -2169,6 +2504,59 @@ pub fn golden_cases() -> Vec<String> {
             "subj",
             "--hemi",
             "lh",
+            "--o",
+            "o.mgz",
+        ],
+        &[
+            "--seg",
+            "segneg.mgz",
+            "--temp",
+            "t2.mgz",
+            "--regheader",
+            "--new-aseg2vol",
+            "--resmm",
+            "0.5",
+            "--o",
+            "o.mgz",
+        ],
+        &[
+            "--seg",
+            "segnan.mgz",
+            "--temp",
+            "t1.mgz",
+            "--regheader",
+            "--new-aseg2vol",
+            "--ttype",
+            "--resmm",
+            "2",
+            "--o",
+            "o.mgz",
+        ],
+        &[
+            "--label",
+            "s.label",
+            "--fill-ribbon",
+            "--subject",
+            "subj",
+            "--hemi",
+            "lh",
+            "--identity",
+            "--lta",
+            "y.lta",
+            "--label-stat",
+            "st.mgz",
+            "--o",
+            "o.mgz",
+        ],
+        &[
+            "--annot",
+            "subj/label/lh.dense.annot",
+            "--fill-ribbon",
+            "--subject",
+            "subj",
+            "--hemi",
+            "lh",
+            "--identity",
             "--o",
             "o.mgz",
         ],
@@ -2350,9 +2738,25 @@ pub fn parse(line: &str) -> Case {
 
 /// The defects whose official result depends on memory contents (`reproduce` fills it
 /// deterministically): the pseudo-notice `MEMORY`.
-const MEMORY: [&str; 6] = [
-    "FS-53", "FS-249", "FS-1252", "FS-1256", "FS-1258", "FS-1259",
+const MEMORY: [&str; 9] = [
+    "FS-53", "FS-249", "FS-441", "FS-1252", "FS-1256", "FS-1258", "FS-1259", "FS-1263", "FS-1265",
 ];
+
+/// `MRIseg2SegPVF(): done t = <seconds>,`: the time masked.
+pub fn mask_time(text: &str) -> String {
+    let key = "MRIseg2SegPVF(): done t = ";
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(k) = rest.find(key) {
+        out.push_str(&rest[..k + key.len()]);
+        rest = &rest[k + key.len()..];
+        let end = rest.find(',').unwrap_or(rest.len());
+        out.push_str("<T>");
+        rest = &rest[end..];
+    }
+    out.push_str(rest);
+    out
+}
 
 /// The port's line for a case line and the defects it noted (`dir`: an empty folder), with the
 /// pseudo-notices `CRASH`, `MEMORY` and `HANG`.
@@ -2389,6 +2793,7 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
             err: &mut terr,
             env: environment,
             dir: Some(dir),
+            threads: 1,
         };
         match main(&mut g, &mut r, &c.args) {
             Ok(()) => 0,
@@ -2396,7 +2801,7 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
         }
     };
     let _ = out.flush();
-    let mask = |b: &[u8]| escape(b).replace(&escape(d.as_bytes()), "<DIR>");
+    let mask = |b: &[u8]| mask_time(&escape(b).replace(&escape(d.as_bytes()), "<DIR>"));
     let files = written(dir, &c.files, &c.dirs);
     let text = format!("EXIT {status} | {} | {} | {files}", mask(&out), mask(&err));
     let mut ids: Vec<&'static str> = g.notices.as_slice().iter().map(|n| n.defect.id).collect();

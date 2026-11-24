@@ -103,6 +103,7 @@ pub mod binarize;
 pub mod coords;
 pub mod curvfile;
 pub mod curvio;
+pub mod defects2seg;
 pub mod discrete;
 pub mod dist;
 pub mod edges;

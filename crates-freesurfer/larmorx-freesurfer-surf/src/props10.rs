@@ -417,7 +417,7 @@ pub fn mris_face_normal_face(
         }
     }
     let f = surf.face_mut(faceno as usize);
-    let norm = f.norm.get_or_insert_with(|| DMatrix::zeros(3, 1));
+    let norm = f.norm.get_or_insert_with(|| Box::new(DMatrix::zeros(3, 1)));
     for (k, &x) in c.iter().enumerate() {
         norm.set(k as i32 + 1, 1, (x / cl).to_f64());
     }
@@ -505,8 +505,8 @@ pub fn mris_edge_metric_edge(
     e.maxarea = if a0 > a1 { e.area[0] } else { e.area[1] };
     e.dot = dvector_dot(
         io.out,
-        surf.face(fa as usize).norm.as_ref(),
-        surf.face(fb as usize).norm.as_ref(),
+        surf.face(fa as usize).norm.as_deref(),
+        surf.face(fb as usize).norm.as_deref(),
     );
     if e.dot.abs() > 1000.0 {
         let _ = writeln!(
@@ -519,8 +519,8 @@ pub fn mris_edge_metric_edge(
             e.vtxno[0], e.vtxno[1]
         );
         let (Some(n0), Some(n1)) = (
-            surf.face(fa as usize).norm.as_ref(),
-            surf.face(fb as usize).norm.as_ref(),
+            surf.face(fa as usize).norm.as_deref(),
+            surf.face(fb as usize).norm.as_deref(),
         ) else {
             g.notices.add(
                 &FS_538,
@@ -632,11 +632,11 @@ pub fn mris_triangle_area_stats(
 /// older coordinates, or crashes when there are none).
 fn refresh_normals(g: &mut Globals, sg: &SurfGlobals, io: &mut Io, surf: &mut Mris, who: &str) {
     let old: Vec<Option<DMatrix>> = (0..nfaces(surf))
-        .map(|f| surf.face(f).norm.clone())
+        .map(|f| surf.face(f).norm.as_deref().cloned())
         .collect();
     mris_face_metric(sg, io, surf);
     let changed = old.iter().enumerate().filter(|(f, n)| {
-        let new = surf.face(*f).norm.as_ref();
+        let new = surf.face(*f).norm.as_deref();
         match (n, new) {
             (Some(a), Some(b)) => a
                 .data()

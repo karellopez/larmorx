@@ -22,7 +22,8 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 (``MRI_MASK_CASES``, 2026-11-22), ``mri_cc`` (``MRI_CC_CASES``, ``MRI_CC_WM_CASES``, 2026-11-23), ``fs_temp_file``
 (``FS_TEMP_FILE_CASES``, 2026-11-22), ``getfullpath`` (``GETFULLPATH_CASES``, 2026-11-22) and
 ``mri_vol2vol`` (``MRI_VOL2VOL_CASES``, 2026-11-23; its morph and ``--gcam`` on the classic
-recording, relay 54) and ``mri_concat`` (``MRI_CONCAT_CASES``, 2026-11-23).
+recording, relay 54), ``mri_concat`` (``MRI_CONCAT_CASES``, 2026-11-23) and ``mri_label2vol``
+(``MRI_LABEL2VOL_CASES``, 2026-11-24: ``defect2seg``'s two calls, the first that read a surface).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -3391,3 +3392,106 @@ def test_mri_concat_replica_needs_no_more_memory_than_freesurfer(tmp_path, name,
             f"mri_concat {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
         )
         assert (r_dir / out).read_bytes() == (o_dir / out).read_bytes(), name
+
+
+#: ``mri_label2vol``'s calls on the ds000005 v8 recording (relay 56 of track A): ``defect2seg``'s
+#: two (the left hemisphere's defects into ``orig.mgz``, the right's merged into the recorded
+#: ``surface.defects.mgz``; each reads a surface of 125,094 vertices), ``seg2cc``'s form (the
+#: ``aseg`` onto the native grid), a label and the same label projected along the normals.
+MRI_LABEL2VOL_CASES = [
+    ("defects", ["--defects", "{surf}/lh.orig.nofix", "{surf}/lh.defect_labels", "{mri}/orig.mgz",
+                 "1000", "0", "out.mgz", "{label}/lh.nofix.cortex.label"]),
+    ("defects-merge", ["--defects", "{surf}/rh.orig.nofix", "{surf}/rh.defect_labels",
+                       "{mri}/surface.defects.mgz", "2000", "1", "out.mgz",
+                       "{label}/rh.nofix.cortex.label"]),
+    ("seg", ["--seg", "{mri}/aseg.mgz", "--temp", "{mri}/rawavg.mgz", "--regheader", "--o",
+             "out.mgz"]),
+    ("label", ["--label", "{label}/lh.cortex.label", "--temp", "{mri}/orig.mgz", "--identity",
+               "--o", "out.mgz"]),
+    ("proj", ["--label", "{label}/lh.cortex.label", "--temp", "{mri}/orig.mgz", "--identity",
+              "--proj", "frac", "0", "1", "0.1", "--subject", "sub-01", "--hemi", "lh", "--o",
+              "out.mgz"]),
+]  # fmt: skip
+
+
+def _mgz_without_command_lines(b: bytes) -> bytes:
+    """A written volume decompressed, each command line it records (the 8-byte length before
+    ``ProgramName: `` to the NUL after it: the time, the user, the machine) as ``<CMD>``."""
+    import gzip
+
+    if b[:2] == b"\x1f\x8b":
+        b = gzip.decompress(b)
+    out, i = bytearray(), 0
+    while i < len(b):
+        if b.startswith(b"ProgramName: ", i) and len(out) >= 8:
+            del out[-8:]
+            out += b"<CMD>"
+            k = b.find(b"\0", i)
+            i = len(b) if k < 0 else k
+            continue
+        out.append(b[i])
+        i += 1
+    return bytes(out)
+
+
+@pytest.mark.parametrize(("name", "args"), MRI_LABEL2VOL_CASES)
+def test_mri_label2vol_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, args):
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    home = ws / FS_HOME if ws else None
+    exe = home / "bin" / "mri_label2vol" if home else None
+    subj = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / "ds000005-sub-01-v8" / "subjects" / "sub-01"
+        if ws
+        else None
+    )
+    if exe is None or not exe.is_file() or not (subj / "surf" / "lh.orig.nofix").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    words = [a.format(mri=subj / "mri", surf=subj / "surf", label=subj / "label") for a in args]
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        "FS_DISABLE_LANG": "1",
+        "FREESURFER_SEED": "1234",
+        "SUBJECTS_DIR": str(subj.parent),
+        **freesurfer_env(),
+    }
+
+    def fresh(d: Path):
+        def reset() -> None:
+            if d.exists():
+                shutil.rmtree(d)
+            d.mkdir()
+
+        reset()
+        return reset
+
+    out = "out.mgz"
+    o_dir = tmp_path / "freesurfer"
+    code, fs_mib = _original_peak(
+        ["mri_label2vol", *words], env, "freesurfer", fresh(o_dir), o_dir, (), "freesurfer"
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        fresh(r_dir)
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_label2vol", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(f"mri_label2vol {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"mri_label2vol {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        assert _mgz_without_command_lines((r_dir / out).read_bytes()) == _mgz_without_command_lines(
+            (o_dir / out).read_bytes()
+        ), name

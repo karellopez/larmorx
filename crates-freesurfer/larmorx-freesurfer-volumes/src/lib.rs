@@ -29,6 +29,7 @@ pub mod mri_cc;
 pub mod mri_concat;
 pub mod mri_convert;
 pub mod mri_info;
+pub mod mri_label2vol;
 pub mod mri_make_uchar;
 pub mod mri_mask;
 pub mod mri_robust_register;
@@ -73,6 +74,10 @@ pub const PROGRAMS: &[Program] = &[
     Program {
         name: mri_info::main::NAME,
         run: mri_info::main::run,
+    },
+    Program {
+        name: mri_label2vol::main::NAME,
+        run: mri_label2vol::main::run,
     },
     Program {
         name: mri_make_uchar::main::NAME,

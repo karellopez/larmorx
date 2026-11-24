@@ -18,7 +18,11 @@ Nothing is installed system-wide. `setup.sh <dir>` puts into `<dir>`:
 
 The binary uses the GNU ABI (MinGW), not MSVC as CI does: the file system, paths and error codes
 are Windows' own either way; the C runtime's maths functions would differ (larmorx's results do
-not use them).
+not use them). One exception found (track A relay 56): on x86-64 without SSE4.1 Rust's `f32::round`,
+and an `f64::round` of a widened `float` the optimiser narrows, call the C library's `roundf`, and
+MinGW's rounds 0.49999997 up to 1 (glibc's, Microsoft's and Apple's do not): a difference only this
+tool shows is worth checking for that before blaming the port (fs.volume's `aseg2vol.rs` rounds by
+the integer part since then).
 
     validation/investigations/windows-cross-check/setup.sh <dir>
     # build: cargo's arguments after the workspace folder (run it in a memory box)

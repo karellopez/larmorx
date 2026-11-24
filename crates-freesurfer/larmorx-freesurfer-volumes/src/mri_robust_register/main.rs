@@ -52,8 +52,11 @@
 //! The test mode (`--test <n> <image>`, [`super::options`]): `testRobust`
 //! ([`larmorx_freesurfer_robust::testmode`]), which ends the program.
 //!
-//! Not ported yet (ends with its message and status 1): the debug output of `--debug` (the
-//! library's intermediate images and its key presses).
+//! The debug output (`--debug`): the library's intermediate images and key presses
+//! ([`larmorx_freesurfer_robust::debug`]; the key presses read the standard input, `Run::input`),
+//! the means of each half-way image (`--halfmov`, `--halfdst`) over the robust registration's
+//! weights (` mov int means: <mean> ( <n> )  w0: ... w1: ...  weighted: ...`, the same words for
+//! the destination), and the lines naming the images to check (`To check debug output, run:`).
 //!
 //! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-robust-register.md`):
 //! - FS-1070: [`super::options`].
@@ -72,11 +75,16 @@
 //!   exhausts the memory box). Both modes keep that image's header (the voxels released where
 //!   FreeSurfer frees the image) and use it, noted (rule A; the maps on standard error, the
 //!   defined part, as FreeSurfer prints them).
+//! - **FS-1079** (crash): `--debug` with a half-way image (`--halfmov`, `--halfdst`) after a
+//!   registration with a cost other than ROB and ROBENT takes the weights' means with no weights
+//!   (`MRIiterator` of a null image): the program dies of a segmentation fault after writing the
+//!   image. By default the means are not printed (there are no weights), noted; `reproduce` ends
+//!   with status 139 there.
 
 use std::io::Write;
 
 use larmorx_core::cfmt::ostream;
-use larmorx_core::defects::{FS_1071, FS_1072, FS_1075};
+use larmorx_core::defects::{FS_1071, FS_1072, FS_1075, FS_1079};
 use larmorx_core::vnl_fixed;
 use larmorx_core::vnl_matrix::{VnlMatrix, matlab_print_long, matlab_print_long_diag};
 use larmorx_freesurfer_core::globals::Globals;
@@ -84,6 +92,7 @@ use larmorx_freesurfer_core::log::{self, ERROR_BADFILE, ERROR_NOFILE, Fatal};
 use larmorx_freesurfer_core::matrix::{Matrix, matrix_copy, matrix_multiply};
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Settings;
+use larmorx_freesurfer_core::sse::{add64, div64, mul, sub64};
 use larmorx_freesurfer_core::system;
 use larmorx_freesurfer_core::timer::Timer;
 use larmorx_freesurfer_core::utils::{nint, resolve};
@@ -94,8 +103,8 @@ use larmorx_freesurfer_io::mriio::{mri_read_volume, mri_write};
 use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::lta::{LINEAR_RAS_TO_RAS, LINEAR_VOX_TO_VOX, Lta, lta_alloc};
 use larmorx_freesurfer_mri::mri::{
-    MGZ_INTENT_UNKNOWN, MRI_FLOAT, MRI_UCHAR, Mri, mri_alloc, mri_copy_header,
-    mri_copy_pulse_parameters,
+    MGZ_INTENT_UNKNOWN, MRI_FLOAT, MRI_INT, MRI_LONG, MRI_SHORT, MRI_UCHAR, MRI_USHRT, Mri,
+    mri_alloc, mri_copy_header, mri_copy_pulse_parameters,
 };
 use larmorx_freesurfer_mri::vol_geom::extract_i_to_r;
 use larmorx_freesurfer_mri::voxel::mri_get_vox_val;
@@ -129,6 +138,8 @@ const STRLEN: usize = 1024;
 pub fn run(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
     let mut g = Globals::new(settings.mode);
     g.stderr.read_write = system::stderr_read_write();
+    let stdin = std::io::stdin();
+    let mut input = stdin.lock();
     let status = {
         let mut terr = log::TrackedErr::new(&g, &mut *err);
         let mut r = Run {
@@ -137,6 +148,7 @@ pub fn run(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut 
             env: &settings.env,
             dir: settings.dir.as_deref(),
             threads: settings.threads,
+            input: Some(&mut input),
         };
         match main(&mut g, &mut r, args) {
             Ok(()) => 0,
@@ -179,6 +191,10 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
             err: &mut *r.err,
             env: r.env,
             dir: r.dir,
+            input: match r.input.as_mut() {
+                Some(i) => Some(&mut **i),
+                None => None,
+            },
         };
         if p.satit && p.robust() {
             reg.find_saturation(g, &mut io)?;
@@ -453,6 +469,16 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
         }
     }
 
+    if p.debug > 0 {
+        let _ = writeln!(r.out);
+        let _ = writeln!(r.out, "To check debug output, run:");
+        let name = &reg.name;
+        let _ = writeln!(
+            r.out,
+            "  tkmedit -f {name}-mriS-mapped.mgz -aux {name}-mriT-mapped.mgz -overlay {name}-mriS-weights.mgz"
+        );
+    }
+
     let _ = writeln!(r.out);
     drop(lta);
     let msec = start.milliseconds();
@@ -530,7 +556,7 @@ fn half_way(
     }
     // the weights (`R.getWeights()`): the robust registration's; none after the Powell one
     let weights = (!powell).then_some(hw);
-    half_way_outputs(g, r, p, mov, dst, &m1, &m2, hw, weights)
+    half_way_outputs(g, r, reg, p, mov, dst, &m1, &m2, hw, weights)
 }
 
 /// [`half_way`]'s transforms and images, into the geometry `hw`; the weights resampled there
@@ -539,6 +565,7 @@ fn half_way(
 fn half_way_outputs(
     g: &mut Globals,
     r: &mut Run,
+    reg: &RegRobust,
     p: &Options,
     mov: &Mri,
     dst: &Mri,
@@ -590,7 +617,7 @@ fn half_way_outputs(
                      name: &str,
                      pulse: bool,
                      oneminus: bool|
-     -> Result<(), Fatal> {
+     -> Result<Mri, Fatal> {
         let mut m =
             lta_transform_interp(g, r.out, r.err, r.env, src, None, lta, p.finalsampletype)?
                 .into_new()
@@ -612,15 +639,21 @@ fn half_way_outputs(
             None,
             MGZ_INTENT_UNKNOWN,
         )?;
-        Ok(())
+        Ok(m)
     };
     if !p.halfmov.is_empty() {
         let _ = writeln!(r.out, " creating half-way movable ...");
-        resampled(g, r, mov, &mut m2hw, &p.halfmov, true, false)?;
+        let m = resampled(g, r, mov, &mut m2hw, &p.halfmov, true, false)?;
+        if p.debug > 0 {
+            debug_means(g, r, reg, weights, &m)?;
+        }
     }
     if !p.halfdst.is_empty() {
         let _ = writeln!(r.out, " creating half-way destination ...");
-        resampled(g, r, dst, &mut d2hw, &p.halfdst, true, false)?;
+        let m = resampled(g, r, dst, &mut d2hw, &p.halfdst, true, false)?;
+        if p.debug > 0 {
+            debug_means(g, r, reg, weights, &m)?;
+        }
     }
     if !p.halfweights.is_empty() {
         if let Some(w) = weights {
@@ -633,6 +666,87 @@ fn half_way_outputs(
             );
         }
     }
+    Ok(())
+}
+
+/// A voxel reader of `MRIiterator` for an image's type (`uchar`, `short`, `ushort`, `int`,
+/// `long`, `float`): the value at a byte offset of its storage, as `float`.
+fn iterator_reader(err: &mut dyn Write, m: &Mri) -> Result<fn(&[u8]) -> f32, Fatal> {
+    let f: fn(&[u8]) -> f32 = match m.mtype {
+        MRI_UCHAR => |b| f32::from(b[0]),
+        MRI_SHORT => |b| f32::from(i16::from_le_bytes([b[0], b[1]])),
+        MRI_USHRT => |b| f32::from(u16::from_le_bytes([b[0], b[1]])),
+        MRI_INT => |b| i32::from_le_bytes([b[0], b[1], b[2], b[3]]) as f32,
+        MRI_LONG => |b| i64::from_le_bytes(b[..8].try_into().expect("8 bytes")) as f32,
+        MRI_FLOAT => |b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]),
+        t => {
+            let _ = writeln!(err, "MRIiterator: Type not supported: {t}");
+            return Err(Fatal::Exit(1));
+        }
+    };
+    Ok(f)
+}
+
+/// `main`'s means of a half-way image `m` under `--debug` (`MRIiterator`s over the weights and
+/// the image side by side, in their storage's order, every voxel of every frame): ` mov int
+/// means: <mean> ( <n> )  w0: <mean where |w| > 0.0001> ( <n> ) w1: <mean where |w - 1| < 0.0001>
+/// ( <n> )  weighted: <sum m w / sum w> ( <sum w> )`, in the standard output's state (the same
+/// words for the destination; 0 / 0 prints `-nan`). No weights (FS-1079: a Powell registration):
+/// FreeSurfer dies of a segmentation fault; by default nothing is printed.
+fn debug_means(
+    g: &mut Globals,
+    r: &mut Run,
+    reg: &RegRobust,
+    weights: Option<&Mri>,
+    m: &Mri,
+) -> Result<(), Fatal> {
+    let Some(w) = weights else {
+        g.notices.add(
+            &FS_1079,
+            "--debug's means of a half-way image after a registration without weights (FreeSurfer dies of a segmentation fault)",
+        );
+        if g.notices.reproduce() {
+            let _ = r.out.flush();
+            return Err(Fatal::Exit(139));
+        }
+        return Ok(());
+    };
+    let read_w = iterator_reader(r.err, w)?;
+    let read_m = iterator_reader(r.err, m)?;
+    let (wb, mb) = (w.bytes_per_vox, m.bytes_per_vox);
+    let (wd, md) = (
+        w.chunk.as_deref().unwrap_or(&[]),
+        m.chunk.as_deref().unwrap_or(&[]),
+    );
+    // both images have the half-way geometry (the weights'), one frame each
+    let n = (md.len() / mb).min(wd.len() / wb);
+    let (mut meanw1, mut meanw0, mut mean, mut meanw, mut countw) = (0.0f64, 0.0, 0.0, 0.0, 0.0);
+    let (mut countw1, mut countw0, mut count) = (0i32, 0i32, 0i32);
+    for k in 0..n {
+        let vs = read_m(&md[k * mb..]);
+        let vw = read_w(&wd[k * wb..]);
+        if f64::from(vw.abs()) > 0.0001 {
+            meanw0 = add64(meanw0, f64::from(vs));
+            countw0 = countw0.wrapping_add(1);
+        }
+        if sub64(f64::from(vw), 1.0).abs() < 0.0001 {
+            meanw1 = add64(meanw1, f64::from(vs));
+            countw1 = countw1.wrapping_add(1);
+        }
+        mean = add64(mean, f64::from(vs));
+        count = count.wrapping_add(1);
+        meanw = add64(meanw, f64::from(mul(vs, vw)));
+        countw = add64(countw, f64::from(vw));
+    }
+    let _ = writeln!(
+        r.out,
+        " mov int means: {} ( {count} )  w0: {} ( {countw0} ) w1: {} ( {countw1} )  weighted: {} ( {} )",
+        reg.os(div64(mean, f64::from(count))),
+        reg.os(div64(meanw0, f64::from(countw0))),
+        reg.os(div64(meanw1, f64::from(countw1))),
+        reg.os(div64(meanw, countw)),
+        reg.os(countw)
+    );
     Ok(())
 }
 
@@ -927,6 +1041,8 @@ fn init_registration(
         err: &mut *r.err,
         env: r.env,
         dir: r.dir,
+        // setSourceAndTarget waits for no key
+        input: None,
     };
     reg.set_source_and_target(g, &mut io, &mov, &dst, !p.floattype)?;
     Ok((pmov, pdst))

@@ -25,15 +25,16 @@
 
 use std::io::Write;
 
-use larmorx_core::cfmt;
 use larmorx_core::math::Libm;
 use larmorx_freesurfer_core::cstd::double_to_int_x86;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::sse::{add64, div64, mul64, sub64};
 use larmorx_freesurfer_mri::mri::Mri;
-use larmorx_freesurfer_volume::sample::sample_volume_frame;
+use larmorx_freesurfer_volume::sample::ByteSampler;
 
+use crate::costs::sample;
+use crate::debug::Cout;
 use crate::mymatrix::Mat4;
 
 /// The number of bins per axis (`256 / dim`, `dim` 1).
@@ -66,6 +67,18 @@ fn row(m: &Mat4, k: usize, u: f64, v: f64, w: f64) -> f64 {
     )
 }
 
+/// `(int) floor(v)` as x86-64 converts it: a number from 0 below 2^31 truncated straight (its
+/// floor), any other through `floor` and `cvttsd2si` (no call of libm's `floor` for the samples of
+/// byte images, all at or above 0).
+#[inline]
+fn floor_int(v: f64) -> i32 {
+    if (0.0..2_147_483_648.0).contains(&v) {
+        v as i32
+    } else {
+        double_to_int_x86(v.floor())
+    }
+}
+
 impl JointHisto {
     /// `JointHisto()`: 256 x 256 zeros.
     pub fn new() -> JointHisto {
@@ -88,8 +101,8 @@ impl JointHisto {
         *h = add64(*h, w);
     }
 
-    /// `create(mriS, mriT, Msi, Mti, d1, d2, d3)`; `prec` is the standard output's precision
-    /// (its error lines print the points with it).
+    /// `create(mriS, mriT, Msi, Mti, d1, d2, d3)`; `cout` is the standard output's state (its
+    /// error lines print the points in it).
     #[allow(clippy::too_many_arguments)]
     pub fn create(
         &mut self,
@@ -101,7 +114,7 @@ impl JointHisto {
         msi: &Mat4,
         mti: &Mat4,
         d: [i32; 3],
-        prec: usize,
+        cout: Cout,
     ) -> Result<(), Fatal> {
         self.histo.iter_mut().for_each(|h| *h = 0.0);
         self.sum = 0.0;
@@ -113,6 +126,7 @@ impl JointHisto {
         ];
         s.outside_val = -1.0;
         t.outside_val = -1.0;
+        let (bs, bt) = (ByteSampler::new(s), ByteSampler::new(t));
         let lim = |k: usize| dt[k] - f64::from(d[k]) + 1.0;
         let mut z = 0i32;
         while f64::from(z) < lim(2) {
@@ -129,19 +143,19 @@ impl JointHisto {
                     let zs = row(msi, 2, ux, uy, uz);
                     x += d[0];
                     let mut vs = 0.0;
-                    sample_volume_frame(g, err, s, xs, ys, zs, 0, &mut vs);
+                    sample(&bs, g, err, s, xs, ys, zs, 0, &mut vs);
                     if vs == -1.0 {
                         continue;
                     }
-                    let ivs = double_to_int_x86(vs.floor());
+                    let ivs = floor_int(vs);
                     let mut vt = 0.0;
-                    sample_volume_frame(g, err, t, xt, yt, zt, 0, &mut vt);
+                    sample(&bt, g, err, t, xt, yt, zt, 0, &mut vt);
                     if vt == -1.0 {
                         continue;
                     }
-                    let ivt = double_to_int_x86(vt.floor());
+                    let ivt = floor_int(vt);
                     if ivs < 0 || ivt < 0 || ivs >= N as i32 || ivt >= N as i32 {
-                        let p = |v: f64| cfmt::g(v, prec);
+                        let p = |v: f64| cout.os(v);
                         let _ = writeln!(out, "ERROR at ( {} {y} {z} ) ", x - d[0]);
                         let _ = writeln!(
                             out,

@@ -70,6 +70,21 @@ plan is in `specs/mri_robust_register.md` §7.
   FS-1076's or FS-1078's notice. Its hash is in `tests/fs_robreg_test_official.rs`; the seeded
   family's prelude case `--test 1 mov.mgz` is compared now (seed 1 x 120 with `--preload`: 111
   identical, 0 different, 8 not compared, 1 not ported, `--debug`).
+- `check.py --family debug` (relay 49): the debug output (`--debug`), 48 cases (`cases::debug_cases`:
+  20 fixed ones, names in a folder that does not exist, without an extension or of one only,
+  `--initorient`, `--nomulti`, `--verbose 0`, `--leastsquares`, no symmetry, the half-way images'
+  means, 2-D pairs, the entropy images, resliced and reordered sources, every Powell cost; then the
+  seeded family's random options and the Powell family's with `--debug`). Every official run's
+  standard input is `/dev/null` (`check.py` points its own standard input there, which the oracle
+  cache's runs inherit): each key press fails at once, as the port's empty input does. Measured
+  2026-11-24 with `--preload`: 44 identical, 0 different, 4 not compared (FS-1063, FS-1067, two of
+  FS-1075 with FS-1079, their defined parts identical); the default differs on 11, each with its
+  notice. Its hash is in `tests/fs_robreg_debug_official.rs`; seed 1 x 120 with `--preload` (the
+  prelude's `--satit --debug` compared now): 112 identical, 0 different, 8 not compared, none not
+  ported.
+- `timeline.py` (relay 49): every line of a run's standard output with the seconds since the start
+  and since the line before, the port's program or (`--official`, `--preload`) FreeSurfer's: where
+  the time goes (the Powell costs' speed: `docs/findings/freesurfer-robust-register.md` §10).
 - `record.py`: the validation record `docs/validation/freesurfer-mri-robust-register.{json,md}`
   from the summaries above (from a clean commit).
 

@@ -66,20 +66,25 @@ def with_times(rows: list[dict], path: Path | None) -> list[dict]:
     return rows
 
 
-#: The paths the port does not run yet (counted as ``not ported``, never compared); relay 47.
-NOT_PORTED_YET = "the Powell registration's half-way outputs, `--debug`, `--test`"
+#: The paths the port does not run yet (counted as ``not ported``, never compared); relay 49: none
+#: (the half-way outputs of the Powell registration and the test mode came in relay 48, the debug
+#: output in relay 49).
+NOT_PORTED_YET = "none"
+
+#: check.py's families by name (relays 46 to 49).
+FAMILIES = {
+    "powell": "the Powell family",
+    "histo": "the joint-histogram and SB family",
+    "halfway": "the Powell half-way family (FS-1075's defined parts compared)",
+    "test": "the test-mode family (`--test`)",
+    "debug": "the debug-output family (`--debug`)",
+}
 
 
 def probe_set(p: dict) -> str:
-    """A check.py summary's name: its seed, or the Powell registration's family (relay 47)."""
+    """A check.py summary's name: its seed, or its family (relays 47 to 49)."""
     fam = p.get("family")
-    name = (
-        "the Powell family"
-        if fam == "powell"
-        else "the joint-histogram and SB family"
-        if fam == "histo"
-        else f"seed {p['seed']}"
-    )
+    name = FAMILIES.get(fam, f"seed {p['seed']}")
     return name + (" (the decided `cabs` and `csqrt` preloaded)" if p.get("preload") else "")
 
 
@@ -111,8 +116,25 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="an earlier --robent summary whose official runs were not served (their times)",
     )
+    ap.add_argument(
+        "--speed",
+        type=Path,
+        nargs="*",
+        default=[],
+        help="real.py --extra '--cost <c> --powelltol 0.1' summaries (relay 49: the Powell costs' "
+        "times on one head)",
+    )
+    ap.add_argument(
+        "--speed-times",
+        type=Path,
+        nargs="*",
+        default=[],
+        help="earlier --speed summaries whose official runs were not served (their times; matched "
+        "by the cost at the end of the file's name)",
+    )
     ap.add_argument("--golden", required=True)
     ap.add_argument("--golden-fix", required=True)
+    ap.add_argument("--golden-halfway", help="the golden half-way cases' value (both modes)")
     ap.add_argument("--out", type=Path, default=REPO / "docs" / "validation")
     a = ap.parse_args(argv)
     stamp = commit()
@@ -175,15 +197,30 @@ def main(argv: list[str] | None = None) -> int:
                 "different": p["reproduce_differ"],
                 "skipped": p["skipped"],
                 "not_ported": p.get("not_ported", 0),
+                "fs1075_defined_identical": p.get("fs1075_defined_identical", 0),
+                "fs1075_defined_different": p.get("fs1075_defined_differ", 0),
                 "fix_different_with_notice": p["fix_differ"] - p["fix_differ_without_notice"],
                 "fix_different_without_notice": p["fix_differ_without_notice"],
             }
             for p in probes
         ],
-        "golden_sha256": {"official_and_reproduce": a.golden, "fix": a.golden_fix},
+        "golden_sha256": {"official_and_reproduce": a.golden, "fix": a.golden_fix}
+        | ({"powell_half_way_both_modes": a.golden_halfway} if a.golden_halfway else {}),
         "decided_complex": summary_rows(a.preload),
         "entropy_images": with_times(summary_rows(a.robent), a.robent_times),
         "memory": memory,
+        "powell_speed": [
+            {"cost": p.stem.split("-")[-1]}
+            | with_times(
+                summary_rows(p),
+                next(
+                    (q for q in a.speed_times if q.stem.split("-")[-1] == p.stem.split("-")[-1]),
+                    None,
+                ),
+            )[0]
+            for p in a.speed
+            if summary_rows(p)
+        ],
     }
     a.out.mkdir(parents=True, exist_ok=True)
     (a.out / f"{NAME}.json").write_text(json.dumps(payload, indent=1) + "\n", encoding="utf-8")
@@ -287,25 +324,50 @@ def main(argv: list[str] | None = None) -> int:
         "",
     ]
     for p in payload["probe"]:
+        half = (
+            f" (of them FS-1075's defined parts: {p['fs1075_defined_identical']} identical, "
+            f"{p['fs1075_defined_different']} different)"
+            if p["fs1075_defined_identical"] or p["fs1075_defined_different"]
+            else ""
+        )
         lines.append(
             f"- {p['set']}: {p['cases']} cases; `reproduce` {p['identical']} identical, "
-            f"{p['different']} different, {p['skipped']} undefined, {p['not_ported']} not ported; "
-            f"`fix` {p['fix_different_with_notice']} different with a notice, "
+            f"{p['different']} different, {p['skipped']} undefined{half}, {p['not_ported']} not "
+            f"ported; `fix` {p['fix_different_with_notice']} different with a notice, "
             f"{p['fix_different_without_notice']} without."
         )
     lines += [
         "",
+        "The half-way family (`--family halfway`, relay 48): 24 cases of every Powell cost with "
+        "random half-way outputs; the official program never served from the cache (FS-1075: its "
+        "half-way geometry is memory it has freed). The test-mode family (`--family test`): every "
+        "test number, unknown ones, byte, short and float images, a 2-D image, a file that does "
+        "not read. The debug-output family (`--family debug`, relay 49): `--debug` with names in a "
+        "folder that does not exist, without an extension or of one only, `--initorient`, "
+        "`--nomulti`, `--verbose 0`, no symmetry, the half-way images' means, 2-D pairs, the "
+        "entropy images, resliced and reordered sources, every Powell cost, the seeded family's "
+        "random options; the official program's standard input `/dev/null` (each key press "
+        "fails at once), the port's an empty one.",
+    ]
+    lines += [
+        "",
         "## Golden cases",
         "",
-        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_robust_register_golden.rs`: 7 "
+        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_robust_register_golden.rs`: 13 "
         "cases on 32^3 images made with integer arithmetic (fMRIPrep's call with every output, "
         "an affine registration with its half-way outputs, a short source onto a float target "
         "of anisotropic voxels, the entropy images of a short source and a byte target, the "
-        "Powell registration with `--cost NCC`; and on 16^3 byte images `--cost MI` and "
-        "`--cost SB`), on "
-        "every platform: `reproduce` "
+        "Powell registration with `--cost NCC`; on 16^3 byte images `--cost MI` and `--cost SB`; "
+        "four of the test mode; two of the debug output, a robust registration with `--satit` "
+        "and a half-way image, `--cost MI`), on every platform: `reproduce` "
         f"`{a.golden}` (the official program's value on the same inputs, `check.py --golden`), "
-        f"`fix` `{a.golden_fix}`.",
+        f"`fix` `{a.golden_fix}`"
+        + (
+            f"; the Powell half-way outputs' two cases (FS-1075: the port's value in both modes) "
+            f"`{a.golden_halfway}`."
+            if a.golden_halfway
+            else "."
+        ),
         "",
         "## Memory",
         "",
@@ -318,6 +380,25 @@ def main(argv: list[str] | None = None) -> int:
         lines.append(
             f"- {e['case']} ({e['mode']}): {e['larmorx_mib']:.1f} MiB, FreeSurfer "
             f"{e['freesurfer_mib']:.1f} MiB."
+        )
+    if payload["powell_speed"]:
+        lines += [
+            "",
+            "## The Powell costs' speed",
+            "",
+            "`real.py --heads ds000228-sub-pixar008 --extra '--cost <c> --powelltol 0.1' --preload "
+            "<decided_complex.sh's library>` (after fMRIPrep's `--satit --iscale`, which the Powell "
+            "registration ignores and takes): one thread, the official run fresh (relay 49: the "
+            "costs' samples straight from the byte images, bit for bit; before, the port took "
+            "86 s with `LS` and 146 s with `NCC`):",
+            "",
+        ]
+    for r in payload["powell_speed"]:
+        same = all(r["reproduce"].values())
+        lines.append(
+            f"- `--cost {r['cost']}`: `reproduce` {'identical in every byte' if same else 'DIFFERS'}; "
+            f"{r['seconds']['reproduce']} s against FreeSurfer's {r['seconds']['official']} s; peak "
+            f"{r['peak_mib']['reproduce']} MiB against {r['peak_mib']['official']:.1f}."
         )
     (a.out / f"{NAME}.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"{NAME}: {stamp}")

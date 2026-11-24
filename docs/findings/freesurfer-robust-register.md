@@ -105,6 +105,19 @@ The `cout`/`printf` lines share stdout's buffer (`sync_with_stdio`); each option
    --leastsquares??` (`main` 1149). With the finest level skipped (`--highit 0`) and no coarser one,
    no level runs: `tcf` stays `NULL` and the program prints `ERROR: no half way space created (not
    implemented for this cost function)!` (measured: case 10).
+7. **FS-1079** (class a: crash; relay 49). `main`'s debug means of a half-way image (1037-1090,
+   1093-1127): `MRIiterator mw(R.getWeights())`; `RegPowell`'s `getWeights()` is the base class's
+   `NULL`, and the iterator's constructor calls `begin()`, which reads `img->ischunked`: a
+   segmentation fault right after the half-way image is written. **Measured**
+   (`validation/investigations/freesurfer-fs1075-halfway/measure.py --extra "--debug --halfmov
+   hm.mgz"`, the half-way family's 24 cases, two runs each, never served from the cache, standard
+   input `/dev/null`; log `oracles/logs/fs-found-c-r49-m1079.log`, json `C/r49/m1079.json`): the 6
+   cases whose half-way geometry FS-1075 left intact (the target's) died of SIGSEGV in both runs
+   after ` creating half-way movable ...` with `hm.mgz` written; the others ended earlier on
+   FS-1075's garbage geometry (status 1, 252, or killed by the memory box) or had no half-way space
+   (3: no symmetry, no level). Rule A (the input makes sense, the result is a crash): by default the
+   means are not printed (there are no weights), the notice; `reproduce` ends with status 139 there
+   (standard output flushed first, as `endl` left it).
 5. The `--iscalein` file: `ifstream f(name); if (f.good()) f >> iscale; else ErrorExit(...)`.
    libstdc++'s `>>` (`num_get`, C locale): white space only leaves 1 (the sentry fails at the end),
    no number gives 0 (C++11), one too large `+-DBL_MAX`; a folder opens (`fopen` of a folder for
@@ -148,9 +161,7 @@ The `cout`/`printf` lines share stdout's buffer (`sync_with_stdio`); each option
 - (Ported in relay 47, section 7: `RegPowell`'s joint-histogram costs and `SB`.)
 - (Ported in relay 48, §2 item 6: the Powell registration's half-way outputs, FS-1075.)
 - (Ported in relay 48, §8: the test mode, `--test`.)
-- `--debug` (the library's intermediate images, `saveGaussianPyramid`, the key presses
-  `std::cin >> ch`, the `-wcheck-est.txt` file, the debug means of the half-way images): the
-  library ends with `Registration: the debug output (--debug) is not ported yet`.
+- (Ported in relay 49, §9: the debug output, `--debug`.) Nothing of the program is left.
 
 ## 5. The entropy images (`--cost ROBENT`, relay 45)
 
@@ -306,3 +317,75 @@ took <s> seconds.`) and the target, with the mask passed in (no `MRImask` then).
   `fs_robreg_test_official.rs` holds the official hash (3.7 s in a debug build); the golden cases
   gained four (`--test 4`, `--test 5` on a float image, `--test 30`, `--test 0` on 16^3); the
   prelude's `--test 1 mov.mgz` (16^3: FS-1076) is compared in the seeded test now.
+
+## 9. The debug output (`--debug`; relay 49)
+
+- The sites (FreeSurfer 8.2.0): `Registration.cpp` 717-728 (`-mapmov-init.mgz`), 760-764
+  (`saveGaussianPyramid`, 3153-3165: `pyramidS-r<i>.mgz` in the working folder, not under the
+  name), 790-802 (`-mapmov-low-init.mgz`, `-mriT-low.mgz`), 3311-3320 (`initializeTransform`'s
+  ` evecs S: `/` evecs T: ` with `cout << vnl_matrix_fixed<double,3,3>`, only with `--initorient`, after
+  the flip loop whether it broke or not), 3642-3647 (`-mriS-reorder.mgz`), 3843-3849 and 3874-3880
+  (`setSourceAndTarget`'s `Reslice Mov/Dst Matrix:` with `cout << mm.second` and `endl`, then
+  `-mriS-resample.mgz` / `-mriT-resample.mgz`); `RegRobust.h` 193-203 (`-mriS-hw.mgz`, `-mriT-hw.mgz`,
+  `Press a key to run registration: `, `std::cin >> ch`), 277-292 (robust cost only: the step's
+  weights copied into `mri_hweights`, `-mriS-hw-weights.mgz`, a second key press), 308-318
+  (`-mriS-mapped.mgz`, `-mriT-mapped.mgz`, `-mriS-align.mgz`: `MRIclone(mriS)` and
+  `MyMRI::MRIlinearTransform(mri_Swarp, salign, cmd.first)`, the last step's update), 325-330
+  (`-mriS-weights.mgz`); `RegRobust.cpp` 391-398 (`-wcheck-est.txt`, an `ofstream` of its own:
+  precision 6); `RegPowell.cpp` 222-238 (the joint-histogram branch only: `cout.setf(ios::fixed,
+  ios::floatfield)`, ` e = ` with `setprecision(14)`, `vnl_matlab_print(vcl_cerr, p, "p", long)`
+  with no newline after, and at `icount == 0` `shw.mgz`/`thw.mgz` from `MRIclone(tcf)` mapped by
+  `vnl_inverse(msi)` / `vnl_inverse(mti)`); `mri_robust_register.cpp` 1037-1090 and 1093-1127 (the
+  half-way images' means: FS-1079 after a Powell registration), 1156-1164 (`To check debug output,
+  run:` and the `tkmedit` line). `flipInputs`' writes (3479, 3514) and `setSource`/`setTarget`'s
+  (3952, 3984) are not reached by the program. `findSatMultiRes` keeps the debug level, so the
+  saturation search's coarse levels write the iterations' images and wait for keys too (each call's
+  files overwrite the last).
+- `std::cout`'s state: `cout.setf(ios::fixed)` and `setprecision(14)` stay on the stream, so after the
+  first debug report of a joint-histogram cost every `double` on standard output prints with `%.14f`
+  (`   - initial cost:` right after it, the next levels' `   - initial iscale:` and `cout << M`, the
+  multiresolution lines, `Determinant`, `Intenstiy Scale Factor`, `Adjusting Intensity of MOV by`,
+  the joint histogram's error lines and `localNCC`'s `d is nan`). The port keeps one state for the
+  program (`fs.robust` `debug::Cout`, `RegRobust::cout`), copied into and out of the Powell
+  evaluations; the files and standard error keep the default.
+- `RegPowell::icount` is a static of the class: counted over every level and set to 0 after each
+  level's initial cost (`RegPowell.cpp` 520-522), so `shw.mgz`/`thw.mgz` are written at the first
+  level's initial cost and at each level's first Powell evaluation (the last wins); the port keeps
+  it in `RegRobust::powell_icount`. The other costs count but never write.
+- The key presses: libstdc++'s `operator>>(istream&, char&)` (a sentry that skips white space by the
+  C locale, then one `char`; at the end of the input `eofbit|failbit`, after which every sentry fails
+  without reading): `fs.robust` `debug::press_a_key`, which reads the program's standard input
+  (`Run::input`, the CLI's process standard input; the probe and the tests an empty one, as the
+  official runs' `/dev/null`).
+- The probe (`check.py --family debug`, 48 cases, `cases::debug_cases`: 20 fixed and 28 seeded, the
+  official program with `/dev/null` as standard input and the decided `cabs`/`csqrt`): 44 identical,
+  0 different, 4 not compared (FS-1063, FS-1067, two of FS-1075 with FS-1079, their defined parts
+  identical); the default differs on 11, each with its notice (FS-01 7, FS-1073 5, FS-1062 1). Log
+  `oracles/logs/fs-found-c-r49-debug1.log`.
+
+## 10. The Powell costs' speed (relay 49, bit for bit)
+
+- Measured before (relay 48, ds000228-sub-pixar008, one thread): `--cost LS --powelltol 0.1` 86 s against
+  FreeSurfer's 17-23 s, `--cost NCC --powelltol 0.1` 146 s against 33-41 s: every sample of the byte images
+  went through fs.volume's general `MRIsampleVolumeFrame` (its checks of every access, about 90 ns a
+  sample), and the mapped `float` images through `MRIgetVoxVal`/`MRIsetVoxVal`.
+- Changes (the same operations in the same order; `docs/porting-guide.md`'s bit-for-bit rule): fs.volume's
+  `ByteSampler` (a byte volume's samples read straight from its buffer, the corners' rows computed once;
+  finite weights and byte voxels make no NaN, so the plain operations are SSE's; any other call through
+  the general function); fs.volume's `cvtt` without libm's `trunc` (x86-64's baseline has no `roundsd`:
+  each `trunc` was a call; `as` truncates the same); the half-way costs' sampling points in plain
+  arithmetic (only the samplers' comparisons read them); the joint histogram's floor of a sample at or
+  above 0 by truncation; `costs::Floats` for the mapped images. The equality is tested
+  (`sample.rs`' `the_byte_sampler_gives_the_general_samplers_bits`: 4,000 seeded points on four volumes,
+  whole, edge, outside, NaN from its bits, huge, frames the volume lacks, both modes: the value's bits,
+  the status and the notices) and every probe family and head is identical in every byte after it.
+- Measured after (`real.py --heads ds000228-sub-pixar008 --extra '--cost <c> --powelltol 0.1' --preload`,
+  one thread; logs `oracles/logs/fs-found-c-r49-speed{1,2}.log`, jsons `C/r49/speed{,2}-<c>.json`):
+  `LS` 28.9 s against FreeSurfer's 22.9 s, `NCC` 48.8 s against 40.7 s, `MI` 45.9 s against 32.4 s
+  (FreeSurfer's times from the fresh official runs of the first measurement); every byte of standard
+  output, standard error and the files identical with `reproduce`. The record's own run (from a clean
+  commit, both fresh): `LS` 28.8 s against 20.1 s, `NCC` 48.7 against 38.7, `MI` 46.0 against 33.1. `costs_bench` (fs.robust's example,
+  128^3 random bytes): the byte sampler 12.9 ns a sample against the general one's 86 ns; least squares
+  34 ns a voxel. What is left (`timeline.py`, LS): the 128^3 level's evaluations (FreeSurfer about 16 ns a
+  voxel there, its images in the cache), the pyramid (fs.filter's blur and fs.volume's B-spline halving:
+  2.1 s each against 1.0 s) and the reading and reslicing (3.9 s against 2.3 s).

@@ -5,7 +5,7 @@
 //! integer arithmetic (`fs_robreg/cases.rs`' `golden_cases`: fMRIPrep's call with every output, an
 //! affine registration with its half-way outputs, a short source onto a float target of
 //! anisotropic voxels, the entropy images, the Powell registration; and on 16^3 byte images the
-//! mutual information and the SB cost; the test mode, `--test`), the SHA-256 of each case's line (exit status, standard
+//! mutual information and the SB cost; the test mode, `--test`; the debug output, `--debug`), the SHA-256 of each case's line (exit status, standard
 //! output and error, every file written; the time taken masked), against the value FreeSurfer
 //! 8.2.0's official
 //! program gives on the same inputs (`validation/probes/fs-robust-register/check.py --golden`,
@@ -22,10 +22,12 @@ use sha2::{Digest, Sha256};
 /// cases, the Powell registration (`--cost NCC`) added (the same value with the decided `cabs` and
 /// `csqrt` preloaded); again (relay 47, with that preload): 7 cases, `--cost MI` and `--cost SB` on
 /// 16^3 images added; again (relay 48, with that preload): 11 cases, the test mode (`--test 4`,
-/// `--test 5` on a float image, `--test 30`, `--test 0` on a 16^3 image) added.
-const OFFICIAL_SHA256: &str = "52064f87dd798f6a1a2eeeb724a1ec9e551afc4d8504d73f12cb7803c20eefa8";
+/// `--test 5` on a float image, `--test 30`, `--test 0` on a 16^3 image) added; again (relay 49,
+/// with that preload): 13 cases, the debug output (a robust registration with `--satit` and a
+/// half-way image, `--cost MI`) added.
+const OFFICIAL_SHA256: &str = "bf052cf0b9941520f25c04ef846ecdac5d5fa00bcea38049012b2c9f2e6fe2ee";
 /// The port's default on Linux x64 (FS-1078's pattern as voxel values, FS-1076's error).
-const FIX_SHA256: &str = "22ebb567183a3b5b749a0ba67f47edc74d8e93ddfb7c0253535267522d985dcb";
+const FIX_SHA256: &str = "8004a0c633cee42993b1af9a073891917721148916c692dce30eba0e6ff285d2";
 
 fn cases_digest(mode: UpstreamDefects) -> String {
     let mut h = Sha256::new();

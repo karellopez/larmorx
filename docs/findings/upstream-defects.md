@@ -504,6 +504,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FS-1076 | FreeSurfer 8.2.0 `mri_robust_register --test` | on an image of 16 to 31 voxels along its smallest axis the test reads past the end of its one-level image pyramid and registers the level the pyramid dropped (below 16 voxels), which then fails on its size | a (out of bounds; rule B) | none | an error by default, status 1; `reproduce` the dropped level, named | – |
 | FS-1077 | FreeSurfer 8.2.0 `mri_robust_register --test` | an image that does not read is reported as read successfully, then the program dies of a segmentation fault | a (crash) | none | an error in both modes, status 1, named | – |
 | FS-1078 | FreeSurfer 8.2.0 `mri_robust_register --test 5`, `--test 6` | the tests' integer pattern is written byte by byte into an image of shorts or floats: the first bytes of each row change instead of the pattern's voxels | c (rule A) | none | the pattern's values as voxel values by default; `reproduce` the bytes, named | – |
+| FS-1079 | FreeSurfer 8.2.0 `mri_robust_register --debug` with `--halfmov` or `--halfdst` (after a registration with a cost other than ROB and ROBENT) | after writing the half-way image the program takes its means over the registration's weights, which that registration does not have: it dies of a segmentation fault | a (crash; rule A) | none (no Powell registration or debug output in fMRIPrep or recon-all) | the means not printed by default, the program goes on; `reproduce` ends with status 139 there, named | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -4797,6 +4798,14 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
   input's type) the first bytes of each row change instead of the pattern's voxels. Evidence: verified
   (`reproduce` identical on the probe's four short and float cases). larmorx: the pattern's values as voxel
   values by default; `reproduce` the bytes. fMRIPrep and recon-all: none. Found 2026-11-23.
+- **FS-1079** (a, crash; rule A; relay 49 of track C): `--debug` with a half-way image (`--halfmov`,
+  `--halfdst`) after a registration with a cost other than ROB and ROBENT: after writing the image the
+  program would print its means over the registration's weights, and that registration has none: it dies
+  of a segmentation fault. Evidence: measured (the half-way family's 24 cases with `--debug --halfmov`, two
+  runs each, never served from a cache: the 6 whose half-way geometry FS-1075 left intact died so in both
+  runs, the image written; the others ended earlier on FS-1075). larmorx: the means' line not printed by
+  default, the program goes on; `reproduce` ends there with status 139. fMRIPrep and recon-all: none.
+  Found 2026-11-24 (queue 3.2-13).
 
 ### FS-809 to FS-812 zlib 1.2.11 (Ubuntu 22.04's build): deflatePrime with bytes waiting, the stored window's hash count, the dictionary past the window — (a, memory and out of bounds; rules A and B)
 - **What:** `deflatePrime` called while compressed bytes wait behind some already handed out writes its bits at the

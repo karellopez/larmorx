@@ -5,8 +5,8 @@ the robust registration's path, its outputs, the exit statuses, the defects with
 the validation plan, §7); the entropy images (`--cost ROBENT`, §2.1; relay 45); the Powell
 registration with `--cost` `LS`, `NCC`, `TB`, `LNCC` and `SAD` (§2.2; relay 46); its joint-histogram
 costs `MI`, `NMI`, `ECC`, `SCR` and the `SB` cost (§2.3; relay 47); the Powell registration's
-half-way outputs (§2.2, FS-1075; relay 48); the test mode (§2.4; relay 48); not yet specified:
-the debug output (§6). Written by the replica's author (track C, relay 44) as the
+half-way outputs (§2.2, FS-1075; relay 48); the test mode (§2.4; relay 48); the debug output
+(`--debug`, §6; relay 49): the program complete. Written by the replica's author (track C, relay 44) as the
 spec writer: behaviour, conventions and messages, for the clean room (`larmorx-fs-volumes`), which
 works from this file, the library modules' specs (`specs/freesurfer-robust.md` §16 for the
 registration itself, `freesurfer-volume.md` for the transforms' reading, conversion, writing and
@@ -338,7 +338,7 @@ in its place among Powell's lines (step 7).
      m1)`, `v2` likewise; for each column `i` of `C_i` not 0: `mu = (sum_j j P(j, i)) / C_i` and `sum_j
      (P(j, i) (j - mu)) (j - mu)` added to `D1`; for each row `i` of `R_i` not 0 the same with
      `P(i, j)` and `R_i`, added to `D2`; the result `(1 - D1 / v1) + (1 - D2 / v2)`.
-5. With `--debug` the evaluation's report follows the cost (§6).
+5. With `--debug` the evaluation's report follows the cost (§6.4).
 
 ### 2.4 The test mode (`--test <n> <image>`)
 
@@ -445,9 +445,9 @@ it aborts as FS-1070 describes for a missing name (§5: the same handling).
 
 0; 1 (the help, an unknown option or cost, a failed check, the `--mapmovhdr` write, `--uchar`'s
 change of type, FS-1070 by default, the test mode's unknown test and small or unreadable images,
-FS-1076 by default, FS-1077, the paths of §6); 251, 252, 255 (`ErrorExit` above, and the
+FS-1076 by default, FS-1077, §6.5's unsupported type); 251, 252, 255 (`ErrorExit` above, and the
 library's: the registration's own, `specs/freesurfer-robust.md` §16); 134 (FS-1070, FS-1071 and
-FS-1074 with `reproduce`); FS-1074 by default 1.
+FS-1074 with `reproduce`); FS-1074 by default 1; 139 (FS-1079 with `reproduce`).
 
 ## 5. The defects (`larmorx_core::defects`)
 
@@ -502,12 +502,108 @@ FS-1074 with `reproduce`); FS-1074 by default 1.
   with `reproduce`, the parameters by default; for the others, FS-1063, the parameters in both
   modes),
   FS-1062, FS-1067, FS-1068, FS-1069 (`specs/freesurfer-robust.md` §14 and §16).
+- **FS-1079** (crash): `--debug` with `--halfmov` or `--halfdst` after a Powell registration (every
+  cost but `ROB` and `ROBENT`): after writing the half-way image FreeSurfer takes its means over the
+  registration's weights (§6.5), and that registration has none: it dies of a segmentation fault
+  (measured: every case whose half-way geometry FS-1075 left intact, 6 of 24, both runs, status
+  SIGSEGV right after ` creating half-way movable ...` and the image written **(observed)**). By
+  default the means' line is not printed and the program goes on, noted; `reproduce` ends there
+  with status 139, noted.
 
-## 6. Not specified yet (the replica ends each with its own message and status 1)
+## 6. The debug output (`--debug`)
 
-The debug output (`--debug`: the library's intermediate images and key presses; with a
-joint-histogram cost the replica ends after the first cost: `RegPowell: the debug output (--debug)
-is not ported yet`).
+`--debug` sets the debug level 1, which also makes the registration's verbose level 2 (after
+`--verbose`'s, whatever it is). `<name>` is the registration's name (§2: the `--lta` name without
+its extension); every image below is written by FreeSurfer's volume writer (its messages when it
+cannot write; the program goes on, whatever the writer's result) under `<name>-<suffix>.mgz`,
+relative to the working folder as the name is, unless stated.
+
+### 6.1 Before the registration (`setSourceAndTarget`)
+
+1. When the source's axes are reordered towards the target's (`   Reordering axes in mov to better
+   fit dst... ( x y z )`), right after that line: `   Writing reordered source as <name>-mriS-reorder.mgz`
+   and the reordered source written.
+2. When the source is resliced (`    - reslicing Mov ...`): `   Reslice Mov Matrix: `, the resampling
+   matrix as C++ prints a VNL fixed matrix (each row's numbers separated by one blank, one row per
+   line, in the standard output's state, §6.6), an empty line, `   Writing resampled source as
+   <name>-mriS-resample.mgz` and the resliced source written. The same for the target (`   Reslice
+   Dst Matrix: `, `   Writing resampled target as <name>-mriT-resample.mgz`).
+
+### 6.2 The multiresolution registration
+
+1. After the initial transform is found (before the pyramids): ` Debug: writing inital MOV resampled
+   to DST ...` (sic), the initial transform in VNL's long format as `Minit` and an empty line; the
+   (resliced) source mapped onto a copy of the (resliced) target's grid and type by that transform
+   (the trilinear mapping of `specs/freesurfer-robust.md` §2.2), its intensities scaled by the
+   initial intensity scale (§2.1's scaling, offset 0); `    Filename: <name>-mapmov-init.mgz` and
+   that image written.
+2. After the pyramids' size checks: `  Saving Pyramid pyramidS` and each level `i` of the source's
+   pyramid (0 the finest) written as `pyramidS-r<i>.mgz` in the working folder (not under `<name>`);
+   then the target's as `  Saving Pyramid pyramidT`, `pyramidT-r<i>.mgz`.
+3. After the initial transform's lines (`Ti`, `Tia`): ` Debug: writing inital MOV (lowres) resampled
+   to DST (lowres)...`; the coarsest level's source mapped onto a copy of the coarsest target by the
+   adjusted transform (`Tia`) and scaled by the initial intensity scale, written as
+   `<name>-mapmov-low-init.mgz`; the coarsest target written as `<name>-mriT-low.mgz`.
+
+### 6.3 The robust registration's iterations (every call: the saturation search's levels too)
+
+1. In each iteration, after both images are mapped to the half-way space (before the step): the
+   mapped source written as `<name>-mriS-hw.mgz` and the mapped target as `<name>-mriT-hw.mgz`;
+   `HW inputs written as`, the two names (one a line); `Press a key to run registration: ` (no
+   newline) and a key press (below).
+2. In each iteration, after the convergence test, with the robust cost: a copy of the step's
+   weights written as `<name>-mriS-hw-weights.mgz`; `Weights written for this iteration`; `Press a key
+   to continue iterations: ` (no newline) and a key press.
+3. After the iterations: the last mapped source as `<name>-mriS-mapped.mgz`, the last mapped target
+   as `<name>-mriT-mapped.mgz`; the last mapped source mapped by the last step's update onto a copy of
+   the level's source grid (the trilinear mapping), as `<name>-mriS-align.mgz`; then, with the robust
+   cost, the last weights (in the half-way space) as `<name>-mriS-weights.mgz`.
+4. A key press is C++'s `std::cin >> ch` for a `char`: the standard output flushed; white space
+   skipped (blank, tab, newline, vertical tab, form feed, carriage return) and one character read
+   from the standard input; at its end (`/dev/null`, a closed pipe) or on a read error the stream
+   fails, and every later key press returns at once without reading. Nothing else depends on it.
+5. The saturation search (`--satit`), after its ` - final SAT:` line: the file
+   `<name>-wcheck-est.txt` holding `<sat> <wcheck>` and a newline (C++'s default number format); a
+   file that cannot be created is skipped (its `errno` stays for later messages).
+
+### 6.4 The Powell registration's evaluations (the joint-histogram costs only)
+
+For `MI`, `NMI`, `ECC` and `SCR` (not `LS`, `NCC`, `TB`, `LNCC`, `SAD`, `SB`), each evaluation of the
+cost, after it is computed: the standard output's state becomes fixed notation with 14 decimals
+(§6.6), and stays so for the rest of the program; ` e = <cost>  @  ` (no newline; the cost as the
+minimiser sees it, sign turned) and the parameters on standard error in VNL's long format as `p = [
+... ]` and a newline. The evaluations are counted over the whole program (every level), the count
+set to 0 after each level's initial cost: at the evaluation counted as 0 (the first level's initial
+cost, then each level's first evaluation of Powell's method) two images are written in the working
+folder: `shw.mgz`, the byte source mapped onto a copy of the byte target's grid by the inverse of
+the evaluation's source map, and `thw.mgz`, the byte target mapped by the inverse of its target map
+(§2.2's `msi`, `mti`; the trilinear mapping).
+
+### 6.5 The program's own
+
+1. After writing `--halfmov`'s image (and likewise `--halfdst`'s), the means of that image over the
+   weights (in the half-way space; both walked voxel by voxel in their storage order, the image's
+   values as `float`: `uchar`, `short`, `ushort`, `int`, `long` and `float` images; another type:
+   `MRIiterator: Type not supported: <type>` on standard error, status 1): ` mov int means: <m> ( <n>
+   )  w0: <m0> ( <n0> ) w1: <m1> ( <n1> )  weighted: <mw> ( <sw> )` (the same words for the
+   destination), where `m` is the sum of the voxels (in `double`) over their number `n` (an `int`),
+   `m0` the same over the voxels whose weight's absolute value is above 0.0001, `m1` over those whose
+   weight is within 0.0001 of 1 (the difference in `double`), `mw` the sum of the `float` products
+   voxel times weight (each rounded to `float`, summed in `double`) over `sw`, the sum of the weights
+   in `double`; numbers in the standard output's state; 0 / 0 prints `-nan`. After a Powell
+   registration: FS-1079.
+2. At the end, before the time line's empty line: an empty line, `To check debug output, run:` and
+   `  tkmedit -f <name>-mriS-mapped.mgz -aux <name>-mriT-mapped.mgz -overlay <name>-mriS-weights.mgz`.
+
+### 6.6 The standard output's state
+
+Numbers printed with C++'s `<<` on standard output follow one state for the whole program: 6
+significant digits at the start; 14 significant digits once a Powell registration has printed its
+final error (` final e = `); fixed notation with 14 decimals (`%.14f`) from a joint-histogram cost's
+first debug report (§6.4) on, for every later number on standard output (the initial cost's line,
+the following levels' lines, §3's determinant and intensity scale, §6.5's means, the joint
+histogram's error lines). The files (`--iscaleout`, `-wcheck-est.txt`) and standard error keep the
+default.
 
 ## 7. Validation plan (for the clean room)
 
@@ -533,6 +629,14 @@ is not ported yet`).
   FS-1063 not compared) standard output up to `Creating half way data ...`, standard error up to
   the second map and every file but the half-way ones identical, and 4 identical in every byte (the
   official program's memory still held the target's grid) **(observed)**.
+- The debug output (§6): a family of 48 cases (`--debug` with a name in a folder that does not
+  exist, a name without an extension or of an extension only, `--initorient`, `--nomulti`, `--verbose
+  0`, `--leastsquares`, no symmetry, the half-way images, a 2-D pair, the entropy images, resliced and
+  reordered sources, every Powell cost on several levels and alone, the seeded family's random
+  options), the official program's standard input `/dev/null`, the same preload: 44 identical, 4 not
+  compared (FS-1063, FS-1067, and two of FS-1075 and FS-1079, their defined parts identical)
+  **(observed)**. FS-1079 measured on the half-way family's 24 cases with `--debug --halfmov`, two
+  runs each: §5 **(observed)**.
 - fMRIPrep's call (`--satit --iscale --mov T1.mgz --dst <T1w> --lta <out>`) on the six recorded
   heads' `T1.mgz` onto their `rawavg.mgz` (`<workspace>/oracles/freesurfer-8.2.0/runs/<head>-classic/
   subjects/<subject>/mri/`), against the official program at one thread: the transform byte for byte,

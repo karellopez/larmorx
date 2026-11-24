@@ -149,11 +149,28 @@ Not yet: the `debug > 0` paths (with `mri_robust_register`, 3.2-13); not reached
 - **FS-1068** (`registration::get_half_way_maps`): the half-way maps before any iteration (FreeSurfer reads
   empty matrices): an error in both modes, noted. **FS-1069** (`regstep::construct_ab`): a step of two
   images of different extents, frames or types (FreeSurfer reads past one): an error in both modes, noted.
-- A debug level above 0 (`--debug`): `Registration: the debug output (--debug) is not ported yet` and
-  status 1 (its writes and key waits come with 3.2-13).
+- A debug level above 0 (`--debug`): ported in relay 49 (below).
 - `src/entropy.rs` (queue 3.2-13, relay 45 of track C): `mri_robust_register/MyMRI.cpp`
   `MyMRI::entropyImage(MRI*, int, bool, bool, MRI*)` (1177-1569) and `MyMRI::get3Dcorrection`
   (1571-1631), FreeSurfer 8.2.0. Changes: FS-1074 (rule B: a negative or overflowing radius an error by
   default; `reproduce` the abort or the 2-D zeros); the OpenMP slices on the port's threads (each voxel
   computed alone); `log` and `exp` through `larmorx_core::math::Libm` (correctly rounded by default,
   glibc 2.35's with `reproduce`).
+- `src/debug.rs` and the debug sites of `src/registration.rs`, `src/powell.rs` (queue 3.2-13, relay 49
+  of track C): `mri_robust_register/Registration.cpp` 717-728, 760-764, 790-802,
+  `saveGaussianPyramid` (3153-3165), 3311-3320, 3642-3647, 3843-3849, 3874-3880; `RegRobust.h`
+  193-203, 277-292, 308-318, 325-330; `RegRobust.cpp` 391-398; `RegPowell.cpp` 222-238 and its static
+  `icount` (51, 520-522), FreeSurfer 8.2.0; VXL's `vnl_matrix_fixed::print` (ITK 4.13.2's
+  `vnl_matrix_fixed.hxx` 150-159, BSD-3) for `std::cout << M`; libstdc++'s `operator>>(istream&,
+  char&)` as a black box (a sentry that skips the C locale's white space, then one `char`; at the end
+  of the input the stream fails for good). Changes: the program's `std::cout` state (`debug::Cout`:
+  RegPowell's `setf(ios::fixed)` and `setprecision(14)` stay for the rest of the program) is kept in
+  `RegRobust::cout` and passed to the joint histogram's and `localNCC`'s lines; the key presses read
+  the program's standard input through `Io::input` (`None`: an empty one); each debug image written by
+  fs.io's `MRIwrite`, its status not looked at.
+- Speed (relay 49, bit for bit): the Powell costs' samples of their byte images through fs.volume's
+  `ByteSampler` (`MRIsampleVolumeFrame`'s operations in the same order, the voxels read straight from
+  the buffer), the mapped `float` images (`mapMRI`, `mean`, `NCC`, `localNCC`, `SBCost`) read and
+  written straight where every voxel lies inside them (`costs::Floats`); any other image through the
+  general functions.
+

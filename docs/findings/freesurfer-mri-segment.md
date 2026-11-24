@@ -177,4 +177,11 @@ opened is skipped silently (`if (fp)`).
 
 ## 5. The heads' cases and seed 2
 
-(Filled in with the runs' numbers.)
+- The open probe with `--heads` (relay 56, from ea747d34's code): 10 cases on two recorded heads
+  (ds000005 classic, ds004173 v8; recon-all's options with `-noauto`, `-seg aseg.presurf.mgz 3 3 2
+  2`, `-fillbg -fillv`, `-thicken 0`, `-keep` on the head's `wm.mgz`): 10 identical in both modes.
+  On the heads `-fillbg -fillv` find ventricles (no FS-1227), and `-seg` reaches every step of the
+  non-parametric path and `MRIcomputeClassStatisticsSeg` with both classes.
+- Seed 2: 139 cases; `reproduce` 130 identical, 9 counted, 0 different; `fix` 85 identical, 45
+  explained, 0 unexplained.
+- The final record's runs (from a clean commit): `docs/validation/freesurfer-mri-segment.md`.

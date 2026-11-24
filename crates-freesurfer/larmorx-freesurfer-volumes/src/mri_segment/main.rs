@@ -896,8 +896,7 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     let mut labels: Option<Mri> = None;
     let mut leaked: Option<Mri> = None;
     let mut st = Stats::default();
-    let tmp: Mri;
-    match o.segfilename.clone() {
+    let tmp: Mri = match o.segfilename.clone() {
         None => {
             labels = Some(mri_clone(g, r.out, r.err, &src, None)?.unwrap_new());
             if o.auto_detect_stats && !o.wm_low_set {
@@ -1019,12 +1018,10 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
             let _ = writeln!(r.out, " wm_hi  {}", pg(f64::from(o.wm_hi)));
             let _ = writeln!(r.out, " gray_low {}", pg(f64::from(o.gray_low)));
             let _ = writeln!(r.out, " gray_hi  {}", pg(f64::from(o.gray_hi)));
-            tmp = t;
+            t
         }
-        Some(segname) => {
-            tmp = seg_path(g, r, &mut o, &src, segname.as_deref(), &mut st)?;
-        }
-    }
+        Some(segname) => seg_path(g, r, &mut o, &src, segname.as_deref(), &mut st)?,
+    };
     // with reproduce the mask became the labels (FreeSurfer's call); either way it is done
     o.min_wm_mask = None;
 

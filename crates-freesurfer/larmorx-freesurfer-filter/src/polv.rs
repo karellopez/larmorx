@@ -513,8 +513,7 @@ pub fn cpolv_median_curve_segment(
         diag_show_pct_done(g, err, z as f32 / (depth - 1) as f32, 5);
         for y in 0..height {
             for x in 0..width {
-                let (zl, yl, xl) = (i64::from(z), i64::from(y), i64::from(x));
-                let label = mem::read(g, LABEL_BYTES, WHAT, labeled, zl, yl, xl, MRI_UCHAR) as i32;
+                let label = byte_read(g, WHAT, labeled, x, y, z) as i32;
                 if label != MRI_AMBIGUOUS {
                     continue;
                 }
@@ -527,6 +526,7 @@ pub fn cpolv_median_curve_segment(
                 } else {
                     noff += 1;
                 }
+                let (zl, yl, xl) = (i64::from(z), i64::from(y), i64::from(x));
                 mem::write(g, LABEL_BYTES, WHAT, &mut dst, zl, yl, xl, &[label as u8]);
             }
         }
@@ -897,12 +897,18 @@ pub fn thicken_thin_wm_strands_in_place(
         }
         mriseg.segments[i as usize].ignore = 1;
 
-        // the holes between the strand's voxels
+        // the holes between the strand's voxels: a voxel filled lies between two of the
+        // segment's, so only the box around them (inside the volume's border) is looked at; the
+        // fills stay inside it
+        let bx = nonzero_box(g, err, &thin)?;
         loop {
             let mut nfilled = 0i32;
-            for z in 1..depth - 1 {
-                for y in 1..height - 1 {
-                    for x in 1..width - 1 {
+            let Some(((x0, y0, z0), (x1, y1, z1))) = bx else {
+                break;
+            };
+            for z in z0.max(1)..=z1.min(depth - 2) {
+                for y in y0.max(1)..=y1.min(height - 2) {
+                    for x in x0.max(1)..=x1.min(width - 2) {
                         if nbhd_fill(g, err, t1, dst, &thin, x, y, z, wm_hi)? {
                             mri_set_vox_val(g, err, dst, x, y, z, 0, NBHD_FILL as f32, 0)?;
                             mri_set_vox_val(g, err, &mut thin, x, y, z, 0, NBHD_FILL as f32, 0)?;
@@ -945,6 +951,27 @@ fn segment_image(
         }
         None => Ok(mri_segment_to_image(g, out, err, src, None, mriseg, i)?.into_new()),
     }
+}
+
+/// The smallest box holding every voxel of frame 0 that is not 0 (`None` when there is none).
+type Box3 = ((i32, i32, i32), (i32, i32, i32));
+fn nonzero_box(g: &mut Globals, err: &mut dyn Write, m: &Mri) -> Result<Option<Box3>, Fatal> {
+    let (w, h, d) = (m.vg.width, m.vg.height, m.vg.depth);
+    let (mut lo, mut hi) = (
+        (i32::MAX, i32::MAX, i32::MAX),
+        (i32::MIN, i32::MIN, i32::MIN),
+    );
+    for z in 0..d {
+        for y in 0..h {
+            for x in 0..w {
+                if vox_val(g, err, m, x, y, z)? != 0.0 {
+                    lo = (lo.0.min(x), lo.1.min(y), lo.2.min(z));
+                    hi = (hi.0.max(x), hi.1.max(y), hi.2.max(z));
+                }
+            }
+        }
+    }
+    Ok((lo.0 <= hi.0).then_some((lo, hi)))
 }
 
 /// One voxel of a segment of `MRIthickenThinWMStrands`: the voxels it fills.
@@ -1046,7 +1073,9 @@ fn nbhd_fill(
     z: i32,
     wm_hi: f32,
 ) -> Result<bool, Fatal> {
-    if vox_val(g, err, dst, x, y, z)? != 0.0 || !(vox_val(g, err, t1, x, y, z)? < wm_hi) {
+    // !MRIgetVoxVal(dst) && MRIgetVoxVal(T1) < wm_hi (a NaN T1 fails it)
+    let below = vox_val(g, err, t1, x, y, z)?.partial_cmp(&wm_hi) == Some(std::cmp::Ordering::Less);
+    if vox_val(g, err, dst, x, y, z)? != 0.0 || !below {
         return Ok(false);
     }
     let on =
@@ -1073,6 +1102,76 @@ fn nbhd_fill(
     Ok(true)
 }
 
+/// `MRIbinarize(segment, NULL, WM_MIN_VAL, 0, 1)`: a byte volume's voxels compared directly (the
+/// same values), any other through [`mri_binarize`].
+fn binarize_strand(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    segment: &Mri,
+) -> Result<Mri, Fatal> {
+    if segment.mtype == MRI_UCHAR && segment.chunk.is_some() {
+        let mut strand = mri_clone(g, out, err, segment, None)?.unwrap_new();
+        if let (Some(src), Some(dst)) = (segment.chunk.as_ref(), strand.chunk.as_mut())
+            && src.len() == dst.len()
+        {
+            for (d, s) in dst.iter_mut().zip(src) {
+                *d = u8::from(i32::from(*s) >= WM_MIN_VAL);
+            }
+            return Ok(strand);
+        }
+    }
+    Ok(mri_binarize(g, out, err, Pair::New(segment), WM_MIN_VAL as f32, 0.0, 1.0)?.unwrap_new())
+}
+
+/// `MRIxor(strand, border, border, 1, 255)`: two byte volumes of one extent and frame compared
+/// directly (each on within 1..255; 1 where exactly one is), any others through [`mri_xor`].
+fn xor_border(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    strand: &Mri,
+    border: &mut Mri,
+) -> Result<(), Fatal> {
+    let same = strand.mtype == MRI_UCHAR
+        && border.mtype == MRI_UCHAR
+        && strand.nframes == 1
+        && border.nframes == 1
+        && (strand.vg.width, strand.vg.height, strand.vg.depth)
+            == (border.vg.width, border.vg.height, border.vg.depth);
+    if same
+        && let (Some(a), Some(b)) = (strand.chunk.as_ref(), border.chunk.as_mut())
+        && a.len() == b.len()
+    {
+        for (d, s) in b.iter_mut().zip(a) {
+            *d = u8::from((*s >= 1) != (*d >= 1));
+        }
+        return Ok(());
+    }
+    mri_xor(g, out, err, Tri::Second(strand, border), 1, 255)?;
+    Ok(())
+}
+
+/// `MRIvox(m, x, y, z)` of a voxel of the volume: its byte (a byte volume's read directly; any
+/// other type's byte as FreeSurfer reads it, FS-1225).
+#[inline]
+fn byte_read(g: &mut Globals, what: &str, m: &Mri, x: i32, y: i32, z: i32) -> f32 {
+    if m.mtype == MRI_UCHAR
+        && let Some(c) = m.chunk.as_ref()
+        && (0..m.vg.width).contains(&x)
+        && (0..m.vg.height).contains(&y)
+        && (0..m.vg.depth).contains(&z)
+    {
+        let o =
+            (z as usize * m.vg.height as usize + y as usize) * m.vox_per_row as usize + x as usize;
+        if let Some(b) = c.get(o) {
+            return f32::from(*b);
+        }
+    }
+    let (zl, yl, xl) = (i64::from(z), i64::from(y), i64::from(x));
+    mem::read(g, LABEL_BYTES, what, m, zl, yl, xl, MRI_UCHAR)
+}
+
 /// `MRIfillPlanarHoles(mri, mri_segment, mri, mseg)` as `MRIthickenThinWMStrands` calls it (the
 /// volume its own destination: FreeSurfer's copy does nothing): the segment's image binarised at
 /// `WM_MIN_VAL` to 0 and 1 (`MRIbinarize`), its border (dilated twice, `MRIdilate`, minus the
@@ -1095,11 +1194,10 @@ pub fn fill_planar_holes_in_place(
 ) -> Result<(), Fatal> {
     let (width, height, depth) = (dst.vg.width, dst.vg.height, dst.vg.depth);
     let _ = basis();
-    let mut strand =
-        mri_binarize(g, out, err, Pair::New(segment), WM_MIN_VAL as f32, 0.0, 1.0)?.unwrap_new();
+    let mut strand = binarize_strand(g, out, err, segment)?;
     let mut border = mri_dilate(g, out, err, Pair::New(&strand))?.unwrap_new();
     mri_dilate(g, out, err, Pair::Same(&mut border))?;
-    mri_xor(g, out, err, Tri::Second(&strand, &mut border), 1, 255)?;
+    xor_border(g, out, err, &strand, &mut border)?;
     let mut total_filled = 0i32;
     if diag_write_verbose(g) {
         let _ = writeln!(err, "writing binary strand and border images...");
@@ -1107,31 +1205,44 @@ pub fn fill_planar_holes_in_place(
         write_diag(g, out, err, ctx, &mut border, "strand_border.mgh")?;
     }
     const WHAT: &str = "MRIfillPlanarHoles";
-    loop {
-        let mut nfilled = 0i32;
-        for z in 0..depth {
-            for y in 0..height {
-                for x in 0..width {
-                    let (zl, yl, xl) = (i64::from(z), i64::from(y), i64::from(x));
-                    if mem::read(g, LABEL_BYTES, WHAT, dst, zl, yl, xl, MRI_UCHAR)
-                        > WM_MIN_VAL as f32
-                        || mem::read(g, LABEL_BYTES, WHAT, &border, zl, yl, xl, MRI_UCHAR) == 0.0
-                    {
-                        continue;
-                    }
-                    let vertex = cpolv_max_white_at_voxel(g, err, &strand, x, y, z, 5)?;
-                    if cpolv_all_quadrants_filled(g, err, &strand, x, y, z, vertex, 5)
-                        && neighbors_on(g, err, &strand, x, y, z, 1)?
-                            == neighbors_on(g, err, dst, x, y, z, WM_MIN_VAL)?
-                    {
-                        mri_set_vox_val(g, err, dst, x, y, z, 0, THICKEN_FILL as f32, 0)?;
-                        mri_set_vox_val(g, err, &mut strand, x, y, z, 0, 1.0, 0)?;
-                        mri_set_vox_val(g, err, &mut border, x, y, z, 0, 0.0, 0)?;
-                        nfilled += 1;
-                    }
+    // the voxels a pass looks at further, in its order (slices outer): a voxel's own test reads
+    // only its own place in the volume and the border, which only filling it changes
+    let mut candidates: Vec<(i32, i32, i32)> = Vec::new();
+    for z in 0..depth {
+        for y in 0..height {
+            for x in 0..width {
+                if byte_read(g, WHAT, dst, x, y, z) > WM_MIN_VAL as f32
+                    || byte_read(g, WHAT, &border, x, y, z) == 0.0
+                {
+                    continue;
                 }
+                candidates.push((x, y, z));
             }
         }
+    }
+    loop {
+        let mut nfilled = 0i32;
+        let mut kept = Vec::with_capacity(candidates.len());
+        for &(x, y, z) in &candidates {
+            let vertex = cpolv_max_white_at_voxel(g, err, &strand, x, y, z, 5)?;
+            if cpolv_all_quadrants_filled(g, err, &strand, x, y, z, vertex, 5)
+                && neighbors_on(g, err, &strand, x, y, z, 1)?
+                    == neighbors_on(g, err, dst, x, y, z, WM_MIN_VAL)?
+            {
+                mri_set_vox_val(g, err, dst, x, y, z, 0, THICKEN_FILL as f32, 0)?;
+                mri_set_vox_val(g, err, &mut strand, x, y, z, 0, 1.0, 0)?;
+                mri_set_vox_val(g, err, &mut border, x, y, z, 0, 0.0, 0)?;
+                nfilled += 1;
+                // THICKEN_FILL is above WM_MIN_VAL and the border 0: no longer looked at
+                if byte_read(g, WHAT, dst, x, y, z) > WM_MIN_VAL as f32
+                    || byte_read(g, WHAT, &border, x, y, z) == 0.0
+                {
+                    continue;
+                }
+            }
+            kept.push((x, y, z));
+        }
+        candidates = kept;
         total_filled += nfilled;
         if nfilled <= 0 {
             break;

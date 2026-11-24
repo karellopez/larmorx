@@ -395,7 +395,7 @@ def whole_path_texts(args: Sequence[str]) -> list[str]:
 #: program registered in larmorx-freesurfer (its crates' ``PROGRAMS``) is missing here;
 #: ``fs_temp_file`` and ``getfullpath`` read no file but are listed, so the rule has no exception;
 #: ``mri_vol2vol`` from relay 53 of track A, ``mri_concat`` from relay 55 (no run of either was in
-#: the cache before).
+#: the cache before), ``mri_segment`` from relay 56 of track D (none before either).
 EXTENSION_FROM_WHOLE_PATH = (
     "fs_temp_file",
     "fsunit",
@@ -411,6 +411,7 @@ EXTENSION_FROM_WHOLE_PATH = (
     "mri_mask",
     "mri_normalize",
     "mri_robust_register",
+    "mri_segment",
     "mri_segstats",
     "mri_vol2vol",
     "mris_calc",

@@ -406,12 +406,13 @@ impl<'a> ByteSampler<'a> {
         let t6 = xmd * ypd * zmd * v(rmp + xp);
         let t7 = xmd * ymd * zpd * v(rpm + xp);
         let t8 = xmd * ymd * zmd * v(rpp + xp);
+        // `trilinear`'s order of additions (IEEE addition commutes: `t4 + s` is `s + t4` here)
         let mut s = t1 + t2;
         s += t3;
-        s = t4 + s;
+        s += t4;
         s += t5;
-        s = t6 + s;
-        s = t7 + s;
+        s += t6;
+        s += t7;
         s += t8;
         *pval = s;
         NO_ERROR

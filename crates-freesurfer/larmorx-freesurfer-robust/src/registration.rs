@@ -1693,11 +1693,11 @@ impl RegRobust {
             debug_write(g, io, &mut salign, &format!("{name}-mriS-align.mgz"))?;
         }
         self.mri_weights = None;
-        if self.debug > 0 {
-            if let Some(hw) = self.mri_hweights.as_mut() {
-                let n = format!("{}-mriS-weights.mgz", self.name);
-                debug_write(g, io, hw, &n)?;
-            }
+        if self.debug > 0
+            && let Some(hw) = self.mri_hweights.as_mut()
+        {
+            let n = format!("{}-mriS-weights.mgz", self.name);
+            debug_write(g, io, hw, &n)?;
         }
         if let Some(hw) = &self.mri_hweights {
             let v = &mri_t.vg;

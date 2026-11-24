@@ -330,7 +330,10 @@ Reading bin b with b < 0 or b ≥ the allocation is **FS-22** (§1's out-of-rang
 - **Initialise** (h, n, lo, hi): h absent: a new histogram of n bins; given: cleared (its `nbins`
   is **not** changed: its callers set it); n above `max_bins`: the program ends, code -4, `HISTOinit:
   nbins <n> bigger than max bins <max_bins>` + `\n`. When hi ≤ lo: lo = 0, hi = `max_bins - 1`.
-  `min = (float) lo`, `max = (float) hi`, `bin_size = (float)((hi - lo) / (n - 1))` (double), then 1
+  `min = (float) lo`, `max = (float) hi`, `bin_size = (float)((hi - lo) / (n - 1))` (double; `n - 1` in C's 32-bit
+  `int`, wrapping: a given histogram's n of -2147483648 divides by 2147483647, a positive size, where n -2147483647
+  divides by -2147483648 and the size becomes 1; **(observed)**: the probe's `hinit` on a given histogram of 4 bins,
+  the limits 0 and 10: sizes `31a00000` and `3f800000`, `hmake`'s last three lines), then 1
   when at or below 0 (compared as `bin_size <= 0`, so a NaN size stays NaN: a NaN limit (**(observed)**: `hmake`, `hinit`
   with the NaN limits of the double specials), or one bin over an empty range, `0 / 0`,
   **(observed)**: the volume probe's `vhist`, `MRIhistogramVoxel` of a window of no voxels with one bin, the size
@@ -1374,7 +1377,7 @@ it, and again from the cache:
 
 | Group | § | Calls | Memory or crash | EXIT | TIMEOUT | SHA-256 |
 |---|---|---|---|---|---|---|
-| `hmake` | 5.1, 5.2 | 632 | 38 | 3 | 0 | `f0f701cd2f25ee6a1d531c5a50ae3b0b06ca75b6b1fe39e136a7c4d2404146a7` |
+| `hmake` | 5.1, 5.2 | 635 | 38 | 3 | 0 | `b4885c9392e7dd25e189560af52132e7ae0fc52341e5abb1378cc0901cc1188a` |
 | `harith` | 5.3, 21 | 4,364 | 34 | 28 | 0 | `9dd8b0231e076d6d842ab058965e65c3dc7bfde90d4b47401f20f0bcb839eb8e` |
 | `hsmooth` | 5.4 | 450 | 0 | 0 | 0 | `6849da4e3bca2b357f0279e90cdb6b2a39879aa6fe321eced7411f5253a47ed9` |
 | `hsearch` | 5.5 | 3,360 | 249 | 0 | 0 | `d56865eae1fc05166fffc44424405f680c10f6502bbf975232cb9dcb63d28e8e` |
@@ -1398,7 +1401,7 @@ it, and again from the cache:
 | `svd` | 17.4, 17.5 | 2,619 | 354 | 0 | 142 | `e9ebe994f41da2186d1db9474ad78d48dff661a3771a9c9885c5e7b341e785ea` |
 | `mfiles` | 18 | 723 | 28 | 0 | 1 | `8f0ce51069988159cef0214e0f1d893466876b02e7c25233935648a8668c1886` |
 | `rfields` | 19 | 16 | 0 | 0 | 0 | `6f26117e696800de35160344e0a49825b4ff992d68dc6a500ca215703240ce15` |
-| all | | 28,708 | 1,769 | 137 | 299 | |
+| all | | 28,711 | 1,769 | 137 | 299 | |
 
 The groups `eigen`, `svd` and `mfiles` gained the batches `eigen-nonfinite`, `svd-nonfinite` and
 `mfiles-cut` (§17, §18.2; generators of their own, the groups' other cases unchanged) on 2026-11-13;
@@ -1420,7 +1423,10 @@ of the other two batches as §17.5). The groups `melements` and `mvectors` gaine
 (§8.5's cross and triple products, 21 calls) on 2026-11-17 (relay 8): their hashes from then (cold,
 warm and without the cache identical; the probe as its own candidate identical in both modes; log
 `oracles/logs/fs-maths-probe-r8-nan-2026-11-17.log`). `mfiles`' one `TIMEOUT` is a memory line (an empty
-file read into a new matrix: its sizes come from memory) that ends otherwise in some processes.
+file read into a new matrix: its sizes come from memory) that ends otherwise in some processes. The group
+`hmake` gained three fixed `hinit` lines at its end (§5.2's `n - 1` in a 32-bit `int`) on 2026-11-24 (relay 21): its
+hash from then (its earlier 632 lines unchanged; cold, warm and without the cache identical; the probe as its own
+candidate identical in both modes).
 
 ### 23.3 The comparison
 

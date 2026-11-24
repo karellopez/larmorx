@@ -13,7 +13,9 @@
 // §57); volume-to-volume resampling, frame covariance and principal components, the false discovery
 // rate, regions and voxel neighbourhood measures (part 9, §41 to §44); the Talairach helpers, dilation
 // and segment helpers, conforming, set operations, morphology, masks and counts, and the volume
-// histograms (part 10, §46 to §52); fs.bspline: the
+// histograms (part 10, §46 to §52); filling a coarser grid, bright voxels outside the white matter,
+// voxel topology and the binary-volume classes (part 11a, §59 and §60); the rotation and scale of a
+// transform (§64) and voxel lists of a region (§65); fs.bspline: the
 // B-spline coefficients, their sampling, transforms and factor-of-two pyramids,
 // specs/freesurfer-bspline.md), linked against the unit oracle's libutils.a (GCC 8.4.0,
 // FreeSurfer's flags). It holds only calls of FreeSurfer's functions (and of the C library's) by name
@@ -58,6 +60,8 @@
 #include "resample.h"
 #include "transform.h"
 #include "utils.h"
+#include "voxlist.h"
+#include "mriTransform.h"
 
 // functions of FreeSurfer's library that its headers do not declare
 int MRIcopyVolGeomToMRI(MRI *mri, const VOL_GEOM *vg);
@@ -933,6 +937,106 @@ static IMAGE *getimg(size_t *bytes)
   }
   I->numcolor = GIVEN_MARK;
   return I;
+}
+
+// a volume or none: null, or W P
+static MRI *getwn()
+{
+  if (take("null")) return NULL;
+  MRI *m = getw();
+  paint(m);
+  return m;
+}
+// BF, a BinarizeMRI's fields (README.md): BinType thmin thmax n match×n maskthmin maskthmax zce zre zse
+// OnVal OffVal fstart fend invert mritype DoAbs m_debug (the doubles as doubles, the rest integers)
+static void getbin(BinarizeMRI *b)
+{
+  b->BinType = geti();
+  b->thmin = getd();
+  b->thmax = getd();
+  int n = geti();
+  for (int i = 0; i < n; i++) b->matchlist.push_back(geti());
+  b->maskthmin = getd();
+  b->maskthmax = getd();
+  b->ZeroColEdges = geti();
+  b->ZeroRowEdges = geti();
+  b->ZeroSliceEdges = geti();
+  b->OnVal = getd();
+  b->OffVal = getd();
+  b->fstart = geti();
+  b->fend = geti();
+  b->invert = geti();
+  b->mritype = geti();
+  b->DoAbs = geti();
+  b->m_debug = geti();
+}
+// the fields a binarize call may change: fstart fend nhits OnVal OffVal
+static void putbin(const BinarizeMRI *b)
+{
+  puti(b->fstart);
+  puti(b->fend);
+  puti(b->nhits);
+  putd(b->OnVal);
+  putd(b->OffVal);
+}
+// DF, a DEMorphBinVol's fields: morphtype topo nnbrsthresh nmorph frame mm_mritype mm_debug
+static void getdem(DEMorphBinVol *d)
+{
+  d->morphtype = geti();
+  d->topo = geti();
+  d->nnbrsthresh = geti();
+  d->nmorph = geti();
+  d->frame = geti();
+  d->mm_mritype = geti();
+  d->mm_debug = geti();
+}
+// VL, a voxel list: null, or <alloc> <nvox>: VLSTalloc(alloc), its arrays filled (voxel i: xi 1000 + i,
+// yi 2000 + i, zi 3000 + i, fi 4000 + i, xd i + 0.5, yd i + 0.25, zd i + 0.125, vsrc -1 - i, vdst -2 - i),
+// then nvox set
+static VOXEL_LIST *getvl(int *alloc)
+{
+  *alloc = 0;
+  if (take("null")) return NULL;
+  int n = geti(), nv = geti();
+  VOXEL_LIST *vl = VLSTalloc(n);
+  for (int i = 0; i < n; i++) {
+    vl->xi[i] = 1000 + i;
+    vl->yi[i] = 2000 + i;
+    vl->zi[i] = 3000 + i;
+    vl->fi[i] = 4000 + i;
+    vl->xd[i] = (float)i + 0.5f;
+    vl->yd[i] = (float)i + 0.25f;
+    vl->zd[i] = (float)i + 0.125f;
+    vl->vsrc[i] = -1.0f - (float)i;
+    vl->vdst[i] = -2.0f - (float)i;
+  }
+  vl->nvox = nv;
+  *alloc = n;
+  return vl;
+}
+// a voxel list: null, or max_vox nvox type, `self` when its volume is the given one (else `other` or
+// `none`), then for each of its first len voxels xi yi zi fi (integers) xd yd zd vsrc vdst (floats)
+static void putvl(const VOXEL_LIST *vl, const MRI *mri, int len)
+{
+  if (!vl) {
+    out("null");
+    return;
+  }
+  puti(vl->max_vox);
+  puti(vl->nvox);
+  puti(vl->type);
+  out(vl->mri == mri ? "self" : vl->mri ? "other" : "none");
+  for (int i = 0; i < len; i++) {
+    puti(vl->xi[i]);
+    puti(vl->yi[i]);
+    puti(vl->zi[i]);
+    puti(vl->fi[i]);
+    putf(vl->xd[i]);
+    putf(vl->yd[i]);
+    putf(vl->zd[i]);
+    putf(vl->vsrc[i]);
+    putf(vl->vdst[i]);
+  }
 }
 
 // ---- the commands (README.md, "Commands") ------------------------------------------------------
@@ -3291,6 +3395,198 @@ static void call(const std::string &c)
     fflush(stdout);
     putres(res, a, NULL, d);
   }
+  // ---- part 11a (§59, §60), §64's and §65's functions of mri_cc --------------------------------
+  else if (c == "vvfill") {
+    MRI *a = getw();
+    paint(a);
+    MRI *m = getwn();
+    LTA *l = getlta();
+    int usf = geti(), cons = geti();
+    MRI *d = take("new") ? NULL : getw();
+    fflush(stdout);
+    MRI *res = MRIvol2VolFill(a, m, l, usf, cons, d);
+    fflush(stdout);
+    putres(res, a, NULL, d);
+    putlta(l);
+  }
+  else if (c == "fbnwm") {
+    MRI *a = getw();
+    paint(a);
+    MRI *b = getw();
+    paint(b);
+    fflush(stdout);
+    MRI *res = MRIfindBrightNonWM(a, b);
+    fflush(stdout);
+    putres(res, a, b, NULL);
+  }
+  else if (c == "qecc") {
+    MRI *a = getw();
+    paint(a);
+    MRI *m = getwn();
+    int x = geti(), y = geti(), z = geti();
+    fflush(stdout);
+    int v = QuadEulerCharChange(a, m, x, y, z);
+    fflush(stdout);
+    puti(v);
+  }
+  else if (c == "vtero") {
+    MRI *a = getw();
+    paint(a);
+    MRI *m = getwn();
+    fflush(stdout);
+    int v = MRIvolTopoErodeOne(a, m);
+    fflush(stdout);
+    puti(v);
+    putv(a);
+  }
+  else if (c == "vtdil") {
+    MRI *a = getw();
+    paint(a);
+    int on = geti();
+    fflush(stdout);
+    int v = MRIvolTopoDilateOne(a, on);
+    fflush(stdout);
+    puti(v);
+    putv(a);
+  }
+  else if (c == "fscm") {
+    FixSubCortMassHA f;
+    f.subcorticalmass = getw();
+    paint(f.subcorticalmass);
+    f.aseg = getw();
+    paint(f.aseg);
+    f.nDilate = geti();
+    fflush(stdout);
+    int v = f.FixSCM();
+    fflush(stdout);
+    puti(v);
+    putv(f.subcorticalmass);
+    putv(f.mask);
+  }
+  else if (c == "binmri") {
+    BinarizeMRI b;
+    getbin(&b);
+    int k = geti();
+    for (int i = 0; i < k; i++) {
+      MRI *a = getwn();
+      MRI *m = getwn();
+      MRI *d = getdst(a);
+      fflush(stdout);
+      MRI *res = b.binarize(a, m, d);
+      fflush(stdout);
+      putres(res, a, NULL, d);
+      putbin(&b);
+    }
+  }
+  else if (c == "binq") {
+    BinarizeMRI b;
+    getbin(&b);
+    MRI *a = getw();
+    paint(a);
+    MRI *m = getwn();
+    int x = geti(), y = geti(), z = geti(), f = geti();
+    fflush(stdout);
+    int v = b.qualifies(a, m, x, y, z, f);
+    fflush(stdout);
+    puti(v);
+  }
+  else if (c == "bindump") {
+    BinarizeMRI b;
+    getbin(&b);
+    MRI *m = getwn();
+    fflush(stdout);
+    int v = b.dump(NULL, m, NULL);
+    fflush(stdout);
+    puti(v);
+  }
+  else if (c == "demchk") {
+    DEMorphBinVol d;
+    getdem(&d);
+    MRI *a = getwn();
+    MRI *m = getwn();
+    MRI *o = getwn();
+    fflush(stdout);
+    int v = d.check(a, m, o);
+    fflush(stdout);
+    puti(v);
+  }
+  else if (c == "demdump") {
+    DEMorphBinVol d;
+    getdem(&d);
+    fflush(stdout);
+    int v = d.dump(NULL);
+    fflush(stdout);
+    puti(v);
+  }
+  else if (c == "demcf") {
+    DEMorphBinVol d;
+    getdem(&d);
+    MRI *a = getw();
+    paint(a);
+    int fr = geti();
+    fflush(stdout);
+    MRI *res = d.copyFrame(a, fr);
+    fflush(stdout);
+    putres(res, a, NULL, NULL);
+  }
+  else if (c == "demm" || c == "demt" || c == "deml") {
+    DEMorphBinVol d;
+    getdem(&d);
+    MRI *a = getw();
+    paint(a);
+    MRI *res, *o = NULL;
+    if (c == "demm") {
+      fflush(stdout);
+      res = d.morph(a);
+    }
+    else {
+      double lo = 0, hi = 0;
+      std::vector<int> ml;
+      if (c == "demt") {
+        lo = getd();
+        hi = getd();
+      }
+      else {
+        int n = geti();
+        for (int i = 0; i < n; i++) ml.push_back(geti());
+      }
+      MRI *m = getwn();
+      o = getwn();
+      fflush(stdout);
+      res = c == "demt" ? d.morph(a, lo, hi, m, o) : d.morph(a, ml, m, o);
+    }
+    fflush(stdout);
+    putres(res, a, NULL, o);
+    puti(d.nchangestot);
+  }
+  else if (c == "trns") {
+    int k = geti();
+    MATRIX *t = getm(), *o = getm();
+    fflush(stdout);
+    Trns_tErr e = k == 0 ? Trns_ExtractScaleMatrix(t, o) : Trns_ExtractRotationMatrix(t, o);
+    fflush(stdout);
+    puti((int)e);
+    putm(o);
+    putm(t);
+  }
+  else if (c == "vlcir") {
+    MRI *a = getw();
+    paint(a);
+    float lo = getf(), hi = getf();
+    int alloc;
+    VOXEL_LIST *vl = getvl(&alloc);
+    int skip = geti(), border = geti();
+    MRI_REGION r, *rp = getreg(&r);
+    fflush(stdout);
+    VOXEL_LIST *res = VLSTcreateInRegion(a, lo, hi, vl, skip, border, rp);
+    fflush(stdout);
+    out(vl && res == vl ? "given" : "new");
+    // the count's entries; a given list of a larger allocation keeps its arrays: all of them (entries
+    // past the count keep their values)
+    int len = res ? res->nvox : 0;
+    if (vl && alloc > len) len = alloc;
+    putvl(res, a, len);
+  }
   else
     bad("unknown command");
   if (P != T.size()) bad("extra arguments");
@@ -3312,10 +3608,16 @@ static std::string run_line(const Toks &line)
   unsigned long gdiag = 0;
   long gdiag_no = -1;
   bool set_gdiag_no = false;
+  int gxyz[3] = {-1, -1, -1};  // the debugging voxel (Gx Gy Gz), -1 as FreeSurfer starts them
   std::vector<std::string> envs;
   for (; first < line.size(); first++) {
     if (line[first][0] == '@')
       seconds = (unsigned)strtoul(line[first].c_str() + 1, NULL, 10);
+    else if (line[first].compare(0, 6, "+gxyz=") == 0) {
+      // +gxyz=<x>,<y>,<z> sets the debugging voxel for this call
+      if (sscanf(line[first].c_str() + 6, "%d,%d,%d", &gxyz[0], &gxyz[1], &gxyz[2]) != 3)
+        bad("+gxyz= needs x,y,z");
+    }
     else if (line[first].compare(0, 7, "+gdiag=") == 0)
       gdiag = strtoul(line[first].c_str() + 7, NULL, 16);
     else if (line[first].compare(0, 9, "+gdiagno=") == 0) {
@@ -3351,6 +3653,9 @@ static std::string run_line(const Toks &line)
     R.clear();
     Gerror = NO_ERROR;
     Gdiag = gdiag;
+    Gx = gxyz[0];
+    Gy = gxyz[1];
+    Gz = gxyz[2];
     if (set_gdiag_no) {
       // as a program's diagnostic set-up leaves them: the level, and the diagnostic stream
       Gdiag_no = (int)gdiag_no;

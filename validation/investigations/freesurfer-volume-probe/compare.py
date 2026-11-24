@@ -6224,6 +6224,734 @@ class Gen19(Gen18):
         ]
 
 
+class Gen20(Gen19):
+    """Relay 21: part 11a (§59 filling a coarser grid, bright voxels outside the white matter, voxel
+    topology; §60 the binary-volume classes), §64's rotation and scale of a transform and §65's voxel
+    lists of a region (the two functions of mri_cc), the fixed cases of the clean room's items 129
+    and 130 (§52, §8)."""
+
+    @staticmethod
+    def bf(
+        bt: int = 1,
+        thmin: float = 0.5,
+        thmax: float = float("inf"),
+        match=(),
+        mthmin: float = 0.5,
+        mthmax: float = float("inf"),
+        edges=(0, 0, 0),
+        on: float = 1.0,
+        off: float = 0.0,
+        fstart: int = -1,
+        fend: int = -1,
+        invert: int = 0,
+        mritype: int = -1,
+        doabs: int = 0,
+        debug: int = 0,
+    ) -> str:
+        """BF (README.md): a BinarizeMRI's fields, the defaults FreeSurfer's."""
+        return " ".join(
+            [
+                str(bt),
+                f64(thmin),
+                f64(thmax),
+                str(len(match)),
+                *map(str, match),
+                f64(mthmin),
+                f64(mthmax),
+                *map(str, edges),
+                f64(on),
+                f64(off),
+                str(fstart),
+                str(fend),
+                str(invert),
+                str(mritype),
+                str(doabs),
+                str(debug),
+            ]
+        )
+
+    @staticmethod
+    def df(mt=1, topo=1, thr=0, n=0, frame=0, mritype=-1, debug=1) -> str:
+        """DF (README.md): a DEMorphBinVol's fields, the defaults FreeSurfer's."""
+        return f"{mt} {topo} {thr} {n} {frame} {mritype} {debug}"
+
+    def rbf(self, r: random.Random, nf: int) -> str:
+        """A BinarizeMRI's fields drawn: every field, frame ranges inside and past the volume's."""
+        th = [0.5, 0.5, 10.0, 50.0, 100.0, -1.0, float("nan"), float("-inf")]
+        tx = [float("inf"), float("inf"), 120.0, 60.0, 200.0, 0.5, float("nan")]
+        vals = [1.0, 0.0, 2.5, -1.0, 255.0, 300.0, float("nan")]
+        return self.bf(
+            bt=r.choice([1, 1, 1, 2, 2, 3]),
+            thmin=r.choice(th),
+            thmax=r.choice(tx),
+            match=tuple(
+                r.choice([0, 1, 2, 3, 10, 50, 255]) for _ in range(r.choice([0, 0, 1, 2, 3]))
+            ),
+            mthmin=r.choice([0.5, 0.5, 1.0, -1.0, float("nan")]),
+            mthmax=r.choice([float("inf"), float("inf"), 1.5, 2.0]),
+            edges=tuple(int(r.random() < 0.2) for _ in range(3)),
+            on=r.choice(vals[:1] * 3 + vals),
+            off=r.choice(vals[1:2] * 3 + vals),
+            fstart=r.choice([-1, -1, -1, 0, 1, nf - 1]),
+            fend=r.choice([-1, -1, -1, nf, 1, nf + 1]),
+            invert=int(r.random() < 0.2),
+            mritype=r.choice([-1, -1, -1, 0, 1, 3, 4]),
+            doabs=int(r.random() < 0.2),
+            debug=int(r.random() < 0.2),
+        )
+
+    def bvals(self, r: random.Random, n: int, t: int, ps=(0.4, 0.5, 0.7)) -> list:
+        """n voxels of a binary-like volume of the type: 0 and 1 mostly, floats also 0.7, 0.3,
+        1.5, -0.5, 2 and NaN, the others also 2 and 255."""
+        p = r.choice(ps)
+        out = []
+        for _ in range(n):
+            if r.random() < 0.08:
+                out.append(
+                    r.choice([0.7, 0.3, 1.5, -0.5, 2.0, QNAN]) if t == 3 else r.choice([2, 255])
+                )
+            else:
+                v = 1 if r.random() < p else 0
+                out.append(float(v) if t == 3 else v)
+        return out
+
+    def binv(self, r: random.Random, d, t: int, nf: int = 1, box: bool = False) -> str:
+        """A binary-like volume of the extent (a geometry drawn): random voxels, or a box of ones
+        (sometimes with a hole) in zeros."""
+        n = d[0] * d[1] * d[2]
+        if box:
+            lo = [r.randint(0, max(e - 2, 0)) for e in d]
+            hi = [r.randint(lo[k], d[k] - 1) for k in range(3)]
+            hole = [r.randint(lo[k], hi[k]) for k in range(3)] if r.random() < 0.4 else None
+            vals = []
+            for _ in range(nf):
+                for z in range(d[2]):
+                    for y in range(d[1]):
+                        for x in range(d[0]):
+                            p = (x, y, z)
+                            inside = all(lo[k] <= p[k] <= hi[k] for k in range(3))
+                            v = 1 if inside and list(p) != hole else 0
+                            vals.append(float(v) if t == 3 else v)
+        else:
+            vals = self.bvals(r, n * nf, t)
+        return self.pk(self.rgeo(r, d), vals, t=t, nf=nf)
+
+    def lta2(self, ty: int, ga, gb, gc, m1: str, m2: str) -> str:
+        """An array of two transforms (ga to gb, gb to gc), their inverses the identity."""
+        ident = "4 4 " + " ".join(f32(1.0 if i % 5 == 0 else 0.0) for i in range(16))
+
+        def lt(mm: str, a: str, b: str) -> str:
+            return " ".join([f32(0.0)] * 3 + [f32(1.0), mm, Z44, Z44, "0", "0", a, b])
+
+        fw = [lt(m1, self.g_of(ga), self.g_of(gb)), lt(m2, self.g_of(gb), self.g_of(gc))]
+        inv = [lt(ident, self.g_of(gb), self.g_of(ga)), lt(ident, self.g_of(gc), self.g_of(gb))]
+        return f"2 {ty} {f32(1.0)} {xs('')} {' '.join(fw + inv)}"
+
+    def vfill(self) -> list[Batch]:
+        """§59: MRIvol2VolFill: sources of up to 5 x 5 x 4 voxels and 2 frames of the common types;
+        masks or none; one-transform arrays from the source's grid (the transform used as it is) or
+        to it (its inverse), of the voxel, RAS and physical-voxel types, near a scaling; two
+        transforms and arrays of neither end; upsampling factors -1 to 3; DoConserve 0 to 2; new
+        outputs and given ones of the target grid (other frames and types too); the diagnostic
+        level 1."""
+        r = self.rng("vfill")
+        L = []
+        types = [0, 1, 3, 3, 3, 4, 10]
+
+        def dims(lo: int = 1, hi: int = 5):
+            return (r.randint(lo, hi), r.randint(lo, hi), r.randint(lo, min(hi, 4)))
+
+        for _ in range(140):
+            nf = r.choice([1, 1, 2])
+            sd = dims(2)
+            s, sg = self.p9vol(r, sd, r.choice(types), nf)
+            td = dims(1)
+            tg = self.rgeo(r, td)
+            ty = r.choice([0, 0, 1, 1, 2])
+            sc = r.choice([1.0, 1.0, 0.5, 2.0, 0.7])
+            k = r.random()
+            if k < 0.45:
+                lta = self.arr1z(ty, sg, tg, m=self.near(r, scale=sc, t=1.0))
+            elif k < 0.88:
+                lta = self.arr1z(ty, tg, sg, m=self.near(r, scale=1.0 / sc, t=1.0))
+            elif k < 0.94:
+                og = self.rgeo(r, dims(1))
+                lta = self.arr1z(ty, og, tg, m=self.near(r, t=1.0))
+            else:
+                lta = self.lta2(ty, sg, tg, sg, self.near(r, t=1.0), self.near(r, t=1.0))
+            if r.random() < 0.7:
+                mask = "null"
+            else:
+                n = sd[0] * sd[1] * sd[2]
+                mv = [r.choice([0, 0, 1, 1, 1, 2]) for _ in range(n)]
+                mask = self.pk(sg, mv, t=r.choice([0, 1, 3])) + " 0"
+            usf = r.choice([-1, 0, 0, 0, 1, 2, 3])
+            cons = r.choice([0, 0, 1, 2])
+            if r.random() < 0.85:
+                out = "new"
+            else:
+                onf = nf if r.random() < 0.7 else r.choice([1, 2, 3])
+                n = td[0] * td[1] * td[2] * onf
+                out = self.pk(
+                    tg, [r.randint(0, 9) for _ in range(n)], t=r.choice([3, 3, 1]), nf=onf
+                )
+            pre = "+gdiagno=1 " if r.random() < 0.1 else ""
+            L.append(f"{pre}vvfill {s} 0 {mask} {lta} {usf} {cons} {out}")
+        return [Batch("vfill", "vfill", L)]
+
+    def vbright(self) -> list[Batch]:
+        """§59: MRIfindBrightNonWM: T1 and white-matter volumes of 4 x 4 x 3 to 8 x 8 x 5 voxels: a
+        T1 background of levels around 100 and 125 with a bright box (126 to 255) in most cases;
+        T1 values beyond 255, below 0 and NaN (floats, shorts, ints); bytes, floats, shorts and ints;
+        white-matter volumes of bytes, floats and ints (read as bytes): a box of 110 in zeros and
+        fours, or scattered values."""
+        r = self.rng("vbright")
+        L = []
+        lv = [0, 0, 0, 50, 99, 100, 101, 110, 115, 125, 126, 130]
+
+        def box(d):
+            lo = [r.randint(0, e - 1) for e in d]
+            hi = [min(lo[k] + r.randint(0, 3), d[k] - 1) for k in range(3)]
+            return lo, hi
+
+        def inside(p, b):
+            return all(b[0][k] <= p[k] <= b[1][k] for k in range(3))
+
+        for _ in range(100):
+            d = (r.randint(4, 8), r.randint(4, 8), r.randint(3, 5))
+            geo = self.rgeo(r, d)
+            tt = r.choice([0, 0, 0, 3, 3, 4, 1])
+            bb = box(d) if r.random() < 0.8 else None
+            bv = (
+                r.choice([126, 130, 200, 255, 300, 400, -100])
+                if tt != 0
+                else r.choice([126, 200, 255])
+            )
+            wb = box(d) if r.random() < 0.5 else None
+            tv, wv = [], []
+            for z in range(d[2]):
+                for y in range(d[1]):
+                    for x in range(d[0]):
+                        p = (x, y, z)
+                        v = bv if bb and inside(p, bb) else r.choice(lv)
+                        if tt == 3 and r.random() < 0.04:
+                            v = r.choice([300.0, 400.0, -100.0, 255.9, 126.5, QNAN])
+                        tv.append(float(v) if tt == 3 and not isinstance(v, str) else v)
+                        if wb:
+                            wv.append(110 if inside(p, wb) else r.choice([0, 0, 4]))
+                        else:
+                            wv.append(r.choice([0, 0, 0, 0, 4, 5, 110, 250]))
+            wt = r.choice([0, 0, 0, 3, 1])
+            if wt == 3:
+                wv = [float(v) for v in wv]
+            L.append(f"fbnwm {self.pk(geo, tv, t=tt)} 0 {self.pk(geo, wv, t=wt)} 0")
+        return [Batch("vbright", "vbright", L)]
+
+    def vtopo(self) -> list[Batch]:
+        """§59: QuadEulerCharChange (centres inside, at the faces and outside; a mask or none),
+        MRIvolTopoErodeOne (a keep mask or none) and MRIvolTopoDilateOne (on values 1, 2, 255, 0 and
+        -1) on binary patterns and boxes of up to 8 x 8 x 6 voxels of bytes, floats (0.7, 0.3, 1.5,
+        -0.5, NaN too) and ints."""
+        r = self.rng("vtopo")
+        L = []
+
+        def dims(lo: int = 1):
+            return (r.randint(lo, 8), r.randint(lo, 8), r.randint(lo, 6))
+
+        for _ in range(200):
+            d = dims(2)
+            t = r.choice([0, 0, 3, 3, 1])
+            v = self.binv(r, d, t, box=r.random() < 0.4)
+            mask = "null"
+            if r.random() < 0.25:
+                n = d[0] * d[1] * d[2]
+                mask = (
+                    self.pk(self.rgeo(r, d), [r.choice([0, 1, 1, 1]) for _ in range(n)], t=0) + " 0"
+                )
+            if r.random() < 0.85:
+                c = [r.randint(0, e - 1) for e in d]
+            else:
+                c = [r.choice([-1, 0, e - 1, e]) for e in d]
+            L.append(f"qecc {v} 0 {mask} {c[0]} {c[1]} {c[2]}")
+        for _ in range(90):
+            d = dims(3)
+            t = r.choice([0, 0, 3, 3, 1])
+            v = self.binv(r, d, t, box=r.random() < 0.5)
+            keep = "null"
+            if r.random() < 0.3:
+                n = d[0] * d[1] * d[2]
+                keep = (
+                    self.pk(
+                        self.rgeo(r, d),
+                        [r.choice([0.0, 0.0, 0.0, 1.0, 0.6]) for _ in range(n)],
+                        t=3,
+                    )
+                    + " 0"
+                )
+            L.append(f"vtero {v} 0 {keep}")
+        for _ in range(90):
+            d = dims(2)
+            t = r.choice([0, 0, 3, 3, 1])
+            v = self.binv(r, d, t, box=r.random() < 0.5)
+            L.append(f"vtdil {v} 0 {r.choice([1, 1, 1, 2, 255, 0, -1])}")
+        return [Batch("vtopo", "vtopo", L)]
+
+    def vbin(self) -> list[Batch]:
+        """§60: FixSubCortMassHA (label patterns with white matter, cortex, background,
+        hippocampus, amygdala and the inferior lateral ventricles, of ints, floats and bytes;
+        dilations -1 to 3), BinarizeMRI's binarize (every field; volumes of 1 to 3 frames; masks of
+        the extent and of another; given outputs, the input itself; a second call on another
+        volume), qualifies (at voxels inside and on the edges, frames -1 to past the last) and
+        dump."""
+        r = self.rng("vbin")
+        L = []
+        labs = [0, 0, 2, 3, 41, 42, 17, 53, 18, 54, 5, 44, 10, 4, 24]
+        for _ in range(70):
+            d = (r.randint(2, 6), r.randint(2, 6), r.randint(1, 4))
+            n = d[0] * d[1] * d[2]
+            geo = self.rgeo(r, d)
+            at = r.choice([1, 1, 3, 0])
+            av = [r.choice(labs) for _ in range(n)]
+            if at == 3:
+                av = [float(v) + r.choice([0.0, 0.0, 0.0, 0.6]) for v in av]
+            st = r.choice([0, 0, 3, 1])
+            sv = [r.choice([0, 110, 250, 1]) for _ in range(n)]
+            if st == 3:
+                sv = [float(v) for v in sv]
+            L.append(
+                f"fscm {self.pk(geo, sv, t=st)} 0 {self.pk(geo, av, t=at)} 0 {r.choice([-1, 0, 1, 1, 2, 3])}"
+            )
+
+        def vol(d, nf):
+            t = r.choice([0, 3, 3, 3, 4, 1, 10])
+            n = d[0] * d[1] * d[2] * nf
+            if t == 3:
+                vals = self.fvals(r, n, special=0.05, lo=-20.0, hi=150.0)
+            elif t == 0:
+                vals = [r.choice([0, 1, 2, 3, 10, 50, 100, 255]) for _ in range(n)]
+            elif t == 10:
+                vals = [r.choice([0, 1, 2, 3, 10, 50, 100, 300]) for _ in range(n)]
+            else:
+                vals = [r.choice([-5, 0, 1, 2, 3, 10, 50, 100, 300]) for _ in range(n)]
+            return self.pk(self.rgeo(r, d), vals, t=t, nf=nf)
+
+        def maskv(d):
+            if r.random() < 0.6:
+                return "null"
+            dd = d if r.random() < 0.92 else (d[0] + 1, d[1], d[2])
+            n = dd[0] * dd[1] * dd[2]
+            return self.pk(self.rgeo(r, dd), [r.choice([0, 1, 1, 2]) for _ in range(n)], t=0) + " 0"
+
+        def outv(d, nf):
+            k = r.random()
+            if k < 0.7:
+                return "new"
+            if k < 0.78:
+                return "self"
+            dd = d if r.random() < 0.9 else (d[0], d[1] + 1, d[2])
+            onf = nf if r.random() < 0.8 else r.choice([1, 2, 3])
+            n = dd[0] * dd[1] * dd[2] * onf
+            return self.pk(self.rgeo(r, dd), [7.0] * n, t=r.choice([3, 3, 0, 1]), nf=onf)
+
+        for _ in range(160):
+            d = (r.randint(1, 5), r.randint(1, 5), r.randint(1, 4))
+            nf = r.choice([1, 1, 2, 3])
+            calls = [f"{vol(d, nf)} 0 {maskv(d)} {outv(d, nf)}"]
+            if r.random() < 0.15:
+                d2 = (r.randint(1, 4), r.randint(1, 4), r.randint(1, 3))
+                nf2 = r.choice([1, 2, 3])
+                calls.append(f"{vol(d2, nf2)} 0 {maskv(d2)} {outv(d2, nf2)}")
+            L.append(f"binmri {self.rbf(r, nf)} {len(calls)} {' '.join(calls)}")
+        for _ in range(80):
+            d = (r.randint(1, 5), r.randint(1, 5), r.randint(1, 4))
+            nf = r.choice([1, 2])
+            c = [r.choice([0, e - 1, r.randint(0, e - 1)]) for e in d]
+            f = r.choice([-1, 0, 0, nf - 1])
+            L.append(f"binq {self.rbf(r, nf)} {vol(d, nf)} 0 {maskv(d)} {c[0]} {c[1]} {c[2]} {f}")
+        for _ in range(30):
+            d = (r.randint(1, 4), r.randint(1, 4), r.randint(1, 3))
+            L.append(f"bindump {self.rbf(r, 2)} {maskv(d) if r.random() < 0.5 else 'null'}")
+        return [Batch("vbin", "vbin", L)]
+
+    def vdem(self) -> list[Batch]:
+        """§60: DEMorphBinVol's check (inputs, masks and outputs of the extent and of another;
+        frames -1 to past the last; neighbourhoods 0 to 4; morphology types 0 to 3), dump,
+        copyFrame (frames -1 to past the last; output types -1, bytes, floats, ints, shorts),
+        morph of a binary volume (dilations and erosions, neighbourhoods 1 to 3, thresholds 0 to
+        6, 0 to 3 passes, frames 0 and 1, the debugging lines on and off), morph with thresholds
+        and with match lists (one to three frames, masks, outputs only checked)."""
+        r = self.rng("vdem")
+        L = []
+
+        def rdf(nf: int, valid: float = 0.85) -> str:
+            ok = r.random() < valid
+            return self.df(
+                mt=r.choice([1, 2]) if ok else r.choice([0, 1, 2, 3]),
+                topo=r.choice([1, 2, 3]) if ok else r.choice([0, 1, 2, 3, 4]),
+                thr=r.choice([0, 0, 1, 2, 3, 6]),
+                n=r.choice([0, 1, 1, 2, 3]),
+                frame=r.choice([0, 0, 0, 0, 1]) if ok else r.choice([-1, 0, nf - 1, nf, nf + 1]),
+                mritype=r.choice([-1, -1, -1, 0, 3, 1]),
+                debug=r.choice([1, 1, 0]),
+            )
+
+        def same_or_other(d, t=0):
+            if r.random() < 0.5:
+                return "null"
+            dd = d if r.random() < 0.85 else (d[0] + 1, d[1], d[2])
+            n = dd[0] * dd[1] * dd[2]
+            return self.pk(self.rgeo(r, dd), [r.choice([0, 1])] * n, t=t) + " 0"
+
+        for _ in range(60):
+            d = (r.randint(1, 5), r.randint(1, 5), r.randint(1, 4))
+            nf = r.choice([1, 2, 3])
+            a = "null" if r.random() < 0.05 else self.binv(r, d, r.choice([0, 3]), nf=nf) + " 0"
+            L.append(f"demchk {rdf(nf, 0.5)} {a} {same_or_other(d)} {same_or_other(d, 3)}")
+        for _ in range(15):
+            L.append(f"demdump {rdf(2, 0.5)}")
+        for _ in range(50):
+            d = (r.randint(1, 4), r.randint(1, 4), r.randint(1, 3))
+            nf = r.choice([1, 2, 3])
+            t = r.choice([0, 3, 3, 4, 1])
+            n = d[0] * d[1] * d[2] * nf
+            vals = (
+                self.fvals(r, n, special=0.05, lo=-20.0, hi=300.0)
+                if t == 3
+                else [r.randint(0, 255) for _ in range(n)]
+            )
+            v = self.pk(self.rgeo(r, d), vals, t=t, nf=nf)
+            L.append(f"demcf {rdf(nf)} {v} 0 {r.choice([-1, 0, 0, nf - 1, nf, nf + 1])}")
+        for _ in range(120):
+            d = (r.randint(2, 7), r.randint(2, 7), r.randint(2, 5))
+            nf = r.choice([1, 1, 1, 2])
+            v = self.binv(r, d, r.choice([0, 0, 3, 1]), nf=nf, box=r.random() < 0.5)
+            L.append(f"demm {rdf(nf, 0.92)} {v} 0")
+        for _ in range(110):
+            d = (r.randint(2, 6), r.randint(2, 6), r.randint(2, 4))
+            nf = r.choice([1, 1, 2, 3])
+            t = r.choice([0, 3, 3, 4, 1])
+            n = d[0] * d[1] * d[2] * nf
+            vals = (
+                self.fvals(r, n, special=0.03, lo=-20.0, hi=300.0)
+                if t == 3
+                else [r.choice([0, 1, 2, 3, 10, 50, 100, 255]) for _ in range(n)]
+            )
+            v = self.pk(self.rgeo(r, d), vals, t=t, nf=nf)
+            m = same_or_other(d)
+            o = "null" if r.random() < 0.8 else same_or_other(d, 3)
+            if r.random() < 0.5:
+                lo = r.choice([0.5, 1.0, 10.0, 50.0, 99.5])
+                hi = r.choice([float("inf"), 100.0, 255.0, 60.0])
+                L.append(f"demt {rdf(nf, 0.92)} {v} 0 {f64(lo)} {f64(hi)} {m} {o}")
+            else:
+                ml = [r.choice([1, 2, 3, 10, 50, 255]) for _ in range(r.choice([0, 1, 2, 3]))]
+                L.append(
+                    f"deml {rdf(nf, 0.92)} {v} 0 {len(ml)} {' '.join(map(str, ml))} {m} {o}".replace(
+                        "  ", " "
+                    )
+                )
+        return [Batch("vdem", "vdem", L)]
+
+    def vcc(self) -> list[Batch]:
+        """§64's Trns_ExtractScaleMatrix and Trns_ExtractRotationMatrix (4 x 4 transforms near a
+        scaling, any affine, a zero or tiny column, special values; given outputs with old
+        contents) and §65's VLSTcreateInRegion (volumes of up to 6 x 5 x 4 voxels and 2 frames of
+        the common types; ranges; no list, given lists of every capacity with old contents; skips 0
+        to 2; the border test; boxes inside, overlapping and outside the volume)."""
+        r = self.rng("vcc")
+        L = []
+        for _ in range(80):
+            k = r.choice([0, 1])
+            q = r.random()
+            if q < 0.4:
+                t = self.near(r, scale=r.choice([1.0, 0.5, 2.0, 1.3]), t=20.0)
+            elif q < 0.8:
+                t = self.affine(r, special=0.1)
+            else:
+                v = self.affine(r).split()
+                col = r.randrange(3)
+                tiny = r.choice([0.0, 1e-9, 1e-7, -0.0])
+                for row in range(3):
+                    v[2 + 4 * row + col] = f32(tiny)
+                t = " ".join(v)
+            o = "4 4 " + " ".join(f32(r.uniform(-9, 9)) for _ in range(16))
+            L.append(f"trns {k} {t} {o}")
+        for _ in range(120):
+            d = (r.randint(1, 6), r.randint(1, 5), r.randint(1, 4))
+            # one frame: the count is frame 0's, and later frames in the range write past the
+            # arrays (FS-890, vrules24)
+            nf = 1
+            t = r.choice([0, 3, 3, 1, 4])
+            n = d[0] * d[1] * d[2] * nf
+            if t == 3:
+                vals = self.fvals(r, n, special=0.04, lo=-5.0, hi=10.0)
+            else:
+                vals = [r.choice([0, 0, 1, 2, 3, 5, 9]) for _ in range(n)]
+            v = self.pk(self.rgeo(r, d), vals, t=t, nf=nf)
+            lo = f32(r.choice([0.0, 1.0, 0.5, 2.0, -1.0]))
+            hi = f32(r.choice([1.0, 3.0, 9.0, 1.5, 100.0]))
+            if r.random() < 0.5:
+                vl = "null"
+            else:
+                a = r.choice([0, 1, 3, 8, 20, 60])
+                vl = f"{a} {r.randint(0, a)}"
+            skip = r.choice([0, 0, 0, 1, 2])
+            border = int(r.random() < 0.3)
+            box = []
+            for e in d:
+                if r.random() < 0.8:
+                    x0 = r.randint(0, e - 1)
+                    box.append((x0, r.randint(1, e - x0)))
+                else:
+                    x0 = r.randint(-1, e - 1)
+                    box.append((x0, r.randint(0, e - x0)))
+            bx = " ".join(
+                str(p) for p in (box[0][0], box[1][0], box[2][0], box[0][1], box[1][1], box[2][1])
+            )
+            L.append(f"vlcir {v} 0 {lo} {hi} {vl} {skip} {border} {bx}")
+        return [Batch("vcc", "vcc", L)]
+
+    def vrules24(self) -> list[Batch]:
+        """The fixed cases of part 11a and the clean room's items 129 and 130."""
+        L, H = [], []
+        P = self.plain
+        # item 129 (§52): MRIhistoEqualize with a template of no voxel between the limits (every
+        # voxel keeps its value); MRIhistogram of constants of 255 and more (bin 0) and of 254
+        src = self.lab(P((4, 1, 1)), [0, 3, 6, 9], t=0)
+        src2 = self.lab(P((4, 2, 1)), [0, 3, 3, 6, 6, 6, 9, 4], t=0)
+        tpl = self.lab(P((4, 1, 1)), [0, 9, 0, 9], t=0)
+        L.append(f"heq {src} 0 {tpl} 0 new 3 6")
+        L.append(f"heq {src2} 0 {tpl} 0 new 3 6")
+        L.append(f"hist {self.pk(P((2, 2, 1)), [300] * 4, t=4)} 0 4")
+        L.append(f"hist {self.pk(P((2, 2, 1)), [300] * 4, t=4)} 0 2")
+        L.append(f"hist {self.lab(P((4, 1, 1)), [255] * 4, t=0)} 0 3")
+        L.append(f"hist {self.lab(P((4, 1, 1)), [254] * 4, t=0)} 0 3")
+        # item 130 (§8): MRIvalRangeRegion's end in 32-bit wrapping arithmetic
+        z = fixed_w(4, 4, 4, 3, fill=-1)
+        for reg in (
+            "0 0 0 4 4 4",
+            "1 0 0 3 4 4",
+            "1 0 0 2147483647 4 4",
+            "1 0 0 2147483646 4 4",
+            "-1 0 0 2147483647 4 4",
+            "1 1 1 2147483647 2147483647 2147483647",
+        ):
+            L.append(f"vrangereg {z} {reg}")
+        # §59, QuadEulerCharChange's debugging voxel: a face, an edge and a corner set, a voxel
+        # alone, a full block, a mask, a centre outside
+        P3 = P((3, 3, 3))
+        alone = self.lab(P3, [0] * 27, t=0)
+        face = self.lab(P3, [1 if i == 12 else 0 for i in range(27)], t=0)
+        edge = self.lab(P3, [1 if i in (3, 9, 12) else 0 for i in range(27)], t=0)
+        corner = self.lab(P3, [1 if i != 13 else 0 for i in range(27)], t=0)
+        full = self.lab(P3, [1] * 27, t=0)
+        half = self.lab(P3, [1 if i % 3 == 0 else 0 for i in range(27)], t=3)
+        for v in (alone, face, edge, corner, full, half):
+            L.append(f"+gxyz=1,1,1 qecc {v} 0 null 1 1 1")
+        msk = self.lab(P3, [1 if i % 2 else 0 for i in range(27)], t=0) + " 0"
+        L.append(f"+gxyz=1,1,1 qecc {corner} 0 {msk} 1 1 1")
+        L.append(f"+gxyz=0,0,0 qecc {corner} 0 null 0 0 0")
+        L.append(f"+gxyz=1,1,1 qecc {corner} 0 null 1 1 0")
+        L.append(f"+gxyz=-1,1,1 qecc {face} 0 null -1 1 1")
+        # the erosion and dilation of one layer on a cube of ones in zeros (5 x 5 x 5), a keep mask
+        cube = self.lab(
+            P((5, 5, 5)),
+            [
+                1 if 1 <= x <= 3 and 1 <= y <= 3 and 1 <= zz <= 3 else 0
+                for zz in range(5)
+                for y in range(5)
+                for x in range(5)
+            ],
+            t=0,
+        )
+        L.append(f"vtero {cube} 0 null")
+        L.append(f"vtero {cube} 0 {self.lab(P((5, 5, 5)), [1.0] * 125, t=3)} 0")
+        L.append(f"vtdil {cube} 0 1")
+        L.append(f"vtdil {self.lab(P((5, 5, 5)), [0] * 125, t=0)} 0 1")
+        # §59, MRIvol2VolFill's messages: two transforms; a source at neither end; the diagnostic
+        # level with the transform as it is and with its inverse; a mask of zeros with upsampling
+        g1, g2, g3 = P((3, 2, 2)), P((2, 2, 2), sizes=(1.5, 1.0, 1.0)), P((4, 4, 1))
+        s1 = self.lab(g1, [float(i) for i in range(12)], t=3)
+        idm = "4 4 " + " ".join(f32(1.0 if i % 5 == 0 else 0.0) for i in range(16))
+        L.append(f"vvfill {s1} 0 null {self.lta2(0, g1, g2, g1, idm, idm)} 0 0 new")
+        L.append(f"vvfill {s1} 0 null {self.arr1z(0, g3, g2, m=idm)} 0 0 new")
+        L.append(f"+gdiagno=1 vvfill {s1} 0 null {self.arr1z(0, g1, g2, m=idm)} 0 0 new")
+        L.append(f"+gdiagno=1 vvfill {s1} 0 null {self.arr1z(1, g2, g1, m=idm)} 0 1 new")
+        L.append(
+            f"vvfill {s1} 0 {self.lab(g1, [0] * 12, t=0)} 0 {self.arr1z(0, g1, g2, m=idm)} 2 0 new"
+        )
+        L.append(
+            f"vvfill {s1} 0 {self.lab(g1, [0] * 6 + [1] * 6, t=0)} 0 {self.arr1z(0, g1, g2, m=idm)} 2 0 new"
+        )
+        # §59, MRIfindBrightNonWM: FS-802's T1 values (300 is not bright, 400 is; -100 and NaN), a
+        # bright voxel beside 13 and 12 white-matter voxels
+        g = P((7, 7, 5))
+
+        def blk(v, t):
+            vals = []
+            for zz in range(5):
+                for y in range(7):
+                    for x in range(7):
+                        ins = 2 <= x <= 4 and 2 <= y <= 4 and 1 <= zz <= 3
+                        vals.append(v if ins else (0.0 if t == 3 else 0))
+            return self.pk(g, vals, t=t)
+
+        wm0 = self.lab(g, [0] * 245, t=0)
+        for v in (300.0, 400.0, -100.0, QNAN, 255.9, 126.0, 125.5, 125.0):
+            L.append(f"fbnwm {blk(v, 3)} 0 {wm0} 0")
+        for t in (4, 1):
+            for v in (300, 400, -100, 126):
+                L.append(f"fbnwm {blk(v, t)} 0 {wm0} 0")
+        # the white matter read as bytes: a float volume of 5.0 (its bytes 0, 0, 160, 64)
+        L.append(f"fbnwm {blk(200, 0)} 0 {self.lab(g, [5.0] * 245, t=3)} 0")
+        # §60, FixSubCortMassHA: no dilation (-1), one; every label kind
+        ga = P((4, 2, 1))
+        L.append(
+            f"fscm {self.lab(ga, [110] * 8, t=0)} 0 {self.lab(ga, [2, 17, 17, 53, 18, 5, 44, 0], t=1)} 0 -1"
+        )
+        L.append(
+            f"fscm {self.lab(ga, [110] * 8, t=0)} 0 {self.lab(ga, [2, 17, 17, 53, 18, 5, 44, 0], t=1)} 0 1"
+        )
+        # §60, BinarizeMRI's messages and fields: no input; BinType 1 with a match list; fend past
+        # the frames; a mask and an output of another extent; invert; the debugging lines; FS-803's
+        # frame ranges from 1; a second call keeps the stored frame range; BinType 3; NaN limits
+        v2 = self.lab(
+            P((3, 2, 1)), [0.0, 0.4, 0.5, 1.0, 2.0, QNAN, -3.0, 0.6, 9.0, 0.5, 1.0, 0.0], t=3, nf=2
+        )
+        v3 = self.lab(P((3, 2, 1)), [float(i % 4) for i in range(18)], t=3, nf=3)
+        m32 = self.lab(P((3, 2, 1)), [1, 0, 1, 1, 0, 1], t=0) + " 0"
+        mo = self.lab(P((2, 2, 1)), [1] * 4, t=0) + " 0"
+        L.append(f"binmri {self.bf(debug=1)} 1 null null new")
+        L.append(f"binmri {self.bf(match=(1, 2), debug=0)} 1 {v2} 0 null new")
+        L.append(f"binmri {self.bf(fend=3)} 1 {v2} 0 null new")
+        L.append(f"binmri {self.bf()} 1 {v2} 0 {mo} new")
+        L.append(f"binmri {self.bf()} 1 {v2} 0 null {self.lab(P((2, 2, 1)), [7.0] * 4, t=3, nf=2)}")
+        L.append(f"binmri {self.bf(invert=1, debug=1)} 1 {v2} 0 {m32} new")
+        L.append(f"binmri {self.bf(fstart=1, debug=1)} 1 {v3} 0 {m32} new")
+        L.append(f"binmri {self.bf(fstart=1, fend=2, edges=(1, 0, 0))} 1 {v3} 0 null new")
+        L.append(f"binmri {self.bf(fstart=2)} 1 {v3} 0 {m32} new")
+        L.append(f"binmri {self.bf()} 2 {v2} 0 null new {v3} 0 null new")
+        L.append(f"binmri {self.bf(fend=1)} 2 {v3} 0 null new {v2} 0 null new")
+        L.append(f"binmri {self.bf(bt=3, match=(1, 2), debug=1)} 1 {v3} 0 null new")
+        L.append(f"binmri {self.bf(bt=2, debug=1)} 1 {v3} 0 {m32} new")
+        L.append(f"binmri {self.bf(thmin=float('nan'))} 1 {v2} 0 null new")
+        L.append(f"binmri {self.bf(thmax=float('nan'), doabs=1)} 1 {v2} 0 null new")
+        L.append(f"binmri {self.bf(mthmin=float('nan'))} 1 {v2} 0 {m32} new")
+        L.append(f"binmri {self.bf(mritype=0, on=300.0, off=-1.0)} 1 {v2} 0 null new")
+        L.append(f"binmri {self.bf()} 1 {v2} 0 null self")
+        L.append(f"bindump {self.bf(bt=2, match=(4, 5, 6))} {m32}")
+        L.append(f"bindump {self.bf(bt=1, match=(4,))} null")
+        L.append(f"bindump {self.bf(bt=3)} null")
+        L.append(f"binq {self.bf(edges=(1, 1, 1))} {v2} 0 null 1 1 0 0")
+        L.append(f"binq {self.bf(edges=(0, 1, 0))} {v2} 0 null 1 1 0 -1")
+        L.append(f"binq {self.bf()} {v2} 0 {m32} 1 0 0 -1")
+        # §60, DEMorphBinVol: each check message; a frame equal to the frames (FS-806); a morph
+        # with frame 1 (FS-804) and with a bad neighbourhood (FS-807); the thresholded and matched
+        # morphs of two frames (FS-808) with frame 1 (FS-805); copyFrame's message
+        b5 = self.lab(
+            P((5, 5, 3)),
+            [
+                1 if (x, y) in ((2, 2), (1, 2)) and zz == 1 else 0
+                for zz in range(3)
+                for y in range(5)
+                for x in range(5)
+            ],
+            t=0,
+            nf=1,
+        )
+        b52 = self.lab(
+            P((5, 5, 3)),
+            [
+                1 if (x, y) == (2, 2) and zz == 1 else 0
+                for f in range(2)
+                for zz in range(3)
+                for y in range(5)
+                for x in range(5)
+            ],
+            t=0,
+            nf=2,
+        )
+        o53 = self.lab(P((5, 5, 3)), [0] * 75, t=0) + " 0"
+        o44 = self.lab(P((4, 4, 3)), [0] * 48, t=0) + " 0"
+        L.append(f"demchk {self.df()} null null null")
+        L.append(f"demchk {self.df()} {b5} 0 {o44} null")
+        L.append(f"demchk {self.df()} {b5} 0 null {o44}")
+        L.append(f"demchk {self.df(frame=-1)} {b5} 0 null null")
+        L.append(f"demchk {self.df(frame=1)} {b5} 0 null null")
+        L.append(f"demchk {self.df(frame=2)} {b5} 0 null null")
+        L.append(f"demchk {self.df(topo=4)} {b5} 0 {o53} {o53}")
+        L.append(f"demchk {self.df(mt=3)} {b5} 0 null null")
+        L.append(f"demdump {self.df(mt=2, topo=3, thr=4, n=5, frame=1, mritype=3)}")
+        L.append(f"demcf {self.df()} {b5} 0 1")
+        L.append(f"demcf {self.df()} {b5} 0 2")
+        L.append(f"demcf {self.df(mritype=3)} {b52} 0 1")
+        for mt in (1, 2):
+            for topo in (1, 2, 3):
+                L.append(f"demm {self.df(mt=mt, topo=topo, n=2)} {b5} 0")
+        L.append(f"demm {self.df(n=1, thr=1)} {b5} 0")
+        L.append(f"demm {self.df(n=1, frame=1)} {b52} 0")
+        L.append(f"demm {self.df(n=1, topo=4)} {b5} 0")
+        L.append(f"demm {self.df(n=1, mt=0)} {b5} 0")
+        L.append(f"demm {self.df(n=1, frame=2)} {b5} 0")
+        f2 = self.lab(
+            P((5, 5, 3)),
+            [
+                0.7 if (x, y) == (2, 2) and zz == 1 else 0.0
+                for f in range(2)
+                for zz in range(3)
+                for y in range(5)
+                for x in range(5)
+            ],
+            t=3,
+            nf=2,
+        )
+        L.append(f"demt {self.df(n=1)} {f2} 0 {f64(0.5)} {f64(float('inf'))} null null")
+        L.append(f"demt {self.df(n=1, frame=1)} {f2} 0 {f64(0.5)} {f64(float('inf'))} null null")
+        L.append(f"deml {self.df(n=1, frame=1)} {b52} 0 1 1 null null")
+        L.append(f"deml {self.df(n=1)} {b5} 0 1 1 null {o44}")
+        L.append(f"demt {self.df(n=1, frame=3)} {b52} 0 {f64(0.5)} {f64(1.5)} null null")
+        # §64: no transform, no output; a zero column (its factor 1), a NaN
+        i4 = "4 4 " + " ".join(f32(1.0 if i % 5 == 0 else 0.0) for i in range(16))
+        for k in (0, 1):
+            L.append(f"trns {k} null {i4}")
+            L.append(f"trns {k} {i4} null")
+            zc = i4.split()
+            zc[2 + 0] = f32(0.0)
+            L.append(f"trns {k} {' '.join(zc)} {i4}")
+            nn = i4.split()
+            nn[2 + 5] = QNAN
+            L.append(f"trns {k} {' '.join(nn)} {i4}")
+        # §65: a given list too small (new arrays) and large enough (kept, its old entries past
+        # the count); the allocation line; the border test against the frame's number; two frames;
+        # a box whose end passes the int maximum (no voxel); a box partly outside
+        vv = self.lab(P((3, 2, 1)), [0.0, 1.0, 1.0, 2.0, 1.0, 0.0], t=3)
+        # two frames, the second without a voxel in the range, and with three (FS-890)
+        va = self.lab(
+            P((3, 2, 1)), [0.0, 1.0, 1.0, 2.0, 1.0, 0.0, 5.0, 5.0, 0.0, 0.0, 5.0, 5.0], t=3, nf=2
+        )
+        vb = self.lab(
+            P((3, 2, 1)), [0.0, 1.0, 1.0, 2.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 5.0], t=3, nf=2
+        )
+        one = f32(1.0)
+        L.append(f"vlcir {vv} 0 {one} {one} 2 2 0 0 0 0 0 3 2 1")
+        L.append(f"vlcir {vv} 0 {one} {one} 9 2 0 0 0 0 0 3 2 1")
+        L.append(f"+gdiag=10000040 vlcir {vv} 0 {one} {one} null 0 0 0 0 0 3 2 1")
+        L.append(f"vlcir {vv} 0 {f32(0.0)} {one} null 0 1 0 0 0 3 2 1")
+        L.append(f"vlcir {vv} 0 {one} {f32(2.0)} 12 0 0 0 0 0 0 3 2 1")
+        L.append(f"vlcir {vv} 0 {one} {one} null 0 0 1 0 0 2147483647 2 1")
+        L.append(f"vlcir {vv} 0 {one} {one} null 0 0 -1 -1 0 3 3 1")
+        L.append(f"vlcir {vv} 0 {one} {one} null 1 0 0 0 0 3 2 1")
+        L.append(f"vlcir {va} 0 {one} {one} null 0 0 0 0 0 3 2 1")
+        L.append(f"vlcir {va} 0 {one} {one} null 0 1 0 0 0 3 2 1")
+        L.append(f"vlcir {vb} 0 {one} {one} null 0 0 0 0 0 3 2 1")
+        # FS-889: a negative skip (FreeSurfer never ends)
+        H.append(f"@1 vlcir {vv} 0 {one} {one} null -1 0 0 0 0 3 2 1")
+        return [
+            Batch("vrules24", "vrules24", L),
+            Batch("vrules24", "vrules24-hang", H, guards=False),
+        ]
+
+
 GROUPS = [
     "vgblock",
     "vgcopy",
@@ -6291,6 +7019,13 @@ GROUPS = [
     "vrules22",
     "vhist",
     "vrules23",
+    "vfill",
+    "vbright",
+    "vtopo",
+    "vbin",
+    "vdem",
+    "vcc",
+    "vrules24",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -6448,7 +7183,7 @@ def licence_guard(b: Batch) -> None:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen19) else Gen19(gen.seed)
+    gen = gen if isinstance(gen, Gen20) else Gen20(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

@@ -328,5 +328,9 @@ of its own, so the groups' other batches keep their cases.
   triple product's terms in pairs) added to `melements` and `mvectors`; `refs --groups
   melements,mvectors` cold, warm and without the cache give the spec's new hashes; the probe as its own
   candidate identical in both modes (`oracles/logs/fs-maths-probe-r8-nan-2026-11-17.log`).
+- 2026-11-24 (track E, relay 21): three fixed `hinit` lines appended to `hmake` (§5.2's `n - 1` in a 32-bit
+  `int`: a given histogram of 4 bins with the counts -2147483648 and -2147483647 and the limits 0 and 10, and
+  -2147483648 over the empty range); the group's earlier 632 lines unchanged; `refs --groups hmake` cold, warm and
+  without the cache give the spec's new hash; the probe as its own candidate identical in both modes.
 - About 40 minutes for a cold `refs` on the reference machine (most of it the guard runs of `eigen`
   and `svd`), seconds warm; `compare` about 10 minutes more (the candidate's runs).

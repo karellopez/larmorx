@@ -4507,8 +4507,10 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
   their own check fails (FS-807) and compare a multi-frame input's thresholds with its byte copy (FS-808).
 - **Evidence:** verified (`validation/probes/fs-volume`, part 17: FreeSurfer 8.2.0's functions from the unit oracle's
   build against the port; seeds 7 and 13, 11,000 cases each, every comparable line identical with `reproduce`, `fix`
-  different only with its notices). The mechanisms: `docs/findings/freesurfer-volume.md` §25 (closed to FreeSurfer's
-  clean-room implementers).
+  different only with its notices); the open probe `validation/investigations/freesurfer-volume-probe/` (groups
+  `vbright`, `vbin`, `vdem` and `vrules24`, 2026-11-24: FS-802's values in floats, shorts and ints, FS-803's crashes,
+  FS-804's to FS-806's frames past a one-frame copy, FS-807's and FS-808's settings among their lines). The mechanisms:
+  `docs/findings/freesurfer-volume.md` §25 (closed to FreeSurfer's clean-room implementers).
 - **fMRIPrep:** none. **FreeSurfer:** none known on recon-all's paths (`mris_place_surface` reads a byte
   `brain.finalsurfs`; its ventricle fill morphs frame 0 of a one-frame volume).
 - **larmorx:** FS-802, FS-803, FS-804, FS-805, FS-808 corrected by default (rule A); FS-806, FS-807 by rule B. Found
@@ -4522,7 +4524,9 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
   from a volume never gets its maximum count (FS-892); copying a list with spline slopes zeroes them (FS-893).
 - **Evidence:** verified (`validation/probes/fs-volume`, part 18: FreeSurfer 8.2.0's functions from the unit oracle's
   build against the port; seeds 7 and 13, 18,000 cases each, every comparable line identical with `reproduce`, `fix`
-  different only with its notices). The mechanisms: `docs/findings/freesurfer-volume.md` §26 and §27 (closed to
+  different only with its notices); the open probe `validation/investigations/freesurfer-volume-probe/` (groups `vcc`
+  and `vrules24`, 2026-11-24: `VLSTcreateInRegion`'s FS-889 (its hang ended by the alarm), FS-890 (a second frame past
+  the count) and FS-892 among their lines). The mechanisms: `docs/findings/freesurfer-volume.md` §26 and §27 (closed to
   FreeSurfer's clean-room implementers).
 - **fMRIPrep:** none. **FreeSurfer:** none known on recon-all's paths (`mri_ca_label`, `gcamorph.cpp` and `mrimorph.cpp`
   make whole one-frame lists with skip 0; recon-all's arrays hold one transform; subjects' paths are short).

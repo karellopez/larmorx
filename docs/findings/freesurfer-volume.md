@@ -891,6 +891,20 @@ oracle's `libutils.a` member `mri2.cpp.o` (`objdump -dr -C`, `<scratch>/C/r20/mr
   a one-frame input is binarized as it is. The output of `morph(binvol)` is a byte copy too (`copyFrame`), which the
   default keeps (the result is binary). The overloads never write `outvol` and leak `involuse` (`free_involuse` unused).
 - **FS-802** (c, rule A): see above; values 0 to 255 are unchanged.
+- **FS-1233** (c, rule A; track D's relay 57, from track E's relay 21): every access of `MRIfindBrightNonWM` but the
+  T1's first read goes through byte pointers (`MRIvox`): the white matter's reads, the label's write into the T1's
+  clone, `MRIdilateThreshLabel`'s and `MRIdilateInvThreshLabel`'s reads of the label and the T1, and `MRIunion`;
+  `MRIclose`, `MRIxor`, `MRIreplaceValues` and `MRIvoxelsInLabel` go by the type. With a T1 that is not of bytes the
+  labels are bytes inside its voxels (a `float` T1: 130 lands in the low bytes of the row's first quarter, no voxel
+  reads 130); with white matter not of bytes, the row's bytes stand for other voxels. The 8.2.0 callers: `mri_segment`
+  changes its input to bytes first (never reached); `mris_make_surfaces` passes its T1 as read (`mri_T1 =
+  MRIread(...)`, no change of type; its white matter is changed to bytes), `mris_place_surface` its `--invol` and
+  `--wm` as read, both after `MRIclipBrightWM` (which stores the T1's every voxel through a byte, FS-468); `mris_ms_refine`
+  declares it without a call. The input makes sense (a `float` intensity volume), the result is wrong: rule A. The
+  default runs the same steps on byte volumes holding the T1's values as bytes (FS-802) and the white matter's values
+  (clamped to 0..255, NaN 0) and writes the labels 100 and 130 into the T1's clone with `MRIsetVoxVal`; `reproduce`
+  keeps FreeSurfer's bytes. The probe's seed 1 (`tests/fs_volume_official.rs`): 20 `fbnwm` lines, 13 with a T1 or white
+  matter not of bytes (FS-1233 noted), 9 of them changed by the default; `reproduce` still FreeSurfer's.
 - No new not-comparable IDs: FS-803, FS-804, FS-806's reads and writes past a volume are the voxel functions' FS-53
   (`check.py`'s SKIP already).
 

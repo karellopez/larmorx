@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE help [
+<!ENTITY lt "#38;#60;">
+<!ENTITY gt "&#62;">
+<!ENTITY amp "&#38;#38;">
+<!ELEMENT help (name , synopsis , description , arguments+ , outputs* , example* , bugs* , reporting* , see-also*)*>
+<!ELEMENT name (#PCDATA)>
+<!ELEMENT synopsis (#PCDATA)>
+<!ELEMENT description (#PCDATA)>
+<!ELEMENT arguments (positional* , required-flagged* , optional-flagged*)*>
+<!ELEMENT positional (intro* , argument* , explanation*)*>
+<!ELEMENT required-flagged (intro* , argument* , explanation*)*>
+<!ELEMENT optional-flagged (intro* , argument* , explanation*)*>
+<!ELEMENT intro (#PCDATA)>
+<!ELEMENT argument (#PCDATA)>
+<!ELEMENT explanation (#PCDATA)>
+<!ELEMENT outputs (output* , explanation*)>
+<!ELEMENT output (#PCDATA)>
+<!ELEMENT example (#PCDATA)>
+<!ELEMENT bugs (#PCDATA)>
+<!ELEMENT reporting (#PCDATA)>
+<!ELEMENT see-also (#PCDATA)>
+]>
+
+<help>
+	<name>mri_edit_wm_with_aseg</name>
+	<synopsis>mri_edit_wm_with_aseg &lt;options&gt; input-wm input-T1/brain aseg output-wm</synopsis>
+	<description>*****************************************</description>
+  <arguments>
+    <positional>
+      <intro>*********************************************</intro>
+    </positional>
+    <required-flagged>
+      <intro>******************************************</intro>
+    </required-flagged>
+    <optional-flagged>
+      <argument>-fillven</argument>
+      <argument>-fix-scm-ha ndil</argument>
+      <explanation>Remove voxels in amyg, ILV, and parts of hippo</explanation>
+      <argument>-fix-scm-ha-only aseg.presurf.mgz SCM ndil out.mgz</argument>
+      <explanation>Standalone: </explanation>
+      <argument>-keep</argument>
+      <explanation>keep edits as found in output volume</explanation>
+      <argument>-keep-in</argument>
+      <explanation>keep edits as found in input volume</explanation>
+      <argument>-lh</argument>
+      <explanation>erase rh labels from output</explanation>
+      <argument>-rh</argument>
+      <argument>-wmsa wmsavol</argument>
+      <explanation>Include WM lessions (77,78,79,99) in WM (good when passing synthseg (which does not have wmsa) as the aseg </explanation>
+      <explanation>erase lh labels from output</explanation>
+      <argument>-fix-ento-wm entowm level lhval rhval</argument>
+      <explanation>Insert lhval rhval where {3,4}006 and {3,4}201 in entowm volume. For wm.seg use 255. For brain.finalsurfs use 255. For filled use 255 and 127. </explanation>
+      <argument>-sa-fix-ento-wm entowm level lhval rhval invol outvol</argument>
+      <explanation>Stand-alone version of -fix-ento-wm </explanation>
+      <argument>-fix-acj aseg.presurf lhval rhval</argument>
+      <explanation>Insert lhval rhval at the amygdala-cortical junction. For wm.seg use 255. For brain.finalsurfs use 255. For filled use 255 and 127. </explanation>
+      <argument>-sa-fix-acj aseg.presurf lhval rhval invol outvol</argument>
+      <explanation>Stand-alone version of -fix-acj </explanation>
+      <argument>-label-acj aseg.presurf outvol</argument>
+      <explanation>Stand-alone option to output the ACJ labels</explanation>
+      <argument>-keep-hailvcp</argument>
+      <explanation>Experimental option to keep hippo/amyg/inf lat vent/choroid plexus in the subcortical mass.</explanation>
+      <argument>-fill-seg-wm (-no-fill-seg-wm)</argument>
+      <explanation>Fill WM from seg (excluding voxels adjacent to cortex); off by default</explanation>
+      <argument>-debug_voxel Gx Gy Gz</argument>
+    </optional-flagged>
+  </arguments>
+	<example>mri_edit_wm_with_aseg -keep-in wm.seg.mgz brain.mgz aseg.mgz wm.asegedit.mgz</example>
+  <reporting>Report bugs to &lt;freesurfer@nmr.mgh.harvard.edu&gt;</reporting>
+</help>
+

@@ -188,11 +188,11 @@ def main(argv: list[str] | None = None) -> int:
         "",
         "## Golden cases",
         "",
-        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_segment_golden.rs`: eleven cases "
-        "on 32^3 volumes made with integer arithmetic (recon-all's call, the defaults, a `float` "
-        "input with NaNs and infinities by their bits, `-noauto -thicken 0`, `-seg`, `-fillbg "
-        "-fillv` (FS-1227), `-thickenonly`, `-keep`, `-b 0.5 -polvlen 2` (FS-1220), an output "
-        "into a missing folder (FS-1226), an option without its value (FS-1219)), on every "
+        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_segment_golden.rs`: eight cases "
+        "on 32^3 volumes made with integer arithmetic (recon-all's call, a `float` input with NaNs "
+        "and infinities by their bits on `-thickenonly`, `-noauto -thicken 0`, `-seg`, `-fillbg "
+        "-fillv` (FS-1227), `-keep` with `-b 0.5 -polvlen 2` (FS-1220), an output into a missing "
+        "folder (FS-1226), an option without its value (FS-1219)), on every "
         f"platform: `reproduce` `{a.golden}`, the official program's value on the same inputs "
         f"(`prog.py --golden`); the default `{a.golden_fix}`.",
         "",

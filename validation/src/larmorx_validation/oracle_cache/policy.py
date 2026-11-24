@@ -407,6 +407,7 @@ EXTENSION_FROM_WHOLE_PATH = (
     "mri_cc",
     "mri_concat",
     "mri_convert",
+    "mri_edit_wm_with_aseg",
     "mri_info",
     "mri_label2vol",
     "mri_make_uchar",

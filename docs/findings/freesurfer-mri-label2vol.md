@@ -1,7 +1,7 @@
-# FreeSurfer 8.2.0's `mri_label2vol`: findings of the replica (queue item 3.2-40, part 1)
+# FreeSurfer 8.2.0's `mri_label2vol`: findings of the replica (queue item 3.2-40)
 
 **Restricted** (source-derived): closed to FreeSurfer clean-room implementers, who work from
-`specs/mri_label2vol.md`. Track A, relay 56 (2026-11-24). The replica:
+`specs/mri_label2vol.md`. Track A, relays 56 and 57 (2026-11-24). The replica:
 `crates-freesurfer/larmorx-freesurfer-volumes/src/mri_label2vol/` and fs.surf's
 `crates-freesurfer/larmorx-freesurfer-surf/src/defects2seg.rs`; the probe:
 `validation/probes/fs-label2vol/`; the record: `docs/validation/freesurfer-mri-label2vol.md`.
@@ -21,14 +21,69 @@ fs.defect by the module table, put in fs.surf's `defects2seg.rs`: the orchestrat
 (`utils/resample.cpp` 626-665) and `annotation2label` (`utils/annotation.cpp` 318), these four in
 the program's `surface.rs` until `mri_vol2surf`, `mri_surf2vol` or `mri_annotation2label` need them.
 
-Part 2 (relay 57): `MRIseg2SegPVF` (`resample.cpp` 2041-2343, threads and statics) for
-`--new-aseg2vol`, `MRIsurf2VolOpt` (`resample.cpp` 1642) with the program's
-`MRIsurfaceLabel2VolOpt` for `--fill-ribbon`. Its known defects to register then: the `--fill-ribbon`
-label loop converts `srclabel` (a `NULL` pointer at the first label) instead of `labels[nthlabel]`
-when a label is not in tkregister coordinates (338: a crash); an annotation index no vertex has
-leaves `labels[nthlabel]` `NULL`, which `MRIsurfaceLabel2VolOpt` then reads (crash);
-`MRIsurf2VolOpt` reads `crsRibbon->rptr[1][2]` and `rptr[1][3]` of a 4 x 1 vector, which on
-FreeSurfer's contiguous storage are rows 2 and 3 (the intended elements: no effect, kept).
+Part 2 (relay 57): `MRIseg2SegPVF` (`resample.cpp` 2041-2343) with `VOXsegPVF2Seg` (2385) for
+`--new-aseg2vol`, `MRIsurf2VolOpt` (1642-1798) with the program's `MRIsurfaceLabel2VolOpt`
+(1365-1389) for `--fill-ribbon`, in the program's `resample.rs` (they move to fs.volume when
+`mri_gtmpvc` or `mri_surf2vol` needs them). What they reach was ported already: `LTAmriIsSource`,
+`LTAmriIsTarget`, `LTAinvert`, `LTAchangeType`, `LTAfillInverse` (fs.volume's `ltaops.rs`),
+`TransformRegDat2LTA` (`vol2vol.rs`), `TransformLTA2RegDat` (fs.gca's `regdat.rs`),
+`MRIsegIdListNot0` (`voxops.rs`), `MRIallocFromVolGeom`, `useVolGeomToMRI`,
+`MRIcopyPulseParameters` (fs.mri), `MHTcreateVertexTable_Resolution` and
+`MHTfindClosestVertexNoXYZ` (fs.surf's `mht.rs`, `mhtfind.rs`), `MRISfindClosestVertex`
+(`props.rs`), `FSENVgetenv` (fs.core) with `CTABreadASCII` (fs.io).
+
+### Part 2: details that decide bits
+
+- `MRIseg2SegPVF` keeps `InitNeeded`, `nvox`, `clist`/`rlist`/`slist`, `seg2frame` and `nthcall`
+  in `static`s: `mri_label2vol` calls it once, so the cache is always made (its two lines always
+  print) and `nthcall < 4` always prints the `done` line, whose `timer.seconds()` varies (the probe
+  masks it; the cache keeps it volatile). The port keeps no cache: with no mask the voxel list is
+  the columns-rows-slices order itself (FreeSurfer's `clist`/`rlist`/`slist`: 12 bytes a voxel the
+  port does not hold), and the label-to-frame map is the sorted list (a binary search) instead of
+  `calloc(segidmax + 1)` (4 GB of untouched pages for a label of 10^9).
+- `nthreads = omp_get_max_threads()` is printed twice; the loop is `omp parallel for` with
+  `reduction(+:nhits)` and per-thread `nperf` arrays: each voxel's counts are its own and the total
+  is a sum of `int`s, so the result does not depend on the threads. The port samples on one
+  thread and prints FreeSurfer's count (`OMP_NUM_THREADS`, else the logical CPUs, at most 128:
+  fs.core's `romp`). Speed: FreeSurfer runs on every CPU by default; the port's single thread is a
+  speed item (the voxels are independent).
+- `resmm` (the program's `double`): `ASeg->xsize/UpsampleFactor` is a `float` division (the
+  `int` factor converted), default factor -1, so by default `resmm = -xsize`: the negative branch
+  takes `round(abs(resmm))` as an upsampling factor (`abs` of a `double`: libstdc++'s `std::abs`
+  overload, measured: `--resmm -2.7` gives 3 samples, not 2). A 1 mm segmentation gives one sample
+  per voxel; 0.5 mm, `round(0.5) = 1`; below 0.5 mm, 0 (FS-1266). The negative branch has no
+  `if (ndc < 1) ndc = 1` (the positive branch has).
+- `ndc = round(vg->xsize / resmm)`: `vg->xsize` is the `float` geometry's, the quotient in
+  `double`, C's `round`, then `cvttsd2si` (NaN and beyond the range `INT_MIN`: FS-12, and FS-1267
+  where it matters); the port's `round` is an exact integer-part round without the C library
+  (relay 56: MinGW's `roundf`). `npervox = ndc * ndr * nds` (`int` multiply, then `cvtsi2ss`).
+- The loop's arithmetic: `cf = c + dcstart + dc * i` (left to right: `(c + dcstart) + dc*i`),
+  `m11cf = m11*cf + m14`, `m12rf = m12*rf + m11cf`, `ca = nint(m12rf + m13*sf)`: no FMA (x86-64
+  baseline). The matrix elements are the `float` `m_L`'s widened. `segid = MRIgetVoxVal(...)` is an
+  implicit `float` to `int` conversion (FS-12). `nperf[f]++` on a `float`; `(float)nperf[f] /
+  npervox` in `float`.
+- `VOXsegPVF2Seg`: `vsum` in `float`, `v > 0 && vmax < v`; the vote's `vtt[100]` (only the first
+  `nTT = ctabTissueType->nentries - 1` zeroed), `tt = ct->entries[segid]->TissueType - 1` for
+  every label of the list, not only the voxel's.
+- `MRIsurfaceLabel2VolOpt` sets `val = 1.0` for every label (not the label's number): the output
+  is 1 (or the stat) wherever any label's vertex is the closest.
+- `MRIsurf2VolOpt`: `R = TransformLTA2RegDat(Q2); R = MatrixInverse(R, NULL)` (the first `R`
+  leaked), `invR = MatrixInverse(R, NULL)`, `M = invR * T`: the registration inverted twice in
+  `float` (not exactly the original); the port does the same. `crsRibbon->rptr[1][2]` and
+  `rptr[1][3]` of the 4 x 1 vector are its rows 2 and 3 on FreeSurfer's contiguous storage
+  (`rptr[r] = data + (r-1)*cols - 1`): the intended elements, no effect, kept; the port reads the
+  same places (`relt(1, 2)`, `relt(1, 3)`, fs.core's matrix keeps FreeSurfer's row arithmetic).
+  `nint` of the `float` elements widened; `ribval = MRIgetVoxVal(...)` converted to `int` (FS-12).
+  `dmin = 1000` and `d < dmin` in `float`. The hemisphere from the surface file's name
+  (`MRISread`: the first byte of its last part, `l`/`r`).
+- `FillRibbon` reads `fsenv->SUBJECTS_DIR` (FS-1273) after `FSENVgetenv()`, which needs
+  `FREESURFER_HOME` and reads `$FREESURFER_HOME/FreeSurferColorLUT.txt` (for nothing here); its
+  `NULL` is dereferenced at once (FS-1272). Without `FREESURFER_HOME` the official program stops
+  earlier, in its licence check (`chklc` when the surface is read: `ERROR: FreeSurfer environment
+  FREESURFER_HOME is not defined.`, status 255), which the replica does not have (the decision log,
+  2026-10-19): the probe tests FS-1272 with a `FREESURFER_HOME` that holds no colour table.
+- `--fill-ribbon`'s writes end the program with `exit(err)`, the writer's status: `ERROR_BADPARM`
+  (-4, status 252) for a folder that does not exist (measured), where the other paths `exit(1)`.
 
 ### Details that decide bits
 
@@ -103,10 +158,62 @@ FreeSurfer's contiguous storage are rows 2 and 3 (the intended elements: no effe
 13. **FS-1262** (class c: `int` overflow). `LabelCode = nhitsmax_label + 1 + LabelCodeOffset`
     wraps past 2147483647. Rule B.
 
+14. **FS-1261** (class a: a crash). `--fill-ribbon`, a label not in tkregister coordinates with
+    `--tkr-template`: `LabelToSurfaceRAS(srclabel, ToTkrTemplate, srclabel)` converts the file
+    static `srclabel` (`NULL`: the label loop below never ran) instead of `labels[nthlabel]`
+    (measured: signal 11). Rule A (the conversion of the label read; only its vertices and stats are
+    used, so the output is that of a label in tkregister coordinates); `reproduce`: status 139.
+15. **FS-1263** (class a: out of bounds). `seg2frame[segidlist[f]] = f` for a label below 0 writes
+    before the `calloc`ed array (into the allocator's header), and reads it back for each sample:
+    memory contents. Rule A (each label its frame); `reproduce` fills the same, noted (the probe:
+    `MEMORY`). NaN voxels never reach it: `MRIread` makes them 0.
+16. **FS-1264** (class a: a crash). `VOXsegPVF2Seg`'s vote reads `ct->entries[segid]->TissueType`
+    for every label: a label the colour table does not hold is a `NULL` entry (measured: signal 11)
+    or an entry past the table (memory contents). Rule B; `reproduce`: status 139.
+17. **FS-1265** (class a: out of bounds). A label with `TissueType` 0 or -1 (unassigned by the
+    schema) gives `tt` -1 or -2: `vtt[tt] += ...` writes before the stack array. Rule A (no vote);
+    `reproduce` fills the same, noted (`MEMORY`).
+18. **FS-1266** (class c). The negative branch's `ndc = ndr = nds = round(abs(resmm))` is not
+    raised to 1: 0 samples, `npervox` 0, the PVFs never written (zeros) and with `--ttype` every
+    voxel's `nperf` 0/0 (NaN): `vsum < 0.5` is false, the vote's comparisons all false, every voxel
+    `segidlist[0]`. Reached by default with a segmentation of voxels below 0.5 mm. Rule A (one
+    sample, as the positive branch); `reproduce` FreeSurfer's.
+19. **FS-1267** (class a: undefined conversions, `int` overflow). `ndc = round(...)` past `int`
+    (`--resmm -inf`: `INT_MIN`, the loops never run) and `npervox = ndc*ndr*nds` past `int` (wraps;
+    reachable only with absurd `--resmm`). Rule B (an error); `reproduce` FreeSurfer's.
+20. **FS-1268** (class a: a crash). `annotation2label` returns `NULL` for an index no vertex has;
+    the loop's `continue` leaves `labels[nthlabel]` `NULL` and `MRIsurfaceLabel2VolOpt` reads
+    `label->n_points` (measured: signal 11). Every atlas annotation whose table lists a structure
+    no vertex has (`lh.a.annot` of the probe; the recorded heads' `rh.aparc.annot`) crashes. Rule A
+    (the index maps nothing); `reproduce`: status 139.
+21. **FS-1269** (class a: out of bounds). `MRIsetVoxVal(overlay, vtxno, 0, 0, 0, val)` with `vtxno`
+    -1 (a volume label) or past `nvertices` writes outside the overlay's buffer (measured: signal 11,
+    signal 6 from the allocator, or nothing seen). Rule B (as FS-1258); `reproduce` the voxel
+    writer's handling (FS-52, FS-53).
+22. **FS-1270** (class a: a crash). `MRIsurf2VolOpt` returns `NULL` after `ribbon is neither source
+    nor target`; `MRIaddCommandLine(OutVol, cmdline)` dereferences it (measured: signal 11). Rule B
+    (status 1 after the line); `reproduce`: status 139.
+23. **FS-1271** (class a: a crash). `MHTfindClosestVertexNoXYZ` returns -1 for a probe with no
+    vertex in its cell and the neighbours searched (FS-997, kept); `MRIsurf2VolOpt` prints the
+    search and returns `NULL`, then the same crash. Rule A (the full search's vertex, which it
+    computes for its message: the documented behaviour, every ribbon voxel the closest vertex's
+    value); `reproduce` the lines and status 139. The probe's `subjfar` (a ribbon of 8 mm voxels)
+    reaches it.
+24. **FS-1272** (class a: a crash). `fsenv->SUBJECTS_DIR` of a `NULL` `FSENVgetenv()`. Rule B
+    (status 1 after the environment's message); `reproduce`: status 139.
+25. **FS-1273** (class c). The ribbon from `fsenv->SUBJECTS_DIR`, the surface from `SUBJECTS_DIR`
+    (`--sd`'s, else the environment's): with `--sd` another folder, the ribbon of the environment's
+    subject (or `(null)/<subject>/mri/ribbon.mgz` when it is unset). Rule A (the program's subjects
+    folder); `reproduce` FreeSurfer's.
+
 Kept (rule C or messages, no ID): the duplicated `DoLabelStatVol && nlabels == 0` check (the
 second's message names `--stat-thresh`: dead), `igorning`, `Outut Volume`, `Thesholding`,
 `Contraining`, the help's missing spaces (`atemplate`, `volumethat`), the label path's `PVF
-(null)` line, the ignored statuses of the `--hits`, PVF and thickness reads and writes.
+(null)` line, the ignored statuses of the `--hits`, PVF and thickness reads and writes; part 2's
+`Initilizing`, the default `resmm = -xsize` read as an upsampling factor (rule C: FreeSurfer's
+design, documented in the function's comment: a negative `resmm` is a factor), `--fill-ribbon`'s
+value 1 for every label, `--hits`/`--pvf`/`--offset` ignored by both paths, the `FSENVgetenv`
+colour table read for nothing.
 
 ## Memory
 

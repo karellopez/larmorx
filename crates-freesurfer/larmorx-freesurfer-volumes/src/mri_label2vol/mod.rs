@@ -10,7 +10,9 @@
 //! - [`options`]: `parse_commandline`, `check_options`, `dump_options`, the usage, help and
 //!   version texts.
 //! - [`main`]: `main`, `get_crs`, `is_surface_label`, `load_annotation` (the program's own
-//!   functions) and the `--defects` path.
+//!   functions), the `--defects`, `--new-aseg2vol` and `--fill-ribbon` paths.
+//! - [`resample`]: `utils/resample.cpp`'s `MRIseg2SegPVF`, `VOXsegPVF2Seg` and `MRIsurf2VolOpt`,
+//!   and the program's `MRIsurfaceLabel2VolOpt` (part 2, relay 57).
 //! - [`surface`]: the surface library's functions only this program reaches in wave 3.2:
 //!   `MRISloadSurfSubject` (`utils/mrisutils.cpp`), `ProjNormDist` and `ProjNormFracThick`
 //!   (`utils/resample.cpp`), `annotation2label` (`utils/annotation.cpp`).

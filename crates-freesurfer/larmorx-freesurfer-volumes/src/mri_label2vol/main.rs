@@ -28,15 +28,21 @@
 //! annotation's index) plus `--offset`, 0 where none; written with the command line; `mri_label2vol
 //! done `, status 0.
 //!
-//! Not ported yet (part 2 of queue item 3.2-40): `--new-aseg2vol` (`MRIseg2SegPVF`) and
-//! `--fill-ribbon` (`MRIsurf2VolOpt`), which end with a message, status 1.
+//! `--new-aseg2vol` (`mri_label2vol.cpp` 294-307): the segmentation's partial volumes on the
+//! template's grid ([`super::resample::mri_seg2seg_pvf`]), or with `--ttype` its labels, written
+//! with the command line. `--fill-ribbon` (312-363): the labels (or the annotation's indices)
+//! filled into `<SUBJECTS_DIR>/<subject>/mri/ribbon.mgz`'s cortex by the surface's closest vertex
+//! ([`super::resample::surface_label2vol_opt`]), written with the command line; `--label-stat`'s
+//! stats likewise.
 //!
 //! Defects (`larmorx_core::defects`; the mechanisms in `docs/findings/freesurfer-mri-label2vol.md`):
 //! FS-1249 and FS-1250 (fs.surf's `MRISdefects2Seg`), FS-1251 to FS-1253 (`--defects`), FS-1254
 //! (`--pvf` with labels ends with status 1 and no output), FS-1255 (more than 32,767 hits in a
 //! voxel), FS-1256 (`--proj none`), FS-1257 (a projection that never ends), FS-1258 (a label
 //! point beyond the surface's vertices with `--proj`), FS-1259 ([`super::options`]), FS-1260 (a
-//! segmentation without a template), FS-1262 (label codes past the `int` range).
+//! segmentation without a template), FS-1261 (`--fill-ribbon` with a label in scanner
+//! coordinates), FS-1262 (label codes past the `int` range), FS-1272 and FS-1273 (`--fill-ribbon`'s
+//! environment and subjects folder); FS-1263 to FS-1271 in [`super::resample`].
 
 use std::io::Write;
 

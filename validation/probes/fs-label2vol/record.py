@@ -57,8 +57,10 @@ def main(argv: list[str] | None = None) -> int:
         real = {
             k: r[k]
             for k in ("calls", "reproduce_identical", "fix_identical",
-                      "official_image_is_recorded", "with_a_record")
+                      "official_image_is_recorded", "with_a_record", "official_crashes_matched")
+            if k in r
         }  # fmt: skip
+        real["fix_differ_with_notice"] = sum(not x["fix"] and bool(x["fix_notices"]) for x in r["rows"])
         real["runs"] = sorted({x["run"] for x in r["rows"]})
         real["kinds"] = dict(Counter(x["call"] for x in r["rows"]))
     memory = []
@@ -73,13 +75,14 @@ def main(argv: list[str] | None = None) -> int:
             )  # fmt: skip
     payload = {
         "name": NAME,
-        "tool": "mri_label2vol (FreeSurfer 8.2.0): every option and path but --new-aseg2vol and --fill-ribbon",
+        "tool": "mri_label2vol (FreeSurfer 8.2.0): every option and path",
         "status": "experimental",
         "larmorx_commit": stamp,
         "generated": datetime.date.today().isoformat(),
         "platform": f"{platform.system()} {platform.machine()}",
-        "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_label2vol/), fs.surf (defects2seg.rs), "
-        "the larmorx-freesurfer program",
+        "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_label2vol/, its resample.rs: "
+        "MRIseg2SegPVF, VOXsegPVF2Seg, MRIsurf2VolOpt), fs.surf (defects2seg.rs), the larmorx-freesurfer "
+        "program",
         "reference": "FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mri_label2vol) "
         "and its recon-all runs (oracles/freesurfer-8.2.0/runs/: defect2seg's calls)",
         "probe": [
@@ -102,8 +105,6 @@ def main(argv: list[str] | None = None) -> int:
         "real": real,
         "golden_sha256": {"official_and_reproduce": a.golden, "fix": a.golden_fix},
         "memory": memory,
-        "not_ported_yet": "--new-aseg2vol (MRIseg2SegPVF) and --fill-ribbon (MRIsurf2VolOpt): "
-        "part 2 of queue item 3.2-40; both end with a message, status 1",
     }
     a.out.mkdir(parents=True, exist_ok=True)
     (a.out / f"{NAME}.json").write_text(json.dumps(payload, indent=1) + "\n", encoding="utf-8")
@@ -111,9 +112,9 @@ def main(argv: list[str] | None = None) -> int:
         "# Validation: FreeSurfer's `mri_label2vol` (replica)",
         "",
         f"Status `experimental`. Generated {payload['generated']} on {payload['platform']} from "
-        f"commit `{stamp}` with `validation/probes/fs-label2vol/record.py` (queue item 3.2-40 "
-        "part 1, track A relay 56: every option, message, exit status and failure case but "
-        "`--new-aseg2vol` and `--fill-ribbon`, which end with a message, status 1: part 2).",
+        f"commit `{stamp}` with `validation/probes/fs-label2vol/record.py` (queue item 3.2-40, "
+        "track A relays 56 and 57: every option, message, exit status and failure case, "
+        "`--new-aseg2vol` and `--fill-ribbon` included).",
         "",
         f"- **Replica:** {payload['replica']} (`larmorx-freesurfer [--upstream-defects "
         "reproduce|fix] freesurfer mri_label2vol ...`).",
@@ -129,14 +130,21 @@ def main(argv: list[str] | None = None) -> int:
             "hemisphere's defects into `orig.mgz` with the cortex label, the right's merged into "
             "the left's volume) on the six classic and six v8 runs, and, on the v8 runs, `seg2cc`'s form (`--seg "
             "<seg> --temp <vol> --regheader`: the head's `aseg.mgz` onto its native grid "
-            "`rawavg.mgz` and back onto `norm.mgz`), each run's own files "
+            "`rawavg.mgz` and back onto `norm.mgz`) and part 2's paths, which no recorded step "
+            "takes (`--new-aseg2vol --ttype --resmm 0.5`: the aseg onto `rawavg.mgz`'s grid with 8 "
+            "samples a voxel and the tissue types' vote; `--fill-ribbon` with `lh.cortex.label` "
+            "and its stats, and with the atlas annotation `rh.aparc.annot`, whose table lists a "
+            "structure no vertex has: FreeSurfer crashes, FS-1268), each run's own files "
             f"({', '.join(real['runs'])}; by kind: {kinds}): {real['calls']} calls, `reproduce` "
             f"{real['reproduce_identical']} identical to the official program (exit status, both "
             f"streams, every file byte for byte, the command lines a volume records masked), the "
             f"default {real['fix_identical']}; the official defect volume's header and voxels equal "
             f"to the run's recorded `mri/surface.defects.mgz` in {real['official_image_is_recorded']} "
             f"of {real['with_a_record']} (its colour table's random colours left out: recon-all "
-            "seeds them from the clock, the probe with `FREESURFER_SEED=1234`).",
+            "seeds them from the clock, the probe with `FREESURFER_SEED=1234`); "
+            f"{real.get('official_crashes_matched', 0)} calls in which the official program "
+            "crashes, ended by `reproduce` with the same signal's status (counted as identical; "
+            f"`fix` maps them); `fix` different with a notice in {real['fix_differ_with_notice']}.",
             "",
         ]
     lines += [
@@ -158,11 +166,23 @@ def main(argv: list[str] | None = None) -> int:
         "`--aparc+aseg`; `--defects` into templates of three types (merged and not, a label, "
         "no volume geometry, NaN and infinite defect numbers, negative ones, numbers near the "
         "int range, a short overlay, offsets and merge flags that are no numbers, a negative "
-        "offset, missing files); then seeded command lines. Each case in one folder; exit "
+        "offset, missing files); `--new-aseg2vol` (segmentations of 1, 0.5 and 0.4 mm voxels, "
+        "labels below 0, a label of 10^6, labels without a tissue type or not in the colour "
+        "table, a segmentation of 0 only, `--resmm` positive, negative, 0, NaN and infinite, "
+        "`--upsample` 0, 3 and -2, `--ttype` and `--ttype+head` with two colour tables, the "
+        "tissue types' vote over many samples); `--fill-ribbon` (the ribbon's 3, 42 and other "
+        "values; surface labels, stats NaN and infinite, `--label-stat`, `--stat-thresh`, labels "
+        "of vertices outside the surface, in scanner coordinates with and without "
+        "`--tkr-template`; annotations with every index and with gaps; `--lta` with the ribbon "
+        "at the source, the destination and neither end; a ribbon far from the surface; `--sd` "
+        "other than `SUBJECTS_DIR`, none, a `FREESURFER_HOME` without its colour table; a right "
+        "hemisphere; outputs that cannot be written); then seeded command lines. Each case in "
+        "one folder; exit "
         "status, both streams and every file written, case by case; counted apart: FreeSurfer's "
         "crashes (CRASH: statuses 134, 136, 139), results it takes from memory contents (MEMORY: "
-        "FS-53, FS-249, FS-1252, FS-1256, FS-1258, FS-1259) and a projection that never ends "
-        "(HANG: FS-1257):",
+        "FS-53, FS-249, FS-441, FS-1252, FS-1256, FS-1258, FS-1259, FS-1263, FS-1265) and a "
+        "projection that never ends (HANG: FS-1257); `MRIseg2SegPVF(): done t = <seconds>` "
+        "masked:",
         "",
     ]
     for p in payload["probe"]:
@@ -178,12 +198,15 @@ def main(argv: list[str] | None = None) -> int:
         "",
         "## Golden cases",
         "",
-        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_label2vol_golden.rs`: 9 cases "
+        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_label2vol_golden.rs`: 15 cases "
         "on volumes up to 12^3 and a surface of 66 vertices (`defect2seg`'s two calls, defect "
         "numbers with NaN and infinities from their bits, `seg2cc`'s segmentation onto another "
         "grid and upsampled with its hits, two labels with their hits, a label with NaN, "
         "infinite and huge coordinates through a `register.dat` with its stat volume, a "
-        "projected surface label, an annotation), on every platform: "
+        "projected surface label, an annotation; `--new-aseg2vol` with no sample per voxel "
+        "(FS-1266), with the tissue types' vote and through a `register.dat`; `--fill-ribbon` "
+        "with a label of NaN and infinite stats and its stat volume, through an `.lta` whose "
+        "destination is the ribbon, and with an annotation), on every platform: "
         f"`reproduce` `{a.golden}` (the official program's value on the same inputs, `check.py "
         f"--golden`), `fix` `{a.golden_fix}`.",
         "",

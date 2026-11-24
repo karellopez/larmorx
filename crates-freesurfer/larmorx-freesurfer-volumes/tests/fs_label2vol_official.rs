@@ -15,11 +15,12 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-24 from the official program (`check.py --seed 1 --n 600`, relay 56): 600
-/// cases, 589 lines identical, 11 hashed as `SKIP`.
+/// Recorded 2026-11-24 from the official program (`check.py --seed 1 --n 600`, relay 57, with
+/// part 2's paths: `--new-aseg2vol` and `--fill-ribbon`): 600 cases, 551 lines identical, 49 hashed
+/// as `SKIP` (FreeSurfer's crashes, memory contents and a hang).
 const N: usize = 600;
-const OFFICIAL_SHA256: &str = "47e3dc1662b4b0813b63b5442a77cdf8f58f05ea445496f3356925104be84152";
-const SKIPPED: usize = 11;
+const OFFICIAL_SHA256: &str = "bf8ecdd7ed063887f3ea97c849dbffc6cf3e2af4d86bfe3f88cd00eeb7cba6c0";
+const SKIPPED: usize = 49;
 
 /// `check.py`'s `SKIP` (the port's pseudo-notices).
 const SKIP: [&str; 3] = ["CRASH", "MEMORY", "HANG"];

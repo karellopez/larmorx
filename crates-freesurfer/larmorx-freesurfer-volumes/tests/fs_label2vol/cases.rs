@@ -583,11 +583,8 @@ fn part2_inputs(
         lta_of(0, shift, ([6, 5, 4], [1.0, 1.5, 2.0]), ([4, 4, 3], [2.0, 2.0, 2.0])),
     ));
     // segmentations of odd labels
-    let nan = f32::from_bits(0x7fc0_0000);
     let mut sneg = seg_volume_of(&mut g, MRI_FLOAT, [12, 12, 12], [1.0, 1.0, 1.0], true, &[0.0, 2.0, -1.0, 17.0, -3.0, 41.0]);
     put(files, "segneg.mgz", &mut sneg);
-    let mut snan = seg_volume_of(&mut g, MRI_FLOAT, [6, 5, 4], [1.0, 1.5, 2.0], false, &[0.0, 2.0, nan, 3.0]);
-    put(files, "segnan.mgz", &mut snan);
     let mut sbig = seg_volume_of(&mut g, MRI_INT, [6, 5, 4], [1.0, 1.5, 2.0], false, &[0.0, 3.0, 1_000_000.0, 41.0]);
     put(files, "segbig.mgz", &mut sbig);
     let mut su = seg_volume_of(&mut g, MRI_INT, [12, 12, 12], [1.0, 1.0, 1.0], true, &[0.0, 1.0, 3.0, 17.0, 41.0, 77.0]);
@@ -612,6 +609,21 @@ fn part2_inputs(
     b.extend_from_slice(&binary_of(LUT3));
     files.push(("subj/label/lh.dense.annot".into(), b));
     files.push(("subj/label/rh.dense.annot".into(), files.last().expect("the annotation").1.clone()));
+    // a surface label whose stats are NaN and infinite (the label's text: C's sscanf gives them)
+    let stats = ["nan", "-nan", "inf", "-inf", "2.5", "-1"];
+    let mut pts: Vec<(i32, String, String, String, String)> = Vec::new();
+    for (i, p) in v.iter().enumerate() {
+        if g.chance(2) {
+            pts.push((
+                i as i32,
+                format!("{}", p[0]),
+                format!("{}", p[1]),
+                format!("{}", p[2]),
+                g.pick(&stats).to_owned(),
+            ));
+        }
+    }
+    files.push(("snan.label".into(), label_file(&pts, "TkReg")));
 }
 
 /// Whether argument `a` names file `f` (or a folder holding it).
@@ -2099,7 +2111,6 @@ fn part2_prelude(add_env: &mut dyn FnMut(&[&str], &[&str])) {
         (vec![], nseg("segq.mgz", "t2.mgz", &["--ttype"])),
         (vec![], nseg("segn.mgz", "orig.mgz", &["--hits", "h.mgz", "--pvf", "p.mgz"])),
         (vec![], nseg("segneg.mgz", "t2.mgz", &[])),
-        (vec![], nseg("segnan.mgz", "t.mgz", &[])),
         (vec![], nseg("segbig.mgz", "t2.mgz", &["--resmm", "0.5"])),
         (vec![], nseg("segu.mgz", "t1.mgz", &["--ttype", "--resmm", "1"])),
         (vec!["FREESURFER_HOME=@DIR@/fsh2"], nseg("segu.mgz", "t1.mgz", &["--ttype", "--resmm", "1"])),
@@ -2137,6 +2148,8 @@ fn part2_prelude(add_env: &mut dyn FnMut(&[&str], &[&str])) {
         (vec![], rib(&["--label", "s.label", "--label", "lh.cortex.label"])),
         (vec![], rib(&["--label", "s.label", "--label-stat", "st.mgz"])),
         (vec![], rib(&["--label", "s.label", "--label-stat", "st.mgz", "--stat-thresh", "0"])),
+        (vec![], rib(&["--label", "snan.label", "--label-stat", "st.mgz"])),
+        (vec![], rib(&["--label", "snan.label", "--label-stat", "st.mgz", "--stat-thresh", "0"])),
         (vec![], rib(&["--label", "s.label", "--temp", "t2.mgz"])),
         (vec![], rib(&["--label", "s.label", "--surf", "orig"])),
         (vec![], rib(&["--label", "s.label", "--hits", "h.mgz", "--pvf", "p.mgz"])),
@@ -2158,9 +2171,9 @@ fn part2_prelude(add_env: &mut dyn FnMut(&[&str], &[&str])) {
         (vec!["-SUBJECTS_DIR"], rib(&["--label", "s.label", "--sd", "."])),
         (vec!["SUBJECTS_DIR=@DIR@/nowhere"], rib(&["--label", "s.label", "--sd", "."])),
         (vec!["FREESURFER_HOME=@DIR@/nowhere"], rib(&["--label", "s.label"])),
-        (vec![], rib(&["--label", "s.label", "--o", "nodir/o.mgz"])),
+        (vec![], s(&["--fill-ribbon", "--subject", "subj", "--hemi", "lh", "--identity", "--label", "s.label", "--o", "nodir/o.mgz"])),
         (vec![], rib(&["--label", "s.label", "--label-stat", "nodir/st.mgz"])),
-        (vec![], rib(&["--label", "s.label", "--o", "o.nii.gz"])),
+        (vec![], s(&["--fill-ribbon", "--subject", "subj", "--hemi", "lh", "--identity", "--label", "s.label", "--label-stat", "st.nii.gz", "--o", "o.nii.gz"])),
         (vec![], s(&["--fill-ribbon", "--subject", "subj", "--hemi", "rh", "--identity", "--annot", "subj/label/rh.dense.annot", "--o", "o.mgz"])),
         (vec![], s(&["--fill-ribbon", "--subject", "subjfar", "--hemi", "lh", "--identity", "--label", "s.label", "--o", "o.mgz"])),
         (vec![], s(&["--fill-ribbon", "--subject", "nosubj", "--hemi", "lh", "--identity", "--label", "s.label", "--o", "o.mgz"])),
@@ -2215,13 +2228,12 @@ const SEGS2: &[&str] = &[
     "segh.mgz",
     "segq.mgz",
     "segneg.mgz",
-    "segnan.mgz",
     "segbig.mgz",
     "segu.mgz",
 ];
 const RIBBON_LABELS: &[&str] = &[
     "s.label",
-    "s.label",
+    "snan.label",
     "lh.cortex.label",
     "scan.label",
     "sbad.label",
@@ -2509,11 +2521,22 @@ pub fn golden_cases() -> Vec<String> {
         ],
         &[
             "--seg",
-            "segneg.mgz",
+            "segq.mgz",
             "--temp",
             "t2.mgz",
             "--regheader",
             "--new-aseg2vol",
+            "--o",
+            "o.mgz",
+        ],
+        &[
+            "--seg",
+            "seg.mgz",
+            "--temp",
+            "t3.nii.gz",
+            "--regheader",
+            "--new-aseg2vol",
+            "--ttype",
             "--resmm",
             "0.5",
             "--o",
@@ -2521,14 +2544,28 @@ pub fn golden_cases() -> Vec<String> {
         ],
         &[
             "--seg",
-            "segnan.mgz",
+            "seg.mgz",
             "--temp",
-            "t1.mgz",
-            "--regheader",
+            "t.mgz",
+            "--reg",
+            "reg.dat",
             "--new-aseg2vol",
-            "--ttype",
             "--resmm",
-            "2",
+            "0.5",
+            "--o",
+            "o.mgz",
+        ],
+        &[
+            "--label",
+            "snan.label",
+            "--fill-ribbon",
+            "--subject",
+            "subj",
+            "--hemi",
+            "lh",
+            "--identity",
+            "--label-stat",
+            "st.mgz",
             "--o",
             "o.mgz",
         ],

@@ -2123,6 +2123,16 @@ defects! {
         "mri_edit_wm_with_aseg with an option given without all its values (-fillven, -fix-scm-ha, -fix-scm-ha-only, -fix-ento-wm, -sa-fix-ento-wm, -label-acj, -fix-acj, -sa-fix-acj, -keep-hailvcp, -debug_voxel) reads past its arguments and crashes (exit status 139); larmorx prints a clear error and the help, exit status 1";
     FS_1240 = "FS-1240", "FreeSurfer", true,
         "mri_edit_wm_with_aseg ends with exit status 0 when its output cannot be written (a folder that does not exist): larmorx ends with 1";
+    FS_1281 = "FS-1281", "FreeSurfer", true,
+        "mri_pretess -debug_voxel given as its last arguments, without its three values, reads past its arguments and crashes (exit status 139; what it printed to a file or pipe is lost): larmorx prints that the option needs its values and the help, exit status 1";
+    FS_1282 = "FS-1282", "FreeSurfer", true,
+        "mri_pretess given a label number outside 0 to 255 (the segmentation is read as bytes) finds no voxel of it, writes the segmentation unchanged and prints the share of modified voxels as -nan, except -1, which it takes as wm: larmorx ends with an error (exit status 1) by default";
+    FS_1283 = "FS-1283", "FreeSurfer", true,
+        "mri_pretess on a segmentation without a voxel of the label prints the share of modified voxels as -nan (0 out of 0): kept";
+    FS_1284 = "FS-1284", "FreeSurfer", true,
+        "mri_pretess changes a segmentation that is not of bytes to bytes before it starts (its values rounded and clamped to 0 to 255; above 255 the warning about forced scaling) and writes its output as bytes, so the labels above 255 of an int or float segmentation are lost: kept";
+    FS_1285 = "FS-1285", "FreeSurfer", true,
+        "mri_pretess ends with exit status 0 when its output cannot be written (a folder that does not exist): larmorx ends with 1";
     FS_1210 = "FS-1210", "FreeSurfer", true,
         "mri_cc -a 0 whose search for the callosum's seed fails (no column of the callosum's thickness near Talairach's origin, or 'could not find valid seed for the cc') uses the seed's Talairach millimetres as a voxel position (only the printed centre and the division counts depend on it): larmorx uses the seed's voxel";
     FS_974 = "FS-974", "FreeSurfer", true,

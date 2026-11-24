@@ -33,6 +33,7 @@ pub mod mri_info;
 pub mod mri_label2vol;
 pub mod mri_make_uchar;
 pub mod mri_mask;
+pub mod mri_pretess;
 pub mod mri_robust_register;
 pub mod mri_robust_template;
 pub mod mri_segment;
@@ -97,6 +98,10 @@ pub const PROGRAMS: &[Program] = &[
     Program {
         name: mri_normalize::main::NAME,
         run: mri_normalize::main::run,
+    },
+    Program {
+        name: mri_pretess::main::NAME,
+        run: mri_pretess::main::run,
     },
     Program {
         name: mri_robust_register::main::NAME,

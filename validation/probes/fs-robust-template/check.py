@@ -326,7 +326,9 @@ def main(argv: list[str] | None = None) -> int:
         else:
             differ += 1
             if len(first) < a.show:
-                first.append({"case": k, "args": case[-400:], "official": c[:2500], "port": r[:2500]})
+                first.append(
+                    {"case": k, "args": case[-400:], "official": c[:2500], "port": r[:2500]}
+                )
         if f != c:
             fix_differ += 1
             for x in fids:

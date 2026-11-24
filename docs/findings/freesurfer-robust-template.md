@@ -109,7 +109,9 @@ CORE-MATH's `acos`, glibc's for a NaN argument) into the official program. Measu
 - The golden cases (6 on 32^3: fMRIPrep's call on three inputs, recon-all's on two, the mean space,
   one global iteration with weights, NaN voxels from their bits, a 4-D input's one `--mapmov`):
   official = reproduce `5ee82ce6...`; the default `cfe17db9...` (FS-1090).
-- fMRIPrep's recorded calls (`real.py`): ds004173's three N4-corrected T1w and ds005454's two, the
+- fMRIPrep's recorded calls (`real.py`; first with fs-robust-register's complex pair only, then for the
+  record, from the clean commit e9b605fd, with `libdecidedtemplate.so`: the same verdicts and times within a
+  few seconds): ds004173's three N4-corrected T1w and ds005454's two, the
   fMRIPrep, recon-all and longitudinal recipes: 6/6 identical in every byte (standard output and error,
   the template, LTAs, intensity files, the mapped inputs) with `reproduce` and the default. One thread:
   FreeSurfer 76 s, 76 s, 271 s (ds004173's fMRIPrep, recon-all, longitudinal), 57 s, 56 s, 59 s

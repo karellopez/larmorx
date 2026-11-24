@@ -207,7 +207,9 @@ def main(argv: list[str] | None = None) -> int:
          "--manifest-path", str(MANIFEST)],
         check=True, env=env,
     )  # fmt: skip
-    root = ws / "oracles" / "inputs" / "fs-robust-template" / ("real-preload" if a.preload else "real")
+    root = (
+        ws / "oracles" / "inputs" / "fs-robust-template" / ("real-preload" if a.preload else "real")
+    )
     jobs = [(run, recipe) for run in a.runs.split(",") for recipe in a.recipes.split(",")]
 
     def one(job: tuple[str, str]) -> dict:
@@ -227,7 +229,11 @@ def main(argv: list[str] | None = None) -> int:
             "fix_identical": fix_same,
             "reproduce_notices": rep["notices"],
             "fix_notices": fix["notices"],
-            "seconds": {"official": o["seconds"], "reproduce": rep["seconds"], "fix": fix["seconds"]},
+            "seconds": {
+                "official": o["seconds"],
+                "reproduce": rep["seconds"],
+                "fix": fix["seconds"],
+            },
             "peak_mib": {
                 "official": o["peak_mib"],
                 "reproduce": rep["peak_mib"],

@@ -103,8 +103,10 @@ def main(argv: list[str] | None = None) -> int:
     out.write_text(json.dumps(rec, indent=1) + "\n", encoding="utf-8")
 
     def same(v: dict) -> str:
-        return "identical in every byte" if all(v.values()) else (
-            "differs: " + ", ".join(k for k, x in v.items() if not x)
+        return (
+            "identical in every byte"
+            if all(v.values())
+            else ("differs: " + ", ".join(k for k, x in v.items() if not x))
         )
 
     md = [

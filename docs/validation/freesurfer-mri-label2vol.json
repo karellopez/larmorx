@@ -1,0 +1,134 @@
+{
+ "name": "freesurfer-mri-label2vol",
+ "tool": "mri_label2vol (FreeSurfer 8.2.0): every option and path but --new-aseg2vol and --fill-ribbon",
+ "status": "experimental",
+ "larmorx_commit": "880c66875e97",
+ "generated": "2026-11-24",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_label2vol/), fs.surf (defects2seg.rs), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mri_label2vol) and its recon-all runs (oracles/freesurfer-8.2.0/runs/: defect2seg's calls)",
+ "probe": [
+  {
+   "set": "seed 1",
+   "cases": 600,
+   "identical": 589,
+   "different": 0,
+   "skipped": 11,
+   "skipped_why": {
+    "MEMORY": 6,
+    "HANG": 1,
+    "CRASH": 4
+   },
+   "fix_different_with_notice": 119,
+   "fix_different_without_notice": 0
+  },
+  {
+   "set": "seed 2",
+   "cases": 1500,
+   "identical": 1489,
+   "different": 0,
+   "skipped": 11,
+   "skipped_why": {
+    "MEMORY": 6,
+    "HANG": 1,
+    "CRASH": 4
+   },
+   "fix_different_with_notice": 292,
+   "fix_different_without_notice": 0
+  }
+ ],
+ "real": {
+  "calls": 36,
+  "reproduce_identical": 36,
+  "fix_identical": 36,
+  "official_image_is_recorded": 12,
+  "with_a_record": 12,
+  "runs": [
+   "ds000005-sub-01-classic",
+   "ds000005-sub-01-v8",
+   "ds000228-sub-pixar008-classic",
+   "ds000228-sub-pixar008-v8",
+   "ds002422-sub-02-classic",
+   "ds002422-sub-02-v8",
+   "ds004173-sub-603309-classic",
+   "ds004173-sub-603309-v8",
+   "ds005003-sub-RS001-classic",
+   "ds005003-sub-RS001-v8",
+   "ds005454-sub-16-classic",
+   "ds005454-sub-16-v8"
+  ],
+  "kinds": {
+   "defects-lh": 12,
+   "defects-rh": 12,
+   "seg-to-native": 6,
+   "seg-to-conformed": 6
+  }
+ },
+ "golden_sha256": {
+  "official_and_reproduce": "aeabe265b849ca1002d79d2e07cc640fc12d97ca20468cc7dd9be3fe21d7e717",
+  "fix": "9cb289bfca40e71fb04cc2f6ecd364930c72794d207a8fd168347cccf27caa2c"
+ },
+ "memory": [
+  {
+   "case": "defects",
+   "mode": "reproduce",
+   "larmorx_mib": 242.4,
+   "freesurfer_mib": 226.1
+  },
+  {
+   "case": "defects",
+   "mode": "fix",
+   "larmorx_mib": 242.2,
+   "freesurfer_mib": 226.1
+  },
+  {
+   "case": "defects-merge",
+   "mode": "reproduce",
+   "larmorx_mib": 228.4,
+   "freesurfer_mib": 214.4
+  },
+  {
+   "case": "defects-merge",
+   "mode": "fix",
+   "larmorx_mib": 228.3,
+   "freesurfer_mib": 214.4
+  },
+  {
+   "case": "seg",
+   "mode": "reproduce",
+   "larmorx_mib": 838.0,
+   "freesurfer_mib": 841.8
+  },
+  {
+   "case": "seg",
+   "mode": "fix",
+   "larmorx_mib": 838.5,
+   "freesurfer_mib": 841.8
+  },
+  {
+   "case": "label",
+   "mode": "reproduce",
+   "larmorx_mib": 76.0,
+   "freesurfer_mib": 77.4
+  },
+  {
+   "case": "label",
+   "mode": "fix",
+   "larmorx_mib": 76.4,
+   "freesurfer_mib": 77.4
+  },
+  {
+   "case": "proj",
+   "mode": "reproduce",
+   "larmorx_mib": 230.9,
+   "freesurfer_mib": 214.1
+  },
+  {
+   "case": "proj",
+   "mode": "fix",
+   "larmorx_mib": 230.9,
+   "freesurfer_mib": 214.1
+  }
+ ],
+ "not_ported_yet": "--new-aseg2vol (MRIseg2SegPVF) and --fill-ribbon (MRIsurf2VolOpt): part 2 of queue item 3.2-40; both end with a message, status 1"
+}

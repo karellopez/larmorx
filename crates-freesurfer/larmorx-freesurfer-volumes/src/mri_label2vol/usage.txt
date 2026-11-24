@@ -1,0 +1,47 @@
+USAGE: mri_label2vol
+
+   --o volid : output volume
+
+     Possible inputs:
+   --label labelid <--label labelid>  
+   --annot annotfile : surface annotation file  
+   --seg   segpath : segmentation
+     --upsample USFactor: upsample seg by factor
+     --resmm ResMM : upsample resolution (instead of USF)
+     --ttype : use default tissue type info for seg
+     --ttype+head : use default+head tissue type info for seg
+     --new-aseg2vol : use new function (eventually will become default)
+   --aparc+aseg  : use aparc+aseg.mgz in subjectdir as seg
+
+   --temp tempvolid : output template volume
+
+   --reg regmat : VolXYZ = R*LabelXYZ
+   --regheader volid : label template volume (needed with --label or --annot)
+       for --seg, use the segmentation volume
+   --identity : set R=I
+   --invertmtx : Invert the registration matrix
+
+   --fillthresh thresh : between 0 and 1 (def 0)
+   --labvoxvol voxvol : volume of each label point (def 1mm3)
+   --proj type start stop delta
+   --fill-ribbon
+
+   --subject subjectid : needed with --proj or --annot
+   --hemi hemi : needed with --proj or --annot
+   --surf surface  : use surface instead of white
+
+   --hits hitvolid : each frame is nhits for a label
+   --label-stat statvol : map the label stats field into the vol
+   --stat-thresh thresh : only use label point where stat > thresh
+   --offset k : add k to segmentation numbers (good when 0 should not be ignored)
+   --defects surf defectno.mgz voltemplate.mgz offset mergeflag <label>
+     Creates a segmentation volume of the surface defects, eg, 
+       mri_label2vol --defects surf/lh.orig surf/lh.defect_labels mri/orig.mgz    1000 0 mri/defects.mgz
+       mri_label2vol --defects surf/rh.orig surf/rh.defect_labels mri/defects.mgz 2000 1 mri/defects.mgz
+       If a label is included, it will be used to mask out defects outside of the label;
+         defect numbers are not changed
+
+   --native-vox2ras : use native vox2ras xform instead of tkregister-style
+   --version : print version and exit
+   --help 
+

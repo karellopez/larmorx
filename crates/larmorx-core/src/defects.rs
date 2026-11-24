@@ -2811,6 +2811,32 @@ defects! {
         "mri_concat --mask of other dimensions than the inputs is read at the inputs' voxels by --sort, --vote, --first-non-zero and --cumsum (other voxels of the mask, memory contents, a crash); corrected: ERROR: --mask's dimensions differ from the volume's, status 1";
     FS_1247 = "FS-1247", "FreeSurfer", true,
         "mri_concat --zconcat with a slice count to skip that is not a number skips a count taken from memory contents; corrected: ERROR: --zconcat: nskip <x> is not a number, status 1";
+    FS_1249 = "FS-1249", "FreeSurfer", true,
+        "mri_label2vol --defects with a negative offset names colour-table entries before the table's first (a write through memory contents, a crash); corrected: ERROR: the offset is negative, status 1";
+    FS_1250 = "FS-1250", "FreeSurfer", true,
+        "mri_label2vol --defects with defect numbers and an offset whose sum passes 2147483647: the colour table's size wraps below 0 and the program crashes; corrected: ERROR: the defect numbers plus the offset pass 2147483647, status 1";
+    FS_1251 = "FS-1251", "FreeSurfer", true,
+        "mri_label2vol --defects takes its seventh word as the label whenever the surface's name is not an option, even when that word is the next option (which then fails to read as a label), and drops the label when the surface's name starts with --; corrected: the seventh word is the label when it is not an option";
+    FS_1252 = "FS-1252", "FreeSurfer", true,
+        "mri_label2vol --defects with an offset or merge flag that is not a number uses a value from memory contents; corrected: ERROR: --defects: the offset (or merge flag) is not a number, status 1";
+    FS_1253 = "FS-1253", "FreeSurfer", true,
+        "mri_label2vol --defects with a label whose points name vertices the surface does not have: the label's mask is refused and the program then crashes; corrected: ERROR: the label does not fit the surface, status 1";
+    FS_1254 = "FS-1254", "FreeSurfer", true,
+        "mri_label2vol --pvf with labels or an annotation writes the partial-volume file, then ends with exit status 1 without writing the output volume; corrected: the output written too, status 0";
+    FS_1255 = "FS-1255", "FreeSurfer", true,
+        "mri_label2vol counts a label's hits in a voxel in a 16-bit integer: from the 32,768th label point in one voxel the count wraps to -32,768 and the voxel loses the label; corrected: the count stops at 32,767";
+    FS_1256 = "FS-1256", "FreeSurfer", true,
+        "mri_label2vol --proj none never sets the projected points: every point lands at a position taken from memory contents; corrected: ERROR: --proj none projects nothing, status 1";
+    FS_1257 = "FS-1257", "FreeSurfer", true,
+        "mri_label2vol --proj whose stop is infinite, or whose step is too small for the depth ever to pass the stop, never ends; corrected: ERROR: --proj never reaches its end, status 1";
+    FS_1258 = "FS-1258", "FreeSurfer", true,
+        "mri_label2vol --proj with a label point at a vertex the surface does not have (other than -1) reads outside the surface's vertices (memory contents or a crash); corrected: ERROR: the label point is not one of the surface's vertices, status 1";
+    FS_1259 = "FS-1259", "FreeSurfer", true,
+        "mri_label2vol with more than 100 --label options writes past its table of labels into the program's other settings; corrected: any number of labels";
+    FS_1260 = "FS-1260", "FreeSurfer", true,
+        "mri_label2vol with a segmentation (--seg or --aparc+aseg) and --fill-ribbon but no --temp maps the segmentation onto a template it never read and crashes; corrected: ERROR: a segmentation needs a template volume, status 1";
+    FS_1262 = "FS-1262", "FreeSurfer", true,
+        "mri_label2vol --offset large enough that a label's code (its number plus the offset) passes the int range writes a wrapped code; corrected: ERROR: the label codes pass the range of an int, status 1";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

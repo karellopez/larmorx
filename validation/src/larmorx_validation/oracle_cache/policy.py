@@ -397,7 +397,8 @@ def whole_path_texts(args: Sequence[str]) -> list[str]:
 #: ``mri_vol2vol`` from relay 53 of track A, ``mri_concat`` from relay 55 (no run of either was in
 #: the cache before), ``mri_label2vol`` from relay 56 (its probe's first runs, keyed without it,
 #: run again under the new keys), ``mri_segment`` from relay 56 of track D (none before),
-#: ``mri_robust_template`` from relay 50 of track C (none before).
+#: ``mri_robust_template`` from relay 50 of track C (none before), ``mri_pretess`` from relay 58 of
+#: track D (its probe's first runs keyed with it).
 EXTENSION_FROM_WHOLE_PATH = (
     "fs_temp_file",
     "fscalc",
@@ -416,6 +417,7 @@ EXTENSION_FROM_WHOLE_PATH = (
     "mri_make_uchar",
     "mri_mask",
     "mri_normalize",
+    "mri_pretess",
     "mri_robust_register",
     "mri_robust_template",
     "mri_segment",

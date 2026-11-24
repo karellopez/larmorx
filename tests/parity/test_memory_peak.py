@@ -27,8 +27,8 @@ recording, relay 54), ``mri_concat`` (``MRI_CONCAT_CASES``, 2026-11-23), ``mri_l
 (``MRI_LABEL2VOL_CASES``, 2026-11-24: ``defect2seg``'s two calls, the first that read a surface;
 ``--new-aseg2vol`` and ``--fill-ribbon`` from relay 57 of track A),
 ``mri_segment`` (``MRI_SEGMENT_CASES``, 2026-11-24), ``mri_edit_wm_with_aseg``
-(``MRI_EDIT_WM_WITH_ASEG_CASES``, 2026-11-24) and the tcsh scripts ``seg2cc`` and ``mergeseg``
-(``SCRIPT_CASES``, 2026-11-24).
+(``MRI_EDIT_WM_WITH_ASEG_CASES``, 2026-11-24), the tcsh scripts ``seg2cc`` and ``mergeseg``
+(``SCRIPT_CASES``, 2026-11-24) and ``mri_pretess`` (``MRI_PRETESS_CASES``, 2026-11-24).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -3885,3 +3885,75 @@ def test_scripts_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, ru
                 o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=Path(out).name
             )
             assert c.same, f"{name} ({mode}) {out}: {c.verdict} {c.detail}"
+
+
+#: ``mri_pretess``: recon-all's calls on ds000005 sub-01's classic files (``mri`` the recording's
+#: folder): the white matter (``wm``) and the filled volume's right hemisphere (255), one thread.
+MRI_PRETESS_CASES = [
+    ("wm", "ds000005-sub-01-classic", ["{mri}/wm.asegedit.mgz", "wm", "{mri}/norm.mgz", "wm.mgz"]),
+    (
+        "filled255",
+        "ds000005-sub-01-classic",
+        ["{mri}/filled.mgz", "255", "{mri}/norm.mgz", "filled-pretess255.mgz"],
+    ),
+]
+
+
+@pytest.mark.parametrize(("name", "run", "args"), MRI_PRETESS_CASES)
+def test_mri_pretess_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, run, args):
+    from larmorx_validation.freesurfer import files as fsfiles
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / "mri_pretess" if ws else None
+    mri = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / run / "subjects" / "sub-01" / "mri"
+        if ws
+        else None
+    )
+    if exe is None or not exe.is_file() or not (mri / "wm.asegedit.mgz").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    words = [a.format(mri=mri) for a in args]
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        "FS_DISABLE_LANG": "1",
+        **freesurfer_env(),
+    }
+
+    def fresh(d: Path):
+        def reset() -> None:
+            if d.exists():
+                shutil.rmtree(d)
+            d.mkdir()
+
+        reset()
+        return reset
+
+    out = words[-1]
+    o_dir = tmp_path / "freesurfer"
+    code, fs_mib = _original_peak(
+        ["mri_pretess", *words], env, "freesurfer", fresh(o_dir), o_dir, (), "freesurfer"
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        fresh(r_dir)
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_pretess", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(f"mri_pretess {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"mri_pretess {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        c = fsfiles.compare(o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out)
+        assert c.same, f"mri_pretess {name} ({mode}): {c.verdict} {c.detail}"

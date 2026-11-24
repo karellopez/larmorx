@@ -24,7 +24,7 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
 | `licence_reach.py` | which of a prebuilt probe's commands can reach FreeSurfer's licence check ("The licence check" below): `licence_reach.py <probe> <source.cpp> [--expect a,b]` (the same step after each build, not the implementer's: it reads the probe binary) |
-| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 43 groups of seeded cases and 21 of fixed cases (`vrules`, `vrules4` to `vrules22`, `vbsrules`; 19,865 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 44 groups of seeded cases and 22 of fixed cases (`vrules`, `vrules4` to `vrules23`, `vbsrules`; 20,600 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 | `models.py` | statements of the spec checked as models of the probe's printed results (`region` and `cov` also a candidate's, in both modes): `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `region` (§43's boxes, FS-269 as decided: every `rgbb` line of `vregion`, `vrules17`, `vrules18` and `vrules20`, on the probe and, with `--candidate`, a candidate's lines in both modes), `cov` (§42's `MRIcovarianceMatrix`, FS-483's count as decided: every `cov` line of `vcov` and `vrules19` whose mask has the volume's extent) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
@@ -631,3 +631,13 @@ cached matrices as allocated, recomputed or dropped.
   runs) the same cold, warm and twice without the cache; the probe as its own candidate: no unexplained difference
   in either mode; every model as before (logs `oracles/logs/fs-volume-probe-r19-final-2026-11-23.log`,
   `-r19-vrules22-2026-11-23.log`).
+- Relay 20 (2026-11-24): the fs.volume clean room's items 119 to 123 (`vrules23`'s first 34 calls: the dilations' box
+  when nothing is found, the erosions' destination checks, the segmentation dilation's writes, the label dilations'
+  boxes, `MRImaskDifferentGeometry`'s extent; the `conform` hash's start state named above; `compare.py`'s
+  `both_lines`, "The comparison loop"). Then part 10c: the prebuilt probe rebuilt from commit `fa3837bc` (the
+  commands `hreg` to `hsegm` above and the histogram encoding H; its build in `BUILD_INFO.txt`, the same bytes twice;
+  the 980099f6 build kept in `<workspace>/archive/2026-11-24-fs-volume-probe-980099f6/`; `licence_reach.py`: still the
+  five commands): every earlier group's hash unchanged (64); the new groups `vhist` (605 calls, §52) and `vrules23`
+  (130, its fixed cases; FS-502's line in the batch `vrules23-hang` without the guard runs) the same cold, warm and
+  twice without the cache; the probe as its own candidate: no unexplained difference in either mode; every model as
+  before (log `oracles/logs/fs-volume-probe-r20-final-2026-11-24.log`).

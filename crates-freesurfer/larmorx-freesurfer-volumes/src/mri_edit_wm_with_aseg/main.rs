@@ -36,6 +36,7 @@ use larmorx_freesurfer_core::diag::diag_init;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::help_xml::output_help_xml;
 use larmorx_freesurfer_core::log::{self, ERROR_NOFILE, ERROR_UNSUPPORTED, Fatal};
+use larmorx_freesurfer_core::random::comm_of;
 use larmorx_freesurfer_core::run::{Environment, Settings};
 use larmorx_freesurfer_core::system;
 use larmorx_freesurfer_core::timer::Timer;
@@ -116,6 +117,9 @@ pub struct Run<'a, 'b> {
 pub fn run(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut dyn Write) -> u8 {
     let mut g = Globals::new(settings.mode);
     g.stderr.read_write = system::stderr_read_write();
+    // the process's name as the kernel gives it (recon-all runs the program by name), which the
+    // colour tables' unseeded random numbers print
+    g.comm = comm_of(NAME);
     let mut cout = Cout::new(&g);
     let status = {
         let mut terr = log::TrackedErr::new(&g, &mut *err);

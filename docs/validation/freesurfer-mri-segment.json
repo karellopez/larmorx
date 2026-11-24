@@ -1,0 +1,128 @@
+{
+ "name": "freesurfer-mri-segment",
+ "tool": "mri_segment (FreeSurfer 8.2.0)",
+ "status": "experimental",
+ "larmorx_commit": "6a16d3987fdb",
+ "generated": "2026-11-24",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_segment/) on larmorx-freesurfer-filter (src/polv.rs, classify.rs, nonpar.rs), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mri_segment) and its recon-all runs' recorded mri_segment steps (oracles/freesurfer-8.2.0/runs/)",
+ "replay": {
+  "reproduce": {
+   "runs": [
+    "ds000005-sub-01-classic",
+    "ds000005-sub-01-v8",
+    "ds000228-sub-pixar008-classic",
+    "ds000228-sub-pixar008-v8",
+    "ds002422-sub-02-classic",
+    "ds002422-sub-02-v8",
+    "ds004173-sub-603309-classic",
+    "ds004173-sub-603309-v8",
+    "ds005003-sub-RS001-classic",
+    "ds005003-sub-RS001-v8",
+    "ds005454-sub-16-classic",
+    "ds005454-sub-16-v8"
+   ],
+   "steps": 12,
+   "verdicts": {
+    "REPRODUCED": 12
+   },
+   "seconds": {
+    "recorded": 511.7,
+    "replayed": 784.8
+   }
+  },
+  "fix": {
+   "runs": [
+    "ds000005-sub-01-classic",
+    "ds000005-sub-01-v8",
+    "ds000228-sub-pixar008-classic",
+    "ds000228-sub-pixar008-v8",
+    "ds002422-sub-02-classic",
+    "ds002422-sub-02-v8",
+    "ds004173-sub-603309-classic",
+    "ds004173-sub-603309-v8",
+    "ds005003-sub-RS001-classic",
+    "ds005003-sub-RS001-v8",
+    "ds005454-sub-16-classic",
+    "ds005454-sub-16-v8"
+   ],
+   "steps": 12,
+   "verdicts": {
+    "REPRODUCED": 12
+   },
+   "seconds": {
+    "recorded": 511.7,
+    "replayed": 785.3
+   }
+  }
+ },
+ "program": [
+  {
+   "seed": 1,
+   "cases": 139,
+   "verdicts": {
+    "identical": 130,
+    "fix-identical": 84,
+    "fix-explained": 46,
+    "reproduce-skip": 9,
+    "fix-skip": 9
+   },
+   "heads": 0,
+   "heads_verdicts": {}
+  },
+  {
+   "seed": 2,
+   "cases": 139,
+   "verdicts": {
+    "identical": 130,
+    "fix-identical": 85,
+    "fix-explained": 45,
+    "reproduce-skip": 9,
+    "fix-skip": 9
+   },
+   "heads": 0,
+   "heads_verdicts": {}
+  },
+  {
+   "seed": 1,
+   "cases": 0,
+   "verdicts": {},
+   "heads": 10,
+   "heads_verdicts": {
+    "identical": 10,
+    "fix-identical": 10
+   }
+  }
+ ],
+ "golden_sha256": {
+  "reproduce": "d4ca21c0af962e596f0b091da61a58fa0b866ac78327b361ced6e8d3b139b34c",
+  "fix": "735f6cf680c9bb93d3c0fb7c50c2b9e19c3722cb827add8e8d116017254665a3"
+ },
+ "memory": [
+  {
+   "case": "mri_segment recon-all",
+   "mode": "reproduce",
+   "larmorx_mib": 134.8,
+   "freesurfer_mib": 139.0
+  },
+  {
+   "case": "mri_segment recon-all",
+   "mode": "fix",
+   "larmorx_mib": 133.8,
+   "freesurfer_mib": 139.0
+  },
+  {
+   "case": "mri_segment seg",
+   "mode": "reproduce",
+   "larmorx_mib": 330.4,
+   "freesurfer_mib": 346.0
+  },
+  {
+   "case": "mri_segment seg",
+   "mode": "fix",
+   "larmorx_mib": 330.2,
+   "freesurfer_mib": 346.0
+  }
+ ]
+}

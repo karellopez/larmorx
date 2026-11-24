@@ -169,7 +169,7 @@ opened is skipped silently (`if (fp)`).
   infinities by their bits): `reproduce` = the official program's value (`d4ca21c0...`, recorded by
   `validation/probes/fs-segment/prog.py --golden`), default `735f6cf6...`.
 - Memory (`tests/parity/test_memory_peak.py`, `MRI_SEGMENT_CASES`): recon-all's call on ds000005
-  classic: 136.6 MiB (FreeSurfer 130.7 MiB at the recording).
+  classic 134.8 MiB (FreeSurfer 139.0 in the same measurement), `-seg` 330.4 MiB (346.0).
 - Speed: 95 s at relay 56's first build (FreeSurfer 37 s), 53 s after the planar holes' candidate
   list, the strand's box and the byte volumes' direct reads (fs.filter's `classify.rs` and
   `polv.rs`). Of the rest, fs.volume's `MRIhistoSegment` (two passes, about 20 s: its region
@@ -184,4 +184,8 @@ opened is skipped silently (`if (fp)`).
   non-parametric path and `MRIcomputeClassStatisticsSeg` with both classes.
 - Seed 2: 139 cases; `reproduce` 130 identical, 9 counted, 0 different; `fix` 85 identical, 45
   explained, 0 unexplained.
-- The final record's runs (from a clean commit): `docs/validation/freesurfer-mri-segment.md`.
+- The final record's runs (from the clean 6a16d398): `docs/validation/freesurfer-mri-segment.md`:
+  replays 12/12 in each mode; seed 1 130 identical + 9 counted, `fix` 84 + 46 explained; seed 2
+  130 + 9, `fix` 85 + 45; the heads 10/10 in both modes; memory 134.8 / 133.8 MiB against
+  FreeSurfer's 139.0 (recon-all's call), 330.4 / 330.2 against 346.0 (`-seg`); 0 different, 0
+  unexplained.

@@ -84,9 +84,9 @@ Every run in a memory box (`scripts/orchestration/boxed.sh 16 ...`).
 
 The replica (`larmorx-freesurfer`, relay 56 of track D):
 
-- seed 1: 139 cases; `reproduce` 130 identical, 0 different, 9 counted; `fix` 84 identical, 48
-  with a notice, 0 without (observed, after the FS-1227 change; the first run had 2 different:
-  `-w 1`, now counted as FS-498, and `-fillv` on the axial input).
+- seed 1: 139 cases; `reproduce` 130 identical, 0 different, 9 counted; `fix` 84 identical, 46
+  with a notice, 0 without (observed, from 6a16d398; the first run had 2 different: `-w 1`, now
+  counted as FS-498, and `-fillv` on the axial input, since corrected).
 - seed 2: 139 cases; `reproduce` 130 identical, 0 different, 9 counted; `fix` 85 identical, 45
-  with a notice, 0 without (observed).
+  with a notice, 0 without (observed, from 6a16d398).
 - the heads: 10 cases; `reproduce` 10 identical; `fix` 10 identical (observed).

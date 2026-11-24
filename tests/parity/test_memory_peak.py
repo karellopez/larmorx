@@ -26,8 +26,9 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 recording, relay 54), ``mri_concat`` (``MRI_CONCAT_CASES``, 2026-11-23), ``mri_label2vol``
 (``MRI_LABEL2VOL_CASES``, 2026-11-24: ``defect2seg``'s two calls, the first that read a surface;
 ``--new-aseg2vol`` and ``--fill-ribbon`` from relay 57 of track A),
-``mri_segment`` (``MRI_SEGMENT_CASES``, 2026-11-24) and ``mri_edit_wm_with_aseg``
-(``MRI_EDIT_WM_WITH_ASEG_CASES``, 2026-11-24).
+``mri_segment`` (``MRI_SEGMENT_CASES``, 2026-11-24), ``mri_edit_wm_with_aseg``
+(``MRI_EDIT_WM_WITH_ASEG_CASES``, 2026-11-24) and the tcsh scripts ``seg2cc`` and ``mergeseg``
+(``SCRIPT_CASES``, 2026-11-24).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -3778,3 +3779,109 @@ def test_mri_edit_wm_with_aseg_replica_needs_no_more_memory_than_freesurfer(
                 o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out
             )
             assert c.same, f"mri_edit_wm_with_aseg {name}: {c.verdict} {c.detail}"
+
+
+#: The tcsh scripts seg2cc (recon-all's call on ds000005's v8 head: mri_info, then mri_cc) and
+#: mergeseg (the head's callosum label 253 merged into its segmentation: mri_binarize twice,
+#: mri_mask, fscalc's mri_convert, mris_calc, mri_convert, and mri_convert --ctab), against
+#: FreeSurfer's script, whose process tree's peak is its largest program's (relay 58 of track A).
+SCRIPT_CASES = [
+    ("seg2cc", "ds000005-sub-01-v8", ["--s", "sub-01"]),
+    ("mergeseg", "ds000005-sub-01-v8",
+     ["--src", "{mri}/aseg.auto_noCCseg.mgz", "--merge", "{mri}/aseg.auto.mgz", "--segid-only",
+      "253", "--o", "out/merged.mgz", "--ctab", "{fsh}/FreeSurferColorLUT.txt"]),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("name", "run", "words"), SCRIPT_CASES)
+def test_scripts_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, run, words):
+    from larmorx_validation.freesurfer import files as fsfiles
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / name if ws else None
+    mri = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / run / "subjects" / "sub-01" / "mri"
+        if ws
+        else None
+    )
+    inputs = ("aseg.auto_noCCseg.mgz", "norm.mgz", "aseg.auto.mgz")
+    if exe is None or not exe.is_file() or not all((mri / f).is_file() for f in inputs):
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+
+    def env_of(d: Path) -> dict[str, str]:
+        return {
+            "PATH": f"{exe.parent}:/usr/bin:/bin",
+            "LC_ALL": "C",
+            "LANG": "C",
+            "TZ": "UTC",
+            "OMP_NUM_THREADS": "1",
+            "USER": "memory",
+            "HOME": str(d),
+            "FS_DISABLE_LANG": "1",
+            **freesurfer_env(),
+            "SUBJECTS_DIR": str(d / "subj"),
+        }
+
+    def fresh(d: Path):
+        def reset() -> None:
+            if d.exists():
+                shutil.rmtree(d)
+            (d / "subj" / "sub-01" / "mri").mkdir(parents=True)
+            for f in inputs[:2] if name == "seg2cc" else inputs:
+                shutil.copyfile(mri / f, d / "subj" / "sub-01" / "mri" / f)
+
+        reset()
+        return reset
+
+    def args(d: Path) -> list[str]:
+        fill = {"mri": str(d / "subj" / "sub-01" / "mri"), "fsh": str(ws / FS_HOME)}
+        return [w.format(**fill) for w in words]
+
+    # the varying lines: dates, run times, fs_time's figures, peaks, the process number's folder
+    volatile = (
+        r"(?m)^(?:[A-Z][a-z]{2} ){2}[ \d]\d \d\d:\d\d:\d\d \w+ \d{4}$",
+        r"(?<=Started at ).*",
+        r"(?<=Ended   at ).*",
+        r"(?<=-Run-Time-Sec )\d+",
+        r"(?<=-Run-Time-Hours )[\d.]+",
+        r"(?m)(?<=^@#@FSTIME  ).*",
+        r"(?m)(?<=^@#@FSLOADPOST ).*",
+        r"(?<=VmPeak  )\d+",
+        r"(?<=segmentation took )[\d.]+",
+        r"(?<=tmpdir\.seg2cc\.)\d+",
+        r"tmp\.[A-Za-z0-9]{6}\b",
+        r"(?<=valid   : )\d+",
+    )
+    o_dir = tmp_path / "freesurfer"
+    o_env = env_of(o_dir)
+    code, fs_mib = _original_peak(
+        [name, *args(o_dir)], o_env, "freesurfer", fresh(o_dir), o_dir, volatile, "freesurfer"
+    )
+    assert code == 0
+    outs = (
+        ("subj/sub-01/mri/aseg.auto.mgz", "subj/sub-01/mri/transforms/cc_up.lta")
+        if name == "seg2cc"
+        else ("out/merged.mgz",)
+    )
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        fresh(r_dir)
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", name, *args(r_dir)]
+        code, mib = _peak(cmd, env_of(r_dir), r_dir)
+        assert code == 0
+        print(f"{name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"{name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        for out in outs:
+            c = fsfiles.compare(
+                o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=Path(out).name
+            )
+            assert c.same, f"{name} ({mode}) {out}: {c.verdict} {c.detail}"

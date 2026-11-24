@@ -78,6 +78,27 @@ pub fn localtime(env: &Environment, t: i64) -> Tm {
     gmtime(t + Zone::of(env).offset_at(t))
 }
 
+/// `localtime(&t)` in the program's zone with the zone's abbreviation at `t` (`tm_zone`, what
+/// `strftime`'s `%Z` prints): a TZif file's for the time type in effect (beyond its last
+/// transition its footer's), a POSIX `TZ` string's standard or daylight name (`<+0530>`: the
+/// text between the brackets), `UTC` for UTC.
+pub fn localtime_zone(env: &Environment, t: i64) -> (Tm, String) {
+    let zone = Zone::of(env);
+    (gmtime(t + zone.offset_at(t)), zone.abbr_at(t))
+}
+
+/// `date`'s output without a format in the C locale (GNU coreutils 8.32: `%a %b %e %H:%M:%S %Z
+/// %Y`), at `t` in the program's zone.
+pub fn date_c(env: &Environment, t: i64) -> String {
+    let (tm, zone) = localtime_zone(env, t);
+    let c = strftime_c(&tm);
+    // `%c`'s `%a %b %e %H:%M:%S %Y` with the zone before the year
+    match c.rsplit_once(' ') {
+        Some((head, year)) => format!("{head} {zone} {year}"),
+        None => c,
+    }
+}
+
 /// `strftime(buf, n, "%c", tm)` in the C locale: `%a %b %e %H:%M:%S %Y`.
 pub fn strftime_c(tm: &Tm) -> String {
     const DAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -117,10 +138,12 @@ enum Day {
 
 /// A parsed POSIX `TZ` string: standard offset (seconds east of UTC) and, with daylight
 /// saving, its offset and the two rules with their local times.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct PosixTz {
     std_off: i64,
     dst: Option<(i64, Day, i64, Day, i64)>,
+    /// The standard and the daylight names (`tm_zone`).
+    names: (String, String),
 }
 
 struct Cursor<'a> {
@@ -132,17 +155,19 @@ impl Cursor<'_> {
     fn peek(&self) -> Option<u8> {
         self.s.get(self.i).copied()
     }
-    fn name(&mut self) -> Option<()> {
+    /// A zone name, its text (without the brackets of the `<...>` form).
+    fn name(&mut self) -> Option<String> {
         if self.peek() == Some(b'<') {
             let end = self.s[self.i..].iter().position(|&b| b == b'>')?;
+            let text = String::from_utf8_lossy(&self.s[self.i + 1..self.i + end]).into_owned();
             self.i += end + 1;
-            return Some(());
+            return Some(text);
         }
         let start = self.i;
         while self.peek().is_some_and(|b| b.is_ascii_alphabetic()) {
             self.i += 1;
         }
-        (self.i - start >= 3).then_some(())
+        (self.i - start >= 3).then(|| String::from_utf8_lossy(&self.s[start..self.i]).into_owned())
     }
     fn num(&mut self) -> Option<i64> {
         let start = self.i;
@@ -215,12 +240,16 @@ impl PosixTz {
             s: s.as_bytes(),
             i: 0,
         };
-        c.name()?;
+        let std_name = c.name()?;
         let std_off = -c.hms()?;
         if c.peek().is_none() {
-            return Some(PosixTz { std_off, dst: None });
+            return Some(PosixTz {
+                std_off,
+                dst: None,
+                names: (std_name.clone(), std_name),
+            });
         }
-        c.name()?;
+        let dst_name = c.name()?;
         let dst_off = match c.peek() {
             Some(b',') | None => std_off + 3600,
             _ => -c.hms()?,
@@ -241,6 +270,7 @@ impl PosixTz {
         Some(PosixTz {
             std_off,
             dst: Some((dst_off, start.0, start.1, end.0, end.1)),
+            names: (std_name, dst_name),
         })
     }
 
@@ -269,6 +299,16 @@ impl PosixTz {
         }
     }
 
+    /// The zone's name at `t`.
+    fn abbr_at(&self, t: i64) -> String {
+        match self.dst {
+            Some((dst_off, ..)) if self.offset_at(t) == dst_off && dst_off != self.std_off => {
+                self.names.1.clone()
+            }
+            _ => self.names.0.clone(),
+        }
+    }
+
     fn offset_at(&self, t: i64) -> i64 {
         let Some((dst_off, sd, st, ed, et)) = self.dst else {
             return self.std_off;
@@ -294,6 +334,9 @@ struct TzFile {
     times: Vec<i64>,
     idx: Vec<u8>,
     types: Vec<(i64, bool)>,
+    /// Each type's abbreviation index into `chars`.
+    abbr: Vec<u8>,
+    chars: Vec<u8>,
     footer: Option<PosixTz>,
 }
 
@@ -338,7 +381,10 @@ impl TzFile {
             let off = be(body.get(tt + 6 * k..)?, 4)? as u32 as i32;
             f.types
                 .push((i64::from(off), *body.get(tt + 6 * k + 4)? != 0));
+            f.abbr.push(*body.get(tt + 6 * k + 5)?);
         }
+        let ct = tt + typecnt * 6;
+        f.chars = body.get(ct..ct + charcnt)?.to_vec();
         let len = tt + typecnt * 6 + charcnt + leap * (width + 4) + isstd + isut;
         if version2 {
             let footer = body.get(len..)?;
@@ -351,18 +397,37 @@ impl TzFile {
         (!f.types.is_empty() && f.idx.iter().all(|&i| (i as usize) < typecnt)).then_some(f)
     }
 
-    fn offset_at(&self, t: i64) -> i64 {
+    /// The time type in effect at `t`, or `None` beyond the last transition with a footer.
+    fn type_at(&self, t: i64) -> Option<usize> {
         if self.times.is_empty() || t < self.times[0] {
-            let k = self.types.iter().position(|ty| !ty.1).unwrap_or(0);
-            return self.types[k].0;
+            return Some(self.types.iter().position(|ty| !ty.1).unwrap_or(0));
         }
-        if t >= *self.times.last().expect("not empty")
-            && let Some(f) = &self.footer
-        {
-            return f.offset_at(t);
+        if t >= *self.times.last().expect("not empty") && self.footer.is_some() {
+            return None;
         }
         let k = self.times.partition_point(|&x| x <= t) - 1;
-        self.types[self.idx[k] as usize].0
+        Some(self.idx[k] as usize)
+    }
+
+    fn offset_at(&self, t: i64) -> i64 {
+        match (self.type_at(t), &self.footer) {
+            (Some(k), _) => self.types[k].0,
+            (None, Some(f)) => f.offset_at(t),
+            (None, None) => 0,
+        }
+    }
+
+    fn abbr_at(&self, t: i64) -> String {
+        match (self.type_at(t), &self.footer) {
+            (Some(k), _) => {
+                let start = usize::from(self.abbr.get(k).copied().unwrap_or(0));
+                let rest = self.chars.get(start..).unwrap_or(&[]);
+                let end = rest.iter().position(|&b| b == 0).unwrap_or(rest.len());
+                String::from_utf8_lossy(&rest[..end]).into_owned()
+            }
+            (None, Some(f)) => f.abbr_at(t),
+            (None, None) => String::new(),
+        }
     }
 }
 
@@ -409,6 +474,14 @@ impl Zone {
             Zone::Utc => 0,
             Zone::File(f) => f.offset_at(t),
             Zone::Posix(p) => p.offset_at(t),
+        }
+    }
+
+    fn abbr_at(&self, t: i64) -> String {
+        match self {
+            Zone::Utc => "UTC".to_owned(),
+            Zone::File(f) => f.abbr_at(t),
+            Zone::Posix(p) => p.abbr_at(t),
         }
     }
 }
@@ -485,5 +558,21 @@ mod tests {
             ("TZDIR", d.path().to_string_lossy().into_owned()),
         ]);
         assert_eq!(localtime(&env, 1_768_478_400).hour, 13);
+        assert_eq!(localtime_zone(&env, 1_768_478_400).1, "CET");
+        assert_eq!(localtime_zone(&env, 1_782_907_200).1, "CEST");
+        assert_eq!(localtime_zone(&env, -10).1, "CET");
+        assert_eq!(date_c(&env, 1_768_478_400), "Thu Jan 15 13:00:00 CET 2026");
+    }
+
+    #[test]
+    fn zone_names() {
+        let env = |tz: &str| Environment::from_pairs([("TZ", tz), ("TZDIR", "/nonexistent")]);
+        let (summer, winter) = (1_782_907_200, 1_768_478_400);
+        let ny = env("EST5EDT,M3.2.0,M11.1.0");
+        assert_eq!(localtime_zone(&ny, summer).1, "EDT");
+        assert_eq!(localtime_zone(&ny, winter).1, "EST");
+        assert_eq!(localtime_zone(&env("<+0530>-5:30"), 0).1, "+0530");
+        assert_eq!(localtime_zone(&env(""), 0).1, "UTC");
+        assert_eq!(date_c(&env(""), 0), "Thu Jan  1 00:00:00 UTC 1970");
     }
 }

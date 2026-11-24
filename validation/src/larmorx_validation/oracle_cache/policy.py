@@ -400,9 +400,11 @@ def whole_path_texts(args: Sequence[str]) -> list[str]:
 #: ``mri_robust_template`` from relay 50 of track C (none before).
 EXTENSION_FROM_WHOLE_PATH = (
     "fs_temp_file",
+    "fscalc",
     "fsunit",
     "getfullpath",
     "lta_convert",
+    "mergeseg",
     "mri_add_xform_to_header",
     "mri_binarize",
     "mri_cc",
@@ -420,6 +422,7 @@ EXTENSION_FROM_WHOLE_PATH = (
     "mri_segstats",
     "mri_vol2vol",
     "mris_calc",
+    "seg2cc",
 )
 
 

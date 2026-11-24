@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-24-freesurfer-batch-109",
+ "dossier": "2026-11-24-freesurfer-batch-110",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 546898,
+  "accesses": 547676,
   "agents": 582,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 993,
-  "archived_files": 993,
+  "archive_checksums_matched": 995,
+  "archived_files": 995,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -658,28 +658,32 @@
    "2026-11-24-session-transcripts-freesurfer-batch-109": {
     "files": 5,
     "sha256": "0bfb7e3e9f7305c9e99010b37fd6b52df18f458e6932407f09f9bf1877b96cee"
+   },
+   "2026-11-24-session-transcripts-freesurfer-batch-110": {
+    "files": 2,
+    "sha256": "dc457bd85324f10aad5ad1a909714b57f315fdeada208b0ed8e10767a24a50cc"
    }
   },
-  "commits_printed": 5716,
+  "commits_printed": 5726,
   "distinct_transcripts": 586,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
    "agents_without_worktree": 477,
    "bad_lines": 0,
-   "calls_without_result": 143,
+   "calls_without_result": 146,
    "compaction_parent_missing": 9,
    "compactions": 89,
-   "refused_calls": 1753,
+   "refused_calls": 1754,
    "refused_calls_restricted_accesses": 743,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 10244
+   "unresolved_paths": 10245
   },
-  "last_record": "2026-11-24 00:52 UTC",
+  "last_record": "2026-11-24 02:14 UTC",
   "live_files": 586,
-  "live_files_also_archived": 584,
+  "live_files_also_archived": 586,
   "sessions": 4,
-  "tool_calls": 153386,
+  "tool_calls": 153592,
   "tool_calls_by_tool": [
    [
     "Agent",
@@ -695,7 +699,7 @@
    ],
    [
     "Bash",
-    134932
+    135132
    ],
    [
     "CronCreate",
@@ -763,12 +767,12 @@
    ],
    [
     "Write",
-    7387
+    7393
    ]
   ],
-  "transcript_bytes": 37605520675,
-  "transcript_files": 1579,
-  "unique_paths": 99385
+  "transcript_bytes": 37867961686,
+  "transcript_files": 1581,
+  "unique_paths": 99526
  },
  "levels": [
   [
@@ -849,7 +853,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "1ef9a271"
+  "verdicts_repository": "3142282f"
  },
  "overview": {
   "agents_by_role": [

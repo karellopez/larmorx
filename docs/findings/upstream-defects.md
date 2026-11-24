@@ -353,7 +353,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FS-499 | FreeSurfer 8.2.0 `MRIgetEqualizeHisto`, `MRIhistoEqualize` | the equalisation indexes the volume's histogram by intensity: a negative low limit, a volume whose minimum is not 0 or a high limit beyond the bins reads and writes past the histograms (heap corruption: `free(): corrupted unsorted chunks`) | a (memory) | none known (byte volumes from 0 to 255) | reads 0 and writes dropped in both modes, named | – |
 | FS-500 | FreeSurfer 8.2.0 `MRIgetEqualizeHisto` | the bin values from the low to the high limit are set in the volume's histogram, freed right after, not in the result (left 0 or the given histogram's) | c | none (callers read the counts) | set in the result (rule A, 2026-11-14), named; `reproduce` FreeSurfer's | – |
 | FS-501 | FreeSurfer 8.2.0 `MRIhistoSegment` | a volume of integers or longs has no region histogram and the smoothing of none crashes; a window whose range needs 2^31 bins or more crashes in the histogram's clearing | a (crash) | none known (byte volumes) | an error in both modes, named | – |
-| FS-502 | FreeSurfer 8.2.0 `MRIhistoSegment` | a gray-matter limit below -1 with no gray-matter peak never ends (the search comes back to the same peak) | a (hang) | none known (callers pass positive limits) | an error in both modes, named | – |
+| FS-502 | FreeSurfer 8.2.0 `MRIhistoSegment` | a gray-matter limit below -1 never ends once both peaks are found (the white-matter peak takes the gray-matter one, and the search comes back to the same peak, or finds none: -1, still above the limit) | a (hang) | none known (callers pass positive limits) | an error in both modes, named | – |
 | FS-503 | FreeSurfer 8.2.0 `MRIhistogramRegionWithThreshold` (`MRIhistogramVoxel`) | with several OpenMP threads the per-thread histograms of fractional sample weights are summed: the counts depend on the thread count | b | none known | one thread's order in both modes | – |
 | FS-504 | FreeSurfer 8.2.0 `LTAconcat`, `LTAreduce`, `LTAmriIsSource`, `LTAmriIsTarget`, `LTAprint`, `LTAchangeType` (its diagnostic print), `MRIaseg2volMU`; since relay 34 also `LTAwriteEx`'s writers, `LTAtransformAtPoint`, `LTAvoxelTransformToCoronalRasTransform`, `DevolveXFMWithSubjectsDir`, `LTAmat2RotMat`, `RMSregDiffMJ` | no transform array, an array without transforms, or a transform without a 4 x 4 matrix, where one is read: memory not owned is read, or the program crashes | a (memory, crash) | none known (recon-all's arrays hold one transform) | an error in both modes, named | – |
 | FS-505 | FreeSurfer 8.2.0 `LTAfillInverse` (and every function that calls it) | an inverse transform without a matrix: its inverse is computed and lost, the inverse stays without a matrix | c | none known (arrays are allocated with matrices) | the inverse kept (rule A, 2026-11-14), named; `reproduce` FreeSurfer's | – |
@@ -4410,7 +4410,9 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
   (FS-503).
 - **Evidence:** verified (`validation/probes/fs-volume`, part 15: FreeSurfer 8.2.0's functions from the unit oracle's
   build against the port; seeds 7 and 13, every comparable line identical with `reproduce`, `fix` different only with
-  its notices). The mechanisms: `docs/findings/freesurfer-volume.md` §21 (closed to FreeSurfer's clean-room
+  its notices); the open probe `validation/investigations/freesurfer-volume-probe/` (groups `vhist` and `vrules23`,
+  2026-11-24: FS-498's NaN bins and one-bin windows, FS-499's `free()` aborts, FS-501's crashes and FS-502's hang
+  among their lines). The mechanisms: `docs/findings/freesurfer-volume.md` §21 (closed to FreeSurfer's clean-room
   implementers).
 - **fMRIPrep:** none. **FreeSurfer:** none known (its callers histogram finite byte volumes from 0 to 255 with
   positive limits).

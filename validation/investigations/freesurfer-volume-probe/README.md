@@ -24,7 +24,7 @@ build tree, which is closed to FreeSurfer's clean-room implementers, so they nev
 | `fs_volume_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
 | `licence_reach.py` | which of a prebuilt probe's commands can reach FreeSurfer's licence check ("The licence check" below): `licence_reach.py <probe> <source.cpp> [--expect a,b]` (the same step after each build, not the implementer's: it reads the probe binary) |
-| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 43 groups of seeded cases and 21 of fixed cases (`vrules`, `vrules4` to `vrules22`, `vbsrules`; 19,865 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the volume spec's §69 and the B-spline spec's §9: 44 groups of seeded cases and 22 of fixed cases (`vrules`, `vrules4` to `vrules23`, `vbsrules`; 20,600 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 | `models.py` | statements of the spec checked as models of the probe's printed results (`region` and `cov` also a candidate's, in both modes): `fs291` (§9's byte walk of FS-291 under `reproduce`, a tensor volume's rows all at its first voxel: every `invc` and `sam` line of `vscale`, `vtwo` and `vrules`), `skull` (§20's walks: every `vskull` line), `cma` (§23's label tables: every `cmalab` line of `vcma`), `view` (§34's `MRItoImageView`: the `toimgv` lines of `vimage` and `vrules9` without a given image), `smooth` (§35's `MRIsmoothParcellation`: every `smpar` line on shorts), `nearest` (§35's `MRIfindNearestNonzeroLocation`: every `nearnz` line of `vnbhd`), `physvox` (§54's change from physical-voxel to RAS-to-RAS under `reproduce`: 60 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `ltatypes` (§54's six changes between the voxel, RAS-to-RAS and physical-voxel types, their validity checks and ends: every `ltachg` line of `vltapv` and `vrules10` and 180 seeded arrays, with the probe's own `vgi2r` and `vgr2i`), `region` (§43's boxes, FS-269 as decided: every `rgbb` line of `vregion`, `vrules17`, `vrules18` and `vrules20`, on the probe and, with `--candidate`, a candidate's lines in both modes), `cov` (§42's `MRIcovarianceMatrix`, FS-483's count as decided: every `cov` line of `vcov` and `vrules19` whose mask has the volume's extent) |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe`; its guard
@@ -65,6 +65,9 @@ fs.mri probe's (its README, "Encodings"). Added here:
 | the table | the floats `00000000 80000000 3f000000 bf000000 3f800000 bf800000 40200000 437f8000 437e8000 43800000 bfc00000 501502f9 d01502f9 7f7fffff ff7fffff 00000001 7f800000 ff800000 7fc00000 ffc00000 7fc12345 7f800001 40500000 42c80000 1e3ce508 477fff80 46ffff00 c7000080 4f000000 4f800000 41200000 c1200000 3dcccccd 40490fdb` (entry 0 first): zeros, halves, ones, 2.5, 255.5, 254.5, 256, -1.5, ±1e10, the largest floats, the smallest subnormal, infinities, NaNs (both signs, a payload, a signalling one), 3.25, 100, 1e-20, 65535.5, 32767.5, -32768.5, 2^31, 2^32, ±10, 0.1, π |
 | D, a destination | `new` (none: the function makes one), `self` (the first source), `other` (the second source), or a W |
 | R, a region | `null`, or `x y z dx dy dz` |
+| H, a histogram | `null`, or `<alloc> <nbins> <bin_size> <min> <max>` then `nbins` bin values and `nbins` counts (floats but the first two; the fs.maths probe's histogram argument): `HISTOalloc(alloc)`, then `nbins` and those fields written over it (`nbins` at most `alloc`) |
+| a histogram (printed) | `null`, or `nbins max_bins bin_size min max`, then the values and then the counts of its first `min(nbins, max_bins)` bins (none when that is 0 or below) |
+| a histogram result (printed) | `given` when the returned histogram is the given one, else the histogram (printed); then, when one was given, the given histogram's state |
 | a volume (printed) | `null`, or the fs.mri probe's header (its "volume (printed)" without the index tables and frames), the colour table (CT, each entry with its count), the voxels |
 | a result (printed) | `self`, `other` or `given` when the returned volume is that one, then the volume; then, when a given destination is not the result, the destination's state |
 | unset | an output the call may leave is 7.0 before the call (`40e00000`, `401c000000000000`) |
@@ -265,7 +268,7 @@ The spec's sections in brackets.
 | `sstat W P W P i i` | `MRIsegStats` (the segmentation, the volume, the segment, the frame) [§48] | the count, then the five floats `min max range mean std` (unset: 7) |
 | `hseg W P W P i d d d` | `HISTOseg` (the segmentation, the volume, the segment, `bmin`, `bmax`, `bdelta`) [§48] | the histogram: `max_bins nbins`, `bin_size min max` (floats), then each bin's value and count (floats) |
 | `dilo W P d D` | `MRIdilate` with the source's `outside_val` set to the double first [§48] | the result |
-| `conform k W P [i d i]` | k 0 `MRIconform`, 1 `MRIgetConformMatrix`, 2 `MRIconformedTemplate` (the width, the size (a double), `KeepDC`) of the volume [§49] | k 0 and 2 the result, k 1 the matrix (M, `null` for none); then the input after the call; each volume printed as `a volume (printed)` but its voxels as `h` and the FNV-1a 64 hash of their bytes (16 hexadecimal digits; `novox` without voxels) |
+| `conform k W P [i d i]` | k 0 `MRIconform`, 1 `MRIgetConformMatrix`, 2 `MRIconformedTemplate` (the width, the size (a double), `KeepDC`) of the volume [§49] | k 0 and 2 the result, k 1 the matrix (M, `null` for none); then the input after the call; each volume printed as `a volume (printed)` but its voxels as `h` and a 64-bit FNV-1a hash of their bytes (16 hexadecimal digits; `novox` without voxels): the start state 1469598103934665603 (decimal; not FNV's usual offset basis 14695981039346656037, of which it lacks the last digit), then for each byte of the voxel buffer in memory order (columns fastest, then rows, slices and frames; the type's bytes of each voxel little-endian, every frame) the state XOR the byte, times the usual prime 1099511628211, modulo 2^64 |
 | `union W P W P D`, `isect W P W P D`, `mand W P W P D i`, `mxor W P W P D i i` | `MRIunion`, `MRIintersect`, `MRIand` (the threshold), `MRIxor` (`t1`, `t2`) of the two volumes into D (`other`: the second) [§50] | the result (`other` when it is the second volume) |
 | `compl W P D`, `erode W P D`, `erode2d W P D`, `dil6 W P D`, `mnot W P D`, `b2c W P D` | `MRIcomplement`, `MRIerode`, `MRIerode2D`, `MRIdilate6`, `MRInot`, `MRIbinMaskToCol` [§50] | the result |
 | `edges W P d D` | `MRIsetEdges` (the value) [§50] | the result |
@@ -284,6 +287,14 @@ The spec's sections in brackets.
 | `cent W P` | `MRIcomputeCentroid` [§50] | the status and the three doubles (unset: 7) |
 | `pthr W P (null\|W P) i d` | `MRIpercentThresh` (the mask or `null`, the frame, the percentage) [§50] | the threshold (a double) |
 | `cnbhd W P n (i i i i i)×n` | for each `w x y z val`, `MRIcountValInNbhd` [§50] | the count per point |
+| `hreg W P H i R` | `MRIhistogramRegion` (the given histogram, the bin count, the region) [§52] | a histogram result |
+| `hvox W P H i i i i i (null\|W P) f` | `MRIhistogramVoxel` (the given histogram, the bin count, `x0 y0 z0`, the window, the threshold volume or `null`, the threshold) [§52] | a histogram result |
+| `hthr W P H i R W P f i` | `MRIhistogramRegionWithThreshold` (the given histogram, the bin count, the region, the threshold volume, the threshold, the frame) [§52] | a histogram result |
+| `hist W P i` | `MRIhistogram` (the bin count) [§52] | the histogram |
+| `geq W P H i i i` | `MRIgetEqualizeHisto` (the given result, `low`, `high`, `norm`) [§52] | a histogram result |
+| `heq W P W P D i i` | `MRIhistoEqualize` (the source, the template, D (`other`: the template), `low`, `high`) [§52] | the result |
+| `hlr W P (self\|W P) R i i`, `hlab W P (self\|W P) i i` | `MRIhistogramLabelRegion` (the labelled volume, `self` the volume itself; the region; the label, the bin count), `MRIhistogramLabel` (the labelled volume; the label, the bin count) [§52] | the histogram |
+| `hsegm W P D i i i i f` | `MRIhistoSegment` (D, the labelled volume: `new`, `self` or a W; `wm_low wm_hi gray_hi wsize`, `sigma`) [§52] | the result |
 
 ## The models
 
@@ -343,7 +354,11 @@ FS-300 in `vsample` and `vresamp` (the cubic frame sampler's window points outsi
 the first that succeeds), FS-469 in `vpvlab` (a label's mean read outside the table, from the stack
 beside it, which every run fills the same way), FS-198, FS-504 and FS-508 in `vlta54` and `vrules14` (a freed
 matrix, or a transform the array does not hold, read: the same bytes in every run), FS-509 in `vrules15`, FS-517 in
-`vrules15` and `vrules16`, and in both modes on the
+`vrules15` and `vrules16`; in both modes on single lines the loop names (`both_lines` in `compare.py`), where
+FreeSurfer reads or writes memory it does not own and the four runs still agree (a write in the allocator's slack,
+bytes every run leaves the same), when the candidate noted the line's defect: FS-163 on `vrules22`'s threshold
+dilation into a destination too small, FS-496 on three of its `pthr` lines, FS-53 on the seven `vset` `pthr` lines
+that read a frame past the volume's; and in both modes on the
 `bvr` line without a cache that FreeSurfer ends at its licence check (`EXIT 255`, `FREESURFER_HOME is
 not defined`: LARMORX performs no licence check). Under `reproduce` a line where FreeSurfer aborted
 with the C++ runtime's lines (`CRASH 6`, standard error starting `terminate called after throwing`:
@@ -616,3 +631,13 @@ cached matrices as allocated, recomputed or dropped.
   runs) the same cold, warm and twice without the cache; the probe as its own candidate: no unexplained difference
   in either mode; every model as before (logs `oracles/logs/fs-volume-probe-r19-final-2026-11-23.log`,
   `-r19-vrules22-2026-11-23.log`).
+- Relay 20 (2026-11-24): the fs.volume clean room's items 119 to 123 (`vrules23`'s first 34 calls: the dilations' box
+  when nothing is found, the erosions' destination checks, the segmentation dilation's writes, the label dilations'
+  boxes, `MRImaskDifferentGeometry`'s extent; the `conform` hash's start state named above; `compare.py`'s
+  `both_lines`, "The comparison loop"). Then part 10c: the prebuilt probe rebuilt from commit `fa3837bc` (the
+  commands `hreg` to `hsegm` above and the histogram encoding H; its build in `BUILD_INFO.txt`, the same bytes twice;
+  the 980099f6 build kept in `<workspace>/archive/2026-11-24-fs-volume-probe-980099f6/`; `licence_reach.py`: still the
+  five commands): every earlier group's hash unchanged (64); the new groups `vhist` (605 calls, §52) and `vrules23`
+  (130, its fixed cases; FS-502's line in the batch `vrules23-hang` without the guard runs) the same cold, warm and
+  twice without the cache; the probe as its own candidate: no unexplained difference in either mode; every model as
+  before (log `oracles/logs/fs-volume-probe-r20-final-2026-11-24.log`).

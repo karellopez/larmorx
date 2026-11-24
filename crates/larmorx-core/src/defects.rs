@@ -3034,7 +3034,7 @@ defects! {
     FS_501 = "FS-501", "FreeSurfer", true,
         "the histogram segmentation of white matter (MRIhistoSegment) crashes on a volume of integers or longs (no region histogram to smooth) and on a region whose range needs 2^31 bins or more";
     FS_502 = "FS-502", "FreeSurfer", true,
-        "the histogram segmentation of white matter (MRIhistoSegment) never ends when its search for the gray-matter peak comes back to a peak it has found (a gray-matter limit below -1 with no peak)";
+        "the histogram segmentation of white matter (MRIhistoSegment) never ends when its search for the gray-matter peak comes back to a peak it has found (a gray-matter limit below -1 once both peaks are found)";
     FS_503 = "FS-503", "FreeSurfer", true,
         "the thresholded region histogram (MRIhistogramRegionWithThreshold) with several threads adds per-thread histograms of fractional counts, whose sums depend on the number of threads";
     FS_504 = "FS-504", "FreeSurfer", true,

@@ -19,9 +19,10 @@ the voxel, RAS-to-RAS and physical-voxel types by its relay 13 (2026-11-22, with
 questions on part 7b), §54's rest by its relay 14, §55-57 by its relay 15, part 9's §41 and §43 by its relay 16
 (2026-11-22), part 9's §42 and §44, with FS-269 as decided, by its relay 17 (2026-11-23), part 10a (§46-48) by
 its relay 18 (2026-11-23, with the clean room's questions on part 9), part 10b (§49-51) by its relay 19 (2026-11-23,
-with the clean room's questions on part 10a)**:
+with the clean room's questions on part 10a), part 10c (§52-53) by its relay 20 (2026-11-24, with the clean room's
+questions on part 10b)**:
 the black-box validation plan (§69) with its open probe, a read-through as a clean-room reader, the
-defects' texts in `larmorx_core::defects` checked. The sections after §45 (but §46 to §51 and §54 to §57) are
+defects' texts in `larmorx_core::defects` checked. The sections after §45 (but §46 to §53 and §54 to §57) are
 not yet read through that way: their validation plans still name the replica's closed probe, which the implementer does
 not open (§69 says what to do meanwhile). What black-box runs confirmed is marked **(observed)**.
 
@@ -55,9 +56,10 @@ and voxel-to-RAS matrices; part 7b (§34-35) slices as 2-D images, neighbourhood
 difference lists and voxelwise operations. Then the rest of the module (§41-68), of which these are
 ready too: part 9 (§41-45: volume-to-volume resampling, frame covariance, PCA and the false discovery rate,
 regions, voxel neighbourhood measures); part 10a (§46-48: the Talairach helpers, dilation and the segment
-helpers); part 10b (§49-51: conforming; set operations, morphology, masks and counts); §54 (operations on a transform array) whole; §55 to §57 (segmentations onto another grid, SPM warps,
-segment statistics, crops), `MRIaseg2volMU`'s upsampling and `MRIvol2VolTkRegVSM` included. Not yet: §52 and §53,
-§59 to §68.
+helpers); part 10b (§49-51: conforming; set operations, morphology, masks and counts); part 10c (§52-53: the volume
+histograms); §54 (operations on a transform array) whole; §55 to §57 (segmentations onto another grid, SPM warps,
+segment statistics, crops), `MRIaseg2volMU`'s upsampling and `MRIvol2VolTkRegVSM` included. Not yet: §59 to §68 (but
+§64's and §65's functions `mri_cc` reaches, stated from `specs/mri_cc.md`, still without a probe command).
 
 ## 1. Conventions
 
@@ -2535,12 +2537,19 @@ value beyond the `int` range or NaN is FS-12 here too (clamped by default, NaN t
 `reproduce`), as section 50's common rules say.
 - `MRIdilateUchar(src, dst)`: without `dst` a clone of `src` (voxels zero); a `dst` of another extent ends the program
   (`MRIcheckVolDims`'s message); `dst == src`: the dilation goes into a clone, copied back with `MRIcopy` at the end.
-  The bounding box of `src`'s nonzero bytes (frame 0, read as bytes), grown by one voxel and clipped to the volume
-  (starting from `[w-1, 0]` per axis, so an all-zero volume of extent 1 still visits its voxel); in it each voxel of
-  `dst` becomes the largest byte of the 3 x 3 x 3 neighbourhood (coordinates clamped to the volume), written as a byte
-  at the voxel's index of the row (whatever `dst`'s type). Other voxels of `dst` are not touched. The box is found
-  slices outermost, then rows, then columns; its voxels are visited slices, rows, columns (**(observed)**: `vdil`;
-  `vrules20`, an all-zero volume of one voxel and of two, a float volume's rows read as bytes).
+  The box (the same rule for every dilation of sections 48 and 50 that names "the box ... grown by one"): per axis of
+  extent `e`, a low bound that starts at `e - 1` and a high bound that starts at 0; each nonzero byte of `src` (frame 0,
+  read as bytes) at coordinate `c` lowers the low bound to `c - 1` and raises the high bound to `c + 1` where they are
+  not already beyond; then the low bound is raised to 0 when below it and the high bound lowered to `e - 1` when above
+  it. So with a nonzero byte the box is the nonzero bytes' bounding box grown by one voxel and clipped to the volume;
+  with none, every axis keeps `[e - 1, 0]`, which holds no coordinate unless `e` is 1: only a volume of 1 x 1 x 1
+  voxels visits a voxel then (its one voxel), and every other all-zero source leaves `dst` untouched. In the box each
+  voxel of `dst` becomes the largest byte of the 3 x 3 x 3 neighbourhood (coordinates clamped to the volume), written
+  as a byte at the voxel's index of the row (whatever `dst`'s type). Other voxels of `dst` are not touched. The box is
+  found slices outermost, then rows, then columns; its voxels are visited slices, rows, columns (**(observed)**:
+  `vdil`; `vrules20`, an all-zero volume of one voxel and of two, a float volume's rows read as bytes; `vrules23`,
+  all-zero sources of 1 x 1 x 1, 2 x 1 x 1, 4 x 1 x 1, 1 x 2 x 1, 1 x 1 x 2, 2 x 2 x 1 and 3 x 3 x 1 voxels into
+  destinations of 7: only the one voxel of 1 x 1 x 1 is written (0), the others untouched).
 - `MRIdilate(src, dst)`: a byte `src` is `MRIdilateUchar`. Otherwise the same destination rules; the bounding box of
   the voxels above 0 in any frame (nearest samples at whole coordinates, `MRIsampleVolumeFrameType`, section 18; the
   search runs frames outermost, then slices, rows, columns), grown and clipped likewise; then for each frame in turn,
@@ -2696,11 +2705,15 @@ its voxels are read or written: FS-58.
   1) is outside) becomes 0, and one on a near face only becomes the smaller of 0 and the inside values after its
   first outside offset (**(observed)**: `vmorph`; `vrules22`, a slice of negative values with each neighbourhood, edges
   eroded or not: eroded, every voxel 0).
-- `MRIerode(src, dst)`: clone without `dst`; `dst == src` works into a clone copied back (`MRIcopy`) at the end. Two
+- `MRIerode(src, dst)`: first `MRIcheckVolDims(src, dst)` (a given `dst` of another extent ends the program with its
+  message, status 252; frames are not compared); clone without `dst`; `dst == src` works into a clone copied back
+  (`MRIcopy`) at the end. Two
   byte volumes: bytes, the smallest of the 27 neighbourhood bytes starting from 255. Otherwise for each frame of `src`
   the smallest of the voxel's value and its 27 neighbours' (`float`, `<`), as values.
-- `MRIerode2D(src, dst)`: as `MRIerode`'s destinations; frame 0, the smallest of the 3 x 3 in-slice neighbourhood
-  (`double`, starting from the voxel), as values.
+- `MRIerode2D(src, dst)`: as `MRIerode`'s check and destinations; frame 0, the smallest of the 3 x 3 in-slice
+  neighbourhood (`double`, starting from the voxel), as values (**(observed)**, both: `vmorph`; `vrules23`, a 3 x 3 x 1
+  source into destinations of 2 x 3 x 1 and 3 x 3 x 2: `ERROR: <program>-MRIcheckVolDims: volume1 width=3 != volume2
+  width=2.`, resp. `... depth=1 != volume2 depth=2.`, status 252).
 - `MRIerodeSegmentation(seg, out, n, thresh)` and `MRIdilateSegmentation(seg, out, n, mask, frame, mthresh,
   &nchanges)`: `seg == out`: `ERROR: <name>(): cannot be done in-place` (standard output, as the other messages of
   these two), none. Without `out` one frame of `seg`'s extent and type; one of other dimensions (frames not
@@ -2716,7 +2729,14 @@ its voxels are read or written: FS-58.
   a value: a float label 2.5 becomes 2); `seg`'s colour table deep-copied into `out` when both have one (each step's
   own, the last step's kept). Dilation: a voxel of label 0 inside the mask
   (`mask`'s `frame` value not below `mthresh`; all without a mask) whose face neighbours in the volume (order -c, +c,
-  -r, +r, -s, +s) carry nonzero labels takes the most frequent (the smallest of a tie); `nchanges` the number changed.
+  -r, +r, -s, +s) carry nonzero labels takes the most frequent (the smallest of a tie), written with `MRIsetVoxVal`
+  (into a byte `out` a label below 0 becomes 0, fs.mri §5); `nchanges` the number changed. A step writes only the
+  voxels it changes: every other voxel of `out` keeps what it held, which is at first `out = MRIcopy(seg, out)`'s
+  value (fs.mri §13's change of type, FS-162 included: a float label -1 copied into a byte `out` is 255 with
+  `reproduce`) and later the earlier steps' results; the working copy `seg2` keeps `seg`'s type and takes `out`'s
+  values through the change of type between steps (**(observed)**: `vmorph`; `vrules23`, a float source of labels -1,
+  0 and 2 into a byte `out` of 9s, one step (5 changes: the copied -1s stay 255, a written -1 is 0) and two (3 changes
+  in the second, from the working copy's 255s), and into a new float `out`).
   FS-497: with `n == -1`, a step that changes voxels without changing the working copy repeats forever in FreeSurfer:
   a complex volume, whose copy FreeSurfer makes of the first `width` bytes of each row only (an eighth of a float
   complex row, fs.mri §13's FS-161), so that a label in the first voxel's real part reaches the working copy and the
@@ -2725,22 +2745,35 @@ its voxels are read or written: FS-58.
   `TIMEOUT` after the alarm; one whose second voxel holds it ends at once, the label never reaching the copy).
 - `MRIdilateThreshLabel` / `MRIdilateInvThreshLabel(src, val, dst, label, niter, thresh)` (bytes: the common rules'
   comparison, so a label outside 0 to 255 changes nothing): check (src, val);
-  `dst = MRIcopy(src, dst)`; up to `niter` steps on bytes, each from a copy of `dst` (`tmp`): the bounding box of
-  `src`'s bytes equal to `label`, grown by one and clipped (from `[w-1, 0]` per axis); over the box (z, y, x; the
-  loops read the box's bounds at each step, so a bound raised during the pass extends it), a voxel whose `val` byte
+  `dst = MRIcopy(src, dst)`; up to `niter` steps on bytes, each from a copy of `dst` (`tmp`): the box of `src`'s
+  bytes equal to `label`, found again at each step by section 48's rule (`MRIdilateUchar`: grown by one and clipped;
+  with no such byte it holds no voxel unless the volume is 1 x 1 x 1, whose one voxel is then visited and keeps its
+  own byte); over the box (z, y, x; the loops read the box's bounds at each turn, so a bound raised during the pass
+  extends it), a voxel whose `val` byte
   is `>= thresh` (`<= thresh` for the inverse) becomes `label` (as a byte) when any of its 27 neighbourhood bytes in
   `tmp` is `label`; then the box grows to include the last neighbour visited (`x+1`, `y+1`, `z+1` clamped) and a voxel
   that was not `label` in `dst` counts as added; every visited voxel of `dst` is written (its `tmp` byte or `label`).
-  A step that adds none ends the steps. With `niter` 0 or below no copy is made and FreeSurfer's final free prints
+  A step that adds none ends the steps. `dst` itself is not checked: a given `dst` of another extent or frame count
+  meets `MRIcopy`'s rules (fs.mri §13, FS-163: refused by default; with `reproduce` FreeSurfer's placement where every
+  row lands inside `dst`, and in both modes, noted, the error `MRIcopy: the destination is too small for the source's
+  voxels` (status 252) where a row would not: FreeSurfer then writes past `dst`, memory it does not own, which on the
+  probe lands in the allocator's slack and prints `dst`'s own voxels the same in every run, so the loop allows that
+  line by name, §69.3) (**(observed)**: `vrules22`, a row of eight bytes into a given destination of four). With
+  `niter` 0 or below no copy is made and FreeSurfer's final free prints
   `MRIfree: null pointer` as an error (`specs/freesurfer-core.md` §2's C-style error, returning: the program goes on)
   (**(observed)**: `vmorph`; `vrules22`, a row of eight bytes whose label moves one voxel further at each of three
   steps through the raised bound, no steps, a label of 386, thresholds equal to and above the values).
 - `MRIdilateLabelUchar(src, dst, label, niter)`: check (src, dst) with `dst`; `dst = MRIcopy(src, dst)`; `niter` steps
-  on bytes over the box of `src`'s `label` (fixed bounds): a voxel becomes `label` when it or a neighbourhood byte of
-  `tmp` is `label` (search in z, y, x order, stopping at the first). `MRIdilateLabel(src, dst, label, niter)`: check;
-  byte sources go to `MRIdilateLabelUchar`; otherwise the same on values for every frame, the box made from `tmp`'s
-  values of any frame equal to `label` (`double`). Both print `MRIfree: null pointer` with `niter` 0 or below
-  (**(observed)**: `vmorph`; `vrules22`, as for the threshold dilations, and two frames of floats).
+  on bytes, each from a copy of `dst` (`tmp`), over the box of `src`'s bytes equal to `label` (section 48's rule), found
+  again at each step from `src` (not from `tmp`): it widens between steps only when `dst` is `src` (whose bytes the
+  steps change), and a pass never raises its bounds; in it each voxel of `dst` becomes `label` when its own byte or a
+  neighbourhood byte of `tmp` is `label` (search in z, y, x order, stopping at the first), else its `tmp` byte.
+  `MRIdilateLabel(src, dst, label, niter)`: check; byte sources go to `MRIdilateLabelUchar`; otherwise the same on values
+  for every frame, the box found at each step from `tmp`'s values of any frame equal to `label` (`double`), so it
+  widens with every step. Both print `MRIfree: null pointer` with `niter` 0 or below (**(observed)**: `vmorph`;
+  `vrules22`, as for the threshold dilations, and two frames of floats; `vrules23`, a row of eight voxels with the label
+  in the first, three steps: bytes into a new volume label 2 voxels, in place 4; ints (values) 4 either way;
+  `MRIdilateLabelUchar` of the ints reads their rows as bytes).
 - `MRIopenN(src, dst, order)`: `order` erosions (the first into a new volume, the others in place), then `order`
   dilations (`MRIdilate`, the first into `dst`, the others in place); an `order` below 1 still makes one of each.
   `MRIopen`: one erosion, one dilation; `MRIclose`: one dilation, one erosion (**(observed)**: `vmorph`; `vrules22`,
@@ -2759,9 +2792,12 @@ its voxels are read or written: FS-58.
   (byte) nint(in), (byte) nint(out))` (section 31); else each value of each frame (z, y, x, frame innermost) with
   `|(float)(v - in)| < FLT_EPSILON` becomes `out`; others are not written.
 - `MRImaskDifferentGeometry(src, mask, dst, m, out)`: the voxel-to-voxel matrix `src` to `mask`
-  (`MRIgetVoxelToVoxelXform`); clone without `dst`; columns outermost: the voxel times the matrix (`float`), rounded
-  (`nint`); outside the mask's extent the mask value is `m`, else `nint` of the mask's frame-0 value; every frame of
-  `dst` gets `out` where the mask value is `m`, else `src`'s value.
+  (`MRIgetVoxelToVoxelXform`); clone without `dst`; over `dst`'s extent (columns outermost; no volume is checked): the
+  voxel times the matrix (`float`), rounded (`nint`); outside the mask's extent the mask value is `m`, else `nint` of
+  the mask's frame-0 value; every frame of `dst` (its own frame count) gets `out` where the mask value is `m`, else
+  `src`'s value at the same voxel and frame (read as the voxel functions read, outside `src` too: fs.mri §5, FS-52,
+  FS-53) (**(observed)**: `vmask`; `vrules23`, a source of 4 x 4 x 1 voxels and two frames into a new volume, a given
+  one of 2 x 2 x 1 (its four voxels written, one frame) and of 4 x 4 x 1 with one frame).
 - `MRImask(src, mask, dst, m, out)`: the environment's `FS_MRIMASK_ALLOW_DIFF_GEOM` read as `%d` (`sscanf`: leading
   blanks, a sign and digits; 1 without the variable or when no number starts it, an empty value or `x`; `2abc` gives
   2, `-1` gives -1: any number but 0 allows another geometry); with any bit of `Gdiag` set, `MRImask(): AllowDiffGeom
@@ -2783,9 +2819,11 @@ its voxels are read or written: FS-58.
   values, `out` where the mask is below `thresh` (a NaN mask value is not below) (**(observed)**: `vmask`; `vrules22`,
   those replacement values and a float destination).
 - `MRIgrowLabel(mri, filled, in, out)`: check; bytes. For `in != 0` the box of `mri`'s `in` voxels; for `in == 0` the
-  box of nonzero voxels and every voxel on or outside its faces set to `out` in `filled` (counted). The box starts
-  from `[w, 0]` per axis in both cases and is not grown: with no such voxel it is empty, and for `in == 0` every voxel
-  is then on or outside it. Then passes over the box (z, y, x) until none fills: for each voxel of `filled` equal to `out`,
+  box of nonzero voxels and every voxel on or outside its faces set to `out` in `filled` (counted). In both cases, per
+  axis of extent `e`, the low bound starts at `e` and the high bound at 0, and each such voxel at coordinate `c`
+  lowers the low bound to `c` and raises the high bound to `c` where they are not already beyond; the box is neither
+  grown nor clipped: with no such voxel every axis keeps `[e, 0]`, which holds no coordinate (whatever the extent),
+  and for `in == 0` every voxel is then on or outside it. Then passes over the box (z, y, x) until none fills: for each voxel of `filled` equal to `out`,
   each neighbour in the volume equal to `in` in `mri` and not `out` in `filled` is set (counted); after each pass `<n>
   voxels filled, total = <t>.` on standard error (one line per pass, the last one's `<n>` 0). Returns 0
   (**(observed)**: `vmorph`; `vrules22`, labels 257 and 265, a background fill with and without data).
@@ -2809,7 +2847,9 @@ its voxels are read or written: FS-58.
   parameters; a `col` of other dimensions (frames compared): `ERROR: MRIbinMaskToCol: input/output dim mismatch`, none.
   Frame 0: the column where the mask is not below 0.5, else 0.
 - `MRIpercentThresh(mri, mask, frame, pct)`: columns outermost, `frame`'s values (`double`) where the mask is not below
-  0.5 (a NaN mask value is not below), sorted by the C library's `qsort` (glibc's merge order, `specs/glibc-qsort.md`)
+  0.5 (a NaN mask value is not below; a `frame` past the volume's frames is read as fs.mri §5 reads it: FS-53, noted,
+  memory FreeSurfer does not own, which its runs often read the same), sorted by the C library's `qsort` (glibc's
+  merge order, `specs/glibc-qsort.md`)
   with `CompareDoubles` (-1 when `a < b`, +1 when `a > b`, else 0: equal values, +0 and -0 included, and NaNs keep
   their order); the value at `npct = (int) round(n (100 - pct) / 100)` (`double`). FS-495: `npct` from `n` to
   the volume's voxel count minus 1 gives 0 in FreeSurfer (the list's unused, zeroed part); FS-496: `npct` below 0,
@@ -2823,7 +2863,7 @@ its voxels are read or written: FS-58.
 ## 51. Validation plan (sections 49 and 50)
 Made ready by the spec finisher's relay 19: §69's groups `vconf`, `vset`, `vmorph`, `vmask` (seeded) and `vrules22`
 (fixed cases), on the open probe's commands (README.md says what each takes and prints): `conform` (`MRIconform`,
-whose 256^3 result's voxels are printed as their FNV-1a 64 hash, `MRIgetConformMatrix`, `MRIconformedTemplate`; the
+whose 256^3 result's voxels are printed as a 64-bit FNV-1a hash (the start state 1469598103934665603, not FNV's usual offset basis; README.md defines it), `MRIgetConformMatrix`, `MRIconformedTemplate`; the
 input printed afterwards the same way), `union`, `isect`, `mand`, `mxor`, `compl`, `edges`, `mnot`, `b2c`, `cntv`
 (`MRItotalVoxelsOn`, `MRIvoxelsInLabel`, `MRIlabelInVolume`, `MRInMask`), `cent`, `cnbhd`, `pthr`, `rlist`, `rvonly`,
 `cplab`, `cplv`, `slv`, `erodenn`, `erode`, `erode2d`, `erodeseg`, `dilseg`, `dtl` (both threshold dilations), `dlab`
@@ -2837,97 +2877,172 @@ conformed grid itself. Expected: identical with `reproduce` but where FreeSurfer
 and FS-497's lines) or reads and writes memory it does not own (FS-496, and the shared FS-53, FS-58), lines the loop
 allows; the default differs only with a notice (FS-12, FS-491, FS-492, FS-494, FS-495).
 
-## 52. Volume histograms (3.1-38: mrihisto.cpp)
+## 52. Volume histograms (3.1-38)
+(Made ready for the clean room by the spec finisher's relay 20: §69.2's groups `vhist` and `vrules23`.)
 Histograms are `HISTOGRAM`s (sections 5 and 21 of `specs/freesurfer-maths.md`: `HISTOalloc`, `HISTOinit`, `HISTOclear`,
 `HISTOaddSample`, `HISTOsmooth`, `HISTOsoapBubbleZeros`, the peak and valley searches). A negative bin count given to
 an allocation ends the program with `error: Cannot allocate memory` and `HISTOalloc(<n>): could not allocate
-histogram`. "The bin count of a range" below is `nint((max - min) + 1.0)` with the difference in `float` and the sum
-in `double`; a value beyond the `int` range (or NaN) gives -2147483648 in both modes (that allocation then fails).
-`FEQUAL(a, b)` is `|a - b| < FLT_EPSILON` in `float`. "The region clipped to the volume" is `[max(x, 0), min(x + dx,
-width))` per axis (the sums in 32-bit wrapping arithmetic). A "given histogram" is prepared by: reallocated
-(`HISTOrealloc`: zeros, `max_bins = nbins = n`) when its bins in use are fewer than `n`, else its `nbins` set to `n`.
+histogram` (status 254). `HISTOinit` keeps a bin size of NaN (fs.maths §5.2: it replaces only a size at or below 0):
+a histogram of one allocated bin initialised over an empty range (the range then `[0, 0]`) gets `0 / 0`, so its one
+bin's value is NaN and every voxel's bin quotient below is NaN (**(observed)**: `vrules23`, `MRIhistogram` of a
+constant volume, the label histograms of a constant region). "The bin count of a range" below is `nint((max - min) +
+1.0)` with the difference in `float` and the sum in `double`; a value beyond the `int` range (or NaN) gives
+-2147483648 in both modes, noted FS-12 (that allocation then fails); a count above 67,108,864 (2^26) is FS-965: both
+modes end the program, noted, with the message `HISTOalloc(<n>): a histogram of <n> bins (the values' range, <min> to
+<max>) is refused (FreeSurfer allocates <8 n> bytes here)` as `ErrorExit` prints it (`specs/freesurfer-core.md` §2;
+code -2, status 254; the two `float`s in the shortest digits that read back as the same `float`, written
+`<digits>e<exponent>` without a `+` or leading zeros: `1e8`, `-2.5e1`, `0e0`), where FreeSurfer allocates and fills
+that many bins. `FEQUAL(a, b)` is `|a - b| < FLT_EPSILON` in `float`. "The region clipped to the volume" is `[max(x,
+0), min(x + dx, width))` per axis (the sums in 32-bit wrapping arithmetic); the functions take a region (without one
+FreeSurfer crashes: `vrules23`'s `hreg` line with `null`, `CRASH 11`; a candidate may end that call with an error). A
+"given histogram" is prepared by: reallocated (`HISTOrealloc`: zeros, `max_bins = nbins = n`) when its bins in use are
+fewer than `n` (whatever its allocation), else its `nbins` set to `n`. A voxel's bin is `nint` of a quotient (FS-12
+for NaN or a quotient beyond the `int` range: by default NaN gives 0 and beyond the range the nearer end, with
+`reproduce` -2147483648; noted).
+- **Counting outside the bins (FS-498)**, where a function below counts "with no bound" or leaves a bin below 0: a bin
+  outside `[0, nbins - 1]` is by default moved to the nearer end (0 when `nbins` is 0 or below), noted; with
+  `reproduce` the count goes where FreeSurfer puts it when that bin lies in the histogram's allocation (`0` to
+  `max_bins - 1`, so bins from `nbins` on count too) and nowhere outside it, noted (FreeSurfer writes memory it does
+  not own there, or crashes: a NaN quotient's bin -2147483648 crashes it, **(observed)**: `vhist`, `vrules23`,
+  `CRASH 11`).
 - **The region histogram** (used by `MRIhistogramRegion`, `MRIhistogramVoxel` and `MRIhistoSegment`, not callable by
   itself): frame 0's range over the region clipped (`MRIvalRangeRegion`, from 10000 and -10000); `nbins` 0 becomes the
-  bin count of that range; the histogram (new, or given and prepared; a given one with a negative count: FS-501) is
-  cleared and set with `HISTOinit(h, nbins, min, max)`; then bin `b`'s value becomes `(float)b * bin_size + min` (in
-  `float`). Volume types other than bytes, shorts, unsigned shorts and floats: `mriHistogramRegion: unsupported mri type
-  <type>` (`ERROR_UNSUPPORTED`) and no histogram (a given one keeps its bins and zero counts). Each voxel (frame 0, the
+  bin count of that range (any other count, negative too, is kept); the histogram (new, or given and prepared) is
+  cleared and set with `HISTOinit(h, nbins, min, max)` (a given one whose prepared count is negative: FS-501 below);
+  then bin `b`'s value becomes `(float)b * bin_size + min` (in `float`), for `b` from 0 to `nbins - 1`. Volume types other
+  than bytes, shorts, unsigned shorts and floats: `mriHistogramRegion: unsupported mri type <type>`
+  (`ERROR_UNSUPPORTED`, returning) and no histogram, after the preparation, the initialisation and the bins' values (a
+  given one keeps them, with zero counts; **(observed)**: `vrules23`, ints and longs). Each voxel (frame 0, the
   region's z, then y, then x) counts 1 (`1.0f + count`) in bin `nint((v - min) / bin_size)` (the subtraction and the
-  division in `float`, the voxel converted to `float`); the bin is lowered to `nbins - 1` when above, and for every
-  type but bytes raised to 0 when below. Bytes' bins below 0 (a NaN bin size): FS-498.
+  division in `float`, the voxel converted to `float`); the bin is lowered to `nbins - 1` when above, and for every type
+  but bytes raised to 0 when below. Bytes' bins below 0 (a NaN bin size: a region of one value in a histogram of one
+  allocated bin): FS-498. **FS-501** (both modes, noted): a given histogram whose prepared bin count is negative (the
+  count of a range beyond the `int` range: `MRIhistoSegment`'s reused histogram after a window holding an infinity)
+  ends the program with `mriHistogramRegion: a histogram of <n> bins cannot be cleared (FreeSurfer crashes here)`
+  (`ErrorExit`, code -4, status 252).
 - **`MRIhistogramRegion(mri, nbins, histo, region)`**: the region's range as above; `nbins` 0 or below with a range
   within `FLT_EPSILON` prints `MRIhistogramRegion: input mri <fname> is blank` (`ERROR_UNSUPPORTED`, the volume's file
-  name) and returns no histogram; else `nbins` 0 or below becomes the range's bin count, and 255 when that is not above
-  0. The histogram (new or given, prepared) is cleared, its bin size set to `(max - min + 1) / nbins` (in `float`; the
-  region histogram then sets it again), and filled by the region histogram with `nbins`; its result is not checked.
-  An optimisation for overlapping windows is compiled out and changes nothing.
+  name; returning) and returns no histogram (a given one untouched); else `nbins` 0 or below becomes the range's bin
+  count, and 255 when that is not above 0 (a region outside the volume: the range 10000 to -10000). The histogram (new
+  or given, prepared) is cleared, its bin size set to `(max - min + 1) / nbins` (in `float`; the region histogram then
+  sets it again), and filled by the region histogram with `nbins`; its result is not checked: the histogram is
+  returned even when the region histogram refused the type. An optimisation for overlapping windows is compiled out
+  and changes nothing (**(observed)**: `vhist`; `vrules23`: the blank message with an empty name, `error:
+  MRIhistogramRegion: input mri  is blank` with the C-style error's NUL; a region outside: 255 bins, values `10000 +
+  b`, bin size 1, minimum 0 and maximum 254 from `HISTOinit`'s empty range; given histograms of 4 bins, of 2 in use
+  of 300 (both reallocated to the count), of 300 in use (kept, `nbins` set) and of none).
 - **`MRIhistogram(mri, nbins)`**: the range of every frame (`MRIvalRange`: from 10000 and -10000, NaNs passed over);
   `nbins` 0 becomes the range's bin count; a maximum equal to the minimum becomes 255 (after the count); a new
   histogram, `HISTOinit(h, nbins, min, max)`; every voxel of every frame (frames, z, y, x; `MRIgetVoxVal` as a
   `double`) counts 1 in bin `nint((float)(v - min) / bin_size)` (the difference in `double`, rounded to `float`, divided
-  in `float`), with no bound (FS-498).
-- **`MRIgetEqualizeHisto(mri, histo_eq, low, high, norm)`**: `MRIhistogram(mri, 0)`; the result is `histo_eq` or a new
-  histogram of as many bins; `high` above the histogram's `max` (compared in `float`) becomes `(int)max`. `total_pix` is
-  the sum of the counts from `low` to `high`, accumulated in an `int` (each step `(int)((float)total + count)`). Bins `0`
-  to `low - 1` of the result: count 0, value the bin's number. Bins `low` to `high`: the running sum `total` (accumulated
-  the same way); the count is `nint(255.0f * (float)total / (float)total_pix)` (in `float`) with `norm`, else `total`
-  (as a `float`); FS-500: FreeSurfer sets these bins' values (to their numbers) in the volume's histogram instead of the
-  result. Bins `high + 1` to the histogram's bin count: the count at `high` plus the bin's number (in `float`), the value
-  the bin's number. The result's bin count becomes the histogram's. The histograms are indexed by intensity: indices
-  outside a histogram's arrays (a negative `low`, `high` beyond the bins): FS-499.
+  in `float`), with no bound (FS-498) (**(observed)**: `vhist`; `vrules23`, a constant volume of 5 (one bin, the range
+  5 to 255, its bin size infinite and its value NaN, every voxel counted), a constant of 300 (the range 300 to 255,
+  emptied to `[0, 0]`: the size 0 / 0 and FreeSurfer's crash), bin counts 1, 2, 3 and -1 (status 254), three frames,
+  NaN values (`CRASH 11`)).
+- **`MRIgetEqualizeHisto(mri, histo_eq, low, high, norm)`**: `MRIhistogram(mri, 0)`; the result is `histo_eq` (never
+  reallocated) or a new histogram of as many bins; `high` above the histogram's `max` (compared in `float`) becomes
+  `(int)max` (FS-12). `total_pix` is the sum of the counts from `low` to `high`, accumulated in an `int` (each step
+  `(int)((float)total + count)`, FS-12). Bins `0` to `low - 1` of the result: count 0, value the bin's number. Bins
+  `low` to `high`: the running sum `total` (accumulated the same way); the count is `nint(255.0f * (float)total /
+  (float)total_pix)` (in `float`) with `norm`, else `total` (as a `float`); **FS-500**: FreeSurfer sets these bins'
+  values (to their numbers) in the volume's histogram instead of the result, whose values there stay what they were
+  (0 in a new one, the given one's); by default the result's are set (rule A), with `reproduce` they stay; noted
+  where a value differs from its number. Bins `high + 1` to the histogram's bin count: the count at `high` plus the
+  bin's number (in `float`), the value the bin's number. The result's bin count becomes the histogram's. The
+  histograms are indexed by intensity (bin `i` is read as intensity `i`, whatever the volume's minimum); **FS-499**
+  (both modes, noted): a read of a bin outside a histogram's allocation (a negative `low`, `high` past it, a given
+  result of fewer bins) gives 0, a write there is dropped, where FreeSurfer reads memory contents and writes memory it
+  does not own (**(observed)**: `vhist`; `vrules23`, limits 0 to 9, 0 to 300 (lowered to 9), 2 to 6, 5 to 3, 0 to 12;
+  `low` -1 (FreeSurfer's `CRASH 6`: the C library's `free(): ...` message); a given result of 16 bins whose old values
+  stay in bins `low` to `high`; a given result of 4 bins for 10 (`CRASH 11`)).
 - **`MRIhistoEqualize(src, template, dst, low, high)`**: `dst` (or a clone of `src`) frame 0 over `src`'s extent (z, y,
   x): with the two normalised cumulative histograms (`MRIgetEqualizeHisto(.., NULL, low, high, 1)` of `src`, then of
-  `template`), each voxel's `sval = (int)` of its value; when `low <= sval <= high`, the first index from `low` up to the
-  template's bin count whose template count is at or above the source's count at `sval` becomes the value (as a
-  `float`), else `sval` itself. With `DIAG_WRITE` and `DIAG_VERBOSE` in `Gdiag`, the two histograms are plotted to
-  `cum_src.plt` and `cum_template.plt` (`HISTOplot`). FS-499 as above.
+  `template`), both made before any voxel is written (so `dst` may be `src` or `template`), each voxel's `sval = (int)`
+  of its value (FS-12); when `low <= sval <= high`, the first index from `low` up to the template's bin count whose
+  template count is at or above the source's count at `sval` becomes the value (as a `float`, `MRIsetVoxVal`), else
+  `sval` itself; a `dst` of another extent is written as the voxel functions write outside a volume (fs.mri §5). With
+  `DIAG_WRITE` and `DIAG_VERBOSE` in `Gdiag`, the two histograms are plotted to `cum_src.plt` and `cum_template.plt`
+  (`HISTOplot`; the probe does not compare those files). FS-499 as above (**(observed)**: `vhist`; `vrules23`, into a
+  new volume, the source, the template and a given float volume, limits 0 to 9 and 3 to 6).
 - **`MRIhistogramLabelRegion(mri, labeled, region, label, nbins)`**: the region's range (`MRIvalRangeRegion`); `bmin =
   (int)min`; `nbins` 0 or below becomes the range's bin count; a new histogram, `HISTOinit(h, nbins, min, max)`; a range
-  within `FLT_EPSILON`: bin size 1, `MRIhistogramLabelRegion: constant image` (`ERROR_BADPARM`) and that histogram.
-  Otherwise over the region clipped (z, y, x), voxels whose label `nint(labeled's frame-0 value)` equals `label` count 1
-  in bin `nint((float)(v - bmin) / bin_size)` for bytes, shorts and unsigned shorts (the difference in `int`) and
-  `nint((v - min) / bin_size)` for floats, with no bound (FS-498); another type, at the first such voxel:
-  `MRIhistogramLabelRegion: unsupported type <type>` (`ERROR_UNSUPPORTED`) and no histogram.
+  within `FLT_EPSILON`: bin size 1, `MRIhistogramLabelRegion: constant image` (`ERROR_BADPARM`, returning) and that
+  histogram. Otherwise over the region clipped (z, y, x), voxels whose label `nint(labeled's frame-0 value)` equals
+  `label` count 1 in bin `nint((float)(v - bmin) / bin_size)` for bytes, shorts and unsigned shorts (the difference in
+  `int`) and `nint((v - min) / bin_size)` for floats, with no bound (FS-498); another type, at the first such voxel:
+  `MRIhistogramLabelRegion: unsupported type <type>` (`ERROR_UNSUPPORTED`, returning) and no histogram (**(observed)**:
+  `vhist`; `vrules23`, a constant region (one bin, its value NaN, the size then 1), ints with a labelled voxel and
+  without, floats with NaN (`CRASH 11`), a region outside (status 254), shorts of -5 to 10 (16 bins from -5)).
 - **`MRIhistogramLabel(mri, labeled, label, nbins)`**: the range of the labelled voxels (`MRIlabelValRange`: every
   frame, `nint` labels; 10000 and -10000 when none, so `nbins` 0 or below gives a negative count and the program's end);
   `bmin = (int)min`; a new histogram, `HISTOinit(h, nbins, min, max)`; over the volume (z, y, x) the voxels whose
-  labelled frame-0 value equals `label` (compared as `float`s) count 1 in bin `nint((float)(v - bmin) / bin_size)` for
-  bytes, shorts and unsigned shorts, `nint((v - min) / bin_size)` for floats and any other type (`MRIgetVoxVal`), kept in
-  `[0, nbins - 1]`.
+  labelled frame-0 value equals `label` (compared as `float`s, so a label 1.6 counts in the range as 2 and not in the
+  histogram) count 1 in bin `nint((float)(v - bmin) / bin_size)` for bytes, shorts and unsigned shorts,
+  `nint((v - min) / bin_size)` for floats and any other type (`MRIgetVoxVal`), kept in `[0, nbins - 1]`
+  (**(observed)**: `vhist`; `vrules23`, no labelled voxel with 0 bins (status 254) and with 4, labels 2.0 and 1.6, longs,
+  floats with NaN).
 - **`MRIhistogramVoxel(mri, nbins, histo, x0, y0, z0, wsize, mri_thresh, thresh)`**: the region of `wsize` voxels per
   axis from `x0 - (wsize - 1) / 2` (C's division); its range; `nbins` 0 or below becomes the range's bin count (255
   when that is not above 0); the histogram (new or given, prepared), cleared, `HISTOinit` over the range; without
   `mri_thresh` the region histogram with `nbins`, else `MRIhistogramRegionWithThreshold(.., frame 0)`; then
-  `HISTOsoapBubbleZeros(h, h, 100)`.
+  `HISTOsoapBubbleZeros(h, h, 100)` (a histogram of one bin meets its first bin's outside neighbour, fs.maths §5.3:
+  FS-22, memory FreeSurfer does not own) (**(observed)**: `vhist`, its memory lines all of one bin; `vrules23`, windows
+  of 0, 3 and 4 voxels, a threshold volume, a given histogram).
 - **`MRIhistogramRegionWithThreshold(mri, nbins, histo, region, mri_thresh, thresh, frame)`**: over the region clipped
-  (z, y, x), the voxels of `frame` whose threshold volume's value is not below `thresh`: their range in `float` from
-  `1e10` and `-1e10`; `nbins` 0 becomes its bin count; the histogram (new or given, prepared), cleared and set with
-  `HISTOinit` over that range; each of those voxels added with `HISTOaddSample(h, v, min, max)` in the same order. FS-503:
-  FreeSurfer adds them into per-thread histograms and sums those; with one thread the sums are these.
+  (z, y, x), the voxels of `frame` whose threshold volume's value (its `frame` too) is not below `thresh` (a NaN value or
+  threshold is not below): their range in `float` from `1e10` and `-1e10` (NaN values passed over); `nbins` 0 becomes its
+  bin count (no such voxel: a count beyond the `int` range, the program's end with status 254); the histogram (new or
+  given, prepared), cleared and set with `HISTOinit` over that range; each of those voxels added with
+  `HISTOaddSample(h, v, min, max)` in the same order. FS-503: FreeSurfer adds them into per-thread histograms and sums
+  those; with one thread the sums are these, which larmorx gives at any thread count (no notice) (**(observed)**:
+  `vhist`; `vrules23`, no voxel at the threshold, a NaN threshold, the second frame, a given histogram, NaN values).
 - **`MRIhistoSegment(src, labeled, wm_low, wm_hi, gray_hi, wsize, sigma)`**: `sigma` below 0 is 4; `labeled` (or a
   clone of `src`) is relabelled over `src`'s extent (z, y, x), reading both volumes' rows as bytes whatever their types
-  (byte `x` of row `(z, y)`). A voxel whose label byte is 128 (`MRI_AMBIGUOUS`): the region histogram of `src` with bin
-  count 0 over the `wsize`-wide window from `x - wsize / 2` (one histogram reused); smoothed (`HISTOsmooth`, `sigma`;
+  (byte `x` of row `(z, y)`); with `labeled` the source itself, the bytes relabelled are read by the later windows. A
+  voxel whose label byte is 128 (`MRI_AMBIGUOUS`): the region histogram of `src` with bin count 0 over the
+  `wsize`-wide window from `x - wsize / 2` (one histogram reused from voxel to voxel); smoothed (`HISTOsmooth`, `sigma`;
   one smoothed histogram reused); the white-matter peak `HISTOfindLastPeakInRegion(hs, 11, 0.15, wm_low, wm_hi - 7)`,
-  and when found its bin's value as an `int`; the gray-matter peak likewise between 72 and `wm_peak - 10`; while both
-  are found and the gray-matter peak is above `gray_hi`, the white-matter peak becomes it and the gray-matter peak is
-  searched again (FS-502 when it comes back to a peak found before). The valley: -1 when a peak is missing, else
-  `HISTOfindValley(hs, 3, gray_peak + 2, wm_peak - 2)` as an intensity; above `gray_hi` it is -1. The label byte becomes
-  128 when there is no valley, `|in_val - valley| <= 2`, or the valley is at or above `gray_hi`; else 255 (`MRI_WHITE`)
-  when `in_val >= valley` and 1 (`MRI_NOT_WHITE`) below. A volume type the region histogram does not support crashes
-  FreeSurfer (FS-501). `DiagShowPctDone((float)z / (float)(depth - 1), 5)` each slice; with `DIAG_SHOW`, two lines on
-  standard error: `              %8d voxels processed (%2.2f%%)` and `... voxels labeled ...`, the percentages `100.0f *
-  n / (float)(width * height * depth)` in `float`.
+  and when found its bin's value as an `int` (FS-12); the gray-matter peak likewise between 72 and `wm_peak - 10`; while
+  both are found and the gray-matter peak is above `gray_hi`, the white-matter peak becomes it and the gray-matter peak
+  is searched again. **FS-502** (both modes, noted): when the white-matter peak takes a value it already took
+  (FreeSurfer then never ends: with a gray-matter limit below -1, once both peaks are found, the search comes back to
+  the same peak, or finds none, -1, which stays above the limit), the program ends with
+  `MRIhistoSegment: the gray-matter peak <p> stays above <gray_hi> (FreeSurfer never ends here)` (`ErrorExit`, code -4,
+  status 252). The valley: -1 when a peak is missing, else `HISTOfindValley(hs, 3, gray_peak + 2, wm_peak - 2)` as an
+  intensity (FS-12); above `gray_hi` it is -1. The label byte becomes 128 when there is no valley, `|in_val - valley| <=
+  2`, or the valley is at or above `gray_hi`; else 255 (`MRI_WHITE`) when `in_val >= valley` and 1 (`MRI_NOT_WHITE`)
+  below. **FS-501** (both modes, noted): a source type the region histogram refuses (ints, longs) leaves no histogram
+  to smooth, where FreeSurfer crashes; the program ends with `MRIhistoSegment: no region histogram to smooth (FreeSurfer
+  crashes here)` (`ErrorExit`, code -3, status 253). A window of one value in the first histogram (one bin allocated)
+  is FS-498 for bytes (FreeSurfer's crash). `DiagShowPctDone((float)z / (float)(depth - 1), 5)` each slice
+  (`specs/freesurfer-core.md` §5's percent done: lines only with the heartbeat bit `0x4000`); with `DIAG_SHOW`, two
+  lines on standard error: `              %8d voxels processed (%2.2f%%)` and `... voxels labeled ...`, the
+  percentages `100.0f * n / (float)(width * height * depth)` in `float` (the product of the extents in 32-bit
+  wrapping arithmetic) (**(observed)**: `vhist`; `vrules23`, checkerboards of 80 and 110 with `gray_hi` 100 and 95,
+  sigmas -1, 1 and 2, windows 1 and 5, a source of halves (FreeSurfer's crash), the diagnostic lines with and without
+  labels to change, the heartbeat bit at depths 1 and 2 (`0.0% finished` and `100.0% finished` at depth 2, none at depth 1: the
+  fraction 0 / 0), the source itself, a checkerboard of 80 and 128 relabelled in place (8 of its 36 voxels of 128
+  become 255, where a label volume of its own gets all 36: the later windows read the new bytes), ints (`CRASH 11`), an infinity in a later window (`CRASH 11`), FS-502's limit -2 (`TIMEOUT` after the
+  alarm)).
+- Not part of this module (no recorded step reaches them; not specified here): `MRIapplyHistogram`,
+  `MRIhistogramLabelStruct`, `MRIhistoEqualizeRegion`, `MRIapplyHistogramToRegion`, `MRIgetEqualizeHistoRegion`,
+  `MRIhistogramNormalize`, `MRIscaleIntensities`, `MRIcrunch`, `MRIhistoSegmentVoxel`, `MRIfindPercentile`.
 
 ## 53. Validation plan (section 52)
-The probe's `hreg`, `hvox`, `hthr`, `hist`, `geq`, `heq`, `hlr`, `hlab`, `hsegm`: generated volumes of every type, header
-only, frames 0 to 3, extents up to 8 x 8 x 7, filled with two populations (`fill_pat`: a seed, two levels and a spread)
-and painted with NaN and infinities; regions inside, overlapping and outside; given histograms of 0 to 300 bins with
-old contents; bin counts negative, 0, 1 and larger; thresholds and frames; equalisation limits inside and outside the
-histograms; labelled volumes of other extents; `MRIhistoSegment` with labels of 128, its destination new, given and the
-source itself, peak limits that find two peaks and none, and `DIAG_SHOW`. Expected: identical with `reproduce` but where
-FreeSurfer crashes, hangs or touches memory it does not own (FS-498, FS-499, FS-501, FS-502 and the shared FS-53, FS-58,
-FS-290), counted and not compared; the default differs only with a notice.
+Made ready by the spec finisher's relay 20: §69's groups `vhist` (seeded) and `vrules23` (fixed cases; its batch
+`vrules23-hang` holds FS-502's line, run without the guard runs), on the open probe's commands (README.md says what
+each takes and prints, and the histogram encoding H): `hreg` (`MRIhistogramRegion`), `hvox` (`MRIhistogramVoxel`),
+`hthr` (`MRIhistogramRegionWithThreshold`), `hist` (`MRIhistogram`), `geq` (`MRIgetEqualizeHisto`), `heq`
+(`MRIhistoEqualize`), `hlr` (`MRIhistogramLabelRegion`), `hlab` (`MRIhistogramLabel`), `hsegm` (`MRIhistoSegment`). The
+volumes: two populations of bytes, shorts, unsigned shorts, floats (a few special values), ints and longs, one to three
+frames, extents up to 6 x 5 x 4; regions inside, overlapping and outside, empty and of negative sizes; given
+histograms of 0 to 400 bins with old contents and fewer bins in use; bin counts negative, 0, 1 and larger;
+thresholds and frames; equalisation limits inside and outside the histograms; label volumes of bytes, ints and
+floats; `MRIhistoSegment` with labels of 128, its destination new, given and the source itself, peak limits that
+find two peaks and none, `DIAG_SHOW` and the heartbeat bit. Expected: identical with `reproduce` but where FreeSurfer
+crashes, hangs or touches memory it does not own (FS-498, FS-499, FS-501, FS-502 and the shared FS-22, FS-53), lines
+the loop allows; the default differs only with a notice (FS-12, FS-498, FS-500). FS-965's counts are not probed
+(FreeSurfer allocates gigabytes there).
 
 ## 54. Operations on a transform array (3.1-40)
 A transform array (LTA) holds `n` transforms and as many inverse transforms; each has a centre, a spread, a type, a
@@ -3657,6 +3772,16 @@ NaN; `atan2`/`atan2f` of a NaN give `x + y`.
 - **`RMSregDiffMJ(T1, T2, radius)`**: `Q = T1 - T2` (`float`), `M` its upper-left 3 x 3, `t` its first three rows' fourth
   column; `sqrt(((radius radius) tr) / 5 + tt)` in `double` with `tr` the trace (`float` sum) of `Mᵀ M` and `tt` the 1 x 1
   `tᵀ t`, both by the double-accumulating product.
+- **`Trns_ExtractScaleMatrix(T, S)`** and **`Trns_ExtractRotationMatrix(T, R)`** (`mri_cc`'s rotation, `specs/mri_cc.md`
+  §3.1; added by the spec finisher's relay 20 from that spec, behaviour only): either matrix missing returns
+  `Trns_tErr_InvalidParameter` (3) and does nothing; else `Trns_tErr_NoErr` (0). `T` is a 4 x 4 transform; `T0` its copy
+  with the fourth column's first three elements set to 0. The scale: `S` becomes the 4 x 4 identity with, at `(k, k)` for
+  `k` = 1, 2, 3, the `float` length (fs.maths's `VectorLen`) of `T0 e_k` (`e_k` the unit vector with fourth element 0;
+  the product `MatrixMultiply` into the vector itself, the input read before it is overwritten). The rotation: the
+  scale of `T0` (the same steps), each of its three diagonal factors `f` replaced by `1.0 / f` (in `double`, stored as
+  `float`), or by 1 where `|f|` is below `FLT_EPSILON` (2^-23); `R = T0 x` that matrix (`MatrixMultiply` into the
+  caller's `R`, its size messages and ends as fs.maths's). Validation: through `mri_cc`'s open probe (its `-a 0` path,
+  `specs/mri_cc.md` §10); the volume probe has no command for them yet.
 
 ## 65. Voxel lists (3.1-40: voxlist.cpp, relay 34)
 A voxel list has a type, nine arrays (`xi`, `yi`, `zi`, `fi` integers; `xd`, `yd`, `zd`, `vsrc`, `vdst` floats) of the
@@ -3674,6 +3799,25 @@ modes).
   indices...` on standard output under `DIAG_SHOW` and `DIAG_VERBOSE`, and `voxel (<x>, <y>, <z>) = <v %2.1f> added to
   voxlist at <i>` for the debugging voxel `Gx Gy Gz`. The list's volume is `mri`. With `border`, FreeSurfer counts the
   interior voxels instead of the border ones (FS-888; the default counts the border voxels). A negative `skip`: FS-889.
+- **`VLSTcreateInRegion(mri, low, hi, vl, skip, border, box)`** (`mri_cc`'s hemisphere lists, `specs/mri_cc.md` §2.2;
+  added by the spec finisher's relay 20 from that spec and track C's port, behaviour only): over the box (columns from
+  `box.x` while below `box.x + box.dx`, the sum in 32-bit wrapping arithmetic, then rows, then slices, columns
+  outermost; every `skip + 1`-th along each axis from the box's first; the box is not clipped: voxels outside the
+  volume read as the voxel functions read them, fs.mri §5, FS-52, FS-53), the count of frame 0's values (`float`
+  widened to `double`) in `[low, hi]` (the bounds widened too) sizes the list, without the border test: no list given,
+  or a given list whose `max_vox` is below the count, gets nine new arrays of the count (zeros; an empty count gives
+  empty arrays), else the given arrays are kept; `nvox` the count; a new list's `max_vox` stays 0 (as `VLSTcreate`'s,
+  FS-892); `allocating <n> voxel indices...` on standard output under `DIAG_SHOW` and `DIAG_VERBOSE`. Then, for every
+  frame (frames outermost, then the box's columns, rows, slices), each voxel in the range, and with `border` only one
+  with at least one face neighbour whose frame-0 value rounds (`nint`) to the frame's number (section 28's
+  `MRIneighbors` with the frame number as the value), is appended: its column, row, slice, frame and value (`vsrc`, the
+  `double` stored as `float`). A volume of several frames whose later frames add voxels past the count writes past the
+  arrays in FreeSurfer: FS-890, an error in both modes (`VLSTcreateInRegion: voxel <i> of an array of <n> (FreeSurfer
+  reads or writes past the list's arrays here)`, status 252); with a negative `skip` FreeSurfer never ends (or reads
+  before the box): FS-889, an
+  error in both modes (`VLSTcreateInRegion: skip <s> is negative (FreeSurfer never ends here)`, status 252). The
+  list's volume is `mri`. Validation: through `mri_cc`'s open probe (`specs/mri_cc.md` §10); the volume probe has no
+  command for it yet.
 - **`VLSTsort(src, dst)`**: without `dst`, a copy of `src` (`VLSTcopy(src, NULL, 0, src->nvox)`); the destination's
   first `nvox` voxels sorted by the C library's `qsort` (its merge order) with the comparison: larger `vsrc` first; then
   larger `xi`, `yi`, `zi` (a `vsrc` neither below nor above the other, a NaN included, passes to the indices); equal: 0.
@@ -3763,16 +3907,16 @@ both or none, into a new array, another array of 0 to 2 transforms or the source
 `reproduce` but where the original reads memory it does not own or crashes (FS-504, FS-957, the shared voxel defects),
 counted and not compared; the default differs only with a notice (FS-954, FS-956, FS-957 and the shared ones).
 
-## 69. Validation plan (black box), parts 1 to 9, parts 10a and 10b and §54 to §57
+## 69. Validation plan (black box), parts 1 to 10 and §54 to §57
 
 ### 69.1 The probe
 
 The open probe folder `validation/investigations/freesurfer-volume-probe/` holds the probe's source
-(calls of the functions of §2 to §35, §37 to §39, §41 to §44, §46, §48 to §50 and of §54 to §57 by name, and of fs.bspline's) and the
+(calls of the functions of §2 to §35, §37 to §39, §41 to §44, §46, §48 to §50, §52 and of §54 to §57 by name, and of fs.bspline's) and the
 comparison loop; its README lists every
 command, its arguments and what it prints, and the encodings (every float and double as its bits;
 the volumes, geometries, matrices, colour tables and MINC transforms as the fs.mri probe encodes
-them, with the working volume W, the destination D, the region R and the image I added). The implementer runs
+them, with the working volume W, the destination D, the region R, the image I and the histogram H added). The implementer runs
 the prebuilt probe `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_volume_probe` (FreeSurfer
 8.2.0's library as the official build compiles it: the unit oracle, GCC 8.4.0 and FreeSurfer's
 flags) with the fs.maths probe's `guard_malloc.so` beside it, and never builds them. Each call runs
@@ -3872,7 +4016,9 @@ for `vresamp` after its sources were given a good RAS in most cases, `fs-volume-
 | `vmorph` | 50 | 340 | 0 | 8 | 0 | `d6661c8c2733cefc3eb2a13865ffaa852e753cea4f30926b1b6750bfaf77fc3d` |
 | `vmask` | 50 | 110 | 2 | 4 | 0 | `f73d7388bbf105941a9fbe8e3b98720cbbb451d1211ebcf35e8507391ef6ffc9` |
 | `vrules22` | 49, 50 | 134 | 8 | 6 | 6 | `ab5206dbdcbb22959da4ace825fd2e8661a11d5c1443eaebb95f63696ac94cb9` |
-| all | | 19,384 | 1,644 | 951 | 19 | |
+| `vhist` | 52 | 605 | 43 | 38 | 0 | `177dc67f6059428691457dd9bc7c36510ffd767120a2af6dc1123f80f9a00816` |
+| `vrules23` | 48, 50, 52 | 130 | 13 | 8 | 1 | `017ea2c1b0d548b8107ee1edf816367ae850f18bfdcf835c0d468a8cfcfb265a` |
+| all | | 20,119 | 1,700 | 997 | 20 | |
 
 The probe's groups `vbspline` and `vbsrules` are fs.bspline's (`specs/freesurfer-bspline.md` §9).
 
@@ -4273,6 +4419,26 @@ log `oracles/logs/fs-volume-probe-r19-final-2026-11-23.log`); the earlier groups
 probe (**(observed)**, logs `oracles/logs/fs-volume-probe-r19-final-2026-11-23.log` and
 `-r19-vrules22-2026-11-23.log`).
 
+Part 10c (relay 20, the prebuilt probe rebuilt from fa3837bc, which adds the commands `hreg`, `hvox`, `hthr`, `hist`,
+`geq`, `heq`, `hlr`, `hlab` and `hsegm` and the histogram encoding H): `vhist` (§52: 110 region histograms, 70 window and
+70 thresholded ones, 70 whole-volume ones, 60 equalisation histograms and 60 equalisations, 60 label histograms in a
+region and 60 in the volume, 45 segmentations; volumes of two populations of bytes, shorts, unsigned shorts, floats with
+3 % special values, ints and longs, up to 6 x 5 x 4 voxels and 3 frames; given histograms in 40 %) and `vrules23`
+(fixed cases: the clean room's items 119 (all-zero sources of 1 x 1 x 1 to 3 x 3 x 1 voxels dilated into destinations
+of 7) and 121 (the erosions' destination checks, the segmentation dilation's writes, the label dilations' boxes,
+`MRImaskDifferentGeometry` over the destination); then §52's ends and messages: a blank region, a region outside, the
+refused types, given histograms of fewer, more and no bins, no region (`CRASH 11`), NaN values (FS-498's crashes),
+constant volumes, bin counts 1 to 3 and -1, equalisation limits below 0, above the maximum and reversed, FS-500's old
+values, a given result too small (FS-499), equalisations into the source, the template and a given volume, constant
+and refused label histograms, labels compared as floats, windows of 0 and 4, no voxel at a threshold, a NaN threshold,
+the second frame, checkerboard segmentations with two peaks, halves (FS-498), windows of 1, the diagnostic and heartbeat
+bits, the source as its labels, ints (FS-501), a later window's infinity (FS-501), and FS-502's limit -2 in the batch
+`vrules23-hang` without the guard runs, ended by the alarm). Their memory and crash lines: FS-498's NaN bins (bytes'
+one-bin windows, NaN voxels), FS-499's indices past a histogram (a negative `low`, a given result too small: FreeSurfer's
+`free()` aborts), FS-22's soap bubble of one bin (`MRIhistogramVoxel`'s windows of no voxels), FS-53's frames past a
+threshold volume's, FS-501's crashes; every group the same cold, warm and twice without the cache, the earlier groups'
+hashes unchanged with the rebuilt probe (**(observed)**, log `oracles/logs/fs-volume-probe-r20-final-2026-11-24.log`).
+
 `vrules` (relay 7, 2026-11-17: the prebuilt probe unchanged; log
 `oracles/logs/fs-volume-probe-r7-refs-2026-11-17.log`, the same hash from the cache and without it,
 the other groups' hashes unchanged) holds fixed cases of single statements: FS-291 with tensor
@@ -4324,6 +4490,12 @@ standard error) are taken out and their IDs kept. Every line must be identical, 
   transform the array does not hold, read), FS-509 in `vrules15` (§55: a tissue type of 100 counted past
   FreeSurfer's array, a value of its memory), FS-517 in `vrules15` and `vrules16` (§57: larmorx ends where FreeSurfer, as its
   build compiles the overflow, returns a crop of zeros);
+- in both modes, single lines named by the loop (`compare.py`'s `both_lines`) where FreeSurfer reads or writes memory
+  it does not own and the probe's four runs still agree (a write in the allocator's slack, or bytes every run leaves
+  the same), when the candidate noted the line's defect: FS-163 on `vrules22`'s threshold dilation into a destination
+  too small (§50), FS-496 on its three `MRIpercentThresh` lines whose position is past the list's allocation or below
+  0, FS-53 on `vset`'s seven `MRIpercentThresh` lines that read a frame past the volume's (a run with another heap
+  layout may print other values there);
 - in both modes, the `bvr` line without a cache that FreeSurfer ends at its licence check (§23:
   `EXIT 255` with the licence message; LARMORX performs none).
 
@@ -4372,9 +4544,13 @@ every earlier group's hash unchanged, every line of `vtal`, `vdil` and `vrules20
 unexplained difference in either mode. Relay 19 (the prebuilt probe from 4d00c36e): every earlier group's hash
 unchanged, every line of `vrules21`, `vconf`, `vmorph`, `vmask` and `vrules22` identical in both modes, `vset` all
 but its memory lines whose contents changed from process to process (1 to 3); no unexplained difference in either
-mode (logs `oracles/logs/fs-volume-probe-r19-final-2026-11-23.log`, `-r19-vrules22-2026-11-23.log`).
+mode (logs `oracles/logs/fs-volume-probe-r19-final-2026-11-23.log`, `-r19-vrules22-2026-11-23.log`). Relay 20 (the
+prebuilt probe from fa3837bc): every earlier group's hash unchanged, every line of `vrules23` identical in both modes,
+`vhist` all but its memory lines whose contents changed from process to process (0 to 5) and up to 3 where FreeSurfer
+crashed in one process and not in another; `vset`'s and `vrules22`'s lines named in `both_lines` allowed by name; no
+unexplained difference in either mode (log `oracles/logs/fs-volume-probe-r20-final-2026-11-24.log`).
 
-### 69.4 The defects of parts 1 to 9, parts 10a and 10b and §54 to §57 (index)
+### 69.4 The defects of parts 1 to 10 and §54 to §57 (index)
 
 | Defect | § | Defect | § | Defect | § |
 |---|---|---|---|---|---|
@@ -4412,7 +4588,9 @@ mode (logs `oracles/logs/fs-volume-probe-r19-final-2026-11-23.log`, `-r19-vrules
 | FS-487 | 46 | FS-488 | 46 | FS-489 | 48 |
 | FS-490 | 48 | FS-491 | 49 | FS-492 | 49 |
 | FS-493 | 50 | FS-494 | 50 | FS-495 | 50 |
-| FS-496 | 50 | FS-497 | 50 | | |
+| FS-496 | 50 | FS-497 | 50 | FS-498 | 52 |
+| FS-499 | 52 | FS-500 | 52 | FS-501 | 52 |
+| FS-502 | 52 | FS-503 | 52 | FS-965 | 52 |
 
 Others' defects these parts meet: FS-12 (`nint`, `specs/freesurfer-core.md`), FS-52 (§35's second volumes), FS-53 and FS-58
 (`specs/freesurfer-mri.md`; FS-252, its header copy without cached matrices, in part 4), FS-47 and
@@ -4424,7 +4602,9 @@ outside), FS-47 and FS-48 (`MRIpca`'s decompositions) and GLIBC-07 (`pow`, `log1
 conversions to `int`), FS-52 and FS-53 (destinations and masks of fewer frames or another extent) and FS-325 (the
 resamplings' samples); in relay 19's `vrules21`, FS-252 (a volume without its cached matrices copied into a
 Talairach volume); in part 10b, FS-12 (`(int)` labels), FS-52 and FS-53 (destinations, masks and second volumes
-unchecked, written and read outside), FS-58 (a volume without voxels conformed).
+unchecked, written and read outside), FS-58 (a volume without voxels conformed); in part 10c, FS-12 (the bins' `nint`,
+the counts' and peaks' `(int)`), FS-22 (`MRIhistogramVoxel`'s soap bubble of one bin), FS-52 and FS-53 (frames past a
+threshold volume's, destinations of another extent).
 
 ### 69.5 Beyond the probe, and the sections after §40
 
@@ -4436,7 +4616,8 @@ unchecked, written and read outside), FS-58 (a volume without voxels conformed).
   `vcrops`, `vrules15` and `vrules16`: relays 12 to 16; part 9, §41 to §44, is in `vv2v`, `vregion`, `vrules17`,
   `vrules18`, `vcov`, `vvoxel` and `vrules19`: relays 16 and 17; part 10a, §46 to §48, in `vtal`, `vdil` and
   `vrules20`: relay 18, with `vrules21`: relay 19; part 10b, §49 to §51, in `vconf`, `vset`, `vmorph`, `vmask` and
-  `vrules22`: relay 19) are not yet in the open probe's groups: until they
+  `vrules22`: relay 19; part 10c, §52 and §53, in `vhist` and `vrules23`: relay 20) are not yet in the open probe's
+  groups: until they
   are, their clean room checks them against the
   official programs as black boxes and against the replays; their validation plans name the replica's
   probe, which the implementer does not open.

@@ -49,6 +49,7 @@ fn changing(g: &Globals, out: &mut dyn Write, x: i32, y: i32, z: i32) {
 }
 
 /// `edit_segmentation(mri_wm, mri_T1, mri_seg)`.
+#[allow(clippy::too_many_arguments)]
 pub fn edit_segmentation(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -556,6 +557,7 @@ pub fn edit_segmentation(
 
 /// A cortex (or unknown) voxel lateral to the amygdala (left `x - 1`, right `x + 1`), with white
 /// matter above it and no amygdala within 7 below: turned on.
+#[allow(clippy::too_many_arguments)]
 fn lateral_to_amygdala(
     g: &mut Globals,
     err: &mut dyn Write,

@@ -6,8 +6,8 @@
 //! `FixSubCortMassHA`, `MRIfixEntoWM` and `LabelAmygalaCortalJunction`.
 //!
 //! - [`main`]: the program (`main`, `get_option`, `usage_exit`), its entry point [`main::run`];
-//! - [`edit`]: `edit_segmentation`;
-//! - [`paths`]: `remove_paths_to_cortex` and its region's helpers;
+//! - [`edit`]: the function `edit_segmentation`;
+//! - [`paths`]: the function `remove_paths_to_cortex` and its region's helpers;
 //! - [`local`]: the voxel accesses and the small functions (`neighborLabel`, the distances and
 //!   edges, `MRInonfilledInNbhd`, `spackle_wm_superior_to_mtl`, `KeepHAILVCP`).
 

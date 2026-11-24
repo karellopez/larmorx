@@ -225,6 +225,7 @@ pub fn val(
 
 /// `neighborLabel(mri, x, y, z, whalf, label)`: whether a voxel of the window (z outermost,
 /// through the index tables) holds `label` (`MRIgetVoxVal == label` in `float`).
+#[allow(clippy::too_many_arguments)]
 pub fn neighbor_label(
     g: &mut Globals,
     err: &mut dyn Write,
@@ -564,6 +565,7 @@ pub fn distance_to_anterior_edge(
 
 /// `distance_to_lateral_edge(seg, label, x, y, z, left)` (towards +x for the left hemisphere, -x
 /// for the right, up to the width; the width when none).
+#[allow(clippy::too_many_arguments)]
 pub fn distance_to_lateral_edge(
     g: &mut Globals,
     err: &mut dyn Write,

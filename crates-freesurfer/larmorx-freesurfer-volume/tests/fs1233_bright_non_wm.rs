@@ -89,7 +89,7 @@ fn bytes_give_bright_labels_without_a_notice() {
         assert_eq!(t, MRI_UCHAR);
         assert!(!ids.iter().any(|i| i == "FS-1233"));
         assert_eq!(v.iter().filter(|&&x| x == 130.0).count(), 36);
-        assert!(v.iter().any(|&x| x == 100.0));
+        assert!(v.contains(&100.0));
     }
 }
 

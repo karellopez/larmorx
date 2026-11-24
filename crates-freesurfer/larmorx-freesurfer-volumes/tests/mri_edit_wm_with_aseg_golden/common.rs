@@ -179,7 +179,8 @@ fn jitter(x: i32, y: i32, z: i32, n: i32) -> i32 {
 /// of each structure on the right (small columns), mirrored on the left with the left labels.
 pub fn aseg_value(x: i32, y: i32, z: i32) -> u32 {
     // (right label, left label, x range on the right, y range, z range)
-    const BOXES: [(i32, i32, (i32, i32), (i32, i32), (i32, i32)); 21] = [
+    type Bx = (i32, i32, (i32, i32), (i32, i32), (i32, i32));
+    const BOXES: [Bx; 21] = [
         (43, 4, (10, 13), (8, 12), (10, 21)),
         (49, 10, (12, 15), (12, 16), (12, 17)),
         (50, 11, (9, 12), (6, 9), (16, 21)),

@@ -5900,7 +5900,11 @@ class Gen19(Gen18):
         """H (README.md): a given histogram of ``alloc`` bins, some in use, with old contents."""
         alloc = alloc if alloc is not None else r.choice([0, 1, 4, 16, 100, 300])
         nb = r.randint(0, alloc)
-        head = [f32(r.choice([0.5, 1.0, 2.0])), f32(float(r.randint(-5, 5))), f32(float(r.randint(5, 50)))]
+        head = [
+            f32(r.choice([0.5, 1.0, 2.0])),
+            f32(float(r.randint(-5, 5))),
+            f32(float(r.randint(5, 50))),
+        ]
         bins = [f32(float(r.randint(-10, 300))) for _ in range(nb)]
         counts = [f32(float(r.randint(0, 9))) for _ in range(nb)]
         return " ".join([str(alloc), str(nb), *head, *bins, *counts])
@@ -5958,7 +5962,9 @@ class Gen19(Gen18):
             th = "null" if r.random() < 0.4 else self.hv(r, d, r.choice([0, 3, 1])) + " 0"
             w = r.choice([1, 2, 3, 3, 5, 0])
             x, y, z = (r.randint(-1, e) for e in d)
-            L.append(f"hvox {a} 0 {H()} {nb()} {x} {y} {z} {w} {th} {f32(float(r.randint(0, 150)))}")
+            L.append(
+                f"hvox {a} 0 {H()} {nb()} {x} {y} {z} {w} {th} {f32(float(r.randint(0, 150)))}"
+            )
         for _ in range(70):
             d = dims()
             t = r.choice(T)
@@ -5986,8 +5992,12 @@ class Gen19(Gen18):
             d = dims()
             t = r.choice([0, 0, 3, 1])
             a = self.hv(r, d, t, lv=(0, r.randint(20, 200)), spread=r.choice([0, 3, 10]))
-            b = self.hv(r, d, r.choice([0, 3]), lv=(0, r.randint(20, 200)), spread=r.choice([0, 3, 10]))
-            dst = r.choice(["new", "new", "self", "other", self.svol(r, d, r.choice([0, 3]), pz=1.0)])
+            b = self.hv(
+                r, d, r.choice([0, 3]), lv=(0, r.randint(20, 200)), spread=r.choice([0, 3, 10])
+            )
+            dst = r.choice(
+                ["new", "new", "self", "other", self.svol(r, d, r.choice([0, 3]), pz=1.0)]
+            )
             lo = r.choice([0, 0, 1, 10])
             hi = r.choice([255, 100, 40])
             L.append(f"heq {a} 0 {b} 0 {dst} {lo} {hi}")
@@ -5995,7 +6005,11 @@ class Gen19(Gen18):
             d = dims()
             t = r.choice([0, 4, 10, 3, 3, 1])
             a = self.hv(r, d, t, special=0.03)
-            lab = "self" if r.random() < 0.1 else self.svol(r, d, r.choice([0, 3, 1]), labels=(1, 2, 3)) + " 0"
+            lab = (
+                "self"
+                if r.random() < 0.1
+                else self.svol(r, d, r.choice([0, 3, 1]), labels=(1, 2, 3)) + " 0"
+            )
             L.append(
                 f"hlr {a} 0 {lab} {self.hreg_of(r, d, 0.9)} {r.choice([1, 2, 3, 0])} {r.choice([0, 0, -1, 3, 10])}"
             )
@@ -6003,12 +6017,18 @@ class Gen19(Gen18):
             d = dims()
             t = r.choice([0, 4, 10, 3, 3, 1, 2])
             a = self.hv(r, d, t, special=0.03)
-            lab = "self" if r.random() < 0.1 else self.svol(r, d, r.choice([0, 3, 1]), labels=(1, 2, 3), pz=0.3) + " 0"
+            lab = (
+                "self"
+                if r.random() < 0.1
+                else self.svol(r, d, r.choice([0, 3, 1]), labels=(1, 2, 3), pz=0.3) + " 0"
+            )
             L.append(f"hlab {a} 0 {lab} {r.choice([1, 2, 3])} {r.choice([0, 0, -1, 3, 10])}")
         for _ in range(45):
             d = dims(2)
             t = r.choice([0, 0, 0, 0, 4, 3])
-            a = self.hv(r, d, t, lv=(r.randint(74, 90), r.randint(100, 125)), spread=r.choice([2, 5, 8]))
+            a = self.hv(
+                r, d, t, lv=(r.randint(74, 90), r.randint(100, 125)), spread=r.choice([2, 5, 8])
+            )
             k = r.random()
             if k < 0.25:
                 dst = "new"
@@ -6083,7 +6103,8 @@ class Gen19(Gen18):
             L.append(f"hreg {v} 0 null 0 0 0 0 4 1 1")
             L.append(f"hreg {v} 0 null 3 0 0 0 4 1 1")
         given = [
-            "4 4 " + " ".join([f32(1.0), f32(0.0), f32(3.0)] + [f32(float(i)) for i in range(4)] * 2),
+            "4 4 "
+            + " ".join([f32(1.0), f32(0.0), f32(3.0)] + [f32(float(i)) for i in range(4)] * 2),
             "300 2 " + " ".join([f32(1.0), f32(0.0), f32(3.0)] + [f32(9.0)] * 4),
             "300 300 " + " ".join([f32(2.0), f32(-1.0), f32(5.0)] + [f32(9.0)] * 600),
             "0 0 " + " ".join([f32(0.0)] * 3),
@@ -6107,12 +6128,16 @@ class Gen19(Gen18):
         # MRIgetEqualizeHisto: limits inside, above the maximum, below 0; normalised or not; given
         # histograms with old values (FS-500), smaller than the volume's histogram (FS-499)
         eqv = self.lab(P((4, 3, 1)), [0, 1, 1, 2, 3, 3, 3, 5, 7, 9, 9, 9], t=0)
-        old = "16 16 " + " ".join([f32(1.0), f32(0.0), f32(15.0)] + [f32(-7.0)] * 16 + [f32(4.0)] * 16)
+        old = "16 16 " + " ".join(
+            [f32(1.0), f32(0.0), f32(15.0)] + [f32(-7.0)] * 16 + [f32(4.0)] * 16
+        )
         for lo, hi in ((0, 9), (0, 300), (2, 6), (5, 3), (-1, 4), (0, 12)):
             for norm in (0, 1):
                 L.append(f"geq {eqv} 0 null {lo} {hi} {norm}")
             L.append(f"geq {eqv} 0 {old} {lo} {hi} 1")
-        L.append(f"geq {eqv} 0 4 4 {' '.join([f32(1.0), f32(0.0), f32(3.0)] + [f32(1.0)] * 8)} 0 9 1")
+        L.append(
+            f"geq {eqv} 0 4 4 {' '.join([f32(1.0), f32(0.0), f32(3.0)] + [f32(1.0)] * 8)} 0 9 1"
+        )
         # MRIhistoEqualize: into a new volume, the source, the template, a given volume
         tpl = self.lab(P((4, 3, 1)), [0, 0, 2, 2, 4, 4, 6, 6, 8, 8, 9, 9], t=0)
         for dst in ("new", "self", "other", self.lab(P((4, 3, 1)), [1.0], t=3)):
@@ -6167,13 +6192,19 @@ class Gen19(Gen18):
             for gh in (100, 95):
                 L.append(f"hsegm {seg_src} 0 {seg_lab} 85 130 {gh} 5 {f32(sg)}")
         L.append(f"+gdiag=40 hsegm {seg_src} 0 {seg_lab} 85 130 100 5 {f32(2.0)}")
-        L.append(f"+gdiag=40 hsegm {self.lab(P((4, 1, 1)), [70, 110, 70, 110], t=0)} 0 new 85 130 95 3 {f32(2.0)}")
+        L.append(
+            f"+gdiag=40 hsegm {self.lab(P((4, 1, 1)), [70, 110, 70, 110], t=0)} 0 new 85 130 95 3 {f32(2.0)}"
+        )
         L.append(
             f"+gdiag=40 hsegm {self.lab(P((4, 1, 1)), [70, 110, 70, 110], t=0)} 0 {self.lab(P((4, 1, 1)), [128] * 4, t=0)} 85 130 95 3 {f32(2.0)}"
         )
-        L.append(f"hsegm {self.lab(P((4, 1, 1)), [70, 128, 110, 128], t=1)} 0 {self.lab(P((4, 1, 1)), [128] * 4, t=0)} 85 130 95 3 {f32(2.0)}")
+        L.append(
+            f"hsegm {self.lab(P((4, 1, 1)), [70, 128, 110, 128], t=1)} 0 {self.lab(P((4, 1, 1)), [128] * 4, t=0)} 85 130 95 3 {f32(2.0)}"
+        )
         inf = self.lab(P((8, 1, 1)), [80.0, 110.0, 80.0, 110.0, INF, 80.0, 110.0, 80.0], t=3)
-        L.append(f"hsegm {inf} 0 {self.lab(P((8, 1, 1)), [128, 0, 0, 0, 128, 0, 0, 0], t=0)} 85 130 95 3 {f32(2.0)}")
+        L.append(
+            f"hsegm {inf} 0 {self.lab(P((8, 1, 1)), [128, 0, 0, 0, 128, 0, 0, 0], t=0)} 85 130 95 3 {f32(2.0)}"
+        )
         L.append(f"hsegm {seg_src} 0 self 85 130 100 5 {f32(2.0)}")
         # the source itself as the labels, a checkerboard of 80 and 128: the voxels of 128 are
         # relabelled in place, and later windows read the new bytes

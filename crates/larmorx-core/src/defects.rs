@@ -2111,6 +2111,18 @@ defects! {
         "mri_segment -wm_low_factor f sets the bottom of the white matter range to (1 - f) gray_mean + f white_mean without -seg but to f gray_mean + (1 - f) white_mean (its help's formula) with -seg: kept";
     FS_1233 = "FS-1233", "FreeSurfer", true,
         "finding bright voxels outside the white matter (MRIfindBrightNonWM) with a T1 or white-matter volume that is not of bytes (mris_make_surfaces' T1, mris_place_surface's --invol and --wm) reads both, and writes and dilates its labels, as the bytes of the volumes' rows: the labels land on other voxels or are lost (a float T1 never shows a bright voxel); larmorx takes the T1's values as bytes (FS-802) and the white matter's values, and writes the labels (100, 130) in the T1's type";
+    FS_1234 = "FS-1234", "FreeSurfer", false,
+        "mri_edit_wm_with_aseg's search for paths from the hippocampus, amygdala and inferior lateral ventricle to cortex marks its working volumes, made like the segmentation, through their bytes, and reads them by their bytes on the right and by their values on the left (its region's lateral border is also taken anew for each column, so that trim removes nothing): with a segmentation that is not of bytes (recon-all's aseg.presurf.mgz: int in the classic stream, float in v8) the search finds no path and adds no voxel ('0 voxels added to wm to prevent paths from MTL structures to cortex' on every recorded head); kept, as every recon-all result since the segmentation stopped being of bytes";
+    FS_1236 = "FS-1236", "FreeSurfer", true,
+        "mri_edit_wm_with_aseg reads and writes voxels outside the white-matter and T1 volumes (the slice before the first or after the last, a column past a row's end) when the structures it edits touch the volume's border, and walks past its index tables for volumes wider than 500 voxels: memory it does not own; larmorx reads 0 there and writes nowhere (a column past a row's end: FreeSurfer's next or previous row with reproduce, the row's border voxel by default)";
+    FS_1237 = "FS-1237", "FreeSurfer", true,
+        "mri_edit_wm_with_aseg's second spackling of the hippocampus, for a voxel whose lateral-inferior neighbour at x + 1 is off and brighter, turns on the voxel at x - 1 instead (its other three neighbours are handled as intended); larmorx turns on the x + 1 neighbour";
+    FS_1238 = "FS-1238", "FreeSurfer", true,
+        "mri_edit_wm_with_aseg -keep-hailvcp lh rh reads its two values but does not take them from the arguments, so they become the input file names (or, when negative, unknown options): the option cannot be used; larmorx takes the two values";
+    FS_1239 = "FS-1239", "FreeSurfer", true,
+        "mri_edit_wm_with_aseg with an option given without all its values (-fillven, -fix-scm-ha, -fix-scm-ha-only, -fix-ento-wm, -sa-fix-ento-wm, -label-acj, -fix-acj, -sa-fix-acj, -keep-hailvcp, -debug_voxel) reads past its arguments and crashes (exit status 139); larmorx prints a clear error and the help, exit status 1";
+    FS_1240 = "FS-1240", "FreeSurfer", true,
+        "mri_edit_wm_with_aseg ends with exit status 0 when its output cannot be written (a folder that does not exist): larmorx ends with 1";
     FS_1210 = "FS-1210", "FreeSurfer", true,
         "mri_cc -a 0 whose search for the callosum's seed fails (no column of the callosum's thickness near Talairach's origin, or 'could not find valid seed for the cc') uses the seed's Talairach millimetres as a voxel position (only the printed centre and the division counts depend on it): larmorx uses the seed's voxel";
     FS_974 = "FS-974", "FreeSurfer", true,

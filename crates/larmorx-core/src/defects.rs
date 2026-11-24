@@ -2109,6 +2109,8 @@ defects! {
         "mri_segment -seg whose relabelled aseg holds no white matter (it prints ERROR: could not find any WM voxels) goes on with the white matter's statistics 0 and the cortex's taken from memory it never set: larmorx ends with an error by default; with reproduce the cortex's are 0 too";
     FS_1232 = "FS-1232", "FreeSurfer", true,
         "mri_segment -wm_low_factor f sets the bottom of the white matter range to (1 - f) gray_mean + f white_mean without -seg but to f gray_mean + (1 - f) white_mean (its help's formula) with -seg: kept";
+    FS_1233 = "FS-1233", "FreeSurfer", true,
+        "finding bright voxels outside the white matter (MRIfindBrightNonWM) with a T1 or white-matter volume that is not of bytes (mris_make_surfaces' T1, mris_place_surface's --invol and --wm) reads both, and writes and dilates its labels, as the bytes of the volumes' rows: the labels land on other voxels or are lost (a float T1 never shows a bright voxel); larmorx takes the T1's values as bytes (FS-802) and the white matter's values, and writes the labels (100, 130) in the T1's type";
     FS_1210 = "FS-1210", "FreeSurfer", true,
         "mri_cc -a 0 whose search for the callosum's seed fails (no column of the callosum's thickness near Talairach's origin, or 'could not find valid seed for the cc') uses the seed's Talairach millimetres as a voxel position (only the printed centre and the division counts depend on it): larmorx uses the seed's voxel";
     FS_974 = "FS-974", "FreeSurfer", true,

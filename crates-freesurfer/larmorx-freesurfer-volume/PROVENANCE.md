@@ -218,7 +218,9 @@ here); `include/macros.h`'s `MAX`; the official build's operand orders from the 
 - `src/vol2vol.rs`, relay 29: `utils/mri2.cpp` `MRIvol2VolFill` (3568-3692). Changes: FS-504 (an error where
   `MRImaskAndUpsample` gives no volume).
 - `src/mri2ops.rs`, relay 29: `utils/mri2.cpp` `MRIfindBrightNonWM` (6361-6454); `include/mri.h` `BRIGHT_LABEL`,
-  `BRIGHT_BORDER_LABEL` (1690-1691). Changes: FS-802 (rule A).
+  `BRIGHT_BORDER_LABEL` (1690-1691). Changes: FS-802 (rule A); FS-1233 (rule A, track D's relay 57: a T1 or
+  white-matter volume not of bytes labelled from byte copies of their values, the labels written in the T1's type;
+  `tests/fs1233_bright_non_wm.rs`).
 - `src/topo.rs` (3.1-37; relay 29): `utils/mri2.cpp` `MRIvolTopoErodeOne` (5885-5908), `MRIvolTopoDilateOne`
   (5917-5940), `QuadEulerCharChange` (5965-6068).
 - `src/morph.rs` (3.1-37; relay 29): `utils/mri2.cpp` `FixSubCortMassHA::FixSCM` (6534-6587), `BinarizeMRI::dump`

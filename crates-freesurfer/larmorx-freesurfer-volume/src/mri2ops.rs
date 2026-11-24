@@ -44,7 +44,9 @@
 use std::io::Write;
 
 use larmorx_core::cfmt;
-use larmorx_core::defects::{FS_268, FS_512, FS_513, FS_514, FS_515, FS_516, FS_517, FS_802};
+use larmorx_core::defects::{
+    FS_268, FS_512, FS_513, FS_514, FS_515, FS_516, FS_517, FS_802, FS_1233,
+};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
 use larmorx_freesurfer_core::matrix::{Matrix, matrix_multiply};
@@ -64,6 +66,7 @@ use larmorx_freesurfer_mri::vol_geom::{VolGeom, p0_to_cras, set_vox2ras_from_mat
 use crate::arith::{Pair, Tri, mri_clone, mri_extract_region, mri_replace_values};
 use crate::coords::dircos_to_orientation_string;
 use crate::deriv::{Axis, index};
+use crate::frames::mri_clone_different_type;
 use crate::labels::WM_MIN_VAL;
 use crate::labels::int_of;
 use crate::ltaops::{InvertInto, lta_change_type, lta_invert, lta_print};
@@ -1078,7 +1081,111 @@ fn byte_of(g: &mut Globals, v: f32) -> u8 {
 /// (`MRIunion`, into the label volume), `MRIfindBrightNonWM(): <n> bright non-wm voxels
 /// segmented.` (the voxels labelled 130, `MRIvoxelsInLabel`) on standard output, and three
 /// dilations into the T1's voxels of exactly 0 (`MRIdilateInvThreshLabel`, label 130, in place).
+///
+/// FS-1233: a T1 or white-matter volume of another type than bytes is read, and the labels written
+/// and dilated, as the bytes of its rows (FreeSurfer's byte pointers): the labels land on other
+/// voxels. `reproduce` does so; the default runs the same steps on byte copies of the two (the
+/// T1's values as bytes, FS-802; the white matter's values clamped to 0..255, NaN 0) and writes
+/// the labels into a clone of the T1 in its type (`MRIsetVoxVal`, frame 0).
 pub fn mri_find_bright_non_wm(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    t1: &Mri,
+    wm: &Mri,
+) -> Result<Option<Mri>, Fatal> {
+    if t1.mtype == MRI_UCHAR && wm.mtype == MRI_UCHAR {
+        return bright_non_wm(g, out, err, t1, wm);
+    }
+    let reproduce = g.notices.reproduce();
+    g.notices.add(
+        &FS_1233,
+        format!(
+            "MRIfindBrightNonWM on a T1 of type {} and white matter of type {}: {}",
+            t1.mtype,
+            wm.mtype,
+            if reproduce {
+                "read and labelled as bytes, as in FreeSurfer"
+            } else {
+                "labelled from their values, written in the T1's type (FreeSurfer uses their bytes)"
+            }
+        ),
+    );
+    if reproduce {
+        return bright_non_wm(g, out, err, t1, wm);
+    }
+    let t1b = match t1.mtype == MRI_UCHAR {
+        true => None,
+        false => Some(byte_copy(g, out, err, t1, true)?),
+    };
+    let wmb = match wm.mtype == MRI_UCHAR {
+        true => None,
+        false => Some(byte_copy(g, out, err, wm, false)?),
+    };
+    let Some(lab) = bright_non_wm(
+        g,
+        out,
+        err,
+        t1b.as_ref().unwrap_or(t1),
+        wmb.as_ref().unwrap_or(wm),
+    )?
+    else {
+        return Ok(None);
+    };
+    if t1b.is_none() {
+        return Ok(Some(lab));
+    }
+    let Some(mut res) = mri_clone(g, out, err, t1, None)?.into_new() else {
+        return Ok(None);
+    };
+    let (w, h, d) = (t1.vg.width, t1.vg.height, t1.vg.depth);
+    for z in 0..d {
+        for y in 0..h {
+            for x in 0..w {
+                let v = vox_byte(g, "MRIfindBrightNonWM", &lab, x, y, z);
+                if v != 0 {
+                    mri_set_vox_val(g, err, &mut res, x, y, z, 0, f32::from(v), 0)?;
+                }
+            }
+        }
+    }
+    Ok(Some(res))
+}
+
+/// FS-1233's default: a byte volume of `m`'s extent and header holding frame 0's values
+/// (`MRIgetVoxVal`) as bytes: a T1's as FS-802 takes them, a white-matter volume's clamped to
+/// 0..255 (NaN 0).
+fn byte_copy(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m: &Mri,
+    t1: bool,
+) -> Result<Mri, Fatal> {
+    let mut b = mri_clone_different_type(g, out, err, m, MRI_UCHAR)?;
+    let (w, h, d) = (m.vg.width, m.vg.height, m.vg.depth);
+    for z in 0..d {
+        for y in 0..h {
+            for x in 0..w {
+                let v = mri_get_vox_val(g, err, m, x, y, z, 0, 0)?;
+                let v = if t1 {
+                    byte_of(g, v)
+                } else if v.is_nan() || v <= 0.0 {
+                    0
+                } else {
+                    v.min(255.0) as u8
+                };
+                if v != 0 {
+                    mri_set_vox_val(g, err, &mut b, x, y, z, 0, f32::from(v), 0)?;
+                }
+            }
+        }
+    }
+    Ok(b)
+}
+
+/// [`mri_find_bright_non_wm`]'s steps as FreeSurfer runs them (on the volumes' bytes).
+fn bright_non_wm(
     g: &mut Globals,
     out: &mut dyn Write,
     err: &mut dyn Write,

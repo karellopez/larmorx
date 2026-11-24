@@ -2991,11 +2991,28 @@ for NaN or a quotient beyond the `int` range: by default NaN gives 0 and beyond 
 - **`MRIhistogramRegionWithThreshold(mri, nbins, histo, region, mri_thresh, thresh, frame)`**: over the region clipped
   (z, y, x), the voxels of `frame` whose threshold volume's value (its `frame` too) is not below `thresh` (a NaN value or
   threshold is not below): their range in `float` from `1e10` and `-1e10` (NaN values passed over); `nbins` 0 becomes its
-  bin count (no such voxel: a count beyond the `int` range, the program's end with status 254); the histogram (new or
-  given, prepared), cleared and set with `HISTOinit` over that range; each of those voxels added with
-  `HISTOaddSample(h, v, min, max)` in the same order. FS-503: FreeSurfer adds them into per-thread histograms and sums
-  those; with one thread the sums are these, which larmorx gives at any thread count (no notice) (**(observed)**:
-  `vhist`; `vrules23`, no voxel at the threshold, a NaN threshold, the second frame, a given histogram, NaN values).
+  bin count (no such voxel: the range `1e10` to `-1e10`, whose count is beyond the `int` range, -2147483648); the
+  histogram (new or given, prepared). Then a **working histogram**: a new one of `nbins` bins (`HISTOalloc(nbins)`, so its
+  `max_bins` is `nbins`; a negative count ends the program here, with or without a given histogram: `error: Cannot
+  allocate memory`, `HISTOalloc(<n>): could not allocate histogram`, status 254), cleared and set with
+  `HISTOinit(w, nbins, min, max)` over that range. Then the histogram itself is cleared and set with `HISTOinit(h, nbins,
+  min, max)` (its bin values, bin size, minimum and maximum: with an empty range they come from its own `max_bins`, which
+  a given histogram may hold larger than `nbins`). Each of those voxels is added to the **working** histogram,
+  `HISTOaddSample(w, v, min, max)`, in the same order; with a range of one value (`min == max`) the sample is placed by
+  the working histogram's own minimum and bin size (fs.maths §5.6), those of the range `[0, nbins - 1]` (bin size 1,
+  or NaN for one bin), so a given histogram's larger allocation never changes where a sample goes. Last, the
+  histogram's first `nbins` counts become the working histogram's counts plus its own (its zeros; `float` sums), and its
+  `nbins` is `nbins`; the working histogram is freed. **FS-503**: FreeSurfer has one such working histogram per thread
+  (each allocated, cleared and initialised as above, all before the histogram's own initialisation), each voxel added to
+  the working histogram of the thread that visits it, and adds them into the histogram in the threads' order; with one
+  thread the counts are the one working histogram's, which larmorx gives at any thread count (no notice). The working
+  histogram is also why a given histogram does not change the placement. (**(observed)**: `vhist`, its lines 182, 193,
+  212, 214, 227, 232 and 235 counted from 0 (counts of -1, and of -2147483648 from no voxel at the threshold, with
+  given histograms: status 254), its line 118 (`MRIhistogramVoxel` with a threshold volume, a window of one voxel of 87,
+  one bin, a given histogram of 16 allocated: the result's bin size infinite, its range `[0, 15]` and its bin's value NaN,
+  from its own `HISTOinit`; the count 1 in bin 0, from the working histogram's NaN size and fs.maths' FS-19 under
+  `reproduce`), its lines 144 and 165 (windows of one value beyond the bin count: the sample in the last bin); `vrules23`,
+  no voxel at the threshold, a NaN threshold, the second frame, a given histogram, NaN values).
 - **`MRIhistoSegment(src, labeled, wm_low, wm_hi, gray_hi, wsize, sigma)`**: `sigma` below 0 is 4; `labeled` (or a
   clone of `src`) is relabelled over `src`'s extent (z, y, x), reading both volumes' rows as bytes whatever their types
   (byte `x` of row `(z, y)`); with `labeled` the source itself, the bytes relabelled are read by the later windows. A

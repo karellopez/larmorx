@@ -49,7 +49,9 @@ that has written to it (the C library's `perror` then leaves `errno` alone: the 
 relay 14, two more prefixes before the command: `+gdiagno=<n>` sets `Gdiag_no` to n and points the diagnostic
 stream `Gstdout` at standard output (as a program's diagnostic set-up does), `+env=<NAME>=<value>` sets an
 environment variable for that call (`+env=FSLOUTPUTTYPE=NIFTI_GZ`; `+env=NAME=` sets it empty; the comparison
-loop's runs start from an environment of `PATH`, `LC_ALL=C` and `OMP_NUM_THREADS=1` only). The
+loop's runs start from an environment of `PATH`, `LC_ALL=C` and `OMP_NUM_THREADS=1` only). From the build of
+relay 21, `+gxyz=<x>,<y>,<z>` sets FreeSurfer's debugging voxel (`Gx`, `Gy`, `Gz`; each call starts with -1, -1, -1,
+as a program does without `DIAGX`, `DIAGY`, `DIAGZ`). The
 commands that write or read a file use `vg.out` and `vg.in` in the working directory (`ltaread` and
 `ltareads` their own names, `bvc` and `bvr` the folder `subj`).
 
@@ -72,6 +74,11 @@ fs.mri probe's (its README, "Encodings"). Added here:
 | a result (printed) | `self`, `other` or `given` when the returned volume is that one, then the volume; then, when a given destination is not the result, the destination's state |
 | unset | an output the call may leave is 7.0 before the call (`40e00000`, `401c000000000000`) |
 | P, a painting | n, then n times `x y z value` (integers and a float): frame 0's voxels set with `MRIsetVoxVal` after the volume is made |
+| M, a volume or none | `null`, or W P |
+| BF, a `BinarizeMRI`'s fields | `BinType thmin thmax n` then n integers (the match list) `maskthmin maskthmax ZeroColEdges ZeroRowEdges ZeroSliceEdges OnVal OffVal fstart fend invert mritype DoAbs m_debug` (the six limits and values doubles, the rest integers); `nhits` starts at 0 and the debugging stream is standard output |
+| DF, a `DEMorphBinVol`'s fields | `morphtype topo nnbrsthresh nmorph frame mm_mritype mm_debug` (integers); `nchangestot` starts at 0, the debugging stream is standard output |
+| VL, a voxel list | `null`, or `<alloc> <nvox>`: `VLSTalloc(alloc)`, voxel i of its arrays set to `xi` 1000 + i, `yi` 2000 + i, `zi` 3000 + i, `fi` 4000 + i, `xd` i + 0.5, `yd` i + 0.25, `zd` i + 0.125, `vsrc` -1 - i, `vdst` -2 - i, then `nvox` set |
+| a voxel list (printed) | `null`, or `max_vox nvox type`, then `self` when its volume is the call's volume (`other`, `none`), then for each voxel `xi yi zi fi` (integers) `xd yd zd vsrc vdst` (floats): the first `nvox`, or, when a given list's allocation is larger, all of its allocation |
 | I, an image | `null`, or `<rows> <cols> <format> <frames>` (`ImageAlloc`: the format's code, 0 `PFBYTE`, 1 `PFSHORT`, 2 `PFINT`, 3 `PFFLOAT`, 4 `PFCOMPLEX`, 6 `PFDOUBLE`, 35 `PFRGB`, 36 `PFRGBZ`), `<xsize> <ysize>` (floats), a fill (a seed: byte i of the pixels is (seed + 101 i) mod 256; -1 as allocated, zeros; `t<seed>`: float i is the table's entry (7 i + seed) mod 34), then `<orows> <ocols> <rows> <cols> <num_frame>` written over the header after the fill (-1 keeps the allocation's). Printed: `orows ocols rows cols format num_frame xsize ysize`, then the pixels (a string of the buffer's bytes as allocated, `null` without a buffer). A result is `given` (the given image itself, still marked as the probe's), `new` or `null` |
 
 ## Commands
@@ -295,6 +302,20 @@ The spec's sections in brackets.
 | `heq W P W P D i i` | `MRIhistoEqualize` (the source, the template, D (`other`: the template), `low`, `high`) [§52] | the result |
 | `hlr W P (self\|W P) R i i`, `hlab W P (self\|W P) i i` | `MRIhistogramLabelRegion` (the labelled volume, `self` the volume itself; the region; the label, the bin count), `MRIhistogramLabel` (the labelled volume; the label, the bin count) [§52] | the histogram |
 | `hsegm W P D i i i i f` | `MRIhistoSegment` (D, the labelled volume: `new`, `self` or a W; `wm_low wm_hi gray_hi wsize`, `sigma`) [§52] | the result |
+| `vvfill W P M LTA i i (new\|W)` | `MRIvol2VolFill` (the source, the mask, the array, `UpsampleFactor`, `DoConserve`, the output) [§59] | the result, then the array |
+| `fbnwm W P W P` | `MRIfindBrightNonWM` (the T1, the white-matter volume) [§59] | the result |
+| `qecc W P M i i i` | `QuadEulerCharChange` (the volume, the mask, `c r s`) [§59] | its value |
+| `vtero W P M`, `vtdil W P i` | `MRIvolTopoErodeOne` (the keep mask), `MRIvolTopoDilateOne` (the on value) [§59] | its value, then the volume |
+| `fscm W P W P i` | `FixSubCortMassHA`'s `FixSCM` with `subcorticalmass` the first volume, `aseg` the second, `nDilate` [§60] | its value, the subcortical mass, the mask it made |
+| `binmri BF k (M M D)×k` | a `BinarizeMRI` of the fields, `binarize` called k times (the input M, the mask M, D: `new`, `self` or a W) [§60] | per call the result, then the fields `fstart fend nhits` (integers) `OnVal OffVal` (doubles) |
+| `binq BF W P M i i i i` | `qualifies` (the volume, the mask, `c r s f`) [§60] | its value |
+| `bindump BF M` | `dump` (no input, the mask, no output) [§60] | its value |
+| `demchk DF M M M` | a `DEMorphBinVol` of the fields: `check` (the input, the mask, the output) [§60] | its value |
+| `demdump DF` | `dump` [§60] | its value |
+| `demcf DF W P i` | `copyFrame` (the frame) [§60] | the result |
+| `demm DF W P`, `demt DF W P d d M M`, `deml DF W P n i×n M M` | `morph` of a binary volume; `morph` with the thresholds `thmin thmax`; `morph` with the match list (then the mask and the output, each `null` or W P) [§60] | the result (and the given output's state), then `nchangestot` |
+| `trns k M M` | k 0 `Trns_ExtractScaleMatrix`, 1 `Trns_ExtractRotationMatrix` (the transform, the output matrix; `null` for none) [§64] | the error code, the output matrix, the transform |
+| `vlcir W P f f VL i i R` | `VLSTcreateInRegion` (the low and high values, the list, `skip`, `border_only`, the box) [§65] | `given` or `new`, then the list (printed) |
 
 ## The models
 

@@ -11,7 +11,9 @@
 // operations (§54); segmentations onto another grid, SPM warps, segment borders and statistics,
 // concatenation, edits, shifts, the entorhinal fix, the amygdala-cortex junction, crops (§55 to
 // §57); volume-to-volume resampling, frame covariance and principal components, the false discovery
-// rate, regions and voxel neighbourhood measures (part 9, §41 to §44); fs.bspline: the
+// rate, regions and voxel neighbourhood measures (part 9, §41 to §44); the Talairach helpers, dilation
+// and segment helpers, conforming, set operations, morphology, masks and counts, and the volume
+// histograms (part 10, §46 to §52); fs.bspline: the
 // B-spline coefficients, their sampling, transforms and factor-of-two pyramids,
 // specs/freesurfer-bspline.md), linked against the unit oracle's libutils.a (GCC 8.4.0,
 // FreeSurfer's flags). It holds only calls of FreeSurfer's functions (and of the C library's) by name
@@ -830,6 +832,48 @@ static MRI_REGION *getreg(MRI_REGION *r)
   r->dy = geti();
   r->dz = geti();
   return r;
+}
+
+// histograms (README.md, "H"; the fs.maths probe's encoding): null, or <alloc> <nbins> <bin_size> <min> <max>
+// <nbins bin values> <nbins counts> (floats but the first two): HISTOalloc(alloc), then nbins and the fields set
+static HISTOGRAM *geth()
+{
+  if (take("null")) return NULL;
+  int alloc = geti(), nbins = geti();
+  HISTOGRAM *h = HISTOalloc(alloc);
+  h->nbins = nbins;
+  h->bin_size = getf();
+  h->min = getf();
+  h->max = getf();
+  for (int b = 0; b < nbins; b++) h->bins[b] = getf();
+  for (int b = 0; b < nbins; b++) h->counts[b] = getf();
+  return h;
+}
+// a histogram: null, or nbins max_bins bin_size min max, then the values and the counts of its first
+// min(nbins, max_bins) bins
+static void puth(const HISTOGRAM *h)
+{
+  if (!h) {
+    out("null");
+    return;
+  }
+  puti(h->nbins);
+  puti(h->max_bins);
+  putf(h->bin_size);
+  putf(h->min);
+  putf(h->max);
+  int n = std::min(h->nbins, h->max_bins);
+  for (int b = 0; b < n; b++) putf(h->bins[b]);
+  for (int b = 0; b < n; b++) putf(h->counts[b]);
+}
+// the returned histogram (`given` when it is the given one), then the given one's state
+static void puth_res(const HISTOGRAM *res, const HISTOGRAM *given)
+{
+  if (given && res == given)
+    out("given");
+  else
+    puth(res);
+  if (given) puth(given);
 }
 
 static const float UNSET = 7.0f;  // an output the call may leave
@@ -3150,6 +3194,102 @@ static void call(const std::string &c)
       puti(MRIcountValInNbhd(a, w, x, y, z, v));
       fflush(stdout);
     }
+  }
+  // part 10c (relay 20): volume histograms (§52)
+  else if (c == "hreg" || c == "hthr") {
+    MRI *a = getw();
+    paint(a);
+    HISTOGRAM *h = geth();
+    int n = geti();
+    MRI_REGION r, *rp = getreg(&r);
+    MRI *t = NULL;
+    float th = 0;
+    int fr = 0;
+    if (c == "hthr") {
+      t = getw();
+      paint(t);
+      th = getf();
+      fr = geti();
+    }
+    fflush(stdout);
+    HISTOGRAM *res =
+        c == "hreg" ? MRIhistogramRegion(a, n, h, rp) : MRIhistogramRegionWithThreshold(a, n, h, rp, t, th, fr);
+    fflush(stdout);
+    puth_res(res, h);
+  }
+  else if (c == "hvox") {
+    MRI *a = getw();
+    paint(a);
+    HISTOGRAM *h = geth();
+    int n = geti(), x = geti(), y = geti(), z = geti(), w = geti();
+    MRI *t = NULL;
+    if (!take("null")) {
+      t = getw();
+      paint(t);
+    }
+    float th = getf();
+    fflush(stdout);
+    HISTOGRAM *res = MRIhistogramVoxel(a, n, h, x, y, z, w, t, th);
+    fflush(stdout);
+    puth_res(res, h);
+  }
+  else if (c == "hist") {
+    MRI *a = getw();
+    paint(a);
+    int n = geti();
+    fflush(stdout);
+    HISTOGRAM *res = MRIhistogram(a, n);
+    fflush(stdout);
+    puth(res);
+  }
+  else if (c == "geq") {
+    MRI *a = getw();
+    paint(a);
+    HISTOGRAM *h = geth();
+    int lo = geti(), hi = geti(), norm = geti();
+    fflush(stdout);
+    HISTOGRAM *res = MRIgetEqualizeHisto(a, h, lo, hi, norm);
+    fflush(stdout);
+    puth_res(res, h);
+  }
+  else if (c == "heq") {
+    MRI *a = getw();
+    paint(a);
+    MRI *b = getw();
+    paint(b);
+    MRI *d = getdst(a, b);
+    int lo = geti(), hi = geti();
+    fflush(stdout);
+    MRI *res = MRIhistoEqualize(a, b, d, lo, hi);
+    fflush(stdout);
+    putres(res, a, b, d);
+  }
+  else if (c == "hlr" || c == "hlab") {
+    MRI *a = getw();
+    paint(a);
+    MRI *l = a;
+    if (!take("self")) {
+      l = getw();
+      paint(l);
+    }
+    MRI_REGION r, *rp = NULL;
+    if (c == "hlr") rp = getreg(&r);
+    int lab = geti(), n = geti();
+    fflush(stdout);
+    HISTOGRAM *res = c == "hlr" ? MRIhistogramLabelRegion(a, l, rp, lab, n) : MRIhistogramLabel(a, l, lab, n);
+    fflush(stdout);
+    puth(res);
+  }
+  else if (c == "hsegm") {
+    MRI *a = getw();
+    paint(a);
+    MRI *d = getdst(a);
+    int wl = geti(), wh = geti(), gh = geti(), ws = geti();
+    float sg = getf();
+    fflush(stdout);
+    MRI *res = MRIhistoSegment(a, d, wl, wh, gh, ws, sg);
+    fflush(stdout);
+    putres(res, a, NULL, d);
   }
   else
     bad("unknown command");

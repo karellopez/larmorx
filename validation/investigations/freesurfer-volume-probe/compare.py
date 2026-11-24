@@ -5857,7 +5857,172 @@ class Gen18(Gen17):
 
 
 class Gen19(Gen18):
-    """Relay 20: the fixed cases of the clean room's items 119 to 123 (§48, §50)."""
+    """Relay 20: part 10c (§52, the volume histograms) and the fixed cases of the clean room's
+    items 119 to 123 (§48, §50)."""
+
+    @classmethod
+    def hpk(cls, geo, vals, t: int, nf: int = 1) -> str:
+        """``pk`` with unsigned shorts packed two to a word too."""
+        if t == 10:
+            v = [int(x) & 0xFFFF for x in vals]
+            if len(v) % 2:
+                v.append(0)
+            return cls.lab(geo, [v[i] | v[i + 1] << 16 for i in range(0, len(v), 2)], t=10, nf=nf)
+        return cls.pk(geo, vals, t=t, nf=nf)
+
+    def hv(self, r: random.Random, d, t: int, nf: int = 1, lv=None, spread=None, special=0.0):
+        """A volume of two populations: each voxel the level a or b (drawn, or ``lv``) plus a spread;
+        bytes kept in 0..255, unsigned shorts in 0..65535; floats also with special bit patterns."""
+        a, b = lv or (r.randint(0, 120), r.randint(60, 220))
+        s = spread if spread is not None else r.choice([0, 2, 5, 15])
+        n = d[0] * d[1] * d[2] * nf
+        vals = []
+        for _ in range(n):
+            base = a if r.random() < 0.5 else b
+            if t == 3:
+                if r.random() < special:
+                    vals.append(f"{r.choice(SPECIAL):08x}")
+                elif r.random() < 0.5:
+                    vals.append(float(base + r.randint(-s, s)))
+                else:
+                    vals.append(base + r.uniform(-s, s))
+            else:
+                v = base + r.randint(-s, s)
+                if t == 0:
+                    v = min(max(v, 0), 255)
+                elif t == 10:
+                    v = max(v, 0)
+                vals.append(v)
+        return self.hpk(self.plain(d), vals, t=t, nf=nf)
+
+    @staticmethod
+    def hh(r: random.Random, alloc: int | None = None) -> str:
+        """H (README.md): a given histogram of ``alloc`` bins, some in use, with old contents."""
+        alloc = alloc if alloc is not None else r.choice([0, 1, 4, 16, 100, 300])
+        nb = r.randint(0, alloc)
+        head = [f32(r.choice([0.5, 1.0, 2.0])), f32(float(r.randint(-5, 5))), f32(float(r.randint(5, 50)))]
+        bins = [f32(float(r.randint(-10, 300))) for _ in range(nb)]
+        counts = [f32(float(r.randint(0, 9))) for _ in range(nb)]
+        return " ".join([str(alloc), str(nb), *head, *bins, *counts])
+
+    @staticmethod
+    def hreg_of(r: random.Random, d, pin: float = 0.6) -> str:
+        """R: a region inside (each axis with probability ``pin``), overlapping or outside the
+        extent, empty or of a negative size."""
+        out = []
+        for e in d:
+            k = r.random()
+            if k < pin:
+                x0 = r.randint(0, e - 1)
+                dx = r.randint(1, e - x0)
+            elif k < pin + (1 - pin) * 0.6:
+                x0 = r.randint(-3, e)
+                dx = r.randint(0, e + 4)
+            else:
+                x0 = r.randint(-2, e + 2)
+                dx = r.choice([0, -1, -3])
+            out += [x0, dx]
+        return " ".join(str(v) for v in (out[0], out[2], out[4], out[1], out[3], out[5]))
+
+    def vhist(self) -> list[Batch]:
+        """§52: MRIhistogramRegion, MRIhistogramVoxel, MRIhistogramRegionWithThreshold,
+        MRIhistogram, MRIgetEqualizeHisto, MRIhistoEqualize, MRIhistogramLabelRegion,
+        MRIhistogramLabel, MRIhistoSegment: volumes of two populations of bytes, shorts, unsigned
+        shorts, floats (a few special values), ints and longs (the region histogram refuses them),
+        one to three frames; regions inside, overlapping and outside; given histograms of 0 to
+        300 bins with old contents; bin counts negative, 0, 1 and larger; thresholds and frames;
+        equalisation limits inside and outside; label volumes of other types; MRIhistoSegment's
+        destinations new, given and the source itself."""
+        r = self.rng("vhist")
+        L = []
+        T = [0, 0, 0, 4, 10, 3, 3, 3, 1, 2]
+
+        def dims(lo=1):
+            return (r.randint(lo, 6), r.randint(lo, 5), r.randint(lo, 4))
+
+        def nb():
+            return r.choice([0, 0, 0, -1, 1, 2, 5, 20, 64])
+
+        def H():
+            return "null" if r.random() < 0.6 else self.hh(r)
+
+        for _ in range(110):
+            d = dims()
+            t = r.choice(T)
+            a = self.hv(r, d, t, nf=r.choice([1, 1, 2]), special=0.03)
+            L.append(f"hreg {a} 0 {H()} {nb()} {self.hreg_of(r, d)}")
+        for _ in range(70):
+            d = dims()
+            t = r.choice(T)
+            a = self.hv(r, d, t, special=0.03)
+            th = "null" if r.random() < 0.4 else self.hv(r, d, r.choice([0, 3, 1])) + " 0"
+            w = r.choice([1, 2, 3, 3, 5, 0])
+            x, y, z = (r.randint(-1, e) for e in d)
+            L.append(f"hvox {a} 0 {H()} {nb()} {x} {y} {z} {w} {th} {f32(float(r.randint(0, 150)))}")
+        for _ in range(70):
+            d = dims()
+            t = r.choice(T)
+            nf = r.choice([1, 2])
+            a = self.hv(r, d, t, nf=nf, special=0.03)
+            tv = self.hv(r, d, r.choice([0, 3, 1]), nf=r.choice([1, nf]))
+            fr = r.choice([0, 0, nf - 1])
+            th = f32(float(r.choice([0, 0, 30, 100, 200])))
+            L.append(f"hthr {a} 0 {H()} {nb()} {self.hreg_of(r, d, 0.9)} {tv} 0 {th} {fr}")
+        for _ in range(70):
+            d = dims()
+            t = r.choice(T)
+            a = self.hv(r, d, t, nf=r.choice([1, 1, 2, 3]), special=0.02)
+            L.append(f"hist {a} 0 {r.choice([0, 0, 0, 1, 2, 5, 30])}")
+        for _ in range(60):
+            d = dims()
+            t = r.choice([0, 0, 3, 4, 1])
+            # most volumes hold a 0, so that intensities index their histogram's bins
+            a = self.hv(r, d, t, lv=(0, r.randint(20, 200)), spread=r.choice([0, 3, 10]))
+            lo = r.choice([0, 0, 1, 10, 50])
+            hi = r.choice([255, 100, 40, 300])
+            h = "null" if r.random() < 0.6 else self.hh(r, alloc=r.choice([256, 300, 400]))
+            L.append(f"geq {a} 0 {h} {lo} {hi} {r.choice([0, 1])}")
+        for _ in range(60):
+            d = dims()
+            t = r.choice([0, 0, 3, 1])
+            a = self.hv(r, d, t, lv=(0, r.randint(20, 200)), spread=r.choice([0, 3, 10]))
+            b = self.hv(r, d, r.choice([0, 3]), lv=(0, r.randint(20, 200)), spread=r.choice([0, 3, 10]))
+            dst = r.choice(["new", "new", "self", "other", self.svol(r, d, r.choice([0, 3]), pz=1.0)])
+            lo = r.choice([0, 0, 1, 10])
+            hi = r.choice([255, 100, 40])
+            L.append(f"heq {a} 0 {b} 0 {dst} {lo} {hi}")
+        for _ in range(60):
+            d = dims()
+            t = r.choice([0, 4, 10, 3, 3, 1])
+            a = self.hv(r, d, t, special=0.03)
+            lab = "self" if r.random() < 0.1 else self.svol(r, d, r.choice([0, 3, 1]), labels=(1, 2, 3)) + " 0"
+            L.append(
+                f"hlr {a} 0 {lab} {self.hreg_of(r, d, 0.9)} {r.choice([1, 2, 3, 0])} {r.choice([0, 0, -1, 3, 10])}"
+            )
+        for _ in range(60):
+            d = dims()
+            t = r.choice([0, 4, 10, 3, 3, 1, 2])
+            a = self.hv(r, d, t, special=0.03)
+            lab = "self" if r.random() < 0.1 else self.svol(r, d, r.choice([0, 3, 1]), labels=(1, 2, 3), pz=0.3) + " 0"
+            L.append(f"hlab {a} 0 {lab} {r.choice([1, 2, 3])} {r.choice([0, 0, -1, 3, 10])}")
+        for _ in range(45):
+            d = dims(2)
+            t = r.choice([0, 0, 0, 0, 4, 3])
+            a = self.hv(r, d, t, lv=(r.randint(74, 90), r.randint(100, 125)), spread=r.choice([2, 5, 8]))
+            k = r.random()
+            if k < 0.25:
+                dst = "new"
+            elif k < 0.35:
+                dst = "self"
+            else:
+                n = d[0] * d[1] * d[2]
+                lv = [r.choice([128, 128, 128, 0, 255, 1]) for _ in range(n)]
+                dst = self.lab(self.plain(d), lv, t=0)
+            wl, wh, gh = r.choice([85, 90, 95]), r.choice([125, 130, 140]), r.choice([95, 100, 105])
+            ws = r.choice([3, 5, 7, 2])
+            sg = f32(r.choice([-1.0, 1.0, 2.0, 4.0]))
+            L.append(f"hsegm {a} 0 {dst} {wl} {wh} {gh} {ws} {sg}")
+        return [Batch("vhist", "vhist", L)]
 
     def vrules23(self) -> list[Batch]:
         """Item 119: the dilations' box when nothing is found (only a volume of 1 x 1 x 1 visits
@@ -5898,7 +6063,124 @@ class Gen19(Gen18):
         msk = self.lab(P((4, 4, 1)), [0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0], t=1) + " 0"
         for dst in ("new", self.lab(P((2, 2, 1)), [5.0], t=3), self.lab(P((4, 4, 1)), [5.0], t=3)):
             L.append(f"mmask 1 {src2} 0 {msk} {dst} 1 {f32(-3.0)}")
-        return [Batch("vrules23", "vrules23", L)]
+        # part 10c (§52): the histograms' ends and messages
+        H = []
+        one = self.lab(P((3, 3, 1)), [5.0] * 9, t=3)
+        row = self.lab(P((8, 1, 1)), [0, 1, 2, 3, 4, 5, 6, 10], t=0)
+        frow = self.lab(P((4, 2, 1)), [0.0, 1.5, QNAN, 3.0, 2.0, 7.25, 1.0, 9.0], t=3)
+        irow = self.lab(P((4, 1, 1)), [0, 1, 2, 3], t=1)
+        lrow = self.pk(P((4, 1, 1)), [0, 1, 2, 3], t=2)
+        whole = "0 0 0 8 1 1"
+        # MRIhistogramRegion: a blank region with and without a bin count, a negative count, a
+        # region outside (the range 10000 to -10000), the types it refuses, given histograms of
+        # fewer bins in use, of more, of fewer allocated, no region, NaN values
+        L.append(f"hreg {one} 0 null 0 0 0 0 3 3 1")
+        L.append(f"hreg {one} 0 null 4 0 0 0 3 3 1")
+        L.append(f"hreg {row} 0 null -1 {whole}")
+        L.append(f"hreg {row} 0 null 0 20 0 0 2 1 1")
+        L.append(f"hreg {row} 0 null 0 0 0 0 0 1 1")
+        for v in (irow, lrow):
+            L.append(f"hreg {v} 0 null 0 0 0 0 4 1 1")
+            L.append(f"hreg {v} 0 null 3 0 0 0 4 1 1")
+        given = [
+            "4 4 " + " ".join([f32(1.0), f32(0.0), f32(3.0)] + [f32(float(i)) for i in range(4)] * 2),
+            "300 2 " + " ".join([f32(1.0), f32(0.0), f32(3.0)] + [f32(9.0)] * 4),
+            "300 300 " + " ".join([f32(2.0), f32(-1.0), f32(5.0)] + [f32(9.0)] * 600),
+            "0 0 " + " ".join([f32(0.0)] * 3),
+        ]
+        for h in given:
+            for n in (0, 5, 11):
+                L.append(f"hreg {row} 0 {h} {n} {whole}")
+        L.append(f"hreg {row} 0 null 0 null")
+        L.append(f"hreg {frow} 0 null 0 0 0 0 4 2 1")
+        L.append(f"hreg {frow} 0 null 3 0 0 0 4 2 1")
+        L.append(f"hreg {row} 0 null 0 2147483647 0 0 5 1 1")
+        # MRIhistogram: a constant volume (its maximum 255), a constant above 255, bin counts 1, 2
+        # and -1, every frame, NaN values
+        L.append(f"hist {one} 0 0")
+        L.append(f"hist {self.pk(P((2, 2, 1)), [300] * 4, t=4)} 0 0")
+        for n in (1, 2, 3, -1):
+            L.append(f"hist {row} 0 {n}")
+        L.append(f"hist {self.lab(P((2, 1, 1)), [1.0, 2.0, 3.0, 9.0, 4.0, 0.0], t=3, nf=3)} 0 0")
+        L.append(f"hist {frow} 0 0")
+        L.append(f"hist {frow} 0 4")
+        # MRIgetEqualizeHisto: limits inside, above the maximum, below 0; normalised or not; given
+        # histograms with old values (FS-500), smaller than the volume's histogram (FS-499)
+        eqv = self.lab(P((4, 3, 1)), [0, 1, 1, 2, 3, 3, 3, 5, 7, 9, 9, 9], t=0)
+        old = "16 16 " + " ".join([f32(1.0), f32(0.0), f32(15.0)] + [f32(-7.0)] * 16 + [f32(4.0)] * 16)
+        for lo, hi in ((0, 9), (0, 300), (2, 6), (5, 3), (-1, 4), (0, 12)):
+            for norm in (0, 1):
+                L.append(f"geq {eqv} 0 null {lo} {hi} {norm}")
+            L.append(f"geq {eqv} 0 {old} {lo} {hi} 1")
+        L.append(f"geq {eqv} 0 4 4 {' '.join([f32(1.0), f32(0.0), f32(3.0)] + [f32(1.0)] * 8)} 0 9 1")
+        # MRIhistoEqualize: into a new volume, the source, the template, a given volume
+        tpl = self.lab(P((4, 3, 1)), [0, 0, 2, 2, 4, 4, 6, 6, 8, 8, 9, 9], t=0)
+        for dst in ("new", "self", "other", self.lab(P((4, 3, 1)), [1.0], t=3)):
+            L.append(f"heq {eqv} 0 {tpl} 0 {dst} 0 9")
+        L.append(f"heq {eqv} 0 {tpl} 0 new 3 6")
+        # MRIhistogramLabelRegion: a constant region, a type it refuses (with a labelled voxel and
+        # without), floats with NaN, a region outside, bytes with a bin count of 3
+        lab4 = self.lab(P((4, 1, 1)), [1, 1, 2, 1], t=1)
+        L.append(f"hlr {self.lab(P((4, 1, 1)), [5, 5, 5, 5], t=0)} 0 {lab4} 0 0 0 0 4 1 1 1 0")
+        L.append(f"hlr {irow} 0 {lab4} 0 0 0 0 4 1 1 1 0")
+        L.append(f"hlr {irow} 0 {lab4} 0 0 0 0 4 1 1 7 0")
+        flab = self.lab(P((4, 2, 1)), [1] * 8, t=1)
+        L.append(f"hlr {frow} 0 {flab} 0 0 0 0 4 2 1 1 0")
+        L.append(f"hlr {row} 0 {self.lab(P((8, 1, 1)), [1] * 8, t=1)} 0 {whole} 1 3")
+        L.append(f"hlr {row} 0 {self.lab(P((8, 1, 1)), [1] * 8, t=1)} 0 9 0 0 3 1 1 1 0")
+        L.append(f"hlr {self.pk(P((4, 1, 1)), [-5, 3, 10, -2], t=4)} 0 {lab4} 0 0 0 0 4 1 1 1 0")
+        # MRIhistogramLabel: no labelled voxel with and without a bin count, labels compared as
+        # floats (1.6 counts in the range as 2, not in the histogram), longs, bins kept inside
+        fl = self.lab(P((4, 1, 1)), [2.0, 1.6, 2.0, 0.0], t=3)
+        L.append(f"hlab {row} 0 {self.lab(P((8, 1, 1)), [1] * 8, t=1)} 0 5 0")
+        L.append(f"hlab {row} 0 {self.lab(P((8, 1, 1)), [1] * 8, t=1)} 0 5 4")
+        L.append(f"hlab {self.lab(P((4, 1, 1)), [3, 9, 4, 1], t=0)} 0 {fl} 0 2 0")
+        L.append(f"hlab {lrow} 0 {lab4} 0 1 0")
+        L.append(f"hlab {frow} 0 {flab} 0 1 2")
+        # MRIhistogramVoxel: a window of 0 (the range 10000 to -10000), an even window, a
+        # threshold volume
+        L.append(f"hvox {row} 0 null 0 3 0 0 0 null {f32(0.0)}")
+        L.append(f"hvox {row} 0 null 0 3 0 0 4 null {f32(0.0)}")
+        L.append(f"hvox {row} 0 null 0 3 0 0 3 {row} 0 {f32(3.0)}")
+        L.append(f"hvox {row} 0 {given[0]} 0 3 0 0 3 null {f32(0.0)}")
+        # MRIhistogramRegionWithThreshold: no voxel at the threshold, a NaN threshold, the second
+        # frame, a given histogram, NaN values
+        two = self.lab(P((4, 1, 1)), [1.0, 2.0, 3.0, 4.0, 8.0, 6.0, 7.0, 5.0], t=3, nf=2)
+        L.append(f"hthr {row} 0 null 0 {whole} {row} 0 {f32(50.0)} 0")
+        L.append(f"hthr {row} 0 null 0 {whole} {row} 0 {QNAN} 0")
+        L.append(f"hthr {two} 0 null 0 0 0 0 4 1 1 {two} 0 {f32(5.0)} 1")
+        L.append(f"hthr {two} 0 {given[1]} 4 0 0 0 4 1 1 {two} 0 {f32(0.0)} 0")
+        L.append(f"hthr {frow} 0 null 0 0 0 0 4 2 1 {frow} 0 {f32(-1.0)} 0")
+        # MRIhistoSegment: a window of two peaks, sigma below 0, a source of ints (no region
+        # histogram), an infinite value in a later window (FS-501), the diagnostic lines, depth 1
+        n = 6 * 6 * 2
+        # a checkerboard of 80 and 110 (every window of two voxels or more holds both), and halves
+        # of 80 and 110 (the first windows hold one value: a histogram of one bin whose size is
+        # 0 / 0, so FreeSurfer counts the voxels at bin -2147483648: FS-498)
+        sv = [80 if (i % 6 + (i // 6) % 6 + i // 36) % 2 else 110 for i in range(n)]
+        half = self.lab(P((6, 6, 2)), [80 if (i % 6) < 3 else 110 for i in range(n)], t=0)
+        seg_src = self.lab(P((6, 6, 2)), sv, t=0)
+        seg_lab = self.lab(P((6, 6, 2)), [128] * n, t=0)
+        L.append(f"hsegm {half} 0 {seg_lab} 85 130 100 5 {f32(2.0)}")
+        L.append(f"hsegm {seg_src} 0 {seg_lab} 85 130 100 1 {f32(2.0)}")
+        for sg in (-1.0, 1.0):
+            for gh in (100, 95):
+                L.append(f"hsegm {seg_src} 0 {seg_lab} 85 130 {gh} 5 {f32(sg)}")
+        L.append(f"+gdiag=40 hsegm {seg_src} 0 {seg_lab} 85 130 100 5 {f32(2.0)}")
+        L.append(f"+gdiag=40 hsegm {self.lab(P((4, 1, 1)), [70, 110, 70, 110], t=0)} 0 new 85 130 95 3 {f32(2.0)}")
+        L.append(
+            f"+gdiag=40 hsegm {self.lab(P((4, 1, 1)), [70, 110, 70, 110], t=0)} 0 {self.lab(P((4, 1, 1)), [128] * 4, t=0)} 85 130 95 3 {f32(2.0)}"
+        )
+        L.append(f"hsegm {self.lab(P((4, 1, 1)), [70, 128, 110, 128], t=1)} 0 {self.lab(P((4, 1, 1)), [128] * 4, t=0)} 85 130 95 3 {f32(2.0)}")
+        inf = self.lab(P((8, 1, 1)), [80.0, 110.0, 80.0, 110.0, INF, 80.0, 110.0, 80.0], t=3)
+        L.append(f"hsegm {inf} 0 {self.lab(P((8, 1, 1)), [128, 0, 0, 0, 128, 0, 0, 0], t=0)} 85 130 95 3 {f32(2.0)}")
+        L.append(f"hsegm {seg_src} 0 self 85 130 100 5 {f32(2.0)}")
+        # FS-502: a gray-matter limit below -1 with two peaks (FreeSurfer never ends: the alarm)
+        H.append(f"@1 hsegm {seg_src} 0 {seg_lab} 85 130 -2 5 {f32(2.0)}")
+        return [
+            Batch("vrules23", "vrules23", L),
+            Batch("vrules23", "vrules23-hang", H, guards=False),
+        ]
 
 
 GROUPS = [
@@ -5966,6 +6248,7 @@ GROUPS = [
     "vmorph",
     "vmask",
     "vrules22",
+    "vhist",
     "vrules23",
 ]
 

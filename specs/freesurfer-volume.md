@@ -3769,6 +3769,16 @@ NaN; `atan2`/`atan2f` of a NaN give `x + y`.
 - **`RMSregDiffMJ(T1, T2, radius)`**: `Q = T1 - T2` (`float`), `M` its upper-left 3 x 3, `t` its first three rows' fourth
   column; `sqrt(((radius radius) tr) / 5 + tt)` in `double` with `tr` the trace (`float` sum) of `Mᵀ M` and `tt` the 1 x 1
   `tᵀ t`, both by the double-accumulating product.
+- **`Trns_ExtractScaleMatrix(T, S)`** and **`Trns_ExtractRotationMatrix(T, R)`** (`mri_cc`'s rotation, `specs/mri_cc.md`
+  §3.1; added by the spec finisher's relay 20 from that spec, behaviour only): either matrix missing returns
+  `Trns_tErr_InvalidParameter` (3) and does nothing; else `Trns_tErr_NoErr` (0). `T` is a 4 x 4 transform; `T0` its copy
+  with the fourth column's first three elements set to 0. The scale: `S` becomes the 4 x 4 identity with, at `(k, k)` for
+  `k` = 1, 2, 3, the `float` length (fs.maths's `VectorLen`) of `T0 e_k` (`e_k` the unit vector with fourth element 0;
+  the product `MatrixMultiply` into the vector itself, the input read before it is overwritten). The rotation: the
+  scale of `T0` (the same steps), each of its three diagonal factors `f` replaced by `1.0 / f` (in `double`, stored as
+  `float`), or by 1 where `|f|` is below `FLT_EPSILON` (2^-23); `R = T0 x` that matrix (`MatrixMultiply` into the
+  caller's `R`, its size messages and ends as fs.maths's). Validation: through `mri_cc`'s open probe (its `-a 0` path,
+  `specs/mri_cc.md` §10); the volume probe has no command for them yet.
 
 ## 65. Voxel lists (3.1-40: voxlist.cpp, relay 34)
 A voxel list has a type, nine arrays (`xi`, `yi`, `zi`, `fi` integers; `xd`, `yd`, `zd`, `vsrc`, `vdst` floats) of the
@@ -3786,6 +3796,25 @@ modes).
   indices...` on standard output under `DIAG_SHOW` and `DIAG_VERBOSE`, and `voxel (<x>, <y>, <z>) = <v %2.1f> added to
   voxlist at <i>` for the debugging voxel `Gx Gy Gz`. The list's volume is `mri`. With `border`, FreeSurfer counts the
   interior voxels instead of the border ones (FS-888; the default counts the border voxels). A negative `skip`: FS-889.
+- **`VLSTcreateInRegion(mri, low, hi, vl, skip, border, box)`** (`mri_cc`'s hemisphere lists, `specs/mri_cc.md` §2.2;
+  added by the spec finisher's relay 20 from that spec and track C's port, behaviour only): over the box (columns from
+  `box.x` while below `box.x + box.dx`, the sum in 32-bit wrapping arithmetic, then rows, then slices, columns
+  outermost; every `skip + 1`-th along each axis from the box's first; the box is not clipped: voxels outside the
+  volume read as the voxel functions read them, fs.mri §5, FS-52, FS-53), the count of frame 0's values (`float`
+  widened to `double`) in `[low, hi]` (the bounds widened too) sizes the list, without the border test: no list given,
+  or a given list whose `max_vox` is below the count, gets nine new arrays of the count (zeros; an empty count gives
+  empty arrays), else the given arrays are kept; `nvox` the count; a new list's `max_vox` stays 0 (as `VLSTcreate`'s,
+  FS-892); `allocating <n> voxel indices...` on standard output under `DIAG_SHOW` and `DIAG_VERBOSE`. Then, for every
+  frame (frames outermost, then the box's columns, rows, slices), each voxel in the range, and with `border` only one
+  with at least one face neighbour whose frame-0 value rounds (`nint`) to the frame's number (section 28's
+  `MRIneighbors` with the frame number as the value), is appended: its column, row, slice, frame and value (`vsrc`, the
+  `double` stored as `float`). A volume of several frames whose later frames add voxels past the count writes past the
+  arrays in FreeSurfer: FS-890, an error in both modes (`VLSTcreateInRegion: voxel <i> of an array of <n> (FreeSurfer
+  reads or writes past the list's arrays here)`, status 252); with a negative `skip` FreeSurfer never ends (or reads
+  before the box): FS-889, an
+  error in both modes (`VLSTcreateInRegion: skip <s> is negative (FreeSurfer never ends here)`, status 252). The
+  list's volume is `mri`. Validation: through `mri_cc`'s open probe (`specs/mri_cc.md` §10); the volume probe has no
+  command for it yet.
 - **`VLSTsort(src, dst)`**: without `dst`, a copy of `src` (`VLSTcopy(src, NULL, 0, src->nvox)`); the destination's
   first `nvox` voxels sorted by the C library's `qsort` (its merge order) with the comparison: larger `vsrc` first; then
   larger `xi`, `yi`, `zi` (a `vsrc` neither below nor above the other, a NaN included, passes to the indices); equal: 0.

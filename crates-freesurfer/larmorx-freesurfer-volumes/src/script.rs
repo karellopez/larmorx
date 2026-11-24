@@ -238,6 +238,10 @@ impl<'a> Sh<'a> {
     pub fn echo_bytes(&mut self, words: &[String]) -> Vec<u8> {
         let mut plain = words.join(" ").into_bytes();
         plain.push(b'\n');
+        // tcsh's reading is a Unix shell's (FreeSurfer runs there): elsewhere the lines as written
+        if !cfg!(unix) {
+            return plain;
+        }
         let tcsh = csh::echo(words);
         if tcsh != plain {
             let line = String::from_utf8_lossy(&plain).trim_end().to_owned();

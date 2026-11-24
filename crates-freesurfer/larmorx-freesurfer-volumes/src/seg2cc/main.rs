@@ -93,7 +93,13 @@ pub fn run(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut 
 /// `set n = `echo $argv | grep -e -<word> | wc -l``: FreeSurfer asks whether the arguments'
 /// echo holds `-<word>`; by default (FS-1274) whether one of them is `-<word>` or `--<word>`.
 pub fn asks(sh: &mut Sh, args: &[String], word: &str) -> bool {
-    let tcsh = String::from_utf8_lossy(&crate::csh::echo(args)).contains(&format!("-{word}"));
+    // tcsh's echo of the words (on Unix with its backslash sequences)
+    let echoed = if cfg!(unix) {
+        String::from_utf8_lossy(&crate::csh::echo(args)).into_owned()
+    } else {
+        args.join(" ")
+    };
+    let tcsh = echoed.contains(&format!("-{word}"));
     let plain = args
         .iter()
         .any(|a| a == &format!("-{word}") || a == &format!("--{word}"));

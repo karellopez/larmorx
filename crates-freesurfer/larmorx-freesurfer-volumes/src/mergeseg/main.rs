@@ -77,25 +77,30 @@ fn usage(sh: &mut Sh, help: bool) {
     }
 }
 
-/// tcsh's reading of a number in `@`/`if` arithmetic (`if($segiderode > 0)`): decimal, a
-/// leading `0` octal; `if: Badly formed number.` otherwise.
-pub fn tcsh_number(s: &str) -> Option<i64> {
-    let (neg, digits) = match s.strip_prefix('-') {
-        Some(r) => (true, r),
-        None => (false, s.strip_prefix('+').unwrap_or(s)),
-    };
-    if digits.is_empty() || !digits.chars().all(|c| c.is_ascii_digit()) {
-        return None;
+/// `if($v > 0)` as tcsh 6.21 evaluates it for one word `v` (measured): digits (a decimal
+/// number, wrapping as a 64-bit integer; a leading `0` is not octal), `-` and digits; a word
+/// starting with a digit and holding anything else `if: Badly formed number.`, any other word
+/// `if: Expression Syntax.` (both end the script, status 1); an empty word is false.
+pub fn tcsh_positive(v: &str) -> Result<bool, &'static str> {
+    if v.is_empty() {
+        return Ok(false);
     }
-    let v = if digits.len() > 1 && digits.starts_with('0') {
-        if !digits.chars().all(|c| ('0'..='7').contains(&c)) {
-            return None;
-        }
-        i64::from_str_radix(digits, 8).ok()?
-    } else {
-        digits.parse::<i64>().ok()?
+    let (neg, digits) = match v.strip_prefix('-') {
+        Some(r) => (true, r),
+        None => (false, v),
     };
-    Some(if neg { -v } else { v })
+    let first = digits.chars().next();
+    if !first.is_some_and(|c| c.is_ascii_digit()) {
+        return Err("if: Expression Syntax.");
+    }
+    if !digits.chars().all(|c| c.is_ascii_digit()) {
+        return Err("if: Badly formed number.");
+    }
+    let mut n: i64 = 0;
+    for c in digits.bytes() {
+        n = n.wrapping_mul(10).wrapping_add(i64::from(c - b'0'));
+    }
+    Ok(if neg { n.wrapping_neg() > 0 } else { n > 0 })
 }
 
 /// The script on `args`.
@@ -212,13 +217,13 @@ pub fn main(sh: &mut Sh, args: &[String]) -> Flow {
             cmd.push("--match".into());
             cmd.push(o.segid.clone().unwrap_or_default());
             let e = o.segiderode.clone().unwrap_or_else(|| "0".into());
-            match tcsh_number(&e) {
-                None => return sh.stop("if: Badly formed number."),
-                Some(n) if n > 0 => {
+            match tcsh_positive(&e) {
+                Err(msg) => return sh.stop(msg),
+                Ok(true) => {
                     cmd.push("--erode".into());
                     cmd.push(e);
                 }
-                Some(_) => {}
+                Ok(false) => {}
             }
         } else {
             cmd.push("--min".into());
@@ -388,12 +393,15 @@ mod tests {
 
     #[test]
     fn numbers_as_tcsh_reads_them() {
-        assert_eq!(tcsh_number("0"), Some(0));
-        assert_eq!(tcsh_number("12"), Some(12));
-        assert_eq!(tcsh_number("010"), Some(8));
-        assert_eq!(tcsh_number("08"), None);
-        assert_eq!(tcsh_number("-3"), Some(-3));
-        assert_eq!(tcsh_number("1.5"), None);
-        assert_eq!(tcsh_number(""), None);
+        assert_eq!(tcsh_positive("0"), Ok(false));
+        assert_eq!(tcsh_positive("12"), Ok(true));
+        assert_eq!(tcsh_positive("08"), Ok(true));
+        assert_eq!(tcsh_positive("-3"), Ok(false));
+        assert_eq!(tcsh_positive("1.5"), Err("if: Badly formed number."));
+        assert_eq!(tcsh_positive("3a"), Err("if: Badly formed number."));
+        assert_eq!(tcsh_positive("x"), Err("if: Expression Syntax."));
+        assert_eq!(tcsh_positive("+2"), Err("if: Expression Syntax."));
+        assert_eq!(tcsh_positive("9999999999999999999"), Ok(false));
+        assert_eq!(tcsh_positive(""), Ok(false));
     }
 }

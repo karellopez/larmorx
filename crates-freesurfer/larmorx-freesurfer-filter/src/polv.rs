@@ -7,29 +7,67 @@
 //! varies least (`MRIcentralPlaneOfLeastVarianceNormalVoxel` 3802), the median of a plane
 //! (`MRIcpolvMedianAtVoxel` 4078), the ambiguous voxels classified along that direction
 //! (`MRIcpolvMedianCurveVoxel` 3940, `MRIcpolvMedianCurveSegment` 3893), the trinary intensity
-//! segmentation (`MRIintensitySegmentation` 3603) and the labels' mask (`MRImaskLabels` 3768).
+//! segmentation (`MRIintensitySegmentation` 3603) and the labels' mask (`MRImaskLabels` 3768);
+//! relay 56: the thin strands thickened (`MRIthickenThinWMStrands`, the compiled branch at 1670),
+//! the islands removed (`MRIremoveIslands` 4143), the planar holes filled (`MRIfillPlanarHoles`
+//! 4187) with `MRIcpolvMaxWhiteAtVoxel` (4261) and `MRIcpolvAllQuadrantsFilled` (4327, its
+//! compiled branch).
+//!
+//! Defects: FS-1216 (more than 200 positions along the normal), FS-1217 and FS-1218 (a plane's
+//! window whose values FreeSurfer sorts unwritten or past its table), FS-1225 (labels of a
+//! volume not of bytes read and written byte by byte).
 //!
 //! FreeSurfer scales its global tables `ic_x_vertices`, `ic_y_vertices`, `ic_z_vertices` in place
 //! the first time the basis vectors are made (each direction divided by its largest component's
 //! magnitude); every function here runs after that, so [`Basis`] holds the scaled table.
 
 use std::io::Write;
+use std::path::Path;
 use std::sync::OnceLock;
 
+use larmorx_core::defects::{FS_1216, FS_1217, FS_1218, FS_1225};
 use larmorx_core::glibc_qsort::qsort;
 use larmorx_freesurfer_core::cstd::format_double;
+use larmorx_freesurfer_core::diag::DIAG_SHOW;
 use larmorx_freesurfer_core::diag::{DIAG_VERBOSE, DIAG_WRITE, diag_show_pct_done};
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::Fatal;
+use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
 use larmorx_freesurfer_core::ret::Ret;
-use larmorx_freesurfer_core::utils::nint;
+use larmorx_freesurfer_core::run::Environment;
+use larmorx_freesurfer_core::utils::{nint, resolve};
+use larmorx_freesurfer_io::mriio::mri_write;
 use larmorx_freesurfer_mri::copy::mri_copy;
-use larmorx_freesurfer_mri::mri::Mri;
+use larmorx_freesurfer_mri::mri::{MGZ_INTENT_UNKNOWN, MRI_UCHAR, Mri};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
-use larmorx_freesurfer_volume::arith::mri_clone;
+use larmorx_freesurfer_volume::arith::{Pair, Tri, mri_binarize, mri_clear, mri_clone};
+use larmorx_freesurfer_volume::coords::index_not_in_volume;
+use larmorx_freesurfer_volume::deriv::neighbors_on;
+use larmorx_freesurfer_volume::labels::WM_MIN_VAL;
+use larmorx_freesurfer_volume::mriset::{mri_close, mri_dilate, mri_xor};
 use larmorx_freesurfer_volume::sample::sample_volume;
 
 use crate::classify::{MRI_AMBIGUOUS, MRI_NOT_WHITE, MRI_WHITE};
+use crate::mem;
+use crate::segment::{
+    mri_segment, mri_segment_clear_ignore_flags, mri_segment_dilate, mri_segment_max,
+    mri_segment_to_image,
+};
+
+/// The run's environment and working folder: what the diagnostic files (`DIAG_WRITE` with
+/// `DIAG_VERBOSE`) are written with.
+#[derive(Clone, Copy)]
+pub struct Ctx<'a> {
+    pub env: &'a Environment,
+    pub dir: Option<&'a Path>,
+}
+
+/// `THICKEN_FILL`, `NBHD_FILL` (`include/mri.h`).
+pub const THICKEN_FILL: i32 = 200;
+pub const NBHD_FILL: i32 = 210;
+/// `TOO_THIN` (`mripolv.cpp`).
+const TOO_THIN: i32 = 2;
+/// The positions along the normal FreeSurfer's tables hold (`medians[200]`, `dists[200]`).
+pub const MAX_MEDIANS: usize = 200;
 
 /// `NVERTICES` (`mri.h`).
 pub const NVERTICES: usize = 22;
@@ -112,7 +150,47 @@ fn fzero(f: f32) -> bool {
     f.abs() < f32::EPSILON
 }
 
-/// `MRIvox(mri, x, y, z)` through the index tables (`mri->xi[...]`): frame 0's byte.
+/// `MRIgetVoxVal(m, x, y, z, 0)`: a voxel of a byte volume read directly (the same value), any
+/// other through [`mri_get_vox_val`]. For a byte volume it is also `MRIvox(m, x, y, z)`.
+#[inline]
+pub fn vox_val(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    m: &Mri,
+    x: i32,
+    y: i32,
+    z: i32,
+) -> Result<f32, Fatal> {
+    if m.mtype == MRI_UCHAR
+        && x >= 0
+        && y >= 0
+        && z >= 0
+        && x < m.vg.width
+        && y < m.vg.height
+        && z < m.vg.depth
+        && let Some(c) = m.chunk.as_ref()
+    {
+        let o =
+            (z as usize * m.vg.height as usize + y as usize) * m.vox_per_row as usize + x as usize;
+        if let Some(b) = c.get(o) {
+            return Ok(f32::from(*b));
+        }
+    }
+    mri_get_vox_val(g, err, m, x, y, z, 0, 0)
+}
+
+/// `m->xi[x]`, `m->yi[y]`, `m->zi[z]`: the boundary index tables.
+#[inline]
+pub fn tables(m: &Mri, x: i32, y: i32, z: i32) -> (i32, i32, i32) {
+    (
+        Mri::index(m.xi.as_deref().unwrap_or(&[]), x),
+        Mri::index(m.yi.as_deref().unwrap_or(&[]), y),
+        Mri::index(m.zi.as_deref().unwrap_or(&[]), z),
+    )
+}
+
+/// `MRIgetVoxVal(mri, mri->xi[x], mri->yi[y], mri->zi[z], 0)` (and `MRIvox` of a byte volume).
+#[inline]
 fn vox(
     g: &mut Globals,
     err: &mut dyn Write,
@@ -121,10 +199,8 @@ fn vox(
     y: i32,
     z: i32,
 ) -> Result<f32, Fatal> {
-    let xi = Mri::index(mri.xi.as_deref().unwrap_or(&[]), x);
-    let yi = Mri::index(mri.yi.as_deref().unwrap_or(&[]), y);
-    let zi = Mri::index(mri.zi.as_deref().unwrap_or(&[]), z);
-    mri_get_vox_val(g, err, mri, xi, yi, zi, 0, 0)
+    let (xi, yi, zi) = tables(mri, x, y, z);
+    vox_val(g, err, mri, xi, yi, zi)
 }
 
 /// `MRIcentralPlaneOfLeastVarianceNormalVoxel(mri, wsize, x, y, z)`: over the directions in
@@ -182,10 +258,14 @@ pub fn central_plane_of_least_variance_normal_voxel(
 }
 
 /// `MRIcpolvMedianAtVoxel(mri, vertex, x, y, z, wsize)`: the plane of direction `vertex` through
-/// the point sampled at `wsize x wsize` points (`yk` outer: `(float) x + (float) yk e2.x`, then `+
-/// xk e1.x` in `float`, as a `double`) by `MRIsampleVolume` (trilinear), sorted (glibc's `qsort`
-/// with `c1 > c2: 1, c1 < c2: -1, else 0`), the element `wsize^2 / 2`. More than [`MAXLEN`]
-/// samples overrun FreeSurfer's table: the caller refuses such a window.
+/// the point sampled at the `(2 whalf + 1)^2` points of its window (`whalf = (wsize - 1) / 2`;
+/// `yk` outer: `(float) x + (float) yk e2.x`, then `+ xk e1.x` in `float`, as a `double`) by
+/// `MRIsampleVolume` (trilinear); FreeSurfer then sorts `wsize^2` values of its table (glibc's
+/// `qsort` with `c1 > c2: 1, c1 < c2: -1, else 0`) and returns the element `wsize^2 / 2`. For an
+/// even or negative `wsize` the table holds fewer samples than it sorts: the rest is memory
+/// FreeSurfer never wrote, read here as 0 (FS-1217, `reproduce` only: the program refuses such a
+/// window by default). More than [`MAXLEN`] values overrun the table: the caller refuses such a
+/// window (FS-1218).
 #[allow(clippy::too_many_arguments)]
 pub fn cpolv_median_at_voxel(
     g: &mut Globals,
@@ -201,7 +281,8 @@ pub fn cpolv_median_at_voxel(
     let [e1x, e1y, e1z] = b.e1[vertex];
     let [e2x, e2y, e2z] = b.e2[vertex];
     let whalf = (wsize - 1) / 2;
-    let mut vals: Vec<f32> = Vec::with_capacity((wsize.max(0) * wsize.max(0)) as usize);
+    let n = wsize.wrapping_mul(wsize).max(0) as usize;
+    let mut vals: Vec<f32> = Vec::with_capacity(n.max(1));
     for yk in -whalf..=whalf {
         let xbase = x + yk as f32 * e2x;
         let ybase = y + yk as f32 * e2y;
@@ -215,7 +296,17 @@ pub fn cpolv_median_at_voxel(
             vals.push(rval as f32);
         }
     }
-    qsort(&mut vals, |a: &f32, b: &f32| {
+    if vals.len() < n.max(1) {
+        g.notices.add(
+            &FS_1217,
+            format!(
+                "MRIcpolvMedianAtVoxel: a window of {wsize} sorts {n} values of which {} were sampled: the rest, memory FreeSurfer never wrote, read as 0",
+                vals.len()
+            ),
+        );
+        vals.resize(n.max(1), 0.0);
+    }
+    qsort(&mut vals[..n], |a: &f32, b: &f32| {
         if a > b {
             1i32
         } else if a < b {
@@ -224,16 +315,20 @@ pub fn cpolv_median_at_voxel(
             0
         }
     });
-    let k = (wsize * wsize / 2) as usize;
-    vals.get(k).copied().unwrap_or(0.0)
+    vals[n / 2]
 }
 
 /// `MRIcpolvMedianCurveVoxel(mri, labeled, x0, y0, z0, wsize, len, gray_hi, wm_low)`: the voxel's
-/// label from the medians of the planes along the normal of its plane of least variance.
+/// label from the medians of the planes along the normal of its plane of least variance (from
+/// `-len` to `len` in steps of `0.25f`, in `float`). FreeSurfer's tables hold [`MAX_MEDIANS`]
+/// positions and a window of at most [`MAXLEN`] values: a voxel that needs more ends the run with
+/// an error (FS-1216, FS-1218: FreeSurfer writes past them; the program refuses such settings by
+/// default before it starts).
 #[allow(clippy::too_many_arguments)]
 pub fn cpolv_median_curve_voxel(
     g: &mut Globals,
     err: &mut dyn Write,
+    ctx: Ctx,
     mri: &Mri,
     x0: i32,
     y0: i32,
@@ -243,6 +338,23 @@ pub fn cpolv_median_curve_voxel(
     gray_hi: f32,
     wm_low: f32,
 ) -> Result<i32, Fatal> {
+    if wsize.unsigned_abs() > 16 {
+        g.notices.add(
+            &FS_1218,
+            format!(
+                "MRIcpolvMedianCurveVoxel: a plane window of {wsize} needs {} values: FreeSurfer's table holds {MAXLEN} (it writes or reads past it)",
+                i64::from(wsize) * i64::from(wsize)
+            ),
+        );
+        log::error_exit(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!(
+                "MRIcpolvMedianCurveVoxel: the plane window {wsize} holds more than {MAXLEN} values"
+            ),
+        )?;
+    }
     let b = basis();
     let vertex = central_plane_of_least_variance_normal_voxel(g, err, mri, wsize, x0, y0, z0)?;
     let vi = usize::try_from(vertex).unwrap_or(0);
@@ -259,6 +371,24 @@ pub fn cpolv_median_curve_voxel(
     let diag = g.gdiag & DIAG_WRITE != 0 && g.gdiag & DIAG_VERBOSE != 0;
     let mut dist = -len;
     while dist <= len {
+        if medians.len() == MAX_MEDIANS {
+            g.notices.add(
+                &FS_1216,
+                format!(
+                    "MRIcpolvMedianCurveVoxel: -polvlen {} takes more than {MAX_MEDIANS} positions along the normal: FreeSurfer writes past its tables",
+                    format_double("%g", f64::from(len)).unwrap_or_default()
+                ),
+            );
+            log::error_exit(
+                g,
+                err,
+                ERROR_BADPARM,
+                &format!(
+                    "MRIcpolvMedianCurveVoxel: more than {MAX_MEDIANS} positions along the normal (len {})",
+                    format_double("%g", f64::from(len)).unwrap_or_default()
+                ),
+            )?;
+        }
         let x = x0 as f32 + nx * dist;
         let y = y0 as f32 + ny * dist;
         let z = z0 as f32 + nz * dist;
@@ -294,7 +424,7 @@ pub fn cpolv_median_curve_voxel(
                 larmorx_freesurfer_core::cstd::fmt_f(f64::from(*m), 2, 3)
             ));
         }
-        let _ = std::fs::write("med.plt", text);
+        let _ = std::fs::write(resolve(ctx.dir, "med.plt"), text);
     }
     if white_dist > len {
         for (m, d) in medians.iter().zip(&dists) {
@@ -347,14 +477,19 @@ fn pct(n: i32, total: i32) -> String {
     larmorx_freesurfer_core::cstd::fmt_f(f64::from(100.0f32 * n as f32 / total as f32), 2, 2)
 }
 
+/// FS-1225: a labels volume not of bytes, read and written byte by byte (`MRIvox`).
+const LABEL_BYTES: mem::Notes = (&FS_1225, &FS_1225);
+
 /// `MRIcpolvMedianCurveSegment(mri, labeled, dst, wsize, len, gray_hi, wm_low)`: every voxel of
 /// `labeled` that is ambiguous (128) relabelled by [`cpolv_median_curve_voxel`] in a copy of it
-/// (slices outer, columns inner); the counts printed.
+/// (slices outer, columns inner; the labels read and written as bytes, `MRIvox`, whatever the
+/// type: FS-1225); the counts printed.
 #[allow(clippy::too_many_arguments)]
 pub fn cpolv_median_curve_segment(
     g: &mut Globals,
     out: &mut dyn Write,
     err: &mut dyn Write,
+    ctx: Ctx,
     mri: &Mri,
     labeled: &Mri,
     wsize: i32,
@@ -362,6 +497,7 @@ pub fn cpolv_median_curve_segment(
     gray_hi: f32,
     wm_low: f32,
 ) -> Result<Mri, Fatal> {
+    const WHAT: &str = "MRIcpolvMedianCurveSegment";
     let g4 = |v: f32| format_double("%g", f64::from(v)).unwrap_or_default();
     let _ = writeln!(
         out,
@@ -377,19 +513,21 @@ pub fn cpolv_median_curve_segment(
         diag_show_pct_done(g, err, z as f32 / (depth - 1) as f32, 5);
         for y in 0..height {
             for x in 0..width {
-                let label = vox(g, err, labeled, x, y, z)? as i32;
+                let (zl, yl, xl) = (i64::from(z), i64::from(y), i64::from(x));
+                let label = mem::read(g, LABEL_BYTES, WHAT, labeled, zl, yl, xl, MRI_UCHAR) as i32;
                 if label != MRI_AMBIGUOUS {
                     continue;
                 }
                 nlabeled += 1;
-                let label =
-                    cpolv_median_curve_voxel(g, err, mri, x, y, z, wsize, len, gray_hi, wm_low)?;
+                let label = cpolv_median_curve_voxel(
+                    g, err, ctx, mri, x, y, z, wsize, len, gray_hi, wm_low,
+                )?;
                 if label == MRI_WHITE {
                     non += 1;
                 } else {
                     noff += 1;
                 }
-                mri_set_vox_val(g, err, &mut dst, x, y, z, 0, label as f32, 0)?;
+                mem::write(g, LABEL_BYTES, WHAT, &mut dst, zl, yl, xl, &[label as u8]);
             }
         }
     }
@@ -448,7 +586,7 @@ pub fn intensity_segmentation(
                     }
                     continue;
                 }
-                let val = mri_get_vox_val(g, err, src, x, y, z, 0, 0)?;
+                let val = vox_val(g, err, src, x, y, z)?;
                 let label = if val < wm_low || val > wm_hi {
                     nblack += 1;
                     MRI_NOT_WHITE
@@ -487,8 +625,8 @@ pub fn mask_labels(
     for z in 0..depth {
         for y in 0..height {
             for x in 0..width {
-                let m = mri_get_vox_val(g, err, mask, x, y, z, 0, 0)?;
-                let s = mri_get_vox_val(g, err, src, x, y, z, 0, 0)?;
+                let m = vox_val(g, err, mask, x, y, z)?;
+                let s = vox_val(g, err, src, x, y, z)?;
                 mri_set_vox_val(g, err, &mut dst, x, y, z, 0, masked(m, s), 0)?;
             }
         }
@@ -508,8 +646,8 @@ pub fn mask_labels_in_place(
     for z in 0..depth {
         for y in 0..height {
             for x in 0..width {
-                let m = mri_get_vox_val(g, err, mask, x, y, z, 0, 0)?;
-                let s = mri_get_vox_val(g, err, dst, x, y, z, 0, 0)?;
+                let m = vox_val(g, err, mask, x, y, z)?;
+                let s = vox_val(g, err, dst, x, y, z)?;
                 mri_set_vox_val(g, err, dst, x, y, z, 0, masked(m, s), 0)?;
             }
         }
@@ -526,4 +664,578 @@ fn masked(m: f32, s: f32) -> f32 {
     } else {
         0.0
     }
+}
+
+// ---- relay 56: the thin strands, the islands and the planar holes ------------------------------
+
+/// `MRIwrite(m, fname)` of a diagnostic volume (its status not looked at).
+fn write_diag(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    ctx: Ctx,
+    m: &mut Mri,
+    fname: &str,
+) -> Result<(), Fatal> {
+    mri_write(
+        g,
+        out,
+        err,
+        ctx.env,
+        ctx.dir,
+        m,
+        fname,
+        None,
+        MGZ_INTENT_UNKNOWN,
+    )?;
+    Ok(())
+}
+
+fn diag_write_verbose(g: &Globals) -> bool {
+    g.gdiag & DIAG_WRITE != 0 && g.gdiag & DIAG_VERBOSE != 0
+}
+
+/// `MRIremoveIslands(src, NULL, wsize, thresh)`: a clone of the source (zeros) holding, at each
+/// voxel of the slices from `whalf = wsize / 2` on, of their rows from `whalf` on (every column),
+/// the source's value, set to 0 when it is not 0 and at least `thresh` of the `(2 whalf + 1)^3`
+/// voxels around it (the index tables; the voxel itself included) are 0, or to `THICKEN_FILL`
+/// (200) when it is 0 and at least `thresh` of them are not; the slices and rows before `whalf`
+/// stay 0.
+pub fn remove_islands(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    src: &Mri,
+    wsize: i32,
+    thresh: i32,
+) -> Result<Mri, Fatal> {
+    let mut dst = mri_clone(g, out, err, src, None)?.unwrap_new();
+    let (width, height, depth) = (src.vg.width, src.vg.height, src.vg.depth);
+    let whalf = wsize / 2;
+    for z in whalf..depth {
+        for y in whalf..height {
+            for x in 0..width {
+                let (mut num_on, mut num_off) = (0i32, 0i32);
+                for z0 in -whalf..=whalf {
+                    for y0 in -whalf..=whalf {
+                        for x0 in -whalf..=whalf {
+                            if vox(g, err, src, x + x0, y + y0, z + z0)? == 0.0 {
+                                num_off += 1;
+                            } else {
+                                num_on += 1;
+                            }
+                        }
+                    }
+                }
+                let mut val = vox_val(g, err, src, x, y, z)?;
+                if val != 0.0 && num_off >= thresh {
+                    val = 0.0;
+                } else if val == 0.0 && num_on >= thresh {
+                    val = THICKEN_FILL as f32;
+                }
+                mri_set_vox_val(g, err, &mut dst, x, y, z, 0, val, 0)?;
+            }
+        }
+    }
+    Ok(dst)
+}
+
+/// `MRIsampleVolume(m, x, y, z, &val)` of a point (trilinear).
+fn sample(g: &mut Globals, err: &mut dyn Write, m: &Mri, x: f64, y: f64, z: f64) -> f64 {
+    let mut val = 0f64;
+    sample_volume(g, err, m, x, y, z, &mut val);
+    val
+}
+
+/// The search of `MRIthickenThinWMStrands` along its one direction (`nx = nz = 0`, `ny = 1`: the
+/// rows), `sign` -1 downwards and 1 upwards: `nd` a `float` from 0 while `nd <= limit`, the point
+/// `(x, y + sign nd, z)` sampled; the first below `WM_MIN_VAL` gives `nd - 0.5`, none `none`.
+#[allow(clippy::too_many_arguments)]
+fn strand_search(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    m: &Mri,
+    x: i32,
+    y: i32,
+    z: i32,
+    sign: f64,
+    limit: f32,
+    none: f64,
+) -> f64 {
+    let mut nd = 0f32;
+    while nd <= limit {
+        // (double) x - nd * nx with nx 0, (double) y - nd * ny with ny 1
+        let yf = f64::from(y) + sign * f64::from(nd);
+        if sample(g, err, m, f64::from(x), yf, f64::from(z)) < f64::from(WM_MIN_VAL) {
+            return f64::from(nd) - 0.5;
+        }
+        nd += 1.0;
+    }
+    none
+}
+
+/// `MRIthickenThinWMStrands(mri_T1, mri, mri, thickness, nsegments, wm_hi)` as `mri_segment` calls
+/// it (the source its own destination: FreeSurfer's copy into it does nothing, and its later reads
+/// of the source see what it has thickened). The compiled branch (`mripolv.cpp` 1670):
+/// `MRIthickenThinWMStrands(): thickness=<t>, nsegments=<n>` on standard output; the islands
+/// removed (`MRIremoveIslands(mri, NULL, 3, 24)`) and closed (`MRIclose`); the voxels above 0
+/// thin along the rows (the only direction FreeSurfer allows: `nx = nz = 0`, `ny = 1`), the
+/// first voxel below `WM_MIN_VAL` downwards and upwards within `thickness + 1` of the closed
+/// volume (`down + up <= thickness`, each `nd - 0.5` or `thickness + 1`), marked 1 in a clone;
+/// their connected segments (`MRIsegment(thin, 1, 255)`) dilated five times into the volume
+/// (`MRIsegmentDilate`); then for the `nsegments` largest (`MRIsegmentMax`, each then ignored):
+/// the segment's image of the closed volume (`MRIsegmentToImage` into the cleared clone); each of
+/// its voxels at or above `WM_MIN_VAL` searched again in the volume within `TOO_THIN + 1` (3) and,
+/// while `up + down <= TOO_THIN` (2), thickened on the nearer side (both when equal): the voxel
+/// beyond the first non-white one (`up + 1.5`, `nint`) must lie in the volume (else `ERROR:
+/// MRIthickenThinWMStrands: invalid x,y,z!` and the voxel's search ends) and be 0 (upwards also
+/// inside the T1's extent: `MRIindexNotInVolume`); then the non-white one (`up + 0.5`) is set to
+/// `THICKEN_FILL` (200) in the volume and the segment's image when the T1 there is below `wm_hi`;
+/// each side's distance grows by 1 when it was considered; then the holes between the segment's
+/// voxels filled (`NBHD_FILL`, 210: a voxel inside the volume's border that is 0 with a T1 below
+/// `wm_hi`, between two of the segment's voxels along a row, a column or a slice, with no voxel of
+/// the volume outside the segment among its 26 neighbours) until none is, and its planar holes
+/// ([`fill_planar_holes_in_place`]); finally `  <n> segments, <filled> filled` (`%2d`) on
+/// standard output and the ignore flags cleared. With `DIAG_WRITE` and `DIAG_VERBOSE`:
+/// `seg<i>.mgh`, `dilated_seg<i>.mgh` and `thin.mgh`.
+#[allow(clippy::too_many_arguments)]
+pub fn thicken_thin_wm_strands_in_place(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    ctx: Ctx,
+    t1: &Mri,
+    dst: &mut Mri,
+    thickness: i32,
+    nsegments: i32,
+    wm_hi: f32,
+) -> Result<(), Fatal> {
+    let _ = writeln!(
+        out,
+        "MRIthickenThinWMStrands(): thickness={thickness}, nsegments={nsegments}"
+    );
+    let (width, height, depth) = (dst.vg.width, dst.vg.height, dst.vg.depth);
+    let _ = basis();
+    let mut thin = mri_clone(g, out, err, dst, None)?.unwrap_new();
+    let mut tmp = remove_islands(g, out, err, dst, 3, 27 - 3)?;
+    mri_close(g, out, err, Pair::Same(&mut tmp))?;
+    // MRIcopy(mri_src, mri_dst): the same volume, nothing copied
+    let limit = thickness.wrapping_add(1) as f32;
+    let none = f64::from(thickness.wrapping_add(1));
+    for z in 0..depth {
+        for y in 0..height {
+            for x in 0..width {
+                if vox_val(g, err, dst, x, y, z)? > 0.0 {
+                    let down = strand_search(g, err, &tmp, x, y, z, -1.0, limit, none);
+                    let up = strand_search(g, err, &tmp, x, y, z, 1.0, limit, none);
+                    if up + down <= f64::from(thickness) {
+                        mri_set_vox_val(g, err, &mut thin, x, y, z, 0, 1.0, 0)?;
+                    }
+                }
+            }
+        }
+    }
+
+    // now thicken the strands, careful not to connect them with others
+    let mut total_filled = 0i32;
+    let mut mriseg = mri_segment(g, out, err, &thin, 1.0, 255.0)?;
+    if diag_write_verbose(g) {
+        let mut img: Option<Mri> = None;
+        for _ in 0..nsegments {
+            let i = mri_segment_max(&mriseg);
+            if i < 0 {
+                break;
+            }
+            img = segment_image(g, out, err, dst, img, &mriseg, i)?;
+            if let Some(m) = img.as_mut() {
+                write_diag(g, out, err, ctx, m, &format!("seg{i}.mgh"))?;
+            }
+        }
+    }
+    for _ in 0..5 {
+        mri_segment_dilate(g, out, err, &mut mriseg, dst)?;
+    }
+    if diag_write_verbose(g) {
+        let mut img: Option<Mri> = None;
+        for _ in 0..nsegments {
+            let i = mri_segment_max(&mriseg);
+            if i < 0 {
+                break;
+            }
+            img = segment_image(g, out, err, dst, img, &mriseg, i)?;
+            if let Some(m) = img.as_mut() {
+                write_diag(g, out, err, ctx, m, &format!("dilated_seg{i}.mgh"))?;
+            }
+        }
+    }
+
+    let mut nseg = 0i32;
+    while nseg < nsegments {
+        let i = mri_segment_max(&mriseg);
+        if i < 0 {
+            break;
+        }
+        mri_clear(g, err, &mut thin)?;
+        mri_segment_to_image(g, out, err, &tmp, Some(&mut thin), &mriseg, i)?;
+        let mut nfilled = 0i32;
+        let nvox = mriseg.segments[i as usize].voxels.len();
+        for v in 0..nvox {
+            let p = mriseg.segments[i as usize].voxels[v];
+            let (x, y, z) = (i32::from(p.x), i32::from(p.y), i32::from(p.z));
+            if vox_val(g, err, dst, x, y, z)? < WM_MIN_VAL as f32 {
+                continue;
+            }
+            nfilled += thicken_voxel(g, err, t1, dst, &mut thin, x, y, z, wm_hi)?;
+        }
+        total_filled += nfilled;
+        if g.gdiag & DIAG_SHOW != 0 && g.gdiag & DIAG_VERBOSE != 0 {
+            let _ = writeln!(
+                err,
+                "{nseg}: segment {i}, {} voxels, filled = {nfilled}, total = {total_filled}",
+                mriseg.segments[i as usize].voxels.len()
+            );
+        }
+        mriseg.segments[i as usize].ignore = 1;
+
+        // the holes between the strand's voxels
+        loop {
+            let mut nfilled = 0i32;
+            for z in 1..depth - 1 {
+                for y in 1..height - 1 {
+                    for x in 1..width - 1 {
+                        if nbhd_fill(g, err, t1, dst, &thin, x, y, z, wm_hi)? {
+                            mri_set_vox_val(g, err, dst, x, y, z, 0, NBHD_FILL as f32, 0)?;
+                            mri_set_vox_val(g, err, &mut thin, x, y, z, 0, NBHD_FILL as f32, 0)?;
+                            nfilled += 1;
+                        }
+                    }
+                }
+            }
+            total_filled += nfilled;
+            if nfilled <= 0 {
+                break;
+            }
+        }
+        fill_planar_holes_in_place(g, out, err, ctx, dst, &thin)?;
+        nseg += 1;
+    }
+    let _ = writeln!(out, "  {nseg:2} segments, {total_filled} filled");
+    mri_segment_clear_ignore_flags(&mut mriseg);
+    drop(mriseg);
+    if diag_write_verbose(g) {
+        write_diag(g, out, err, ctx, &mut thin, "thin.mgh")?;
+    }
+    Ok(())
+}
+
+/// `mri_tmp = MRIsegmentToImage(mri_src, mri_tmp, mriseg, i)` (a clone the first time).
+fn segment_image(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    src: &Mri,
+    img: Option<Mri>,
+    mriseg: &crate::segment::MriSegmentation,
+    i: i32,
+) -> Result<Option<Mri>, Fatal> {
+    match img {
+        Some(mut m) => {
+            mri_segment_to_image(g, out, err, src, Some(&mut m), mriseg, i)?;
+            Ok(Some(m))
+        }
+        None => Ok(mri_segment_to_image(g, out, err, src, None, mriseg, i)?.into_new()),
+    }
+}
+
+/// One voxel of a segment of `MRIthickenThinWMStrands`: the voxels it fills.
+#[allow(clippy::too_many_arguments)]
+fn thicken_voxel(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    t1: &Mri,
+    dst: &mut Mri,
+    thin: &mut Mri,
+    x: i32,
+    y: i32,
+    z: i32,
+    wm_hi: f32,
+) -> Result<i32, Fatal> {
+    let too = f64::from(TOO_THIN);
+    let limit = (TOO_THIN + 1) as f32;
+    let none = f64::from(TOO_THIN + 1);
+    let mut down_dist = strand_search(g, err, dst, x, y, z, -1.0, limit, none);
+    let mut up_dist = strand_search(g, err, dst, x, y, z, 1.0, limit, none);
+    let mut thin_now = up_dist + down_dist <= too;
+    let mut nfilled = 0i32;
+    let (w, h, d) = (dst.vg.width, dst.vg.height, dst.vg.depth);
+    let outside =
+        |xv: i32, yv: i32, zv: i32| xv >= w || xv < 0 || yv >= h || yv < 0 || zv >= d || zv < 0;
+    while thin_now {
+        let (mut up_added, mut down_added) = (false, false);
+        if up_dist <= down_dist {
+            // nint((double) x + (up_dist + 1.5) * nx) with nx 0 is x
+            let yv = nint(g, f64::from(y) + (up_dist + 1.5));
+            if outside(x, yv, z) {
+                log::error_printf(
+                    g,
+                    err,
+                    ERROR_BADPARM,
+                    "ERROR: MRIthickenThinWMStrands: invalid x,y,z!\n",
+                );
+                break;
+            }
+            if index_not_in_volume(t1, f64::from(x), f64::from(yv), f64::from(z)) == 0
+                && vox_val(g, err, dst, x, yv, z)? == 0.0
+            {
+                up_added = true;
+                let yv = nint(g, f64::from(y) + (up_dist + 0.5));
+                if vox_val(g, err, t1, x, yv, z)? < wm_hi {
+                    mri_set_vox_val(g, err, dst, x, yv, z, 0, THICKEN_FILL as f32, 0)?;
+                    mri_set_vox_val(g, err, thin, x, yv, z, 0, THICKEN_FILL as f32, 0)?;
+                    nfilled += 1;
+                }
+            }
+        }
+        if up_dist >= down_dist {
+            let yv = nint(g, f64::from(y) - (down_dist + 1.5));
+            if outside(x, yv, z) {
+                log::error_printf(
+                    g,
+                    err,
+                    ERROR_BADPARM,
+                    "ERROR: MRIthickenThinWMStrands: invalid x,y,z!\n",
+                );
+                break;
+            }
+            if vox_val(g, err, dst, x, yv, z)? == 0.0 {
+                down_added = true;
+                let yv = nint(g, f64::from(y) - (down_dist + 0.5));
+                if vox_val(g, err, t1, x, yv, z)? < wm_hi {
+                    mri_set_vox_val(g, err, dst, x, yv, z, 0, THICKEN_FILL as f32, 0)?;
+                    mri_set_vox_val(g, err, thin, x, yv, z, 0, THICKEN_FILL as f32, 0)?;
+                    nfilled += 1;
+                }
+            }
+        }
+        if up_added {
+            up_dist += 1.0;
+        }
+        if down_added {
+            down_dist += 1.0;
+        }
+        thin_now = up_dist + down_dist <= too;
+        if !up_added && !down_added {
+            break;
+        }
+    }
+    Ok(nfilled)
+}
+
+/// Whether `MRIthickenThinWMStrands`' neighbourhood filter fills `(x, y, z)`: 0 in the volume
+/// with a T1 below `wm_hi`, between two of the segment's voxels along a row, a column or a slice,
+/// and no voxel of its 27 (itself included) on in the volume but not in the segment.
+#[allow(clippy::too_many_arguments)]
+fn nbhd_fill(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    t1: &Mri,
+    dst: &Mri,
+    thin: &Mri,
+    x: i32,
+    y: i32,
+    z: i32,
+    wm_hi: f32,
+) -> Result<bool, Fatal> {
+    if vox_val(g, err, dst, x, y, z)? != 0.0 || !(vox_val(g, err, t1, x, y, z)? < wm_hi) {
+        return Ok(false);
+    }
+    let on =
+        |g: &mut Globals, err: &mut dyn Write, xx: i32, yy: i32, zz: i32| -> Result<bool, Fatal> {
+            Ok(vox_val(g, err, thin, xx, yy, zz)? != 0.0)
+        };
+    let between = (on(g, err, x + 1, y, z)? && on(g, err, x - 1, y, z)?)
+        || (on(g, err, x, y + 1, z)? && on(g, err, x, y - 1, z)?)
+        || (on(g, err, x, y, z + 1)? && on(g, err, x, y, z - 1)?);
+    if !between {
+        return Ok(false);
+    }
+    for nz in -1..=1 {
+        for ny in -1..=1 {
+            for nx in -1..=1 {
+                if vox_val(g, err, dst, x + nx, y + ny, z + nz)? != 0.0
+                    && vox_val(g, err, thin, x + nx, y + ny, z + nz)? == 0.0
+                {
+                    return Ok(false);
+                }
+            }
+        }
+    }
+    Ok(true)
+}
+
+/// `MRIfillPlanarHoles(mri, mri_segment, mri, mseg)` as `MRIthickenThinWMStrands` calls it (the
+/// volume its own destination: FreeSurfer's copy does nothing): the segment's image binarised at
+/// `WM_MIN_VAL` to 0 and 1 (`MRIbinarize`), its border (dilated twice, `MRIdilate`, minus the
+/// strand: `MRIxor` in 1..255); then, until a pass fills none, each voxel (slices outer) of the
+/// border that is at most `WM_MIN_VAL` in the volume (`MRIvox`), whose direction of the most
+/// strand voxels in a 5 x 5 plane ([`cpolv_max_white_at_voxel`]) has strand on its four sides
+/// ([`cpolv_all_quadrants_filled`]) and whose face neighbours on in the strand (at least 1) are
+/// as many as those on in the volume (at least `WM_MIN_VAL`, `MRIneighborsOn`), set to
+/// `THICKEN_FILL` (200) in the volume, 1 in the strand and 0 in the border. With `DIAG_WRITE` and
+/// `DIAG_VERBOSE`: `writing binary strand and border images...` on standard error and
+/// `binary_strand.mgh`, `strand_border.mgh`; with `DIAG_SHOW` and `DIAG_VERBOSE`: `<n> planar
+/// holes filled`.
+pub fn fill_planar_holes_in_place(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    ctx: Ctx,
+    dst: &mut Mri,
+    segment: &Mri,
+) -> Result<(), Fatal> {
+    let (width, height, depth) = (dst.vg.width, dst.vg.height, dst.vg.depth);
+    let _ = basis();
+    let mut strand =
+        mri_binarize(g, out, err, Pair::New(segment), WM_MIN_VAL as f32, 0.0, 1.0)?.unwrap_new();
+    let mut border = mri_dilate(g, out, err, Pair::New(&strand))?.unwrap_new();
+    mri_dilate(g, out, err, Pair::Same(&mut border))?;
+    mri_xor(g, out, err, Tri::Second(&strand, &mut border), 1, 255)?;
+    let mut total_filled = 0i32;
+    if diag_write_verbose(g) {
+        let _ = writeln!(err, "writing binary strand and border images...");
+        write_diag(g, out, err, ctx, &mut strand, "binary_strand.mgh")?;
+        write_diag(g, out, err, ctx, &mut border, "strand_border.mgh")?;
+    }
+    const WHAT: &str = "MRIfillPlanarHoles";
+    loop {
+        let mut nfilled = 0i32;
+        for z in 0..depth {
+            for y in 0..height {
+                for x in 0..width {
+                    let (zl, yl, xl) = (i64::from(z), i64::from(y), i64::from(x));
+                    if mem::read(g, LABEL_BYTES, WHAT, dst, zl, yl, xl, MRI_UCHAR)
+                        > WM_MIN_VAL as f32
+                        || mem::read(g, LABEL_BYTES, WHAT, &border, zl, yl, xl, MRI_UCHAR) == 0.0
+                    {
+                        continue;
+                    }
+                    let vertex = cpolv_max_white_at_voxel(g, err, &strand, x, y, z, 5)?;
+                    if cpolv_all_quadrants_filled(g, err, &strand, x, y, z, vertex, 5)
+                        && neighbors_on(g, err, &strand, x, y, z, 1)?
+                            == neighbors_on(g, err, dst, x, y, z, WM_MIN_VAL)?
+                    {
+                        mri_set_vox_val(g, err, dst, x, y, z, 0, THICKEN_FILL as f32, 0)?;
+                        mri_set_vox_val(g, err, &mut strand, x, y, z, 0, 1.0, 0)?;
+                        mri_set_vox_val(g, err, &mut border, x, y, z, 0, 0.0, 0)?;
+                        nfilled += 1;
+                    }
+                }
+            }
+        }
+        total_filled += nfilled;
+        if nfilled <= 0 {
+            break;
+        }
+    }
+    if g.gdiag & DIAG_SHOW != 0 && g.gdiag & DIAG_VERBOSE != 0 {
+        let _ = writeln!(err, "{total_filled} planar holes filled");
+    }
+    Ok(())
+}
+
+/// `MRIcpolvMaxWhiteAtVoxel(mri, x, y, z, wsize)`: the last direction (of the 22, in order) whose
+/// `wsize x wsize` plane through the voxel (as [`central_plane_of_least_variance_normal_voxel`]
+/// samples it: `nint` of the `float` point, the index tables) holds the most values above 0.5
+/// (`>=`: a later direction with as many wins; 0 when none has any).
+pub fn cpolv_max_white_at_voxel(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    mri: &Mri,
+    x: i32,
+    y: i32,
+    z: i32,
+    wsize: i32,
+) -> Result<usize, Fatal> {
+    let b = basis();
+    let whalf = (wsize - 1) / 2;
+    let (mut max_count, mut peak) = (0i32, 0usize);
+    for vertex in 0..NVERTICES {
+        let [e1x, e1y, e1z] = b.e1[vertex];
+        let [e2x, e2y, e2z] = b.e2[vertex];
+        let mut num = 0i32;
+        for yk in -whalf..=whalf {
+            let xbase = x as f32 + yk as f32 * e2x;
+            let ybase = y as f32 + yk as f32 * e2y;
+            let zbase = z as f32 + yk as f32 * e2z;
+            for xk in -whalf..=whalf {
+                let xi = nint(g, f64::from(xbase + xk as f32 * e1x));
+                let yi = nint(g, f64::from(ybase + xk as f32 * e1y));
+                let zi = nint(g, f64::from(zbase + xk as f32 * e1z));
+                if f64::from(vox(g, err, mri, xi, yi, zi)?) > 0.5 {
+                    num += 1;
+                }
+            }
+        }
+        if num >= max_count {
+            peak = vertex;
+            max_count = num;
+        }
+    }
+    Ok(peak)
+}
+
+/// `MRIcpolvAllQuadrantsFilled(mri, x, y, z, vertex, wsize)` (its compiled branch): along `+e1`,
+/// `-e1`, `+e2` and `-e2` of the direction's plane, from 0.75 in steps of 0.75 while the distance
+/// is at most `whalf = (wsize - 1) / 2` (`float`), the first point (`(float) x + dist e`) whose
+/// trilinear sample is above 0.5; true when each of the four has one. `mri_segment`'s window (5)
+/// always samples; a window too small to sample at all (`whalf` below 0.75) would test a value
+/// FreeSurfer never set: 0 here.
+#[allow(clippy::too_many_arguments)]
+pub fn cpolv_all_quadrants_filled(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    mri: &Mri,
+    x: i32,
+    y: i32,
+    z: i32,
+    vertex: usize,
+    wsize: i32,
+) -> bool {
+    let b = basis();
+    let whalf = ((wsize - 1) / 2) as f32;
+    let [e1x, e1y, e1z] = b.e1[vertex];
+    let [e2x, e2y, e2z] = b.e2[vertex];
+    let mut val = 0f64;
+    for (ex, ey, ez, sign) in [
+        (e1x, e1y, e1z, 1.0f32),
+        (e1x, e1y, e1z, -1.0),
+        (e2x, e2y, e2z, 1.0),
+        (e2x, e2y, e2z, -1.0),
+    ] {
+        let mut dist = 0.75f32;
+        while dist <= whalf {
+            let (xf, yf, zf) = if sign > 0.0 {
+                (
+                    x as f32 + dist * ex,
+                    y as f32 + dist * ey,
+                    z as f32 + dist * ez,
+                )
+            } else {
+                (
+                    x as f32 - dist * ex,
+                    y as f32 - dist * ey,
+                    z as f32 - dist * ez,
+                )
+            };
+            val = sample(g, err, mri, f64::from(xf), f64::from(yf), f64::from(zf));
+            if val > 0.5 {
+                break;
+            }
+            dist += 0.75;
+        }
+        if val <= 0.5 {
+            return false;
+        }
+    }
+    true
 }

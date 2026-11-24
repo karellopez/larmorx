@@ -459,3 +459,56 @@ pub fn mri_classify_ambiguous_non_par(
     let _ = writeln!(out, "nhits = {nhits}, nrecode = {nrecode}");
     Ok(Some(ambi))
 }
+
+/// What `MRIcomputeClassStatisticsSeg` sets: the white matter's and the cortex's mean and
+/// standard deviation, each pair `None` when FreeSurfer never reaches it.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ClassStatsSeg {
+    pub wm: Option<(f32, f32)>,
+    pub ctx: Option<(f32, f32)>,
+}
+
+/// `MRIcomputeClassStatisticsSeg(norm, seg, &wmmean, &wmstd, &ctxmean, &ctxstd)`
+/// (`utils/mrifilter.cpp` 5542, relay 56 of track D): the white matter (labels 2, 41, 251-255)
+/// and cortex (3, 42) masks of `seg` (`MRImatchSegs`), `norm`'s statistics over each
+/// (`MRIsegStats`, frame 0), printed `wmstats  n=<%6d>, mean=<%g>, std=<%g>, min=<%g>, max=<%g>`
+/// and `ctxstats n=...`. An empty white matter prints `ERROR: could not find any WM voxels` and
+/// ends there (its mean and deviation set to 0 by `MRIsegStats`, the cortex's never set: `None`);
+/// an empty cortex likewise (`ERROR: could not find any CTX voxels`, its pair 0). FreeSurfer's
+/// return value (1 then, else 0) is what `mri_segment` ignores.
+pub fn mri_compute_class_statistics_seg(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    norm: &Mri,
+    seg: &Mri,
+) -> Result<ClassStatsSeg, Fatal> {
+    let (wm, ctx) = masks(g, out, err, seg, None, None)?;
+    let mut res = ClassStatsSeg::default();
+    for (mask, label, tag, wm_class) in [
+        (&wm, "wmstats ", "WM", true),
+        (&ctx, "ctxstats", "CTX", false),
+    ] {
+        let (n, st) = mri_seg_stats(g, err, mask, 1, norm, 0)?;
+        let pair = Some((st.mean, st.std));
+        if wm_class {
+            res.wm = pair;
+        } else {
+            res.ctx = pair;
+        }
+        if n == 0 {
+            let _ = writeln!(out, "ERROR: could not find any {tag} voxels");
+            return Ok(res);
+        }
+        let _ = writeln!(
+            out,
+            "{label} n={n:6}, mean={}, std={}, min={}, max={}",
+            pg(st.mean),
+            pg(st.std),
+            pg(st.min),
+            pg(st.max)
+        );
+    }
+    let _ = out.flush();
+    Ok(res)
+}

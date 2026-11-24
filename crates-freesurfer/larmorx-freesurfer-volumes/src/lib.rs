@@ -32,6 +32,7 @@ pub mod mri_info;
 pub mod mri_make_uchar;
 pub mod mri_mask;
 pub mod mri_robust_register;
+pub mod mri_segment;
 pub mod mri_segstats;
 pub mod mri_vol2vol;
 pub mod mris_calc;
@@ -89,6 +90,10 @@ pub const PROGRAMS: &[Program] = &[
     Program {
         name: mri_robust_register::main::NAME,
         run: mri_robust_register::main::run,
+    },
+    Program {
+        name: mri_segment::main::NAME,
+        run: mri_segment::main::run,
     },
     Program {
         name: mri_segstats::main::NAME,

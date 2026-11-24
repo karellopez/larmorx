@@ -20,19 +20,22 @@ use sha2::{Digest, Sha256};
 /// ported) from the official program with the decided `cabs` and `csqrt` preloaded (`check.py
 /// --preload`, `decided_complex.sh`: the user's D4 decision, which the port's matrix square roots
 /// follow); and again 2026-11-23 (relay 47: `MI`, `NMI`, `ECC`, `SCR` and `SB` ported, the same
-/// preload); and again 2026-11-23 (relay 48: the test mode, `--test`, ported, the same preload).
-/// 120 cases, 111 lines identical, 8 hashed as `SKIP`, 1 as `NOTPORTED` (`--debug`). The Powell families: `fs_robreg_powell_official.rs`, `fs_robreg_histo_official.rs`.
+/// preload); and again 2026-11-23 (relay 48: the test mode, `--test`, ported, the same preload);
+/// and again 2026-11-24 (relay 49: the debug output, `--debug`, ported, the same preload).
+/// 120 cases, 112 lines identical, 8 hashed as `SKIP`, none `NOTPORTED`. The Powell families:
+/// `fs_robreg_powell_official.rs`, `fs_robreg_histo_official.rs`; the debug output's:
+/// `fs_robreg_debug_official.rs`.
 const N: usize = 120;
-const OFFICIAL_SHA256: &str = "172c0971dfe907da32e54122d14d4c1c509d122f4dcd363209ce9208c40be1a0";
+const OFFICIAL_SHA256: &str = "f903a3a4ef52c2885f6f4cfe62bf678986aff78db83c634049ce198a58449e75";
 /// In a debug build (CI's) the five cases of a joint histogram's cost or SB are hashed as `SLOW`,
 /// not run (about 270 s at one thread in a debug build; `cases::histogram_or_sb_cost`): the same
 /// official lines with those five so (`check.py`'s `official_sha256_skip_debug`). A release build
 /// compares them too, and `fs_robreg_histo_official.rs` holds 32 more.
 const OFFICIAL_SHA256_DEBUG: &str =
-    "f0e55e32dd089cde0d46edcf5c6c9742e85f53e6142577dcb3d1eed5ee24d96c";
+    "51fb35253887c4819d0d961721f60d10e8b17b9be8b63e16e6b1aa3b89cd50a6";
 const SLOW_IN_DEBUG: usize = 5;
 const SKIPPED: usize = 8;
-const NOT_PORTED: usize = 1;
+const NOT_PORTED: usize = 0;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 24] = [

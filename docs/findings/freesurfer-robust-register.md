@@ -362,3 +362,29 @@ took <s> seconds.`) and the target, with the mask passed in (no `MRImask` then).
   0 different, 4 not compared (FS-1063, FS-1067, two of FS-1075 with FS-1079, their defined parts
   identical); the default differs on 11, each with its notice (FS-01 7, FS-1073 5, FS-1062 1). Log
   `oracles/logs/fs-found-c-r49-debug1.log`.
+
+## 10. The Powell costs' speed (relay 49, bit for bit)
+
+- Measured before (relay 48, ds000228-sub-pixar008, one thread): `--cost LS --powelltol 0.1` 86 s against
+  FreeSurfer's 17-23 s, `--cost NCC --powelltol 0.1` 146 s against 33-41 s: every sample of the byte images
+  went through fs.volume's general `MRIsampleVolumeFrame` (its checks of every access, about 90 ns a
+  sample), and the mapped `float` images through `MRIgetVoxVal`/`MRIsetVoxVal`.
+- Changes (the same operations in the same order; `docs/porting-guide.md`'s bit-for-bit rule): fs.volume's
+  `ByteSampler` (a byte volume's samples read straight from its buffer, the corners' rows computed once;
+  finite weights and byte voxels make no NaN, so the plain operations are SSE's; any other call through
+  the general function); fs.volume's `cvtt` without libm's `trunc` (x86-64's baseline has no `roundsd`:
+  each `trunc` was a call; `as` truncates the same); the half-way costs' sampling points in plain
+  arithmetic (only the samplers' comparisons read them); the joint histogram's floor of a sample at or
+  above 0 by truncation; `costs::Floats` for the mapped images. The equality is tested
+  (`sample.rs`' `the_byte_sampler_gives_the_general_samplers_bits`: 4,000 seeded points on four volumes,
+  whole, edge, outside, NaN from its bits, huge, frames the volume lacks, both modes: the value's bits,
+  the status and the notices) and every probe family and head is identical in every byte after it.
+- Measured after (`real.py --heads ds000228-sub-pixar008 --extra '--cost <c> --powelltol 0.1' --preload`,
+  one thread; logs `oracles/logs/fs-found-c-r49-speed{1,2}.log`, jsons `C/r49/speed{,2}-<c>.json`):
+  `LS` 28.9 s against FreeSurfer's 22.9 s, `NCC` 48.8 s against 40.7 s, `MI` 45.9 s against 32.4 s
+  (FreeSurfer's times from the fresh official runs of the first measurement); every byte of standard
+  output, standard error and the files identical with `reproduce`. `costs_bench` (fs.robust's example,
+  128^3 random bytes): the byte sampler 12.9 ns a sample against the general one's 86 ns; least squares
+  34 ns a voxel. What is left (`timeline.py`, LS): the 128^3 level's evaluations (FreeSurfer about 16 ns a
+  voxel there, its images in the cache), the pyramid (fs.filter's blur and fs.volume's B-spline halving:
+  2.1 s each against 1.0 s) and the reading and reslicing (3.9 s against 2.3 s).

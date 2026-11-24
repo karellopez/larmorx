@@ -60,7 +60,9 @@ def main(argv: list[str] | None = None) -> int:
                       "official_image_is_recorded", "with_a_record", "official_crashes_matched")
             if k in r
         }  # fmt: skip
-        real["fix_differ_with_notice"] = sum(not x["fix"] and bool(x["fix_notices"]) for x in r["rows"])
+        real["fix_differ_with_notice"] = sum(
+            not x["fix"] and bool(x["fix_notices"]) for x in r["rows"]
+        )
         real["runs"] = sorted({x["run"] for x in r["rows"]})
         real["kinds"] = dict(Counter(x["call"] for x in r["rows"]))
     memory = []

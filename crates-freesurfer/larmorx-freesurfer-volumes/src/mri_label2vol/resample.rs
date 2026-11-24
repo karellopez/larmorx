@@ -21,7 +21,6 @@
 //! surface does not have), FS-1270 (a transform whose ends are not the ribbon), FS-1271 (a ribbon
 //! voxel the surface hash finds no vertex for).
 
-
 use larmorx_core::defects::{
     FS_12, FS_1263, FS_1264, FS_1265, FS_1266, FS_1267, FS_1268, FS_1269, FS_1270, FS_1271,
 };
@@ -32,6 +31,7 @@ use larmorx_freesurfer_core::matrix_ops::matrix_inverse;
 use larmorx_freesurfer_core::romp;
 use larmorx_freesurfer_core::timer::Timer;
 use larmorx_freesurfer_core::utils::nint;
+use larmorx_freesurfer_gca::regdat::transform_lta2_reg_dat;
 use larmorx_freesurfer_io::label::Label;
 use larmorx_freesurfer_io::streams::Io;
 use larmorx_freesurfer_mri::ctab::ColorTable;
@@ -48,11 +48,9 @@ use larmorx_freesurfer_surf::props::find_closest_vertex;
 use larmorx_freesurfer_surf::readwrite::RIGHT_HEMISPHERE;
 use larmorx_freesurfer_surf::views::CURRENT_VERTICES;
 use larmorx_freesurfer_volume::ltaops::{
-    InvertInto, lta_change_type, lta_fill_inverse, lta_invert, lta_mri_is_source,
-    lta_mri_is_target,
+    InvertInto, lta_change_type, lta_fill_inverse, lta_invert, lta_mri_is_source, lta_mri_is_target,
 };
 use larmorx_freesurfer_volume::vol2vol::transform_reg_dat2_lta;
-use larmorx_freesurfer_gca::regdat::transform_lta2_reg_dat;
 
 use super::main::{Run, print_matrix};
 use super::options::g_fmt;
@@ -427,7 +425,17 @@ pub fn mri_seg2seg_pvf(
                 if !do_seg {
                     for (f, &n) in nperf.iter().enumerate() {
                         if n > 0.0 {
-                            mri_set_vox_val(g, r.err, &mut out, c, rr, s, f as i32, n / npervox, 0)?;
+                            mri_set_vox_val(
+                                g,
+                                r.err,
+                                &mut out,
+                                c,
+                                rr,
+                                s,
+                                f as i32,
+                                n / npervox,
+                                0,
+                            )?;
                         }
                     }
                 } else {
@@ -573,8 +581,15 @@ pub fn mri_surf2vol_opt(
         return Ok(Surf2Vol::Null);
     };
     let nframes = overlay.nframes;
-    let mut volsurf =
-        mri_alloc_from_vol_geom(g, r.out, r.err, &q2.xforms[0].dst, MRI_FLOAT, nframes, false)?;
+    let mut volsurf = mri_alloc_from_vol_geom(
+        g,
+        r.out,
+        r.err,
+        &q2.xforms[0].dst,
+        MRI_FLOAT,
+        nframes,
+        false,
+    )?;
     mri_copy_pulse_parameters(overlay, &mut volsurf);
 
     // the output's voxels to the ribbon's
@@ -651,7 +666,8 @@ pub fn mri_surf2vol_opt(
                 let skip = (surf.hemisphere == LEFT_HEMISPHERE && ribval != 3)
                     || (surf.hemisphere == RIGHT_HEMISPHERE && ribval != 42);
                 if !skip {
-                    let (mut vtxno, mut d) = hash.find_closest_vertex_no_xyz(g, r.err, surf, [x, y, z])?;
+                    let (mut vtxno, mut d) =
+                        hash.find_closest_vertex_no_xyz(g, r.err, surf, [x, y, z])?;
                     if vtxno < 0 {
                         g.notices.add(
                             &FS_1271,
@@ -660,7 +676,17 @@ pub fn mri_surf2vol_opt(
                             ),
                         );
                         if g.notices.reproduce() {
-                            no_match(g, r, surf, (c, rr, s), [x, y, z], &v, &t, reg.as_ref(), mm.as_ref())?;
+                            no_match(
+                                g,
+                                r,
+                                surf,
+                                (c, rr, s),
+                                [x, y, z],
+                                &v,
+                                &t,
+                                reg.as_ref(),
+                                mm.as_ref(),
+                            )?;
                             return Ok(Surf2Vol::Null);
                         }
                         let mut io = Io {
@@ -668,7 +694,8 @@ pub fn mri_surf2vol_opt(
                             err: &mut *r.err,
                             env: &env,
                         };
-                        (vtxno, d) = find_closest_vertex(g, &mut io, surf, [x, y, z], CURRENT_VERTICES)?;
+                        (vtxno, d) =
+                            find_closest_vertex(g, &mut io, surf, [x, y, z], CURRENT_VERTICES)?;
                     }
                     if d < dmin {
                         nmin = 0;

@@ -514,7 +514,12 @@ fn binary_of(lut: &[u8]) -> Vec<u8> {
 
 /// A transform file of type `ty` from geometry `src` to `dst` (each `(dims, sizes)` with the
 /// probe's direction cosines and centre) with `rows` as its matrix.
-fn lta_of(ty: i32, rows: [[f64; 4]; 4], src: ([i32; 3], [f64; 3]), dst: ([i32; 3], [f64; 3])) -> Vec<u8> {
+fn lta_of(
+    ty: i32,
+    rows: [[f64; 4]; 4],
+    src: ([i32; 3], [f64; 3]),
+    dst: ([i32; 3], [f64; 3]),
+) -> Vec<u8> {
     let geom = |(d, z): ([i32; 3], [f64; 3])| {
         format!(
             "valid = 1  # volume info valid\nfilename = vol.mgz\nvolume = {} {} {}\nvoxelsize = {:.15e} {:.15e} {:.15e}\nxras   = -1.000000000000000e+00 0.000000000000000e+00 0.000000000000000e+00\nyras   = 0.000000000000000e+00 0.000000000000000e+00 -1.000000000000000e+00\nzras   = 0.000000000000000e+00 1.000000000000000e+00 0.000000000000000e+00\ncras   = 1.500000000000000e+00 -2.000000000000000e+00 5.000000000000000e-01\n",
@@ -539,20 +544,29 @@ fn lta_of(ty: i32, rows: [[f64; 4]; 4], src: ([i32; 3], [f64; 3]), dst: ([i32; 3
 /// destination and at neither end, segmentations with labels below 0 and NaN (from their bits), a
 /// large label, labels without a tissue type or not in the colour table, one of 0.4 mm voxels,
 /// a dense annotation and one with gaps.
-fn part2_inputs(
-    files: &mut Vec<(String, Vec<u8>)>,
-    v: &[[f32; 3]],
-    f: &[[i32; 3]],
-    thick: &[f32],
-) {
+fn part2_inputs(files: &mut Vec<(String, Vec<u8>)>, v: &[[f32; 3]], f: &[[i32; 3]], thick: &[f32]) {
     let mut g = Gen::new(0x1abe_1270_0057);
     let put = |files: &mut Vec<(String, Vec<u8>)>, name: &str, m: &mut Mri| {
         files.extend(write_as(m, name));
     };
     let ribvals = [0.0f32, 3.0, 3.0, 42.0, 42.0, 2.0, 41.0];
-    let mut rib = seg_volume_of(&mut g, MRI_UCHAR, [12, 12, 12], [1.0, 1.0, 1.0], true, &ribvals);
+    let mut rib = seg_volume_of(
+        &mut g,
+        MRI_UCHAR,
+        [12, 12, 12],
+        [1.0, 1.0, 1.0],
+        true,
+        &ribvals,
+    );
     put(files, "subj/mri/ribbon.mgz", &mut rib);
-    let mut rib2 = seg_volume_of(&mut g, MRI_INT, [12, 12, 12], [1.0, 1.0, 1.0], false, &ribvals);
+    let mut rib2 = seg_volume_of(
+        &mut g,
+        MRI_INT,
+        [12, 12, 12],
+        [1.0, 1.0, 1.0],
+        false,
+        &ribvals,
+    );
     put(files, "sd2/subj/mri/ribbon.mgz", &mut rib2);
     let (v2, _) = sphere(3.0, [-0.5, 0.75, -0.25]);
     files.push(("sd2/subj/surf/lh.white".into(), triangle_file(&v2, f, true)));
@@ -560,7 +574,14 @@ fn part2_inputs(
         "sd2/subj/surf/lh.thickness".into(),
         curv_file(thick, f.len() as i32),
     ));
-    let mut far = seg_volume_of(&mut g, MRI_UCHAR, [8, 8, 8], [8.0, 8.0, 8.0], false, &[3.0, 3.0, 42.0]);
+    let mut far = seg_volume_of(
+        &mut g,
+        MRI_UCHAR,
+        [8, 8, 8],
+        [8.0, 8.0, 8.0],
+        false,
+        &[3.0, 3.0, 42.0],
+    );
     put(files, "subjfar/mri/ribbon.mgz", &mut far);
     files.push(("subjfar/surf/lh.white".into(), triangle_file(v, f, true)));
     files.push((
@@ -576,28 +597,77 @@ fn part2_inputs(
     ];
     files.push((
         "y.lta".into(),
-        lta_of(0, shift, ([6, 5, 4], [1.0, 1.5, 2.0]), ([12, 12, 12], [1.0, 1.0, 1.0])),
+        lta_of(
+            0,
+            shift,
+            ([6, 5, 4], [1.0, 1.5, 2.0]),
+            ([12, 12, 12], [1.0, 1.0, 1.0]),
+        ),
     ));
     files.push((
         "z.lta".into(),
-        lta_of(0, shift, ([6, 5, 4], [1.0, 1.5, 2.0]), ([4, 4, 3], [2.0, 2.0, 2.0])),
+        lta_of(
+            0,
+            shift,
+            ([6, 5, 4], [1.0, 1.5, 2.0]),
+            ([4, 4, 3], [2.0, 2.0, 2.0]),
+        ),
     ));
     // segmentations of odd labels
-    let mut sneg = seg_volume_of(&mut g, MRI_FLOAT, [12, 12, 12], [1.0, 1.0, 1.0], true, &[0.0, 2.0, -1.0, 17.0, -3.0, 41.0]);
+    let mut sneg = seg_volume_of(
+        &mut g,
+        MRI_FLOAT,
+        [12, 12, 12],
+        [1.0, 1.0, 1.0],
+        true,
+        &[0.0, 2.0, -1.0, 17.0, -3.0, 41.0],
+    );
     put(files, "segneg.mgz", &mut sneg);
-    let mut sbig = seg_volume_of(&mut g, MRI_INT, [6, 5, 4], [1.0, 1.5, 2.0], false, &[0.0, 3.0, 1_000_000.0, 41.0]);
+    let mut sbig = seg_volume_of(
+        &mut g,
+        MRI_INT,
+        [6, 5, 4],
+        [1.0, 1.5, 2.0],
+        false,
+        &[0.0, 3.0, 1_000_000.0, 41.0],
+    );
     put(files, "segbig.mgz", &mut sbig);
-    let mut su = seg_volume_of(&mut g, MRI_INT, [12, 12, 12], [1.0, 1.0, 1.0], true, &[0.0, 1.0, 3.0, 17.0, 41.0, 77.0]);
+    let mut su = seg_volume_of(
+        &mut g,
+        MRI_INT,
+        [12, 12, 12],
+        [1.0, 1.0, 1.0],
+        true,
+        &[0.0, 1.0, 3.0, 17.0, 41.0, 77.0],
+    );
     put(files, "segu.mgz", &mut su);
-    let mut sx = seg_volume_of(&mut g, MRI_INT, [12, 12, 12], [1.0, 1.0, 1.0], false, &[0.0, 3.0, 99.0, 41.0]);
+    let mut sx = seg_volume_of(
+        &mut g,
+        MRI_INT,
+        [12, 12, 12],
+        [1.0, 1.0, 1.0],
+        false,
+        &[0.0, 3.0, 99.0, 41.0],
+    );
     put(files, "segx.mgz", &mut sx);
-    let mut sq = seg_volume_of(&mut g, MRI_INT, [12, 12, 12], [0.4, 0.4, 0.4], true, &[0.0, 2.0, 3.0, 17.0]);
+    let mut sq = seg_volume_of(
+        &mut g,
+        MRI_INT,
+        [12, 12, 12],
+        [0.4, 0.4, 0.4],
+        true,
+        &[0.0, 2.0, 3.0, 17.0],
+    );
     put(files, "segq.mgz", &mut sq);
     let mut s0 = seg_volume_of(&mut g, MRI_INT, [6, 5, 4], [1.0, 1.5, 2.0], false, &[0.0]);
     put(files, "seg0.mgz", &mut s0);
     files.push(("fsh2/FreeSurferColorLUT.txt".into(), LUT2.to_vec()));
     // annotations: every index of a dense table, and one with gaps
-    let dense = [annot_of(0, 0, 0), annot_of(10, 20, 30), annot_of(40, 50, 60)];
+    let dense = [
+        annot_of(0, 0, 0),
+        annot_of(10, 20, 30),
+        annot_of(40, 50, 60),
+    ];
     let ann: Vec<i32> = (0..v.len()).map(|_| g.pick(&dense)).collect();
     let mut b = Vec::new();
     be4(&mut b, ann.len() as i32);
@@ -608,7 +678,10 @@ fn part2_inputs(
     be4(&mut b, 1);
     b.extend_from_slice(&binary_of(LUT3));
     files.push(("subj/label/lh.dense.annot".into(), b));
-    files.push(("subj/label/rh.dense.annot".into(), files.last().expect("the annotation").1.clone()));
+    files.push((
+        "subj/label/rh.dense.annot".into(),
+        files.last().expect("the annotation").1.clone(),
+    ));
     // a surface label whose stats are NaN and infinite (the label's text: C's sscanf gives them)
     let stats = ["nan", "-nan", "inf", "-inf", "2.5", "-1"];
     let mut pts: Vec<(i32, String, String, String, String)> = Vec::new();
@@ -664,12 +737,13 @@ pub fn line(env: &[&str], i: &Inputs, args: &[String]) -> String {
         .iter()
         .any(|a| a == "--ttype" || a == "--ttype+head" || a == "--fill-ribbon");
     let fsh2 = env.iter().any(|e| e.contains("@DIR@/fsh2"));
-    let files: Vec<&(String, Vec<u8>)> = files
-        .into_iter()
-        .chain(i.files.iter().filter(|(f, _)| {
-            (ttype && f.starts_with("fsh/")) || (fsh2 && f.starts_with("fsh2/"))
-        }))
-        .collect();
+    let files: Vec<&(String, Vec<u8>)> =
+        files
+            .into_iter()
+            .chain(i.files.iter().filter(|(f, _)| {
+                (ttype && f.starts_with("fsh/")) || (fsh2 && f.starts_with("fsh2/"))
+            }))
+            .collect();
     let mut all_env: Vec<&str> = vec!["SUBJECTS_DIR=@DIR@", "FREESURFER_SEED=1234"];
     if ttype {
         // the default colour table the tissue types read: FREESURFER_HOME's
@@ -2084,7 +2158,14 @@ fn prelude() -> Vec<String> {
 /// Part 2's fixed cases (relay 57): `--new-aseg2vol` and `--fill-ribbon`, every path.
 fn part2_prelude(add_env: &mut dyn FnMut(&[&str], &[&str])) {
     let nseg = |seg: &str, temp: &str, extra: &[&str]| -> Vec<String> {
-        let mut a = s(&["--seg", seg, "--temp", temp, "--regheader", "--new-aseg2vol"]);
+        let mut a = s(&[
+            "--seg",
+            seg,
+            "--temp",
+            temp,
+            "--regheader",
+            "--new-aseg2vol",
+        ]);
         a.extend(s(extra));
         a.extend(s(&["--o", "o.mgz"]));
         a
@@ -2094,12 +2175,21 @@ fn part2_prelude(add_env: &mut dyn FnMut(&[&str], &[&str])) {
         (vec![], nseg("seg.mgz", "t.mgz", &[])),
         (vec![], nseg("seg.mgz", "t1.mgz", &["--resmm", "0.5"])),
         (vec![], nseg("seg.mgz", "t2.mgz", &["--ttype"])),
-        (vec![], nseg("seg.mgz", "t1.mgz", &["--ttype", "--resmm", "1"])),
-        (vec![], nseg("seg.mgz", "t1.mgz", &["--ttype+head", "--resmm", "2"])),
+        (
+            vec![],
+            nseg("seg.mgz", "t1.mgz", &["--ttype", "--resmm", "1"]),
+        ),
+        (
+            vec![],
+            nseg("seg.mgz", "t1.mgz", &["--ttype+head", "--resmm", "2"]),
+        ),
         (vec![], nseg("seg.mgz", "t3.nii.gz", &["--resmm", "-2.7"])),
         (vec![], nseg("seg.mgz", "t2.mgz", &["--resmm", "-2.4"])),
         (vec![], nseg("seg.mgz", "t2.mgz", &["--resmm", "-0.3"])),
-        (vec![], nseg("seg.mgz", "t2.mgz", &["--resmm", "-0.3", "--ttype"])),
+        (
+            vec![],
+            nseg("seg.mgz", "t2.mgz", &["--resmm", "-0.3", "--ttype"]),
+        ),
         (vec![], nseg("seg.mgz", "t2.mgz", &["--resmm", "nan"])),
         (vec![], nseg("seg.mgz", "t2.mgz", &["--resmm", "inf"])),
         (vec![], nseg("seg.mgz", "t2.mgz", &["--resmm", "-inf"])),
@@ -2109,55 +2199,203 @@ fn part2_prelude(add_env: &mut dyn FnMut(&[&str], &[&str])) {
         (vec![], nseg("segh.mgz", "orig.mgz", &[])),
         (vec![], nseg("segq.mgz", "t2.mgz", &[])),
         (vec![], nseg("segq.mgz", "t2.mgz", &["--ttype"])),
-        (vec![], nseg("segn.mgz", "orig.mgz", &["--hits", "h.mgz", "--pvf", "p.mgz"])),
+        (
+            vec![],
+            nseg(
+                "segn.mgz",
+                "orig.mgz",
+                &["--hits", "h.mgz", "--pvf", "p.mgz"],
+            ),
+        ),
         (vec![], nseg("segneg.mgz", "t2.mgz", &[])),
         (vec![], nseg("segbig.mgz", "t2.mgz", &["--resmm", "0.5"])),
-        (vec![], nseg("segu.mgz", "t1.mgz", &["--ttype", "--resmm", "1"])),
-        (vec!["FREESURFER_HOME=@DIR@/fsh2"], nseg("segu.mgz", "t1.mgz", &["--ttype", "--resmm", "1"])),
-        (vec!["FREESURFER_HOME=@DIR@/fsh2"], nseg("segu.mgz", "t2.mgz", &["--ttype+head", "--resmm", "0.5"])),
-        (vec![], nseg("segx.mgz", "t1.mgz", &["--ttype", "--resmm", "1"])),
-        (vec![], nseg("seg.mgz", "t3.nii.gz", &["--ttype", "--resmm", "0.5"])),
-        (vec![], nseg("seg.mgz", "t.mgz", &["--ttype+head", "--resmm", "0.25"])),
-        (vec![], nseg("segh.mgz", "t3.nii.gz", &["--ttype", "--resmm", "1"])),
-        (vec![], nseg("segx.mgz", "t3.nii.gz", &["--ttype", "--resmm", "0.5"])),
-        (vec![], nseg("segu.mgz", "t3.nii.gz", &["--ttype", "--resmm", "0.5"])),
-        (vec!["FREESURFER_HOME=@DIR@/fsh2"], nseg("segu.mgz", "t3.nii.gz", &["--ttype", "--resmm", "0.5"])),
-        (vec![], nseg("segbig.mgz", "t3.nii.gz", &["--ttype", "--resmm", "0.5"])),
+        (
+            vec![],
+            nseg("segu.mgz", "t1.mgz", &["--ttype", "--resmm", "1"]),
+        ),
+        (
+            vec!["FREESURFER_HOME=@DIR@/fsh2"],
+            nseg("segu.mgz", "t1.mgz", &["--ttype", "--resmm", "1"]),
+        ),
+        (
+            vec!["FREESURFER_HOME=@DIR@/fsh2"],
+            nseg("segu.mgz", "t2.mgz", &["--ttype+head", "--resmm", "0.5"]),
+        ),
+        (
+            vec![],
+            nseg("segx.mgz", "t1.mgz", &["--ttype", "--resmm", "1"]),
+        ),
+        (
+            vec![],
+            nseg("seg.mgz", "t3.nii.gz", &["--ttype", "--resmm", "0.5"]),
+        ),
+        (
+            vec![],
+            nseg("seg.mgz", "t.mgz", &["--ttype+head", "--resmm", "0.25"]),
+        ),
+        (
+            vec![],
+            nseg("segh.mgz", "t3.nii.gz", &["--ttype", "--resmm", "1"]),
+        ),
+        (
+            vec![],
+            nseg("segx.mgz", "t3.nii.gz", &["--ttype", "--resmm", "0.5"]),
+        ),
+        (
+            vec![],
+            nseg("segu.mgz", "t3.nii.gz", &["--ttype", "--resmm", "0.5"]),
+        ),
+        (
+            vec!["FREESURFER_HOME=@DIR@/fsh2"],
+            nseg("segu.mgz", "t3.nii.gz", &["--ttype", "--resmm", "0.5"]),
+        ),
+        (
+            vec![],
+            nseg("segbig.mgz", "t3.nii.gz", &["--ttype", "--resmm", "0.5"]),
+        ),
         (vec![], nseg("seg.mgz", "t3.nii.gz", &["--resmm", "0.5"])),
         (vec![], nseg("seg0.mgz", "t2.mgz", &[])),
         (vec![], nseg("seg0.mgz", "t2.mgz", &["--ttype"])),
         (vec![], nseg("seg.mgz", "tnan.mgz", &[])),
-        (vec![], s(&["--seg", "seg.mgz", "--temp", "t.mgz", "--identity", "--new-aseg2vol", "--o", "o.nii.gz"])),
-        (vec![], s(&["--seg", "seg.mgz", "--temp", "t.mgz", "--reg", "reg.dat", "--new-aseg2vol", "--o", "o.mgz"])),
-        (vec![], s(&["--seg", "seg.mgz", "--temp", "t.mgz", "--regheader", "--new-aseg2vol", "--o", "nodir/o.mgz"])),
-        (vec![], s(&["--seg", "seg.mgz", "--fill-ribbon", "--new-aseg2vol", "--regheader", "--o", "o.mgz", "--subject", "subj", "--hemi", "lh"])),
-        (vec![], s(&["--aparc+aseg", "--subject", "subj", "--temp", "t.mgz", "--regheader", "subj/mri/aparc+aseg.mgz", "--new-aseg2vol", "--o", "o.mgz"])),
+        (
+            vec![],
+            s(&[
+                "--seg",
+                "seg.mgz",
+                "--temp",
+                "t.mgz",
+                "--identity",
+                "--new-aseg2vol",
+                "--o",
+                "o.nii.gz",
+            ]),
+        ),
+        (
+            vec![],
+            s(&[
+                "--seg",
+                "seg.mgz",
+                "--temp",
+                "t.mgz",
+                "--reg",
+                "reg.dat",
+                "--new-aseg2vol",
+                "--o",
+                "o.mgz",
+            ]),
+        ),
+        (
+            vec![],
+            s(&[
+                "--seg",
+                "seg.mgz",
+                "--temp",
+                "t.mgz",
+                "--regheader",
+                "--new-aseg2vol",
+                "--o",
+                "nodir/o.mgz",
+            ]),
+        ),
+        (
+            vec![],
+            s(&[
+                "--seg",
+                "seg.mgz",
+                "--fill-ribbon",
+                "--new-aseg2vol",
+                "--regheader",
+                "--o",
+                "o.mgz",
+                "--subject",
+                "subj",
+                "--hemi",
+                "lh",
+            ]),
+        ),
+        (
+            vec![],
+            s(&[
+                "--aparc+aseg",
+                "--subject",
+                "subj",
+                "--temp",
+                "t.mgz",
+                "--regheader",
+                "subj/mri/aparc+aseg.mgz",
+                "--new-aseg2vol",
+                "--o",
+                "o.mgz",
+            ]),
+        ),
     ];
     for (env, a) in &cases {
         let a: Vec<&str> = a.iter().map(String::as_str).collect();
         add_env(env, &a);
     }
     let rib = |extra: &[&str]| -> Vec<String> {
-        let mut a = s(&["--fill-ribbon", "--subject", "subj", "--hemi", "lh", "--identity"]);
+        let mut a = s(&[
+            "--fill-ribbon",
+            "--subject",
+            "subj",
+            "--hemi",
+            "lh",
+            "--identity",
+        ]);
         a.extend(s(extra));
         a.extend(s(&["--o", "o.mgz"]));
         a
     };
     let cases: Vec<(Vec<&str>, Vec<String>)> = vec![
         (vec![], rib(&["--label", "s.label"])),
-        (vec![], rib(&["--label", "s.label", "--label", "lh.cortex.label"])),
-        (vec![], rib(&["--label", "s.label", "--label-stat", "st.mgz"])),
-        (vec![], rib(&["--label", "s.label", "--label-stat", "st.mgz", "--stat-thresh", "0"])),
-        (vec![], rib(&["--label", "snan.label", "--label-stat", "st.mgz"])),
-        (vec![], rib(&["--label", "snan.label", "--label-stat", "st.mgz", "--stat-thresh", "0"])),
+        (
+            vec![],
+            rib(&["--label", "s.label", "--label", "lh.cortex.label"]),
+        ),
+        (
+            vec![],
+            rib(&["--label", "s.label", "--label-stat", "st.mgz"]),
+        ),
+        (
+            vec![],
+            rib(&[
+                "--label",
+                "s.label",
+                "--label-stat",
+                "st.mgz",
+                "--stat-thresh",
+                "0",
+            ]),
+        ),
+        (
+            vec![],
+            rib(&["--label", "snan.label", "--label-stat", "st.mgz"]),
+        ),
+        (
+            vec![],
+            rib(&[
+                "--label",
+                "snan.label",
+                "--label-stat",
+                "st.mgz",
+                "--stat-thresh",
+                "0",
+            ]),
+        ),
         (vec![], rib(&["--label", "s.label", "--temp", "t2.mgz"])),
         (vec![], rib(&["--label", "s.label", "--surf", "orig"])),
-        (vec![], rib(&["--label", "s.label", "--hits", "h.mgz", "--pvf", "p.mgz"])),
+        (
+            vec![],
+            rib(&["--label", "s.label", "--hits", "h.mgz", "--pvf", "p.mgz"]),
+        ),
         (vec![], rib(&["--annot", "subj/label/lh.dense.annot"])),
         (vec![], rib(&["--annot", "subj/label/lh.a.annot"])),
         (vec![], rib(&["--annot", "subj/label/lh.zero.annot"])),
         (vec![], rib(&["--label", "scan.label"])),
-        (vec![], rib(&["--label", "scan.label", "--tkr-template", "orig.mgz"])),
+        (
+            vec![],
+            rib(&["--label", "scan.label", "--tkr-template", "orig.mgz"]),
+        ),
         (vec![], rib(&["--label", "sbad.label"])),
         (vec![], rib(&["--label", "sneg.label"])),
         (vec![], rib(&["--label", "a.label"])),
@@ -2165,21 +2403,152 @@ fn part2_prelude(add_env: &mut dyn FnMut(&[&str], &[&str])) {
         (vec![], rib(&["--label", "s.label", "--lta", "x.lta"])),
         (vec![], rib(&["--label", "s.label", "--lta", "y.lta"])),
         (vec![], rib(&["--label", "s.label", "--lta", "z.lta"])),
-        (vec![], rib(&["--label", "s.label", "--lta", "y.lta", "--label-stat", "st.mgz"])),
+        (
+            vec![],
+            rib(&[
+                "--label",
+                "s.label",
+                "--lta",
+                "y.lta",
+                "--label-stat",
+                "st.mgz",
+            ]),
+        ),
         (vec![], rib(&["--label", "s.label", "--sd", "."])),
         (vec![], rib(&["--label", "s.label", "--sd", "sd2"])),
-        (vec!["-SUBJECTS_DIR"], rib(&["--label", "s.label", "--sd", "."])),
-        (vec!["SUBJECTS_DIR=@DIR@/nowhere"], rib(&["--label", "s.label", "--sd", "."])),
-        (vec!["FREESURFER_HOME=@DIR@/nowhere"], rib(&["--label", "s.label"])),
-        (vec![], s(&["--fill-ribbon", "--subject", "subj", "--hemi", "lh", "--identity", "--label", "s.label", "--o", "nodir/o.mgz"])),
-        (vec![], rib(&["--label", "s.label", "--label-stat", "nodir/st.mgz"])),
-        (vec![], s(&["--fill-ribbon", "--subject", "subj", "--hemi", "lh", "--identity", "--label", "s.label", "--label-stat", "st.nii.gz", "--o", "o.nii.gz"])),
-        (vec![], s(&["--fill-ribbon", "--subject", "subj", "--hemi", "rh", "--identity", "--annot", "subj/label/rh.dense.annot", "--o", "o.mgz"])),
-        (vec![], s(&["--fill-ribbon", "--subject", "subjfar", "--hemi", "lh", "--identity", "--label", "s.label", "--o", "o.mgz"])),
-        (vec![], s(&["--fill-ribbon", "--subject", "nosubj", "--hemi", "lh", "--identity", "--label", "s.label", "--o", "o.mgz"])),
-        (vec![], s(&["--fill-ribbon", "--hemi", "lh", "--identity", "--label", "s.label", "--o", "o.mgz"])),
-        (vec![], s(&["--fill-ribbon", "--subject", "subj", "--identity", "--label", "s.label", "--o", "o.mgz"])),
-        (vec![], s(&["--fill-ribbon", "--subject", "subj", "--hemi", "lh", "--label", "s.label", "--o", "o.mgz"])),
+        (
+            vec!["-SUBJECTS_DIR"],
+            rib(&["--label", "s.label", "--sd", "."]),
+        ),
+        (
+            vec!["SUBJECTS_DIR=@DIR@/nowhere"],
+            rib(&["--label", "s.label", "--sd", "."]),
+        ),
+        (
+            vec!["FREESURFER_HOME=@DIR@/nowhere"],
+            rib(&["--label", "s.label"]),
+        ),
+        (
+            vec![],
+            s(&[
+                "--fill-ribbon",
+                "--subject",
+                "subj",
+                "--hemi",
+                "lh",
+                "--identity",
+                "--label",
+                "s.label",
+                "--o",
+                "nodir/o.mgz",
+            ]),
+        ),
+        (
+            vec![],
+            rib(&["--label", "s.label", "--label-stat", "nodir/st.mgz"]),
+        ),
+        (
+            vec![],
+            s(&[
+                "--fill-ribbon",
+                "--subject",
+                "subj",
+                "--hemi",
+                "lh",
+                "--identity",
+                "--label",
+                "s.label",
+                "--label-stat",
+                "st.nii.gz",
+                "--o",
+                "o.nii.gz",
+            ]),
+        ),
+        (
+            vec![],
+            s(&[
+                "--fill-ribbon",
+                "--subject",
+                "subj",
+                "--hemi",
+                "rh",
+                "--identity",
+                "--annot",
+                "subj/label/rh.dense.annot",
+                "--o",
+                "o.mgz",
+            ]),
+        ),
+        (
+            vec![],
+            s(&[
+                "--fill-ribbon",
+                "--subject",
+                "subjfar",
+                "--hemi",
+                "lh",
+                "--identity",
+                "--label",
+                "s.label",
+                "--o",
+                "o.mgz",
+            ]),
+        ),
+        (
+            vec![],
+            s(&[
+                "--fill-ribbon",
+                "--subject",
+                "nosubj",
+                "--hemi",
+                "lh",
+                "--identity",
+                "--label",
+                "s.label",
+                "--o",
+                "o.mgz",
+            ]),
+        ),
+        (
+            vec![],
+            s(&[
+                "--fill-ribbon",
+                "--hemi",
+                "lh",
+                "--identity",
+                "--label",
+                "s.label",
+                "--o",
+                "o.mgz",
+            ]),
+        ),
+        (
+            vec![],
+            s(&[
+                "--fill-ribbon",
+                "--subject",
+                "subj",
+                "--identity",
+                "--label",
+                "s.label",
+                "--o",
+                "o.mgz",
+            ]),
+        ),
+        (
+            vec![],
+            s(&[
+                "--fill-ribbon",
+                "--subject",
+                "subj",
+                "--hemi",
+                "lh",
+                "--label",
+                "s.label",
+                "--o",
+                "o.mgz",
+            ]),
+        ),
     ];
     for (env, a) in &cases {
         let a: Vec<&str> = a.iter().map(String::as_str).collect();
@@ -2255,7 +2624,9 @@ fn seeded(g: &mut Gen, i: &Inputs) -> String {
             if g.chance(2) {
                 args.extend(s(&[
                     "--resmm",
-                    g.pick(&["0", "0.5", "0.25", "1", "2", "-1", "-2", "-2.7", "-0.3", "3"]),
+                    g.pick(&[
+                        "0", "0.5", "0.25", "1", "2", "-1", "-2", "-2.7", "-0.3", "3",
+                    ]),
                 ]));
             }
             if g.chance(3) {
@@ -2275,7 +2646,10 @@ fn seeded(g: &mut Gen, i: &Inputs) -> String {
         12 | 13 => {
             // part 2: --fill-ribbon
             if g.chance(3) {
-                args.extend(s(&["--annot", g.pick(&["subj/label/lh.dense.annot", "subj/label/lh.a.annot"])]));
+                args.extend(s(&[
+                    "--annot",
+                    g.pick(&["subj/label/lh.dense.annot", "subj/label/lh.a.annot"]),
+                ]));
             } else {
                 for _ in 0..g.int(1, 2) {
                     args.extend(s(&["--label", g.pick(RIBBON_LABELS)]));
@@ -2284,7 +2658,11 @@ fn seeded(g: &mut Gen, i: &Inputs) -> String {
                     args.extend(s(&["--label-stat", "st.mgz"]));
                 }
             }
-            args.extend(s(&["--fill-ribbon", "--subject", g.pick(&["subj", "subj", "subj", "subjfar"])]));
+            args.extend(s(&[
+                "--fill-ribbon",
+                "--subject",
+                g.pick(&["subj", "subj", "subj", "subjfar"]),
+            ]));
             args.extend(s(&["--hemi", "lh"]));
             args.extend(s(g.pick(&[
                 &["--identity"][..],

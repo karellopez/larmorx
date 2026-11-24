@@ -89,7 +89,7 @@ fn iround(x: f32) -> i32 {
 /// C's `round` of a `double` (half away from zero) by its integer part: exact for every value
 /// (beyond 2^52, NaN and infinities the value itself).
 fn round_half_away(v: f64) -> f64 {
-    if !(v.abs() < 4_503_599_627_370_496.0) {
+    if v.is_nan() || v.abs() >= 4_503_599_627_370_496.0 {
         return v;
     }
     let t = v as i64 as f64;

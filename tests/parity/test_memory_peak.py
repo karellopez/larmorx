@@ -3485,8 +3485,10 @@ def test_mri_label2vol_replica_needs_no_more_memory_than_freesurfer(tmp_path, na
 
     out = "out.mgz"
     o_dir = tmp_path / "freesurfer"
+    # --new-aseg2vol prints its time (``MRIseg2SegPVF(): done t = <seconds>, ...``)
+    volatile = (r"(?<=MRIseg2SegPVF\(\): done t = )[^,]*(?=,)",)
     code, fs_mib = _original_peak(
-        ["mri_label2vol", *words], env, "freesurfer", fresh(o_dir), o_dir, (), "freesurfer"
+        ["mri_label2vol", *words], env, "freesurfer", fresh(o_dir), o_dir, volatile, "freesurfer"
     )
     assert code == 0
     for mode in ("reproduce", "fix"):

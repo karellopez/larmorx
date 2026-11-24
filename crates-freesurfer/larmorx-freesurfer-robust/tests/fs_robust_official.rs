@@ -111,6 +111,50 @@ fn square_roots_fix_differs_only_with_a_notice() {
     }
 }
 
+/// The matrix logarithm's and exponential's stream (`check.py --family logm`: `logm`, `expm`,
+/// `geomean`), recorded 2026-11-24 (3.2-15: `MatrixLog`, `MatrixExp`, `GeometricMean`, on the
+/// decided `cabs`, `csqrt` and `clog` linked into the official code too; the cases where FreeSurfer's
+/// exponential reads uninitialized memory, FS-1311, against `fsrobust-pade`, the official code with
+/// those coefficients defined): 600 cases, 598 lines identical, 2 hashed as `NOTPORTED` (`ZLAQR0`,
+/// FS-969).
+const N_LOGM: usize = 600;
+const OFFICIAL_LOGM_SHA256: &str =
+    "570ad980b91284dae6b5bea960bd0572357a3a06af78655bc8863b53f7b43bda";
+const NOTPORTED_LOGM: usize = 2;
+
+#[test]
+fn reproduce_gives_the_official_logarithms() {
+    let mut h = Sha256::new();
+    let mut notported = 0;
+    for line in cases::generate_logm(1, N_LOGM) {
+        let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
+        if out.contains("is not ported yet") {
+            notported += 1;
+            h.update(b"NOTPORTED\n");
+        } else if ids.iter().any(|x| *x == "FS-968" || *x == "SVDNAN") {
+            h.update(b"NANBITS\n");
+        } else if ids.iter().any(|x| SKIP.contains(x)) {
+            h.update(b"SKIP\n");
+        } else {
+            h.update(out.as_bytes());
+            h.update(b"\n");
+        }
+    }
+    assert_eq!(notported, NOTPORTED_LOGM);
+    let hex: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    assert_eq!(hex, OFFICIAL_LOGM_SHA256);
+}
+
+/// The logarithm's default differs from `reproduce` only where a defect it corrects is noted.
+#[test]
+fn logarithms_fix_differs_only_with_a_notice() {
+    for line in cases::generate_logm(1, N_LOGM) {
+        let (r, _) = cases::run_line(&line, UpstreamDefects::Reproduce);
+        let (f, ids) = cases::run_line(&line, UpstreamDefects::Fix);
+        assert!(r == f || !ids.is_empty(), "{line}");
+    }
+}
+
 /// The registration step's stream (`check.py --family regstep`: `rgauss`, `regress`, `trans`,
 /// `quat`, `rstep`), recorded 2026-11-22 (3.2-03 part 1: `RobustGaussian`, `Regression`,
 /// `Quaternion`, the fifteen transformation models and `RegistrationStep` in float and double):

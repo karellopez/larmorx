@@ -956,7 +956,12 @@ pub fn generate_logm(seed: u64, n: usize) -> Vec<String> {
                         let v: Vec<f64> = if i == 0 && !g.chance(4) {
                             vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
                         } else if g.chance(20) {
-                            log_matrix(&mut g).1.into_iter().chain(std::iter::repeat(0.0)).take(9).collect()
+                            log_matrix(&mut g)
+                                .1
+                                .into_iter()
+                                .chain(std::iter::repeat(0.0))
+                                .take(9)
+                                .collect()
                         } else {
                             lin3(&mut g).iter().flatten().copied().collect()
                         };
@@ -2125,7 +2130,11 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         }
         "expm" => {
             let m = get_vm(t);
+            // the approximant's double SVD of a matrix with an infinite or NaN number: its NaN
+            // bits are an open item (SVDNAN)
+            cx.svdnan |= m.data.iter().any(|x| !x.is_finite());
             let r = larmorx_freesurfer_robust::matrixlog::matrix_exp(&mut cx.g, &mut cx.b, &m)?;
+            cx.svdnan |= r.data.iter().any(|x| x.is_nan());
             o.vm(&r);
         }
         "geomean" => {
@@ -2133,6 +2142,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let vm: Vec<[[f64; 3]; 3]> = (0..k)
                 .map(|_| {
                     let m = get_vm(t);
+                    cx.svdnan |= m.data.iter().any(|x| !x.is_finite());
                     std::array::from_fn(|i| std::array::from_fn(|j| m.at(i, j)))
                 })
                 .collect();
@@ -2144,6 +2154,8 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                 cols: 3,
                 data: r.iter().flatten().copied().collect(),
             };
+            // a NaN logarithm (a zero eigenvalue under `reproduce`) reaches the exponential's SVD
+            cx.svdnan |= m.data.iter().any(|x| x.is_nan());
             o.vm(&m);
         }
         "rgauss" => {

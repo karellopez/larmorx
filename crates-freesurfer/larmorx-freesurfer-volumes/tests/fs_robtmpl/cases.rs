@@ -962,6 +962,113 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
     out
 }
 
+/// `LIA`'s axes rotated by the unit quaternion `(1, w v)` normalised (`v` from `g`; about `2 w`
+/// radians; square roots only, so every platform makes the same headers).
+fn rotated_lia(g: &mut Gen, w: f64) -> [f32; 9] {
+    let v: [f64; 3] = std::array::from_fn(|_| g.int(-1000, 1000) as f64 / 1000.0);
+    let nv = v.iter().map(|x| x * x).sum::<f64>().sqrt().max(1e-3);
+    let q = [1.0, w * v[0] / nv, w * v[1] / nv, w * v[2] / nv];
+    let n = q.iter().map(|x| x * x).sum::<f64>().sqrt();
+    let [a, b, c, d] = q.map(|x| x / n);
+    let r = [
+        [
+            a * a + b * b - c * c - d * d,
+            2.0 * (b * c - a * d),
+            2.0 * (b * d + a * c),
+        ],
+        [
+            2.0 * (b * c + a * d),
+            a * a - b * b + c * c - d * d,
+            2.0 * (c * d - a * b),
+        ],
+        [
+            2.0 * (b * d - a * c),
+            2.0 * (c * d + a * b),
+            a * a - b * b - c * c + d * d,
+        ],
+    ];
+    let mut out = [0.0f32; 9];
+    for axis in 0..3 {
+        for i in 0..3 {
+            out[axis * 3 + i] = (0..3)
+                .map(|k| r[i][k] * f64::from(LIA[axis * 3 + k]))
+                .sum::<f64>() as f32;
+        }
+    }
+    out
+}
+
+/// One case of the affine mean space (`--affine` without `--fixtp`, queue 3.2-15): two to four
+/// inputs whose headers are rotated (small angles, and some past the logarithm's 0.1 blocking:
+/// its separate eigenvalues), with the program's other options.
+fn affine_case(g: &mut Gen) -> String {
+    let k = g.pick(&[2usize, 2, 3, 3, 4]);
+    let n = g.pick(&[16, 16, 17]);
+    let ty = g.pick(&[MRI_UCHAR, MRI_UCHAR, MRI_SHORT, MRI_FLOAT]);
+    let mut imgs = set(g, k, n, ty);
+    // the inputs' voxel sizes stay equal (the program refuses others: `images have different
+    // voxel sizes`)
+    for im in imgs.iter_mut().skip(1) {
+        if !g.chance(4) {
+            let w = g.pick(&[0.005, 0.02, 0.04, 0.08, 0.15]);
+            im.mdc = rotated_lia(g, w);
+        }
+    }
+    let ext = g.pick(&[".mgz", ".mgz", ".nii.gz"]);
+    let files = files_of(g, &imgs, ext);
+    let mut args = s(&["--mov"]);
+    args.extend(names(k, "t", ext));
+    args.extend(s(&["--template", "tp.mgz", "--affine"]));
+    if g.chance(3) {
+        args.extend(s(&["--sat", g.pick(&["4.685", "8"])]));
+    } else {
+        args.push("--satit".to_owned());
+    }
+    if g.chance(2) {
+        args.push("--inittp".to_owned());
+        args.push(g.int(1, k as i64).to_string());
+    } else {
+        args.push("--seed".to_owned());
+        args.push(g.int(1, 99).to_string());
+    }
+    if g.chance(2) {
+        args.push("--noit".to_owned());
+    } else {
+        args.extend(s(&["--maxit", "1", "--epsit", "0.1"]));
+    }
+    let mut opt = |g: &mut Gen, kk: u64, a: &[&str]| {
+        if g.chance(kk) {
+            args.extend(s(a));
+        }
+    };
+    opt(g, 2, &["--iscale"]);
+    opt(g, 4, &["--average", "0"]);
+    opt(g, 6, &["--nomulti"]);
+    opt(g, 8, &["--doubleprec"]);
+    opt(g, 8, &["--cras"]);
+    opt(g, 8, &["--vox2vox"]);
+    opt(g, 8, &["--finalnearest"]);
+    if g.chance(2) {
+        args.push("--lta".to_owned());
+        args.extend(names(k, "o", ".lta"));
+    }
+    if g.chance(4) {
+        args.push("--mapmov".to_owned());
+        args.extend(names(k, "w", ".mgz"));
+    }
+    if g.chance(4) {
+        args.push("--iscaleout".to_owned());
+        args.extend(names(k, "i", ".txt"));
+    }
+    line(None, &files, &[], &args)
+}
+
+/// The affine mean space's cases of `seed` (`fs_robtmpl_probe cases-affine`).
+pub fn generate_affine(seed: u64, n: usize) -> Vec<String> {
+    let mut g = Gen::new(seed ^ 0x6166_6669);
+    (0..n).map(|_| affine_case(&mut g)).collect()
+}
+
 /// The golden cases (`tests/mri_robust_template_golden.rs`): fMRIPrep's and recon-all's calls on
 /// 32^3 inputs, the mean space of two, the global iterations of three, a NaN input (its NaNs made 0
 /// on reading) and a 4-D input of two frames with one `--mapmov` name (FS-1090), each written as MGZ.
@@ -1113,10 +1220,39 @@ pub fn golden_cases() -> Vec<String> {
         "a1.lta",
         "a2.lta",
     ]);
-    [fmriprep, reconall, mean_space, iterations, nan, four_d]
-        .iter()
-        .map(|a| line(None, &files, &[], a))
-        .collect()
+    // the affine mean space (3.2-15): three inputs, two with rotated headers (one past the
+    // logarithm's blocking, one within it)
+    let mut rot = three.clone();
+    rot[1].mdc = rotated_lia(&mut g, 0.08);
+    rot[2].mdc = rotated_lia(&mut g, 0.02);
+    for (i, im) in rot.iter().enumerate() {
+        let name = format!("r{}.mgz", i + 1);
+        files.push((name.clone(), write_as(&mut image(&mut g, im), &name)));
+    }
+    let affine = s(&[
+        "--mov",
+        "r1.mgz",
+        "r2.mgz",
+        "r3.mgz",
+        "--template",
+        "tp.mgz",
+        "--affine",
+        "--satit",
+        "--inittp",
+        "1",
+        "--noit",
+        "--iscale",
+        "--lta",
+        "a1.lta",
+        "a2.lta",
+        "a3.lta",
+    ]);
+    [
+        fmriprep, reconall, mean_space, iterations, nan, four_d, affine,
+    ]
+    .iter()
+    .map(|a| line(None, &files, &[], a))
+    .collect()
 }
 
 fn is_text(name: &str) -> bool {

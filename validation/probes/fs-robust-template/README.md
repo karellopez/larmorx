@@ -4,7 +4,8 @@ CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (the scripts run the replica; their
 the replica's defect handling). Track C, relay 50 (2026-11-24), queue item 3.2-14 (part 1 of the
 program). The clean room's plan is in `specs/mri_robust_template.md` §9.
 
-- `decided.sh [<workspace>]`: builds the preload the comparisons need,
+- `decided.sh [<workspace>]`: builds the preload the comparisons need (relay 51: with the decided
+  `clog`, `../fs-robust/clogrt.c`, for the affine mean space's matrix logarithm),
   `<workspace>/oracles/freesurfer-8.2.0-probes/fs-template-decided/libdecidedtemplate.so`: the decided
   `cabs` and `csqrt` (`../fs-robust/complexrt.c` on CORE-MATH's correctly rounded `hypot`, the user's
   D4) and the decided `acos` (`acosrt.c`: CORE-MATH's correctly rounded `acos`, glibc's for a NaN
@@ -27,6 +28,17 @@ program). The clean room's plan is in `specs/mri_robust_template.md` §9.
   outputs, the inputs sMRIPrep's `StructuralReference` gave the program) with fMRIPrep's call,
   recon-all's motion correction and sMRIPrep's longitudinal call, official against the port in both
   modes, every byte, with times and peaks.
+- `rebuild.sh [<workspace>]` (relay 51): FreeSurfer's `mri_robust_template` rebuilt from the tag with
+  the unit oracle's compiler, the official programs' flags and libraries (the CMake list of the
+  program's files) into `<workspace>/oracles/freesurfer-8.2.0-probes/fs-template-rebuild/`: as it is
+  (`mri_robust_template`, checked to give the official binary's outputs: `check.py --exe`) and with
+  `MyMatrix.cpp`'s Pade coefficients defined (`pade/mri_robust_template`: a copy of the file with the
+  five arrays of `getPadeCoefficients` `static`; FS-1311: the official build's affine mean space
+  computes with uninitialized stack memory).
+- `check.py --family affine` (relay 51): the affine mean space's own cases (`--affine` without
+  `--fixtp`; inputs with rotated headers, small and large angles), `--pade <rebuild>/pade/
+  mri_robust_template` the reference of every case whose port notes FS-1311; `--exe <program>` compares
+  with another program in place of the official binary.
 - `record.py`: the validation record `docs/validation/freesurfer-mri-robust-template.{json,md}` from
   the summaries above (from a clean commit).
 

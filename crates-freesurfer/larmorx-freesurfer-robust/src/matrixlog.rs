@@ -597,7 +597,11 @@ fn matrix_log_pf(err: &mut dyn Write, a: &VnlCMatrix, m: usize) -> Result<VnlCMa
 /// `j - 1` down `R(i, j) = (T(i, j) - sum_{i<k<j} R(i, k) R(k, j)) / (R(i, i) + R(j, j))`) until
 /// `||T - I||_F <= 1/4`, then `2^iter MatrixLog_pf(T - I, 8)`. Reaching `maxlogiter - 1` roots
 /// ends the program (`MatrixLog_isst:tooManyIterations Too many square roots.`, status 1).
-fn matrix_log_isst(err: &mut dyn Write, a: &VnlCMatrix, maxlogiter: i32) -> Result<VnlCMatrix, Fatal> {
+fn matrix_log_isst(
+    err: &mut dyn Write,
+    a: &VnlCMatrix,
+    maxlogiter: i32,
+) -> Result<VnlCMatrix, Fatal> {
     let n = a.cols;
     if n == 1 {
         let mut m = VnlCMatrix::zeros(1, 1);
@@ -613,7 +617,10 @@ fn matrix_log_isst(err: &mut dyn Write, a: &VnlCMatrix, maxlogiter: i32) -> Resu
             break;
         }
         if iter == maxlogiter - 1 {
-            let _ = writeln!(err, "MatrixLog_isst:tooManyIterations Too many square roots.");
+            let _ = writeln!(
+                err,
+                "MatrixLog_isst:tooManyIterations Too many square roots."
+            );
             return Err(Fatal::Exit(1));
         }
         for j in 0..n {
@@ -708,10 +715,17 @@ pub fn matrix_log(
     let n = a.cols;
     if n == 1 {
         let x = a.at(0, 0);
+        // glibc's log with `reproduce`, the correctly rounded one by default (x86-64's default NaN
+        // for a negative number, as glibc's)
         let l = if g.notices.reproduce() {
             math::log_glibc(x)
         } else {
-            math::log(x)
+            let r = math::log(x);
+            if r.is_nan() && !x.is_nan() {
+                f64::from_bits(0xfff8_0000_0000_0000)
+            } else {
+                r
+            }
         };
         return Ok(VnlMatrix {
             rows: 1,
@@ -808,7 +822,12 @@ pub fn matrix_log(
         s.push_str(&format!(" A = {}\n", print_real(a)));
         s.push_str(&format!(" T = {}\n", print_complex(&t)));
         s.push_str(&format!(" U = {}\n", print_complex(&u)));
-        let back = u.mul(&t).mul(&u.conjugate_transpose()).real().sub(a).fro_norm();
+        let back = u
+            .mul(&t)
+            .mul(&u.conjugate_transpose())
+            .real()
+            .sub(a)
+            .fro_norm();
         s.push_str(&format!(
             " fro( real(U * T * U^*) - A) = {}\n\n",
             cfmt::g(back, 16)

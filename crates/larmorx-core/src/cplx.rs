@@ -316,15 +316,15 @@ pub fn csqrt(z: C64) -> C64 {
     C64::new(re, im)
 }
 
-/// The complex logarithm the project decided for `clog` (FreeSurfer's matrix logarithm takes
-/// `std::log` of a complex eigenvalue; glibc 2.35's `clog` is not correctly rounded and its form
-/// is not public: it differs from every simple formula on 0.1 to 15 % of arguments, measured as
-/// a black box): the imaginary part the correctly rounded `atan2(y, x)` ([`math::atan2`]), the
+/// The complex logarithm the project decided for `clog` (C's `clog`, C++'s `std::log` of a
+/// `std::complex<double>`; glibc 2.35's `clog` is not correctly rounded and its form is not
+/// public: it differs from every simple formula on 0.1 to 15 % of arguments, measured as a black
+/// box): the imaginary part the correctly rounded `atan2(y, x)` ([`math::atan2`]), the
 /// real part `log |z|` from correctly rounded functions: where `|z|^2 - 1` (each square split
 /// exactly into a product and its error, `p + e` with a fused multiply-add, then `(p_x - 1) +
 /// p_y` by two error-free sums and the low parts added in order, rounded once) is above `-1/2`
 /// and below `1/2`, half the correctly rounded `log1p` of it ([`math::log1p`]: accurate near the
-/// unit circle, where an eigenvalue of a near-identity transform lies), otherwise the correctly
+/// unit circle), otherwise the correctly
 /// rounded `log` of the correctly rounded `hypot` (relative error below an ulp and a half there).
 /// The special values are C11 Annex G's as glibc's were measured (`clog(+-0 + i y) = -inf + i
 /// atan2(y, +-0)`; an infinite part gives `+inf`; a NaN part gives glibc's NaN `0x7ff8...` in

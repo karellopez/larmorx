@@ -6,8 +6,7 @@
 //! Ltd.) as Ubuntu 22.04's `liblapack.a` and `libblas.a` (3.10.0-2ubuntu1, gfortran 11) compute
 //! it: `ZTRSEN` moves each selected eigenvalue up to its place by `ZTREXC`, one swap of
 //! neighbouring diagonal elements at a time (`ZLARTG`, the 3.10 Fortran 90 version with its safe
-//! scaling, and `ZROT`). FreeSurfer's matrix logarithm (`MyMatrix::OrdSchurComplexLogical`)
-//! reorders its Schur forms with it.
+//! scaling, and `ZROT`), for the replicas that reorder a complex Schur form.
 //!
 //! The complex arithmetic is gfortran's (`crate::cplx`: the plain product, Smith's division, a
 //! real promoted to `(x, +0)`); `MAX` and `MIN` are `MAXSD`'s and `MINSD`'s (`a > b ? a : b`,

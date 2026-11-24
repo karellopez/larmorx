@@ -233,7 +233,11 @@ pub fn log1p(x: f64) -> f64 {
             rs = rs.wrapping_sub(eoff);
         } else {
             rs = rs.wrapping_sub(1021u64 << 52);
-            let sc = [b(0x3fe0000000000000), b(0x3fd0000000000000), b(0x3fc0000000000000)];
+            let sc = [
+                b(0x3fe0000000000000),
+                b(0x3fd0000000000000),
+                b(0x3fc0000000000000),
+            ];
             t *= sc[(je - 1022) as usize];
             dt *= sc[(je - 1022) as usize];
         }

@@ -1,8 +1,8 @@
 # FreeSurfer 8.2.0's `mri_robust_template`: findings of the replica
 
 CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (source-derived: function names, lines, the code's
-structure). Track C, relay 50 (2026-11-24), queue item 3.2-14 (part 1 of the program; 3.2-15 and
-3.2-16 follow). The behaviour spec is `specs/mri_robust_template.md`; the probe
+structure). Track C, relays 50 and 51 (2026-11-24), queue items 3.2-14 (the program but the affine mean
+space) and 3.2-15 (the affine mean space, §6). The behaviour spec is `specs/mri_robust_template.md`; the probe
 `validation/probes/fs-robust-template/`.
 
 ## 1. What the program is
@@ -127,4 +127,70 @@ CORE-MATH's `acos`, glibc's for a NaN argument) into the official program. Measu
 ## 5. Defects
 
 FS-1080 to FS-1098 (`larmorx_core::defects`; the spec's §8; register rows in track C's HANDOFF.md,
-relay 50). FS-1099, FS-1100 unused.
+relay 50); FS-1099, FS-1100, FS-1311, FS-1312 (relay 51: §6).
+
+## 6. The affine mean space (queue 3.2-15, relay 51)
+
+`--affine` without `--fixtp` reaches `MultiRegistration::initialXforms` 1541-1545:
+`meanr = MyMatrix::GeometricMean(mras3)` (the inverted RAS transforms' 3 x 3 blocks, the target's the
+identity), the only caller of `MatrixLog`/`MatrixExp` in FreeSurfer 8.2.0 (`grep` of the tag).
+`GeometricMean` (1905-1915) is `MatrixExp((1.0/n) * sum MatrixLog(vm[i]))`, MATLAB's `logm` and `expm`
+translated (`MyMatrix.cpp` 286-1266). Ported in `larmorx-freesurfer-robust/src/matrixlog.rs` on new
+larmorx-core pieces: `vnl_svd<std::complex<double>>` (LINPACK's `zsvdc` from VXL's v3p, `job = 21`;
+`vnl_svd_complex.rs`), LAPACK 3.10.0's `ZTRSEN('N', 'V')` with `ZTREXC`, the 3.10 `ZLARTG` and `ZROT`
+(`lapack_ztrsen.rs`), CORE-MATH's `log1p` and the decided `clog`.
+
+**Facts of the official build** (objdump of the probe's `MyMatrix.o`, the official flags, and of the
+official program's imports):
+- The official program imports `clog@GLIBC_2.2.5` (`std::log` of a complex eigenvalue in
+  `MatrixLog_isst`'s `1 x 1` case), besides `acos`, `cabs`, `csqrt`, `log`, `exp`, `pow`, `frexp`,
+  `__divdc3`, `__muldc3`. glibc's `clog` matches no simple formula (black box, 2 x 10^6 arguments per
+  family: `log(hypot)` differs on 3.6 to 88 %, `log1p(|z|^2 - 1) / 2` on 0.06 to 48 %, its imaginary
+  part from the correctly rounded `atan2` on 0.07 to 0.5 %), so the project's decided `clog`
+  (`larmorx_core::cplx::clog`, `validation/probes/fs-robust/clogrt.c`) stands in, in both modes, and
+  the probes preload or wrap it (`decided.sh`, fs-robust's `build.sh`).
+- `std::norm` of `std::complex<double>` (the complex Frobenius norm's squares, `vnl_c_vector`'s
+  `two_norm_squared` through `vnl_math::squared_magnitude`) is libstdc++'s floating-point form
+  `abs(z) * abs(z)` (`_Norm_helper<true>`), so `cabs` (the decided `hypot`) enters `MatrixLog_isst`'s
+  stopping test.
+- **FS-1311**: `getPadeCoefficients` (356-406) points `c` at a local array of a `case` block and
+  copies `c[0..m]` into the vector after the block (and the switch) ended. GCC 8.4 at `-O3` removes the
+  arrays' stores as dead: the function copies `m + 1` doubles of its own uninitialized stack frame
+  (`rsp`, `rsp+0x20`, `+0x50`, `+0x90`, `+0xe0` by degree). Measured with the probe: 436 of 436 seed-1
+  cases that reach `MatrixExp` give a result different from the method's (NaN, `suspicious return value
+  (n) from SVDC`, or arbitrary numbers), and every geometric mean is wrong; the official program's
+  affine mean space is memory contents. The probe's `fsrobust-pade` and the template probe's rebuild
+  (`rebuild.sh`) compile a copy of `MyMatrix.cpp` with the five arrays `static` (the tag is never
+  edited) as the reference.
+- **FS-1312**: `MatrixLog`'s check (683-697) exits when the imaginary part's one-norm passes `10 n
+  2^-52 ||F||_1` (MATLAB's `funm` returns the complex result there; FreeSurfer, which must return a
+  real matrix, ends the program). The complex Schur arithmetic leaves imaginary parts up to about 40
+  `2^-52 ||F||_1` on ordinary transforms: seed 1's 200 `logm` cases, 11 refused with imaginary parts of
+  2.5e-16 to 3.4e-14 (near-identity rotations and scalings, the template's own inputs), against 25
+  genuine failures at 0.0158 and above (FS-1099's nonpositive eigenvalues continued, FS-1100, a
+  singular matrix). Rule A: by default refused only above `sqrt(2^-52) ||F||_1` (1.5e-8 relative; the
+  gap between the two groups is five orders of magnitude on both sides).
+- **FS-1100**: `sylv_tri` (1221-1266) subtracts `M.get_n_columns(0, i-1) * U.get_n_rows(0,
+  i-1).get_column(i)`, `i - 1` columns, where MATLAB's `X(:,1:i-1)` (1-based) is `i` columns: the last
+  solved column's term is left out for every column after the first (`get_n_columns(0, 0)` is an empty
+  matrix, its product with the empty vector 0). Reached when a block of two or more eigenvalues stands
+  right of a single one (a small rotation with an axis scaled by more than 10 %): the logarithm is
+  wrong, usually with a large imaginary part (0.0158 to 0.0189 in seed 1), so FreeSurfer then ends
+  with FS-1312's message. Rule A: the whole sum by default.
+- **FS-1099**: `MatrixLog`'s eigenvalue check (539-547) prints its three lines and `assert(1==2)`, which
+  `-DNDEBUG` removes: FreeSurfer goes on (a reflection's `-1` gives `log` with imaginary part pi and
+  then FS-1312's exit, 3.14159 in every such case). Rule B: the message and status 1 by default.
+- `OrdSchurComplexLogical` passes `long` arguments where `ZTRSEN` reads 32-bit `INTEGER`s and `int`
+  `SELECT`s (little-endian: the low halves; `INFO` starts at 100 and its low half is set to 0); `S`
+  and `SEP` null (`JOB = 'N'` never touches them); `LWORK = n` (at least the 1 `JOB = 'N'` needs).
+- `MatrixLog_pf` sizes `nodes`/`wts` by the matrix (`n`) and `gauss_legendre(8)` reassigns them to 8.
+- `sylv_tri`'s `M(m, n)` is VNL's uninitialized storage, but every column is set before it is read
+  (both with FreeSurfer's `i - 1` columns and the whole sum).
+
+**Measured** (2026-11-24, fs-robust's probe `--family logm`, the official code compiled as the
+official programs are, with `fsrobust-pade` the reference of FS-1311's cases; logs
+`oracles/logs/fs-found-c-r51-logm*.log`): seed 1 x 600: 598 identical with `reproduce`, 0 different,
+2 not ported (`ZLAQR0`: a NaN matrix's Schur form, FS-969); seed 7 x 3,000: 2,982 identical, 10 with
+different NaN bits only (expm and geomean of an infinite or NaN entry: the double SVD's NaN bits,
+`SVDNAN`, an open item since relay 42), 8 not ported; seed 13 x 6,000: 5,958 identical, 19 NaN bits
+only, 23 not ported. `fix` differs only with notices (FS-1099, FS-1100, FS-1311, FS-1312, FS-969).

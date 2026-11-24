@@ -66,8 +66,8 @@ use larmorx_freesurfer_mri::mri::{
 use larmorx_freesurfer_mri::vol_geom::{extract_i_to_r, extract_r_to_i, reinit_cache};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use larmorx_freesurfer_robust::costs::centroid;
-use larmorx_freesurfer_robust::matrixlog::geometric_mean3;
 use larmorx_freesurfer_robust::debug::print_fixed4;
+use larmorx_freesurfer_robust::matrixlog::geometric_mean3;
 use larmorx_freesurfer_robust::mymatrix::{
     Mat3, Mat4, convert_matrix2vnl, get_m_from_rt, get_rt_from_m, lta2matrix, mul3,
     polar_decomposition, polar2_decomposition, ras_matrix2lta, rotation_mean, vox_matrix2lta,

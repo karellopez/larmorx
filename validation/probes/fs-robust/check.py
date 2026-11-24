@@ -23,6 +23,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from collections import Counter
@@ -178,7 +179,8 @@ NANBITS = ("FS-968", "SVDNAN")
 
 
 def nan_canonical(line: str) -> str:
-    """The line with every double or float token that is a NaN replaced by ``NaN``."""
+    """The line with every double or float token that is a NaN replaced by ``NaN``, and the NaNs'
+    printed signs (``-nan`` in VNL's matrices on standard error) dropped."""
     out = []
     for tok in line.split(" "):
         if len(tok) == 16 and all(c in "0123456789abcdef" for c in tok):
@@ -186,7 +188,7 @@ def nan_canonical(line: str) -> str:
             if (v >> 52) & 0x7FF == 0x7FF and v & ((1 << 52) - 1):
                 tok = "NaN"
         out.append(tok)
-    return " ".join(out)
+    return re.sub(r" *-?nan", " nan", " ".join(out))
 
 
 # The port's lines for a path of LAPACK it does not port (ZLAQR0, where ZLAHQR does not converge:

@@ -4,6 +4,7 @@
 //! The port's side of the fs-robust-template probe (`validation/probes/fs-robust-template/`):
 //!
 //!     fs_robtmpl_probe cases <seed> <n>            the case file, on standard output
+//!     fs_robtmpl_probe cases-affine <seed> <n>     the affine mean space's cases (3.2-15)
 //!     fs_robtmpl_probe golden-cases                the golden cases
 //!                                                 (`tests/mri_robust_template_golden.rs`)
 //!     fs_robtmpl_probe run <cases> fix|reproduce   one line per case: the output, a tab, the
@@ -35,6 +36,13 @@ fn main() {
                 println!("{line}");
             }
         }
+        Some("cases-affine") if args.len() == 4 => {
+            let seed: u64 = args[2].parse().expect("seed");
+            let n: usize = args[3].parse().expect("n");
+            for line in cases::generate_affine(seed, n) {
+                println!("{line}");
+            }
+        }
         Some("golden-cases") => {
             for line in cases::golden_cases() {
                 println!("{line}");
@@ -59,7 +67,7 @@ fn main() {
         }
         _ => {
             eprintln!(
-                "usage: fs_robtmpl_probe cases <seed> <n> | golden-cases | run <cases> fix|reproduce | run-seed <seed> <n> fix|reproduce"
+                "usage: fs_robtmpl_probe cases <seed> <n> | cases-affine <seed> <n> | golden-cases | run <cases> fix|reproduce | run-seed <seed> <n> fix|reproduce"
             );
             std::process::exit(2);
         }

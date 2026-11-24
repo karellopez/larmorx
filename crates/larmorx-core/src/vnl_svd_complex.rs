@@ -3,9 +3,8 @@
 //! value decomposition `zsvdc` as translated by f2c in VXL's `v3p/netlib` (with the reference
 //! BLAS kernels it calls, `zscal`, `zaxpy`, `zdotc`, `zdrot`, `zswap`, `dznrm2`, `drotg`, and
 //! libf2c's `z_abs` and `z_div`), then the decomposition `vnl_svd` keeps (`U`, `W` = `|s|`, `V`)
-//! and its two solvers, [`VnlCSvd::solve_matrix`] and [`VnlCSvd::solve_vector`]. FreeSurfer's
-//! matrix logarithm (`MyMatrix::MatrixLog_pf`, `MyMatrix::sylv_tri`) solves its complex systems
-//! with them.
+//! and its two solvers, [`VnlCSvd::solve_matrix`] and [`VnlCSvd::solve_vector`]. The replicas' complex
+//! least-squares systems are solved with them.
 //!
 //! The f2c translations are followed statement by statement, in their order and with their
 //! 1-based indices: LINPACK's complex arithmetic is written out part by part in C (no runtime
@@ -710,7 +709,7 @@ pub struct VnlCSvd {
 }
 
 /// [`VnlCSvd`] of `m` (`rows >= 1`, `cols >= 1`), or [`DivisionByZero`] where LINPACK's `z_div`
-/// divides by zero (FreeSurfer prints `complex division by zero` and aborts).
+/// divides by zero (the C code prints `complex division by zero` and aborts).
 pub fn vnl_svd_complex(m: &VnlCMatrix) -> Result<VnlCSvd, DivisionByZero> {
     let (n, p) = (m.rows, m.cols);
     assert!(n >= 1 && p >= 1, "vnl_svd: a matrix with elements");

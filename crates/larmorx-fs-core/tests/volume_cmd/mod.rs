@@ -19,6 +19,7 @@ mod lta54;
 mod part10;
 mod part10b;
 mod part10c;
+mod part11a;
 mod part7b;
 mod part8;
 mod part9;
@@ -1343,6 +1344,7 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                 && !part10::call(p, l, &c)?
                 && !part10b::call(p, l, &c)?
                 && !part10c::call(p, l, &c)?
+                && !part11a::call(p, l, &c)?
             {
                 args::bad("unknown command")
             }
@@ -1476,14 +1478,16 @@ fn putlta(l: &mut Line, lta: Option<&Lta>) {
     }
 }
 
-/// One line of a batch (its tokens, the `@<seconds>`, `+gdiag=<hex>`, `+gdiagno=<n>` and
-/// `+env=<NAME>=<value>` prefixes included) on a fresh process state in `mode`: the probe's
+/// One line of a batch (its tokens, the `@<seconds>`, `+gdiag=<hex>`, `+gdiagno=<n>`,
+/// `+gxyz=<x>,<y>,<z>` and `+env=<NAME>=<value>` prefixes included) on a fresh process state in `mode`: the probe's
 /// result line. `+gdiagno=` sets the diagnostic level (the diagnostic stream is standard
-/// output, as after a program's diagnostic set-up); `+env=` sets a variable for the call.
+/// output, as after a program's diagnostic set-up); `+gxyz=` sets the debugging voxel (-1, -1,
+/// -1 otherwise); `+env=` sets a variable for the call.
 pub fn run_line(toks: &[String], mode: UpstreamDefects, env: &Environment) -> String {
     let mut first = 0;
     let mut gdiag = 0u64;
     let mut gdiag_no = None;
+    let mut gxyz = [-1i32; 3];
     let mut envs: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
     while first < toks.len() {
         let t = &toks[first];
@@ -1492,6 +1496,12 @@ pub fn run_line(toks: &[String], mode: UpstreamDefects, env: &Environment) -> St
             gdiag = u64::from_str_radix(h, 16).unwrap_or(0);
         } else if let Some(n) = t.strip_prefix("+gdiagno=") {
             gdiag_no = Some(n.parse::<i64>().unwrap_or(0) as i32);
+        } else if let Some(v) = t.strip_prefix("+gxyz=") {
+            let xyz: Vec<i32> = v.split(',').map(|x| x.parse().unwrap_or(0)).collect();
+            if xyz.len() != 3 {
+                args::bad("+gxyz= needs x,y,z")
+            }
+            gxyz = [xyz[0], xyz[1], xyz[2]];
         } else if let Some(e) = t.strip_prefix("+env=") {
             let Some((name, value)) = e.split_once('=') else {
                 args::bad("+env= needs NAME=VALUE")
@@ -1509,6 +1519,7 @@ pub fn run_line(toks: &[String], mode: UpstreamDefects, env: &Environment) -> St
     if let Some(n) = gdiag_no {
         p.gdiag_no = n;
     }
+    p.gvoxel = gxyz;
     for (name, value) in &envs {
         p.env.set(name, value);
     }

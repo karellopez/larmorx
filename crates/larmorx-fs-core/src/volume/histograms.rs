@@ -475,16 +475,21 @@ impl Process {
                 for x in 0..g.width {
                     let val = self.mri_get_vox_val(v.a(), x, y, z, 0, 0)?;
                     let sval = self.int_fs12(sse::widen(val));
+                    // §52 (item 129 b): the first index from `low` while below the template's
+                    // bin count whose count reaches the source's; none (no index there, or no
+                    // count high enough): the voxel's own `sval`, as outside the limits.
                     let out = if low <= sval && sval <= high {
                         let sc = self.eq_count(&hs, i64::from(sval));
                         let mut j = i64::from(low);
+                        let mut found = None;
                         while j < i64::from(ht.nbins) {
                             if self.eq_count(&ht, j) >= sc {
+                                found = Some(j);
                                 break;
                             }
                             j += 1;
                         }
-                        j as f32
+                        found.map_or(sval as f32, |j| j as f32)
                     } else {
                         sval as f32
                     };

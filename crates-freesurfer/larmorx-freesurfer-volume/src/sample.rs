@@ -277,6 +277,137 @@ pub fn sample_volume_frame(
     trilinear(g, err, "MRIsampleVolumeFrame", mri, x, y, z, frame, pval)
 }
 
+/// [`sample_volume_frame`] of a volume of bytes, faster (the Powell registration's costs sample
+/// its byte images millions of times an evaluation): the same operations in the same order, the
+/// voxels read straight from the volume's buffer where every corner lies inside it; any other
+/// call (a frame the volume does not have, a coordinate past the `int` range) goes through
+/// [`sample_volume_frame`] itself. Made by [`ByteSampler::new`] for a byte volume whose rows are
+/// laid out as its row pointers step them (`None` otherwise).
+pub struct ByteSampler<'a> {
+    data: &'a [u8],
+    w: i32,
+    h: i32,
+    d: i32,
+    nframes: i32,
+    /// the bytes from one row to the next (`vox_per_row`)
+    row: usize,
+    outside: f64,
+}
+
+impl<'a> ByteSampler<'a> {
+    /// The sampler of `mri` when it is a byte volume with its voxels (`None` otherwise).
+    pub fn new(mri: &'a Mri) -> Option<ByteSampler<'a>> {
+        let data = mri.chunk.as_deref()?;
+        let (w, h, d, nf) = (mri.vg.width, mri.vg.height, mri.vg.depth, mri.nframes);
+        if mri.mtype != MRI_UCHAR || mri.bytes_per_vox != 1 || w < 1 || h < 1 || d < 1 || nf < 1 {
+            return None;
+        }
+        let row = usize::try_from(mri.vox_per_row).ok()?;
+        let rows = (d as usize)
+            .checked_mul(nf as usize)?
+            .checked_mul(h as usize)?;
+        let need = rows.checked_mul(row)?;
+        if row < w as usize || (need as u64) > mri.bytes_total || need > data.len() {
+            return None;
+        }
+        Some(ByteSampler {
+            data,
+            w,
+            h,
+            d,
+            nframes: nf,
+            row,
+            outside: mri.outside_val,
+        })
+    }
+
+    #[inline(always)]
+    fn at(&self, sl: i32, y: i32, x: i32) -> f64 {
+        let o = (sl as usize * self.h as usize + y as usize) * self.row + x as usize;
+        f64::from(self.data[o])
+    }
+
+    /// `MRIsampleVolumeFrame(mri, x, y, z, frame, &v)` (`mri` the sampler's volume).
+    #[allow(clippy::too_many_arguments)]
+    #[inline]
+    pub fn sample(
+        &self,
+        g: &mut Globals,
+        err: &mut dyn Write,
+        mri: &Mri,
+        x: f64,
+        y: f64,
+        z: f64,
+        frame: i32,
+        pval: &mut f64,
+    ) -> i32 {
+        let lim = 1.0e9;
+        if !(0..self.nframes).contains(&frame) || !(x.abs() < lim && y.abs() < lim && z.abs() < lim)
+        {
+            return sample_volume_frame(g, err, mri, x, y, z, frame, pval);
+        }
+        let (w, h, d) = (self.w, self.h, self.d);
+        if whole(x) && whole(y) && whole(z) {
+            // the nearest voxel (`sample_volume_frame_nearest`, `nint` of a number in range)
+            if index_not_in_volume(mri, x, y, z) == 1 {
+                *pval = self.outside;
+                return NO_ERROR;
+            }
+            let near = |v: f64, n: i32| {
+                let v = (if v < 0.0 { v - 0.5 } else { v + 0.5 }).trunc() as i32;
+                v.clamp(0, n - 1)
+            };
+            let (xv, yv, zv) = (near(x, w), near(y, h), near(z, d));
+            *pval = self.at(zv + frame * d, yv, xv);
+            return NO_ERROR;
+        }
+        if index_not_in_volume(mri, x, y, z) == 1 {
+            *pval = self.outside;
+            return NO_ERROR;
+        }
+        let clampf = |v: f64, n: i32| {
+            let v = if v >= f64::from(n) {
+                f64::from(n) - 1.0
+            } else {
+                v
+            };
+            if v < 0.0 { 0.0 } else { v }
+        };
+        let (x, y, z) = (clampf(x, w), clampf(y, h), clampf(z, d));
+        let lo = |v: f64| cvtt(v).max(0);
+        let (xm, ym, zm) = (lo(x), lo(y), lo(z));
+        let (xp, yp, zp) = (
+            (xm + 1).min(w - 1),
+            (ym + 1).min(h - 1),
+            (zm + 1).min(d - 1),
+        );
+        let xmd = x - f64::from(xm as f32);
+        let ymd = y - f64::from(ym as f32);
+        let zmd = z - f64::from(zm as f32);
+        let (xpd, ypd, zpd) = (1.0 - xmd, 1.0 - ymd, 1.0 - zmd);
+        let base = frame * d;
+        let v = |xi: i32, yi: i32, zi: i32| self.at(base + zi, yi, xi);
+        // the corners and the additions as `trilinear`'s (a byte voxel is never NaN)
+        let t1 = mul64(xpd * ypd * zpd, v(xm, ym, zm));
+        let t2 = mul64(xpd * ypd * zmd, v(xm, ym, zp));
+        let t3 = mul64(xpd * ymd * zpd, v(xm, yp, zm));
+        let t4 = mul64(xpd * ymd * zmd, v(xm, yp, zp));
+        let t5 = mul64(xmd * ypd * zpd, v(xp, ym, zm));
+        let t6 = mul64(xmd * ypd * zmd, v(xp, ym, zp));
+        let t7 = mul64(xmd * ymd * zpd, v(xp, yp, zm));
+        let t8 = mul64(xmd * ymd * zmd, v(xp, yp, zp));
+        let mut s = add64(t1, t2);
+        s = add64(s, t3);
+        s = add64(t4, s);
+        s = add64(s, t5);
+        s = add64(t6, s);
+        s = add64(t7, s);
+        s = add64(s, t8);
+        *pval = s;
+        NO_ERROR
+    }
+}
+
 /// The trilinear sample of `MRIsampleVolume` and `MRIsampleVolumeFrame` once the whole
 /// coordinates and the frames past the volume's are dealt with.
 #[allow(clippy::too_many_arguments)]

@@ -252,12 +252,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", type=Path)
     ap.add_argument(
         "--family",
-        choices=("seeded", "powell", "histo", "halfway", "test"),
+        choices=("seeded", "powell", "histo", "halfway", "test", "debug"),
         default="seeded",
         help="the cases: the prelude, the entropy images and seeded ones (--seed, --n), the "
         "Powell registration's 40 (relay 46), its joint-histogram and SB costs' 32 (relay 47), or "
         "its half-way outputs' 24 (relay 48: FS-1075, never served from the cache), or the test "
-        "mode's (relay 48)",
+        "mode's (relay 48), or the debug output's (relay 49: --debug, standard input /dev/null)",
     )
     ap.add_argument(
         "--preload",
@@ -270,6 +270,11 @@ def main(argv: list[str] | None = None) -> int:
         "--golden", action="store_true", help="the golden cases: their official SHA-256 only"
     )
     a = ap.parse_args(argv)
+    # relay 49: every official run's standard input is /dev/null (the oracle cache's runs inherit
+    # this process's): --debug's key presses then fail at once, as the port's empty input does
+    devnull = os.open(os.devnull, os.O_RDONLY)
+    os.dup2(devnull, 0)
+    os.close(devnull)
     ws = workspace()
     if ws is None:
         raise SystemExit("no workspace with oracles/")

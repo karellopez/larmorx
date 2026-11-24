@@ -42,8 +42,9 @@ use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::sse::{add64, div64, mul, mul64, sqrt64, sub64};
 use larmorx_freesurfer_mri::mri::{MRI_FLOAT, MRI_UCHAR, Mri, mri_alloc_sequence};
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
-use larmorx_freesurfer_volume::sample::sample_volume_frame;
+use larmorx_freesurfer_volume::sample::{ByteSampler, sample_volume_frame};
 
+use crate::debug::Cout;
 use crate::mymatrix::Mat4;
 use crate::mymri::wide;
 
@@ -231,6 +232,83 @@ pub fn minmax(i: &Mri) -> (f32, f32) {
     (min, max)
 }
 
+/// [`sample_volume_frame`] of `m`, through its byte sampler when it has one (the same numbers).
+#[allow(clippy::too_many_arguments)]
+#[inline(always)]
+pub(crate) fn sample(
+    b: &Option<ByteSampler>,
+    g: &mut Globals,
+    err: &mut dyn Write,
+    m: &Mri,
+    x: f64,
+    y: f64,
+    z: f64,
+    f: i32,
+    v: &mut f64,
+) {
+    match b {
+        Some(b) => b.sample(g, err, m, x, y, z, f, v),
+        None => sample_volume_frame(g, err, m, x, y, z, f, v),
+    };
+}
+
+/// A `float` image whose voxels lie in one buffer as its row pointers step them (the images
+/// [`map_mri`] makes): a voxel inside it read and written straight, as `MRIgetVoxVal` and
+/// `MRIsetVoxVal` read and write it.
+#[derive(Clone, Copy)]
+struct Floats {
+    w: usize,
+    h: usize,
+    d: usize,
+}
+
+impl Floats {
+    fn of(m: &Mri) -> Option<Floats> {
+        let c = m.chunk.as_deref()?;
+        let (w, h, d, nf) = (m.vg.width, m.vg.height, m.vg.depth, m.nframes);
+        if m.mtype != MRI_FLOAT || w < 1 || h < 1 || d < 1 || nf < 1 {
+            return None;
+        }
+        let (w, h, d, nf) = (w as usize, h as usize, d as usize, nf as usize);
+        let wh = w.checked_mul(h)?;
+        let whd = wh.checked_mul(d)?;
+        let need = whd.checked_mul(nf)?.checked_mul(4)?;
+        let ok = m.vox_per_row == w as u64
+            && m.vox_per_slice == wh as u64
+            && m.vox_per_vol == whd as u64
+            && c.len() >= need
+            && need as u64 <= m.bytes_total;
+        ok.then_some(Floats { w, h, d })
+    }
+
+    #[inline(always)]
+    fn at(&self, x: i32, y: i32, z: i32, f: i32) -> usize {
+        4 * (((f as usize * self.d + z as usize) * self.h + y as usize) * self.w + x as usize)
+    }
+}
+
+/// `MRIgetVoxVal(m, x, y, z, f)` of a voxel inside `m` ([`Floats`] when it has them).
+#[allow(clippy::too_many_arguments)]
+#[inline(always)]
+fn fget(
+    l: &Option<Floats>,
+    g: &mut Globals,
+    err: &mut dyn Write,
+    m: &Mri,
+    x: i32,
+    y: i32,
+    z: i32,
+    f: i32,
+) -> Result<f32, Fatal> {
+    match (l, m.chunk.as_deref()) {
+        (Some(l), Some(c)) => {
+            let o = l.at(x, y, z, f);
+            Ok(f32::from_le_bytes([c[o], c[o + 1], c[o + 2], c[o + 3]]))
+        }
+        _ => mri_get_vox_val(g, err, m, x, y, z, f, 0),
+    }
+}
+
 /// The row constants of one slice or row of the sampling grid: `M[k][a] * v + base[k]`, `k` the
 /// three rows (the source's order: column `a` times the coordinate, plus the next level's sum).
 #[inline(always)]
@@ -259,6 +337,7 @@ fn half_way_samples(
         t.nframes,
     ];
     let col3 = |m: &Mat4| [m[0][3], m[1][3], m[2][3]];
+    let (bs, bt) = (ByteSampler::new(s), ByteSampler::new(t));
     let mut z = 0;
     while z < dt[2] {
         let tz = lane(mti, 2, f64::from(z), col3(mti));
@@ -273,12 +352,12 @@ fn half_way_samples(
                 let ps = lane(msi, 0, f64::from(x), sy);
                 for f in 0..dt[3] {
                     let mut vs = 0.0;
-                    sample_volume_frame(g, err, s, ps[0], ps[1], ps[2], f, &mut vs);
+                    sample(&bs, g, err, s, ps[0], ps[1], ps[2], f, &mut vs);
                     if vs == -1.0 {
                         continue;
                     }
                     let mut vt = 0.0;
-                    sample_volume_frame(g, err, t, pt[0], pt[1], pt[2], f, &mut vt);
+                    sample(&bt, g, err, t, pt[0], pt[1], pt[2], f, &mut vt);
                     if vt == -1.0 {
                         continue;
                     }
@@ -416,6 +495,8 @@ pub fn map_mri(
     let mut nmri = mri_alloc_sequence(g, out, err, width, height, depth, MRI_FLOAT, mri.nframes)?;
     nmri.outside_val = mri.outside_val;
     let col3 = [mi[0][3], mi[1][3], mi[2][3]];
+    let b = ByteSampler::new(mri);
+    let l = Floats::of(&nmri);
     for iz in 0..depth {
         let tz = lane(mi, 2, f64::from(iz * d[2]), col3);
         for iy in 0..height {
@@ -424,8 +505,16 @@ pub fn map_mri(
                 let p = lane(mi, 0, f64::from(ix * d[0]), ty);
                 for f in 0..mri.nframes {
                     let mut v = 0.0;
-                    sample_volume_frame(g, err, mri, p[0], p[1], p[2], f, &mut v);
-                    mri_set_vox_val(g, err, &mut nmri, ix, iy, iz, f, v as f32, 0)?;
+                    sample(&b, g, err, mri, p[0], p[1], p[2], f, &mut v);
+                    match (&l, nmri.chunk.as_mut()) {
+                        (Some(l), Some(c)) => {
+                            let o = l.at(ix, iy, iz, f);
+                            c[o..o + 4].copy_from_slice(&(v as f32).to_le_bytes());
+                        }
+                        _ => {
+                            mri_set_vox_val(g, err, &mut nmri, ix, iy, iz, f, v as f32, 0)?;
+                        }
+                    }
                 }
             }
         }
@@ -438,10 +527,11 @@ pub fn map_mri(
 pub fn mean(g: &mut Globals, err: &mut dyn Write, mri: &Mri, frame: i32) -> Result<f64, Fatal> {
     let mut d = 0.0f64;
     let mut ocount = 0u32;
+    let l = Floats::of(mri).filter(|_| (0..mri.nframes).contains(&frame));
     for z in 0..mri.vg.depth {
         for y in 0..mri.vg.height {
             for x in 0..mri.vg.width {
-                let v = wide(mri_get_vox_val(g, err, mri, x, y, z, frame, 0)?);
+                let v = wide(fget(&l, g, err, mri, x, y, z, frame)?);
                 if v == -1.0 {
                     ocount = ocount.wrapping_add(1);
                     continue;
@@ -485,15 +575,23 @@ pub fn ncc(
         mean_t.push(mean(g, err, &nt, f)?);
     }
     let (mut dsum, mut sig_s, mut sig_t) = (0.0f64, 0.0f64, 0.0f64);
+    // the mapped images have the same extent and frames (both on the target's grid): every voxel
+    // read inside both
+    let (ls, lt) = (Floats::of(&ns), Floats::of(&nt));
+    let same = ns.vg.width == nt.vg.width
+        && ns.vg.height == nt.vg.height
+        && ns.vg.depth == nt.vg.depth
+        && ns.nframes == nt.nframes;
+    let (ls, lt) = if same { (ls, lt) } else { (None, None) };
     for z in 0..nt.vg.depth {
         for y in 0..nt.vg.height {
             for x in 0..nt.vg.width {
                 for f in 0..nt.nframes {
-                    let vs = wide(mri_get_vox_val(g, err, &ns, x, y, z, f, 0)?);
+                    let vs = wide(fget(&ls, g, err, &ns, x, y, z, f)?);
                     if vs == -1.0 {
                         continue;
                     }
-                    let vt = wide(mri_get_vox_val(g, err, &nt, x, y, z, f, 0)?);
+                    let vt = wide(fget(&lt, g, err, &nt, x, y, z, f)?);
                     if vt == -1.0 {
                         continue;
                     }
@@ -517,7 +615,8 @@ pub fn ncc(
 /// of `d`, each frame: the 5^3 block's means, then `|sum ds dt| / (sqrt(sum dt^2) sqrt(sum ds^2))`
 /// added to the total; a block holding a -1, or of no variance in either image, adds nothing (a
 /// -1 also ends that centre's remaining frames); the total divided by the number of blocks added
-/// (unsigned). A NaN total prints `d is nan <dd> <svar> <tvar>` and ends the program (status 1).
+/// (unsigned). A NaN total prints `d is nan <dd> <svar> <tvar>` (in the standard output's state
+/// `cout`) and ends the program (status 1).
 #[allow(clippy::too_many_arguments)]
 pub fn local_ncc(
     g: &mut Globals,
@@ -528,6 +627,7 @@ pub fn local_ncc(
     msi: &Mat4,
     mti: &Mat4,
     d: [i32; 3],
+    cout: Cout,
 ) -> Result<f64, Fatal> {
     const R: i32 = 2;
     const BW: i32 = 2 * R + 1;
@@ -543,6 +643,17 @@ pub fn local_ncc(
     ];
     let mut total = 0.0f64;
     let mut dcount = 0u32;
+    // both mapped at every voxel of their own grids (the source's and the target's extents)
+    let (ls, lt) = (Floats::of(&ns), Floats::of(&nt));
+    let inside = |m: &Mri, l: Option<Floats>| {
+        l.filter(|_| {
+            m.vg.width >= t.vg.width
+                && m.vg.height >= t.vg.height
+                && m.vg.depth >= t.vg.depth
+                && m.nframes >= t.nframes
+        })
+    };
+    let (ls, lt) = (inside(&ns, ls), inside(&nt, lt));
     let mut z = R;
     while z < dt[2] {
         let (nz, nzm) = (z - R, z - R + BW);
@@ -558,12 +669,12 @@ pub fn local_ncc(
                     for i in nz..nzm {
                         for j in ny..nym {
                             for k in nx..nxm {
-                                let vs = wide(mri_get_vox_val(g, err, &ns, k, j, i, f, 0)?);
+                                let vs = wide(fget(&ls, g, err, &ns, k, j, i, f)?);
                                 if vs == -1.0 {
                                     x += d[0];
                                     continue 'coord;
                                 }
-                                let vt = wide(mri_get_vox_val(g, err, &nt, k, j, i, f, 0)?);
+                                let vt = wide(fget(&lt, g, err, &nt, k, j, i, f)?);
                                 if vt == -1.0 {
                                     x += d[0];
                                     continue 'coord;
@@ -580,12 +691,12 @@ pub fn local_ncc(
                     for i in nz..nzm {
                         for j in ny..nym {
                             for k in nx..nxm {
-                                let vs = wide(mri_get_vox_val(g, err, &ns, k, j, i, f, 0)?);
+                                let vs = wide(fget(&ls, g, err, &ns, k, j, i, f)?);
                                 if vs == -1.0 {
                                     x += d[0];
                                     continue 'coord;
                                 }
-                                let vt = wide(mri_get_vox_val(g, err, &nt, k, j, i, f, 0)?);
+                                let vt = wide(fget(&lt, g, err, &nt, k, j, i, f)?);
                                 if vt == -1.0 {
                                     x += d[0];
                                     continue 'coord;
@@ -610,9 +721,9 @@ pub fn local_ncc(
                         let _ = writeln!(
                             out,
                             "d is nan {} {} {}",
-                            cfmt::ostream(dd),
-                            cfmt::ostream(svar),
-                            cfmt::ostream(tvar)
+                            cout.os(dd),
+                            cout.os(svar),
+                            cout.os(tvar)
                         );
                         return Err(Fatal::Exit(1));
                     }
@@ -668,11 +779,13 @@ pub fn sb_cost(
     let mut iv1 = Vec::with_capacity(n as usize);
     let mut iv2 = Vec::with_capacity(n as usize);
     let (mut norm1, mut norm2) = (0.0f64, 0.0f64);
+    // both mapped on the same grid (the images' extents are equal, one frame)
+    let (ls, lt) = (Floats::of(&ns), Floats::of(&nt));
     for z in 0..ns.vg.depth {
         for y in 0..ns.vg.height {
             for x in 0..ns.vg.width {
-                let f1 = sub64(wide(mri_get_vox_val(g, err, &ns, x, y, z, 0, 0)?), m1);
-                let f2 = sub64(wide(mri_get_vox_val(g, err, &nt, x, y, z, 0, 0)?), m2);
+                let f1 = sub64(wide(fget(&ls, g, err, &ns, x, y, z, 0)?), m1);
+                let f2 = sub64(wide(fget(&lt, g, err, &nt, x, y, z, 0)?), m2);
                 iv1.push(f1);
                 iv2.push(f2);
                 norm1 = add64(norm1, mul64(f1, f1));

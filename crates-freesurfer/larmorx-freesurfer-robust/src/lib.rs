@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 pub mod costs;
+pub mod debug;
 pub mod entropy;
 pub mod jointhisto;
 pub mod mymatrix;

@@ -48,6 +48,9 @@ pub struct Run<'a, 'b> {
     pub dir: Option<&'b std::path::Path>,
     /// The thread count (0: every logical CPU): `--n-threads` or `OMP_NUM_THREADS`.
     pub threads: usize,
+    /// The standard input (`std::cin`), which `--debug`'s key presses read (`None`: an empty one,
+    /// as from `/dev/null`).
+    pub input: Option<&'a mut dyn std::io::BufRead>,
 }
 
 /// The cost functions `--cost` names: `ROB` (also `ROBENT`, with entropy images) runs the robust
@@ -584,6 +587,7 @@ fn parse_next_command(
                 err: &mut *r.err,
                 env: r.env,
                 dir: r.dir,
+                input: None,
             };
             reg.test_robust(g, &mut io, &fname, testno)?;
             return Err(Fatal::Exit(0));

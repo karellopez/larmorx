@@ -24,11 +24,16 @@
 //! joint-histogram costs (`MI`, `NMI`, `ECC`, `SCR`: [`crate::jointhisto`], the histogram of every
 //! evaluation smoothed by 7 bins, its sign turned so that Powell minimises) and the SB cost
 //! ([`crate::costs::sb_cost`], on the shared emulation of libstdc++'s `std::sort`).
+//!
+//! With `--debug` each evaluation of a joint-histogram cost reports itself (` e = <cost>  @  ` on
+//! standard output, which from then on prints numbers fixed with 14 decimals, and the parameters on
+//! standard error), and the evaluation counted as 0 (`RegPowell::icount`, a static over every
+//! level, set to 0 after each level's initial cost) writes `shw.mgz` and `thw.mgz`
+//! ([`crate::debug`]).
 
 use std::cell::RefCell;
 use std::io::Write;
 
-use larmorx_core::cfmt;
 use larmorx_core::math::Libm;
 use larmorx_core::vnl_matrix::{VnlMatrix, matlab_print_long_vector};
 use larmorx_core::vnl_minimize::ReturnCode;
@@ -39,13 +44,14 @@ use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
 use larmorx_freesurfer_core::sse::{div64, sqrt64};
 use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::mri::{MRI_UCHAR, Mri};
-use larmorx_freesurfer_volume::arith::Pair;
+use larmorx_freesurfer_volume::arith::{Pair, mri_clone};
 use larmorx_freesurfer_volume::resize::mri_seq_change_type;
 
 use crate::costs::{abs_diff, least_squares, local_ncc, minmax, ncc, sb_cost, tukey_biweight};
+use crate::debug::{Cout, debug_write, print_fixed4};
 use crate::jointhisto::JointHisto;
 use crate::mymatrix::{Mat4, matrix_sqrt};
-use crate::mymri::{mri_valscale, wide};
+use crate::mymri::{mri_linear_transform, mri_valscale, wide};
 use crate::registration::{Io, RegRobust, dynm, fixed, identity4, inv4, mul4};
 use crate::regstep::Cost;
 use crate::transformation::Transformation;
@@ -61,15 +67,6 @@ impl Write for Shared<'_> {
 
     fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
-    }
-}
-
-/// `vnl_matrix_fixed::print` (`std::cout << M`): each row's numbers separated by a blank, at the
-/// stream's precision, one row per line.
-fn print_fixed(out: &mut dyn Write, m: &Mat4, prec: usize) {
-    for row in m {
-        let line: Vec<String> = row.iter().map(|&v| cfmt::g(v, prec)).collect();
-        let _ = writeln!(out, "{}", line.join(" "));
     }
 }
 
@@ -120,9 +117,13 @@ struct Ctx<'a> {
     tcf: &'a mut Mri,
     /// The joint histogram (`costFunction`'s static `H`).
     histo: JointHisto,
-    /// The standard output's precision (the histogram's error lines).
-    prec: usize,
+    /// The standard output's state (the histogram's error lines; the debug report makes it fixed
+    /// with 14 decimals).
+    cout: Cout,
     debug: bool,
+    /// `RegPowell::icount`: the evaluations so far (the debug report writes the half-way images
+    /// at the evaluation it counts as 0).
+    icount: i32,
 }
 
 impl Ctx<'_> {
@@ -149,18 +150,32 @@ impl Ctx<'_> {
         }
         let d = [self.subsamp; 3];
         let (s, t) = (&mut *self.scf, &mut *self.tcf);
-        match self.cost {
-            Cost::Ls => return Ok(least_squares(g, io.err, s, t, &msi, &mti, d, si, sii)),
-            Cost::Tb => return Ok(tukey_biweight(g, io.err, s, t, &msi, &mti, d, 4.6851)),
-            Cost::Lncc => return Ok(-local_ncc(g, io.out, io.err, s, t, &msi, &mti, [5, 5, 5])?),
-            Cost::Ncc => return Ok(-ncc(g, io.out, io.err, s, t, &msi, &mti, d)?),
-            Cost::Sad => return Ok(abs_diff(g, io.err, s, t, &msi, &mti, d, si, sii)),
-            Cost::Sb => return sb_cost(g, io.out, io.err, s, t, &msi, &mti, d),
-            _ => {}
+        let half_way = match self.cost {
+            Cost::Ls => Some(least_squares(g, io.err, s, t, &msi, &mti, d, si, sii)),
+            Cost::Tb => Some(tukey_biweight(g, io.err, s, t, &msi, &mti, d, 4.6851)),
+            Cost::Lncc => Some(-local_ncc(
+                g,
+                io.out,
+                io.err,
+                s,
+                t,
+                &msi,
+                &mti,
+                [5, 5, 5],
+                self.cout,
+            )?),
+            Cost::Ncc => Some(-ncc(g, io.out, io.err, s, t, &msi, &mti, d)?),
+            Cost::Sad => Some(abs_diff(g, io.err, s, t, &msi, &mti, d, si, sii)),
+            Cost::Sb => Some(sb_cost(g, io.out, io.err, s, t, &msi, &mti, d)?),
+            _ => None,
+        };
+        if let Some(dd) = half_way {
+            self.icount = self.icount.wrapping_add(1);
+            return Ok(dd);
         }
         // the costs of a joint histogram
         self.histo
-            .create(g, io.out, io.err, s, t, &msi, &mti, d, self.prec)?;
+            .create(g, io.out, io.err, s, t, &msi, &mti, d, self.cout)?;
         self.histo.smooth(self.libm, 7.0);
         let dd = match self.cost {
             Cost::Mi => -self.histo.compute_mi(self.libm),
@@ -177,13 +192,28 @@ impl Ctx<'_> {
             }
         };
         if self.debug {
-            // the evaluation's report and the first evaluation's half-way images
-            let _ = writeln!(
-                io.err,
-                "RegPowell: the debug output (--debug) is not ported yet"
-            );
-            return Err(Fatal::Exit(1));
+            // the evaluation's report (`cout.setf(ios::fixed)`, `setprecision(14)`: both stay on
+            // the stream), and at the evaluation counted as 0 both images in the target's space
+            self.cout = Cout {
+                precision: 14,
+                fixed: true,
+            };
+            let _ = write!(io.out, " e = {}  @  ", self.cout.os(dd));
+            let _ = io.out.flush();
+            let _ = io
+                .err
+                .write_all(matlab_print_long_vector(p, "p").as_bytes());
+            if self.icount == 0 {
+                let (scf, tcf) = (&*self.scf, &*self.tcf);
+                let mut sw = mri_clone(g, io.out, io.err, tcf, None)?.unwrap_new();
+                mri_linear_transform(g, io.out, io.err, scf, Some(&mut sw), &inv4(&msi))?;
+                let mut tw = mri_clone(g, io.out, io.err, tcf, None)?.unwrap_new();
+                mri_linear_transform(g, io.out, io.err, tcf, Some(&mut tw), &inv4(&mti))?;
+                debug_write(g, io, &mut sw, "shw.mgz")?;
+                debug_write(g, io, &mut tw, "thw.mgz")?;
+            }
         }
+        self.icount = self.icount.wrapping_add(1);
         Ok(dd)
     }
 }
@@ -239,7 +269,7 @@ impl RegRobust {
         if self.verbose > 1 {
             let _ = writeln!(io.out, "   - initial iscale: {}", self.os(self.iscalefinal));
             let _ = writeln!(io.out, "   - initial transform:");
-            print_fixed(io.out, &first, self.cout_precision);
+            print_fixed4(io.out, &first, self.cout);
             let _ = writeln!(io.out);
         }
         let (mh1, mh2) = if self.symmetry {
@@ -295,8 +325,9 @@ impl RegRobust {
                 scf: &mut scf,
                 tcf: &mut tcf,
                 histo: JointHisto::new(),
-                prec: self.cout_precision,
+                cout: self.cout,
                 debug: self.debug > 0,
+                icount: self.powell_icount,
             };
             self.powell_minimize(g, io, &mut ctx, &mut p, &mut xi, pcount)
         };
@@ -344,8 +375,12 @@ impl RegRobust {
         xi: &mut [f64],
         pcount: usize,
     ) -> Result<(), Fatal> {
-        let min_sse = ctx.cost(g, io, p)?;
+        let min_sse = ctx.cost(g, io, p);
+        self.cout = ctx.cout;
+        self.powell_icount = ctx.icount;
+        let min_sse = min_sse?;
         let _ = writeln!(io.out, "   - initial cost: {}", self.os(min_sse));
+        ctx.icount = 0;
         let _ = writeln!(io.out, " START POWELL");
         let mut failed: Option<Fatal> = None;
         // the cost function's lines and Powell's own go to the same streams in their order
@@ -358,6 +393,7 @@ impl RegRobust {
                     err: &mut Shared(&buf_err),
                     env: io.env,
                     dir: io.dir,
+                    input: None,
                 };
                 match ctx.cost(g, &mut sub, x) {
                     Ok(v) => Some(v),
@@ -388,6 +424,8 @@ impl RegRobust {
         };
         let _ = io.out.write_all(&buf_out.into_inner());
         let _ = io.err.write_all(&buf_err.into_inner());
+        self.cout = ctx.cout;
+        self.powell_icount = ctx.icount;
         if let Some(e) = failed {
             return Err(e);
         }
@@ -403,7 +441,7 @@ impl RegRobust {
             _ => {
                 let _ = writeln!(io.out, " iter: {iterations}");
                 // setprecision(14) stays on the stream
-                self.cout_precision = 14;
+                self.cout.precision = 14;
                 let _ = writeln!(io.out, " final e = {}", self.os(end_error));
                 let _ = write!(io.out, "{}", matlab_print_long_vector(p, "p"));
                 let _ = writeln!(io.out);

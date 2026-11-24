@@ -15,6 +15,10 @@ written), and whether the half-way transforms' target geometry (``dst volume inf
 
     scripts/orchestration/boxed.sh 16 python -P validation/investigations/freesurfer-fs1075-halfway/measure.py \\
         --runs 3 --json <out.json>
+
+Relay 49 (FS-1079): ``--extra "--debug --halfmov hm.mgz"`` appends those arguments to every case
+(its runs in folders of their own, ``fs1075-halfway-extra``); the official program's standard input
+is ``/dev/null`` (the debug output's key presses fail at once).
 """
 
 from __future__ import annotations
@@ -22,6 +26,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -46,7 +51,7 @@ _spec.loader.exec_module(check)
 NEVER = "FS-1075: the half-way geometry is read from a freed image (memory contents)"
 
 
-def run_official(exe: Path, line: str, d: Path, preload: str) -> dict:
+def run_official(exe: Path, line: str, d: Path, preload: str, extra: list[str]) -> dict:
     t = line.split()
     env = {"PATH": f"{exe.parent}:/usr/bin:/bin", "LC_ALL": "C", "LANG": "C",
            "OMP_NUM_THREADS": "1", "FS_DISABLE_LANG": "1", "USER": "larmorx", "TZ": "UTC0",
@@ -71,7 +76,7 @@ def run_official(exe: Path, line: str, d: Path, preload: str) -> dict:
     ndirs = int(t[i])
     i += 1 + ndirs
     nargs = int(t[i])
-    args = [bytes.fromhex(h).decode() for h in t[i + 1 : i + 1 + nargs]]
+    args = [bytes.fromhex(h).decode() for h in t[i + 1 : i + 1 + nargs]] + extra
     done = oracle_cache.run(
         [exe.name, *args],
         env=env,
@@ -127,7 +132,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", type=Path)
     ap.add_argument("--preload", type=Path, help="the official program's LD_PRELOAD library")
     ap.add_argument("--cases", type=str, default="", help="case numbers (comma-separated)")
+    ap.add_argument("--extra", type=str, default="", help="arguments added to every case")
     a = ap.parse_args(argv)
+    devnull = os.open(os.devnull, os.O_RDONLY)
+    os.dup2(devnull, 0)
+    os.close(devnull)
+    extra = a.extra.split()
     ws = workspace()
     if ws is None:
         raise SystemExit("no workspace with oracles/")
@@ -137,13 +147,13 @@ def main(argv: list[str] | None = None) -> int:
     ).stdout
     cases = text.splitlines()
     pick = [int(x) for x in a.cases.split(",") if x] or list(range(len(cases)))
-    root = ws / "oracles" / "inputs" / "fs1075-halfway"
+    root = ws / "oracles" / "inputs" / ("fs1075-halfway-extra" if extra else "fs1075-halfway")
     preload = str(a.preload.resolve()) if a.preload else ""
     out = []
     counts: Counter[str] = Counter()
     for k in pick:
         runs = [
-            run_official(exe, cases[k], root / f"run-{r}" / f"case-{k}", preload)
+            run_official(exe, cases[k], root / f"run-{r}" / f"case-{k}", preload, extra)
             for r in range(a.runs)
         ]
         statuses = [x["status"] for x in runs]

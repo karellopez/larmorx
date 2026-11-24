@@ -29,14 +29,25 @@
 //!
 //! Not reached by either program: `flipInputs`, `init_scaling`, `setSource`, `setTarget`,
 //! `RegRobust::estimateIScale` (no caller). `testRobust` (`--test`) and `buildGaussianPyramid`:
-//! [`crate::testmode`]. The `--debug` writes (the intermediate images, the keypress waits) come
-//! with `mri_robust_register` (queue 3.2-13): a debug level above 0 ends here with "not ported
-//! yet".
+//! [`crate::testmode`].
+//!
+//! The debug output (`--debug`, a level above 0; [`crate::debug`]): the source reordered
+//! (`<name>-mriS-reorder.mgz`) and resliced (`Reslice Mov Matrix:` with the matrix,
+//! `<name>-mriS-resample.mgz`; the target's `-mriT-resample.mgz`); with `--initorient` both
+//! images' principal axes (` evecs S: `, ` evecs T: `); before the levels the source mapped onto
+//! the target by the initial transform (`<name>-mapmov-init.mgz`), both pyramids
+//! (`pyramidS-r<i>.mgz`, `pyramidT-r<i>.mgz` in the working folder), the coarsest level's mapped
+//! source and target (`-mapmov-low-init.mgz`, `-mriT-low.mgz`); in each iteration the half-way
+//! images (`-mriS-hw.mgz`, `-mriT-hw.mgz`) and a key press, the robust cost's weights
+//! (`-mriS-hw-weights.mgz`) and a key press; after the iterations the last half-way images
+//! (`-mriS-mapped.mgz`, `-mriT-mapped.mgz`), the source aligned by the last update
+//! (`-mriS-align.mgz`) and the weights (`-mriS-weights.mgz`); the saturation search's result
+//! (`<name>-wcheck-est.txt`). Each write's status is not looked at (FreeSurfer's).
 
 // the 4 x 4 and 3 x 3 matrices are indexed as FreeSurfer's code indexes them
 #![allow(clippy::needless_range_loop)]
 
-use std::io::Write;
+use std::io::{BufRead, Write};
 
 use larmorx_core::cfmt::{self, ostream};
 use larmorx_core::defects::FS_1068;
@@ -51,6 +62,7 @@ use larmorx_freesurfer_core::log::{
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::sse::{add64, div64, mul64, sqrt64, sub, sub64};
+use larmorx_freesurfer_core::utils::resolve;
 use larmorx_freesurfer_filter::conv::{mri_convolve_gaussian, mri_gaussian1d};
 use larmorx_freesurfer_io::reorder::mri_reorder;
 use larmorx_freesurfer_mri::copy::mri_copy;
@@ -65,6 +77,9 @@ use larmorx_freesurfer_volume::resize::mri_seq_change_type;
 use larmorx_freesurfer_volume::xform::mri_get_resample_matrix;
 
 use crate::costs::{centroid, orientation};
+use crate::debug::{
+    Cout, debug_write, press_a_key, print_fixed3, print_fixed4, save_gaussian_pyramid,
+};
 use crate::mymatrix::{
     Mat4, affine_trans_dist_sq, convert_matrix2vnl, get_frobenius_diff, matrix_sqrt,
     polar_decomposition, polar2_decomposition, rigid_trans_dist_sq,
@@ -210,9 +225,15 @@ pub struct RegRobust {
     /// registered, its voxels released where FreeSurfer frees the whole image (FS-1075: FreeSurfer
     /// then reads the half-way geometry from freed memory); its header is the half-way geometry.
     pub powell_hw: Option<Mri>,
-    /// The precision of the program's `std::cout` for numbers: 6, and 14 once `RegPowell` has
-    /// printed its final error (`setprecision(14)` stays on the stream).
-    pub cout_precision: usize,
+    /// The program's `std::cout` state for numbers: precision 6, 14 once `RegPowell` has printed
+    /// its final error (`setprecision(14)` stays on the stream), and fixed from `RegPowell`'s first
+    /// debug report on ([`Cout`]).
+    pub cout: Cout,
+    /// `std::cin` has failed (the end of the input reached by a key press of `--debug`).
+    pub cin_failed: bool,
+    /// `RegPowell::icount` (a static: the evaluations counted over every level; set to 0 before
+    /// each Powell run, after the level's initial cost).
+    pub powell_icount: i32,
 }
 
 impl Default for RegRobust {
@@ -222,12 +243,14 @@ impl Default for RegRobust {
 }
 
 /// The streams and environment every call writes to and reads, and the folder relative names are
-/// read from and written to (`None`: the process's own; the debug and test files).
+/// read from and written to (`None`: the process's own; the debug and test files); `input` the
+/// standard input the debug output's key presses read (`None`: an empty one).
 pub struct Io<'a> {
     pub out: &'a mut dyn Write,
     pub err: &'a mut dyn Write,
     pub env: &'a Environment,
     pub dir: Option<&'a std::path::Path>,
+    pub input: Option<&'a mut dyn BufRead>,
 }
 
 impl RegRobust {
@@ -284,7 +307,9 @@ impl RegRobust {
             xtol: 1e-5,
             ftol: 1e-5,
             powell_hw: None,
-            cout_precision: 6,
+            cout: Cout::default(),
+            cin_failed: false,
+            powell_icount: 0,
         }
     }
 
@@ -307,7 +332,7 @@ impl RegRobust {
 
     /// `std::cout << v` at the stream's current precision.
     pub fn os(&self, v: f64) -> String {
-        cfmt::g(v, self.cout_precision)
+        self.cout.os(v)
     }
 
     /// `RegRobust::clear()`: `Registration::clear()` (the robust cost, no intensity scaling, no
@@ -418,17 +443,6 @@ impl RegRobust {
     /// `getFinalIscale()`.
     pub fn get_final_iscale(&self) -> f64 {
         self.iscalefinal
-    }
-
-    fn not_ported_debug(&self, err: &mut dyn Write) -> Result<(), Fatal> {
-        if self.debug > 0 {
-            let _ = writeln!(
-                err,
-                "Registration: the debug output (--debug) is not ported yet"
-            );
-            return Err(Fatal::Exit(1));
-        }
-        Ok(())
     }
 
     /// `setTransformation(is2d)`: the model of the settings (translation, rigid, isotropic scale,
@@ -594,7 +608,14 @@ impl RegRobust {
                 self.make_isotropic(g, io, &src, isosize, s_dim[0], s_dim[1], s_dim[2], keeptype)?;
             self.rsrc = Some(self.rsrc.take().expect("Rsrc").mul(&dynm(&rm)));
             self.mri_source = Some(m.expect("a resliced source"));
-            self.not_ported_debug(io.err)?;
+            if self.debug > 0 {
+                let _ = writeln!(io.out, "   Reslice Mov Matrix: ");
+                print_fixed4(io.out, &rm, self.cout);
+                let _ = writeln!(io.out);
+                let n = format!("{}-mriS-resample.mgz", self.name);
+                let _ = writeln!(io.out, "   Writing resampled source as {n}");
+                debug_write(g, io, self.mri_source.as_mut().expect("the source"), &n)?;
+            }
         } else {
             if self.verbose > 0 {
                 let _ = writeln!(io.out, "    - no Mov reslice necessary");
@@ -611,7 +632,14 @@ impl RegRobust {
                 self.make_isotropic(g, io, &trg, isosize, t_dim[0], t_dim[1], t_dim[2], keeptype)?;
             self.rtrg = Some(self.rtrg.take().expect("Rtrg").mul(&dynm(&rm)));
             self.mri_target = Some(m.expect("a resliced target"));
-            self.not_ported_debug(io.err)?;
+            if self.debug > 0 {
+                let _ = writeln!(io.out, "   Reslice Dst Matrix: ");
+                print_fixed4(io.out, &rm, self.cout);
+                let _ = writeln!(io.out);
+                let n = format!("{}-mriT-resample.mgz", self.name);
+                let _ = writeln!(io.out, "   Writing resampled target as {n}");
+                debug_write(g, io, self.mri_target.as_mut().expect("the target"), &n)?;
+            }
         } else {
             if self.verbose > 0 {
                 let _ = writeln!(io.out, "    - no Dst reslice necessary");
@@ -749,7 +777,11 @@ impl RegRobust {
         let sreorderinv = convert_matrix2vnl(&v2v.ok_or_else(|| crash(io.err, "v2v"))?);
         drop(temp);
         self.mri_source = Some(reordered);
-        self.not_ported_debug(io.err)?;
+        if self.debug > 0 {
+            let n = format!("{}-mriS-reorder.mgz", self.name);
+            let _ = writeln!(io.out, "   Writing reordered source as {n}");
+            debug_write(g, io, self.mri_source.as_mut().expect("the source"), &n)?;
+        }
         self.rsrc = Some(self.rsrc.take().expect("Rsrc").mul(&sreorderinv));
         let v2vfull2 = self.v2v_init(g, io)?;
         let det = det4(&v2vfull2);
@@ -1190,6 +1222,16 @@ impl RegRobust {
                     }
                 }
             }
+            if self.debug > 0 {
+                let _ = writeln!(io.out);
+                let _ = writeln!(io.out, " evecs S: ");
+                print_fixed3(io.out, &ev_s, self.cout);
+                let _ = writeln!(io.out);
+                let _ = writeln!(io.out);
+                let _ = writeln!(io.out, " evecs T: ");
+                print_fixed3(io.out, &ev_t, self.cout);
+                let _ = writeln!(io.out);
+            }
             if self.initorient {
                 if self.verbose > 0 {
                     let _ = writeln!(io.out, "     -- using orientation info");
@@ -1459,7 +1501,6 @@ impl RegRobust {
         m: Option<&VnlMatrix>,
         scaleinit: f64,
     ) -> Result<(), Fatal> {
-        self.not_ported_debug(io.err)?;
         let libm = Libm::new(g.mode());
         let mut fmd: (Mat4, f64) = (identity4(), 0.0);
         fmd.0 = match m {
@@ -1490,6 +1531,9 @@ impl RegRobust {
         let mut idiff = 0.0f64;
         let ieps = 0.001;
         let mut i = 1;
+        // the last step's update (`cmd.first`, the debug output's aligned source); the loop runs at
+        // least once (`--maxit` above 0)
+        let mut last_cmd = identity4();
         let mut rstep = RegistrationStep::<T>::new(self.step_params());
         rstep.set_float_svd(true);
         let tname = if T::SINGLE { "f" } else { "d" };
@@ -1521,6 +1565,20 @@ impl RegRobust {
                 &mut mh,
                 &mut mhi,
             )?;
+            if self.debug > 0 {
+                // the half-way images before the step, then a key
+                let (sn, tn) = (
+                    format!("{}-mriS-hw.mgz", self.name),
+                    format!("{}-mriT-hw.mgz", self.name),
+                );
+                debug_write(g, io, swarp.as_mut().expect("the mapped source"), &sn)?;
+                debug_write(g, io, twarp.as_mut().expect("the mapped target"), &tn)?;
+                let _ = writeln!(io.out, "HW inputs written as");
+                let _ = writeln!(io.out, "{sn}");
+                let _ = writeln!(io.out, "{tn}");
+                let _ = write!(io.out, "Press a key to run registration: ");
+                press_a_key(io.out, io.input.as_deref_mut(), &mut self.cin_failed);
+            }
             if self.verbose > 1 {
                 let _ = writeln!(io.out, "   - compute new registration");
             }
@@ -1528,6 +1586,7 @@ impl RegRobust {
             let tw = twarp.as_mut().expect("the mapped target");
             let cmd =
                 rstep.compute_registration_step(g, io.out, io.err, self.trans.as_mut(), sw, tw)?;
+            last_cmd = cmd.0;
             self.wcheck = rstep.wcheck;
             self.wchecksqrt = rstep.wchecksqrt;
             if self.verbose > 1 {
@@ -1602,6 +1661,17 @@ impl RegRobust {
             }
             i += 1;
             self.converged = diff <= epsit && idiff <= ieps;
+            if self.debug > 0 && self.costfun == Cost::Rob {
+                // this iteration's weights, then a key
+                let w = rstep.mri_weights.as_ref().expect("the step's weights");
+                let hw = self
+                    .mri_hweights
+                    .insert(mri_copy(g, io.out, io.err, w, None)?.unwrap_new());
+                debug_write(g, io, hw, &format!("{}-mriS-hw-weights.mgz", self.name))?;
+                let _ = writeln!(io.out, "Weights written for this iteration");
+                let _ = write!(io.out, "Press a key to continue iterations: ");
+                press_a_key(io.out, io.input.as_deref_mut(), &mut self.cin_failed);
+            }
         }
         note_glibc07(g, &libm, "log, exp");
         self.converged = diff <= epsit;
@@ -1610,7 +1680,25 @@ impl RegRobust {
             let w = rstep.mri_weights.as_ref().expect("the step's weights");
             self.mri_hweights = Some(mri_copy(g, io.out, io.err, w, None)?.unwrap_new());
         }
+        if self.debug > 0 {
+            // the images of the last step, and the source aligned by its update
+            let name = self.name.clone();
+            let sw = swarp.as_mut().expect("the mapped source");
+            debug_write(g, io, sw, &format!("{name}-mriS-mapped.mgz"))?;
+            let tw = twarp.as_mut().expect("the mapped target");
+            debug_write(g, io, tw, &format!("{name}-mriT-mapped.mgz"))?;
+            let mut salign = mri_clone(g, io.out, io.err, mri_s, None)?.unwrap_new();
+            let sw = swarp.as_ref().expect("the mapped source");
+            mri_linear_transform(g, io.out, io.err, sw, Some(&mut salign), &last_cmd)?;
+            debug_write(g, io, &mut salign, &format!("{name}-mriS-align.mgz"))?;
+        }
         self.mri_weights = None;
+        if self.debug > 0 {
+            if let Some(hw) = self.mri_hweights.as_mut() {
+                let n = format!("{}-mriS-weights.mgz", self.name);
+                debug_write(g, io, hw, &n)?;
+            }
+        }
         if let Some(hw) = &self.mri_hweights {
             let v = &mri_t.vg;
             let mut w = mri_alloc(g, io.out, io.err, v.width, v.height, v.depth, MRI_FLOAT)?;
@@ -1866,7 +1954,16 @@ impl RegRobust {
                 r?
             }
         };
-        self.not_ported_debug(io.err)?;
+        if self.debug > 0 {
+            let _ = writeln!(io.out, " Debug: writing inital MOV resampled to DST ...");
+            print_m(io.out, &md.0, "Minit");
+            let s = self.mri_source.as_ref().expect("the source");
+            let t = self.mri_target.as_ref().expect("the target");
+            let mut tmp = mapped_onto(g, io, s, t, &md)?;
+            let n = format!("{}-mapmov-init.mgz", self.name);
+            let _ = writeln!(io.out, "    Filename: {n}");
+            debug_write(g, io, &mut tmp, &n)?;
+        }
         let mut mins = 16;
         if self.minsize > mins {
             mins = self.minsize;
@@ -1889,6 +1986,10 @@ impl RegRobust {
             )?;
         }
         let resolution = self.gp_s.len() as i32;
+        if self.debug > 0 {
+            save_gaussian_pyramid(g, io, &mut self.gp_s, "pyramidS")?;
+            save_gaussian_pyramid(g, io, &mut self.gp_t, "pyramidT")?;
+        }
         if self.verbose > 0 {
             let _ = writeln!(io.out, "   - initial transform:");
             print_m(io.out, &md.0, "Ti");
@@ -1902,6 +2003,19 @@ impl RegRobust {
         if self.verbose > 1 {
             let _ = writeln!(io.out, "   - initial adjusted:");
             print_m(io.out, &md.0, "Tia");
+        }
+        if self.debug > 0 {
+            let _ = writeln!(
+                io.out,
+                " Debug: writing inital MOV (lowres) resampled to DST (lowres)..."
+            );
+            let low = (resolution - 1) as usize;
+            let mut tmp = mapped_onto(g, io, &self.gp_s[low], &self.gp_t[low], &md)?;
+            let n = format!("{}-mapmov-low-init.mgz", self.name);
+            debug_write(g, io, &mut tmp, &n)?;
+            drop(tmp);
+            let n = format!("{}-mriT-low.mgz", self.name);
+            debug_write(g, io, &mut self.gp_t[low], &n)?;
         }
         let iscaletmp = self.iscale;
         if resolution - 1 < stopres {
@@ -2284,7 +2398,15 @@ impl RegRobust {
                 ostream(self.wlimit)
             );
         }
-        self.not_ported_debug(io.err)?;
+        if self.debug > 0 {
+            // `ofstream f(<name>-wcheck-est.txt) << sat << " " << wcheck << endl`: a stream of its
+            // own (precision 6); a file that cannot be made gets nothing, its `errno` kept
+            let path = resolve(io.dir, &format!("{}-wcheck-est.txt", self.name));
+            let text = format!("{} {}\n", ostream(self.sat), ostream(self.wcheck));
+            if let Err(e) = std::fs::write(path, text) {
+                g.errno = log::errno_of(&e).unwrap_or(2);
+            }
+        }
         Ok(self.sat)
     }
 }
@@ -2351,6 +2473,21 @@ fn valscale_into(
         },
     }
     Ok(())
+}
+
+/// The debug output's initial images: `MRIclone(t)`, the source mapped onto it by `md.0`
+/// (`MyMRI::MRIlinearTransform`) and its intensities scaled by `md.1` (`MyMRI::MRIvalscale`).
+fn mapped_onto(
+    g: &mut Globals,
+    io: &mut Io,
+    s: &Mri,
+    t: &Mri,
+    md: &(Mat4, f64),
+) -> Result<Mri, Fatal> {
+    let mut tmp = mri_clone(g, io.out, io.err, t, None)?.unwrap_new();
+    mri_linear_transform(g, io.out, io.err, s, Some(&mut tmp), &md.0)?;
+    mri_valscale(g, io.out, io.err, Pair::Same(&mut tmp), md.1, 0.0)?;
+    Ok(tmp)
 }
 
 /// A null image or matrix where FreeSurfer dereferences it: an error (FreeSurfer crashes).

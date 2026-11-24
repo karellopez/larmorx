@@ -479,7 +479,7 @@ pub fn prelude() -> Vec<String> {
         ]),
     ];
     // the costs only RegPowell computes, the entropy images, the test mode and the debug output
-    // (not ported yet: check.py counts them apart)
+    // (each ported since: relays 45 to 49)
     for c in [
         "ls", "mi", "nmi", "ecc", "ncc", "scr", "tb", "lncc", "sad", "sb", "robent",
     ] {
@@ -496,6 +496,12 @@ pub fn prelude() -> Vec<String> {
 
 /// One seeded case: a pair of images of a random type, size and geometry, and random options.
 fn seeded(g: &mut Gen) -> String {
+    let (files, args) = seeded_parts(g);
+    line(None, &files, &[], &args)
+}
+
+/// [`seeded`]'s files and arguments.
+fn seeded_parts(g: &mut Gen) -> (Vec<(String, Vec<u8>)>, Vec<String>) {
     let n = g.pick(&[16, 16, 17, 18, 20]);
     let ty = g.pick(&[MRI_UCHAR, MRI_UCHAR, MRI_SHORT, MRI_FLOAT, MRI_INT]);
     let (mut a, mut b) = pair(g, n, ty);
@@ -586,7 +592,147 @@ fn seeded(g: &mut Gen) -> String {
     if g.chance(10) {
         args.extend(s(&["--iscaleout", "i.txt", "--iscale"]));
     }
-    line(None, &files, &[], &args)
+    (files, args)
+}
+
+/// The debug output's cases (relay 49; `check.py --family debug`, the recorded test
+/// `fs_robreg_debug_official`): a few fixed ones (names in a folder that does not exist, a name
+/// with no extension or only one, the principal axes of `--initorient`, the full images alone,
+/// `--verbose 0`, a 2-D pair, the entropy images, the joint histogram's cost on several levels and
+/// alone, the half-way images' means after a robust and after a Powell registration, FS-1079),
+/// then the seeded family's random options with `--debug` (and half-way images in some) and the
+/// Powell family's with every cost; a seed of their own. The official program's standard input is
+/// `/dev/null` (each key press fails at once).
+pub fn debug_cases() -> Vec<String> {
+    let mut g = Gen::new(0x0064_6267);
+    let (a, b) = pair(&mut g, 16, MRI_UCHAR);
+    let mut a2 = a;
+    a2.size = [1.0, 1.0, 1.5];
+    a2.dims[2] = 14;
+    let mut b2 = b;
+    b2.mdc = RAS;
+    let (mut fa, mut fb) = (a, b);
+    fa.dims = [18, 16, 1];
+    fb.dims = [18, 16, 1];
+    let files = vec![
+        (
+            "mov.mgz".to_owned(),
+            write_as(&mut image(&mut g, &a), "mov.mgz"),
+        ),
+        (
+            "dst.mgz".to_owned(),
+            write_as(&mut image(&mut g, &b), "dst.mgz"),
+        ),
+        (
+            "amov.mgz".to_owned(),
+            write_as(&mut image(&mut g, &a2), "amov.mgz"),
+        ),
+        (
+            "rdst.mgz".to_owned(),
+            write_as(&mut image(&mut g, &b2), "rdst.mgz"),
+        ),
+        (
+            "flatmov.mgz".to_owned(),
+            write_as(&mut image(&mut g, &fa), "flatmov.mgz"),
+        ),
+        (
+            "flatdst.mgz".to_owned(),
+            write_as(&mut image(&mut g, &fb), "flatdst.mgz"),
+        ),
+    ];
+    let with = |lta: &str, extra: &[&str]| {
+        let mut v = s(&[
+            "--mov", "mov.mgz", "--dst", "dst.mgz", "--lta", lta, "--debug",
+        ]);
+        v.extend(s(extra));
+        v
+    };
+    let fixed: Vec<Vec<String>> = vec![
+        with("out.lta", &["--satit"]),
+        with("nodir/o.lta", &["--sat", "4"]),
+        with("out", &["--sat", "4", "--halfmov", "hm.mgz"]),
+        with(".lta", &["--sat", "4"]),
+        with("out.lta", &["--satit", "--initorient"]),
+        with("out.lta", &["--sat", "4", "--nomulti", "--iscale"]),
+        with("out.lta", &["--sat", "4", "--verbose", "0"]),
+        with("out.lta", &["--sat", "4", "--leastsquares"]),
+        with("out.lta", &["--sat", "4", "--nosym", "--affine"]),
+        with(
+            "out.lta",
+            &[
+                "--satit",
+                "--halfmov",
+                "hm.mgz",
+                "--halfdst",
+                "hd.mgz",
+                "--halfweights",
+                "hw.mgz",
+                "--iscale",
+            ],
+        ),
+        with("out.lta", &["--cost", "robent", "--sat", "4"]),
+        with("out.lta", &["--cost", "MI"]),
+        with("out.lta", &["--cost", "nmi", "--nomulti"]),
+        with(
+            "out.lta",
+            &["--cost", "ecc", "--iscale", "--halfmov", "hm.mgz"],
+        ),
+        with("out.lta", &["--cost", "ls", "--halfdst", "hd.mgz"]),
+        with(
+            "out.lta",
+            &["--cost", "scr", "--nosym", "--halfmov", "hm.mgz"],
+        ),
+        s(&[
+            "--mov", "amov.mgz", "--dst", "rdst.mgz", "--lta", "out.lta", "--debug", "--satit",
+        ]),
+        s(&[
+            "--mov", "amov.mgz", "--dst", "rdst.mgz", "--lta", "out.lta", "--debug", "--cost", "mi",
+        ]),
+        s(&[
+            "--mov",
+            "flatmov.mgz",
+            "--dst",
+            "flatdst.mgz",
+            "--lta",
+            "out.lta",
+            "--debug",
+            "--satit",
+            "--halfmov",
+            "hm.mgz",
+        ]),
+        s(&[
+            "--mov",
+            "flatmov.mgz",
+            "--dst",
+            "flatdst.mgz",
+            "--lta",
+            "out.lta",
+            "--debug",
+            "--cost",
+            "nmi",
+        ]),
+    ];
+    let mut out: Vec<String> = fixed.iter().map(|a| line(None, &files, &[], a)).collect();
+    for _ in 0..16 {
+        let (files, mut args) = seeded_parts(&mut g);
+        args.push("--debug".to_owned());
+        if g.chance(3) && !args.iter().any(|a| a == "--halfmov") {
+            args.extend(s(&["--halfmov", "hm.mgz"]));
+        }
+        if g.chance(3) {
+            args.extend(s(&["--halfdst", "hd.mgz"]));
+        }
+        out.push(line(None, &files, &[], &args));
+    }
+    let costs = [
+        "mi", "nmi", "ecc", "scr", "ls", "ncc", "tb", "lncc", "sad", "sb",
+    ];
+    for _ in 0..12 {
+        let (files, mut args) = seeded_powell_parts(&mut g, &costs);
+        args.push("--debug".to_owned());
+        out.push(line(None, &files, &[], &args));
+    }
+    out
 }
 
 /// The Powell registration's cases (relay 46; `check.py --family powell`, the recorded test
@@ -1233,6 +1379,8 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
                 .and_then(|v| v.to_str())
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(0),
+            // the official side's standard input: /dev/null
+            input: None,
         };
         match main(&mut g, &mut r, &args) {
             Ok(()) => 0,

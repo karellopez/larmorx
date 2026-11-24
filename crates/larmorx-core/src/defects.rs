@@ -3335,6 +3335,8 @@ defects! {
         "mri_robust_register's test mode (--test) on an image that does not read prints that it was read successfully, then dies of a segmentation fault; an error in both modes";
     FS_1078 = "FS-1078", "FreeSurfer", true,
         "mri_robust_register's test modes 5 and 6 (--test 5, --test 6) write their pattern of integers as bytes into an image of floating-point numbers, so the bytes of the first voxels of each row change instead of the pattern's voxels; by default the pattern's values are written as voxel values";
+    FS_1079 = "FS-1079", "FreeSurfer", true,
+        "mri_robust_register --debug with a half-way image (--halfmov, --halfdst) after a registration with a cost other than ROB and ROBENT writes the image, then dies of a segmentation fault where it would print the image's means over the registration's weights (that registration has no weights); by default the means are not printed";
 }
 
 /// The register entry with ID `id`.

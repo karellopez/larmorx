@@ -301,6 +301,14 @@ const GOLDEN: &[(&str, &str)] = &[
         "part10c.reproduce",
         "4dda0a62e8665c8d22b32d3b607b67cef03683cfdd59c1c9f42ce250b8186972",
     ),
+    (
+        "part11a.fix",
+        "06309d872bd237bd9306514ab979c1d43ee51e9f58d766e48444cdf8c632309e",
+    ),
+    (
+        "part11a.reproduce",
+        "4d58e5239368bfc08f8ce3a277081ba924a83b37787a2dbb5026d507760a95f8",
+    ),
 ];
 
 fn check(name: &str, bytes: &[u8]) {
@@ -4452,4 +4460,219 @@ const PART10C: &[(&str, Make)] = &[
 #[test]
 fn part10c_histograms() {
     group("part10c", PART10C, 4);
+}
+
+/// A binary-like volume for §59 and §60 (zeros, ones, labels, special values) of a type, painted
+/// with nothing.
+fn bin_w(g: &mut G, e: (i64, i64, i64), kind: i64, frames: i64) -> String {
+    format!("{} 0", seg_w(g, e, kind, frames, &[0, 0, 1, 1, 1, 2, 255, -1]))
+}
+
+/// M: `null` or a binary-like volume.
+fn bin_m(g: &mut G, e: (i64, i64, i64)) -> String {
+    if g.one_in(3) {
+        "null".to_owned()
+    } else {
+        let k = pi(g, &[0, 3]);
+        bin_w(g, e, k, 1)
+    }
+}
+
+/// BF, a `BinarizeMRI`'s fields.
+fn bin_fields(g: &mut G) -> String {
+    let ty = pi(g, &[1, 1, 2, 3]);
+    let n = if ty == 2 || g.one_in(6) { g.int(0, 2) } else { 0 };
+    let list: Vec<String> = (0..n).map(|_| g.int(0, 2).to_string()).collect();
+    let th = |g: &mut G| dbits([0.5, 1.5, f64::INFINITY, -1.0, f64::NAN][g.below(5) as usize]);
+    let (lo, hi) = (th(g), th(g));
+    let (mlo, mhi) = (dbits(0.5), dbits(f64::INFINITY));
+    let edges: Vec<String> = (0..3).map(|_| g.int(0, 1).to_string()).collect();
+    let on = dbits([1.0, 300.0, 2.5][g.below(3) as usize]);
+    let off = dbits([0.0, -1.0][g.below(2) as usize]);
+    let (fs, fe) = (g.int(-1, 1), g.int(-1, 2));
+    format!(
+        "{ty} {lo} {hi} {n} {} {mlo} {mhi} {} {on} {off} {fs} {fe} {} {} {} {}",
+        list.join(" "),
+        edges.join(" "),
+        g.int(0, 1),
+        g.pick(&["-1", "-1", "0", "3"]),
+        g.int(0, 1),
+        g.int(0, 1)
+    )
+}
+
+/// DF, a `DEMorphBinVol`'s fields.
+fn dem_fields(g: &mut G) -> String {
+    format!(
+        "{} {} {} {} {} {} {}",
+        g.pick(&["1", "2", "1", "2", "1", "2", "0"]),
+        g.pick(&["1", "2", "3", "1", "2", "3", "4", "0"]),
+        g.int(-1, 3),
+        g.int(0, 2),
+        g.pick(&["0", "0", "0", "1"]),
+        g.pick(&["-1", "-1", "0", "3", "1"]),
+        g.int(0, 1)
+    )
+}
+
+/// Part 11a (§59, §60) and §64's and §65's functions of `mri_cc`.
+const PART11A: &[(&str, Make)] = &[
+    ("vvfill", |g| {
+        let pool = lta_pool(g);
+        let ty = g.pick(&["0", "1"]);
+        let (lta, s, d) = pool_lta(g, &pool, ty, 1, false, None);
+        let k = if g.one_in(2) { s } else { d };
+        let w = pool_w(&pool, k);
+        let m = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            format!("{} 0", pool_w(&pool, k))
+        };
+        format!("{w} 0 {m} {lta} {} {} new", g.int(-1, 2), g.int(0, 1))
+    }),
+    ("fbnwm", |g| {
+        let e = ext(g, 3, 5);
+        let (k1, k2) = (pi(g, &[0, 0, 3, 4, 1]), pi(g, &[0, 0, 3]));
+        let t1 = hist_w(g, e, k1, 1, false);
+        let wm = hist_w(g, e, k2, 1, false);
+        format!("{t1} 0 {wm} 0")
+    }),
+    ("qecc", |g| {
+        let e = ext(g, 2, 4);
+        let k = pi(g, &[0, 3]);
+        let w = bin_w(g, e, k, 1);
+        let m = bin_m(g, e);
+        let (x, y, z) = (g.int(-1, e.0), g.int(-1, e.1), g.int(-1, e.2));
+        format!("{w} {m} {x} {y} {z}")
+    }),
+    ("vtero", |g| {
+        let e = ext(g, 3, 5);
+        let k = pi(g, &[0, 3]);
+        let w = bin_w(g, e, k, 1);
+        format!("{w} {}", bin_m(g, e))
+    }),
+    ("vtdil", |g| {
+        let e = ext(g, 2, 4);
+        let k = pi(g, &[0, 3]);
+        let w = bin_w(g, e, k, 1);
+        format!("{w} {}", g.pick(&["1", "2", "255", "0"]))
+    }),
+    ("fscm", |g| {
+        let e = ext(g, 2, 4);
+        let scm = hist_w(g, e, 3, 1, false);
+        let aseg = seg_w(g, e, 1, 1, &[0, 2, 3, 41, 42, 17, 53, 18, 54, 5, 44, 10]);
+        format!("{scm} 0 {aseg} 0 {}", g.int(-1, 2))
+    }),
+    ("binmri", |g| {
+        let e = ext(g, 2, 3);
+        let f = bin_fields(g);
+        let k = g.int(1, 2);
+        let mut calls = Vec::new();
+        for _ in 0..k {
+            let fr = g.int(1, 3);
+            let kind = pi(g, &[0, 3]);
+            let a = if g.one_in(8) {
+                "null".to_owned()
+            } else {
+                bin_w(g, e, kind, fr)
+            };
+            let m = bin_m(g, e);
+            let d = g.pick(&["new", "new", "self"]).to_owned();
+            calls.push(format!("{a} {m} {d}"));
+        }
+        format!("{f} {k} {}", calls.join(" "))
+    }),
+    ("binq", |g| {
+        let e = ext(g, 2, 3);
+        let f = bin_fields(g);
+        let w = bin_w(g, e, 3, 2);
+        let m = bin_m(g, e);
+        let (x, y, z) = (g.int(0, e.0 - 1), g.int(0, e.1 - 1), g.int(0, e.2 - 1));
+        format!("{f} {w} {m} {x} {y} {z} {}", g.int(-1, 1))
+    }),
+    ("bindump", |g| {
+        let e = ext(g, 1, 2);
+        let f = bin_fields(g);
+        format!("{f} {}", bin_m(g, e))
+    }),
+    ("demchk", |g| {
+        let e = ext(g, 3, 4);
+        let f = dem_fields(g);
+        let a = bin_m(g, e);
+        let m = bin_m(g, e);
+        let e2 = if g.one_in(3) { ext(g, 3, 4) } else { e };
+        format!("{f} {a} {m} {}", bin_m(g, e2))
+    }),
+    ("demdump", dem_fields),
+    ("demcf", |g| {
+        let e = ext(g, 3, 4);
+        let f = dem_fields(g);
+        let fr = g.int(1, 2);
+        let k = pi(g, &[0, 3]);
+        format!("{f} {} {}", bin_w(g, e, k, fr), g.int(-1, 2))
+    }),
+    ("demm", |g| {
+        let e = ext(g, 3, 5);
+        let f = dem_fields(g);
+        let k = pi(g, &[0, 3]);
+        let fr = g.int(1, 2);
+        format!("{f} {}", bin_w(g, e, k, fr))
+    }),
+    ("demt", |g| {
+        let e = ext(g, 3, 5);
+        let f = dem_fields(g);
+        let k = pi(g, &[0, 3]);
+        let fr = g.int(1, 2);
+        let w = bin_w(g, e, k, fr);
+        let lo = dbits([0.5, 1.5, -1.0][g.below(3) as usize]);
+        let hi = dbits([f64::INFINITY, 1.0, 300.0][g.below(3) as usize]);
+        format!("{f} {w} {lo} {hi} {} null", bin_m(g, e))
+    }),
+    ("deml", |g| {
+        let e = ext(g, 3, 5);
+        let f = dem_fields(g);
+        let k = pi(g, &[0, 1]);
+        let w = bin_w(g, e, k, 1);
+        let n = g.int(0, 2);
+        let list: Vec<String> = (0..n).map(|_| g.int(0, 2).to_string()).collect();
+        format!("{f} {w} {n} {} {} null", list.join(" "), bin_m(g, e))
+    }),
+    ("trns", |g| {
+        let t = if g.one_in(6) {
+            "null".to_owned()
+        } else {
+            pool_mat(g)
+        };
+        let o = if g.one_in(6) {
+            "null".to_owned()
+        } else {
+            format!("4 4 {}", ["00000000"; 16].join(" "))
+        };
+        format!("{} {t} {o}", g.int(0, 1))
+    }),
+    ("vlcir", |g| {
+        let e = ext(g, 2, 4);
+        let k = pi(g, &[0, 3]);
+        let w = bin_w(g, e, k, 1);
+        let (lo, hi) = (
+            g.pick(&["3f800000", "00000000"]),
+            g.pick(&["3f800000", "40000000"]),
+        );
+        let vl = match g.below(3) {
+            0 => "null".to_owned(),
+            1 => format!("{} 1", g.int(1, 3)),
+            _ => format!("{} 2", g.int(20, 40)),
+        };
+        format!(
+            "{w} {lo} {hi} {vl} {} {} {}",
+            g.int(0, 2),
+            g.int(0, 1),
+            hist_r(g, e)
+        )
+    }),
+];
+
+#[test]
+fn part11a_fills_topology_binary_volumes_and_lists() {
+    group("part11a", PART11A, 4);
 }

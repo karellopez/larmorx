@@ -109,7 +109,7 @@ impl Process {
         );
         self.error_exit(
             codes::BAD_PARM,
-            format!("{function}: voxel {i} of an array of {n} (FreeSurfer reads or writes past the list's arrays here)\n")
+            format!("{function}: voxel {i} of an array of {n} (FreeSurfer reads or writes past the list's arrays here)")
                 .as_bytes(),
         )
     }
@@ -138,7 +138,7 @@ impl Process {
             );
             self.error_exit(
                 codes::BAD_PARM,
-                format!("{name}: skip {skip} is negative (FreeSurfer never ends here)\n").as_bytes(),
+                format!("{name}: skip {skip} is negative (FreeSurfer never ends here)").as_bytes(),
             )?;
         }
         let step = skip.wrapping_add(1);

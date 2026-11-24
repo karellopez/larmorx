@@ -827,7 +827,13 @@ impl Process {
                             i
                         }
                     };
-                    let i = self.histo_find_last_peak_in_region(hs, 11, 0.15, wm_low, wm_hi - 7);
+                    let i = self.histo_find_last_peak_in_region(
+                        hs,
+                        11,
+                        0.15,
+                        wm_low,
+                        wm_hi.wrapping_sub(7),
+                    );
                     let mut wm_peak = peak_value(self, i);
                     let i = self.histo_find_last_peak_in_region(
                         hs,

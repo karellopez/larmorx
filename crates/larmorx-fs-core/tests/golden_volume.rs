@@ -4422,11 +4422,7 @@ const PART10C: &[(&str, Make)] = &[
             let k = pi(g, &[0, 3, 1]);
             format!("{} 0", seg_w(g, e, k, 1, &[0, 1, 2, 3]))
         };
-        format!(
-            "{w} 0 {lab} {} {}",
-            g.int(1, 3),
-            g.pick(&["0", "-1", "3"])
-        )
+        format!("{w} 0 {lab} {} {}", g.int(1, 3), g.pick(&["0", "-1", "3"]))
     }),
     ("hsegm", |g| {
         let e = ext(g, 2, 3);

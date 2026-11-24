@@ -2205,10 +2205,18 @@ const R23_HIST_1E8: &str = "hist 2 1 1 3 1 0 i0,1287568416 3f800000 3f800000 3f8
 fn fs498_a_bin_outside_the_histogram() {
     let (rep, rids) = run(R23_HIST_300, UpstreamDefects::Reproduce);
     assert!(rids.iter().any(|i| i == "FS-498"), "{rids:?}");
-    assert_eq!(res_of(&rep).last().map(String::as_str), Some("00000000"), "{rep}");
+    assert_eq!(
+        res_of(&rep).last().map(String::as_str),
+        Some("00000000"),
+        "{rep}"
+    );
     let (fix, fids) = run(R23_HIST_300, UpstreamDefects::Fix);
     assert!(fids.iter().any(|i| i == "FS-12"), "{fids:?}");
-    assert_eq!(res_of(&fix).last().map(String::as_str), Some("40800000"), "{fix}");
+    assert_eq!(
+        res_of(&fix).last().map(String::as_str),
+        Some("40800000"),
+        "{fix}"
+    );
     // the region histogram of bytes: a first window of one value (MRIhistoSegment), noted with
     // `reproduce`
     let (_, ids) = run(R23_SEGM_HALVES, UpstreamDefects::Reproduce);
@@ -2226,7 +2234,10 @@ fn fs499_bins_outside_the_allocation() {
     let (rep, _) = run(R23_GEQ_SMALL, UpstreamDefects::Reproduce);
     let (f, r) = (res_of(&fix), res_of(&rep));
     assert_eq!(f[f.len() - 4..], r[r.len() - 4..]);
-    assert_eq!(f[f.len() - 8..f.len() - 4], ["00000000", "3f800000", "40000000", "40400000"]);
+    assert_eq!(
+        f[f.len() - 8..f.len() - 4],
+        ["00000000", "3f800000", "40000000", "40400000"]
+    );
     assert_eq!(r[r.len() - 8..r.len() - 4], ["3f800000"; 4]);
 }
 
@@ -2244,7 +2255,11 @@ fn fs500_the_cumulative_values() {
 fn fs501_segmentations_freesurfer_crashes_on() {
     for (line, st, msg) in [
         (R23_SEGM_INTS, "EXIT 253 |", "no region histogram to smooth"),
-        (R23_SEGM_INF, "EXIT 252 |", "a histogram of -2147483648 bins cannot be cleared"),
+        (
+            R23_SEGM_INF,
+            "EXIT 252 |",
+            "a histogram of -2147483648 bins cannot be cleared",
+        ),
     ] {
         for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
             let (r, ids) = run(line, mode);
@@ -2263,7 +2278,8 @@ fn fs502_a_peak_search_that_never_ends() {
         let (r, ids) = run(R23_SEGM_LIMIT_M2, mode);
         assert!(r.starts_with("EXIT 252 |"), "{r}");
         assert!(
-            err_of(&r).contains("the gray-matter peak 80 stays above -2 (FreeSurfer never ends here)"),
+            err_of(&r)
+                .contains("the gray-matter peak 80 stays above -2 (FreeSurfer never ends here)"),
             "{r}"
         );
         assert!(ids.iter().any(|i| i == "FS-502"), "{ids:?}");

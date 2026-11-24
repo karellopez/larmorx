@@ -28,22 +28,30 @@
 //! annotation's index) plus `--offset`, 0 where none; written with the command line; `mri_label2vol
 //! done `, status 0.
 //!
-//! Not ported yet (part 2 of queue item 3.2-40): `--new-aseg2vol` (`MRIseg2SegPVF`) and
-//! `--fill-ribbon` (`MRIsurf2VolOpt`), which end with a message, status 1.
+//! `--new-aseg2vol` (`mri_label2vol.cpp` 294-307): the segmentation's partial volumes on the
+//! template's grid ([`super::resample::mri_seg2seg_pvf`]), or with `--ttype` its labels, written
+//! with the command line. `--fill-ribbon` (312-363): the labels (or the annotation's indices)
+//! filled into `<SUBJECTS_DIR>/<subject>/mri/ribbon.mgz`'s cortex by the surface's closest vertex
+//! ([`super::resample::surface_label2vol_opt`]), written with the command line; `--label-stat`'s
+//! stats likewise.
 //!
 //! Defects (`larmorx_core::defects`; the mechanisms in `docs/findings/freesurfer-mri-label2vol.md`):
 //! FS-1249 and FS-1250 (fs.surf's `MRISdefects2Seg`), FS-1251 to FS-1253 (`--defects`), FS-1254
 //! (`--pvf` with labels ends with status 1 and no output), FS-1255 (more than 32,767 hits in a
 //! voxel), FS-1256 (`--proj none`), FS-1257 (a projection that never ends), FS-1258 (a label
 //! point beyond the surface's vertices with `--proj`), FS-1259 ([`super::options`]), FS-1260 (a
-//! segmentation without a template), FS-1262 (label codes past the `int` range).
+//! segmentation without a template), FS-1261 (`--fill-ribbon` with a label in scanner
+//! coordinates), FS-1262 (label codes past the `int` range), FS-1272 and FS-1273 (`--fill-ribbon`'s
+//! environment and subjects folder); FS-1263 to FS-1271 in [`super::resample`].
 
 use std::io::Write;
 
 use larmorx_core::defects::{
-    FS_1251, FS_1252, FS_1253, FS_1254, FS_1255, FS_1256, FS_1257, FS_1258, FS_1260, FS_1262,
+    FS_1251, FS_1252, FS_1253, FS_1254, FS_1255, FS_1256, FS_1257, FS_1258, FS_1260, FS_1261,
+    FS_1262, FS_1272, FS_1273,
 };
 use larmorx_freesurfer_core::diag::diag_init;
+use larmorx_freesurfer_core::fsenv::fsenv_getenv;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, Fatal};
 use larmorx_freesurfer_core::matrix::Matrix;
@@ -53,6 +61,7 @@ use larmorx_freesurfer_core::run::{Environment, Settings};
 use larmorx_freesurfer_core::sse::{add, add64, div, div64, mul, mul64};
 use larmorx_freesurfer_core::system;
 use larmorx_freesurfer_core::version::{get_all_info, get_version, handle_version_option};
+use larmorx_freesurfer_io::colortab::ctab_read_ascii;
 use larmorx_freesurfer_io::identify::MRI_VOLUME_TYPE_UNKNOWN;
 use larmorx_freesurfer_io::label::{LABEL_COORDS_TKREG_RAS, Label, label_read};
 use larmorx_freesurfer_io::mriio::{
@@ -79,11 +88,13 @@ use larmorx_freesurfer_volume::frames::mri_const;
 use larmorx_freesurfer_volume::label_coords::{self, LabelDst, label_to_surface_ras};
 use larmorx_freesurfer_volume::resize::mri_change_type;
 use larmorx_freesurfer_volume::vol2vol::transform_reg_dat2_lta;
+use larmorx_freesurfer_volume::voxops::mri_seg_id_list_not0;
 
 use super::options::{
     PROJ_TYPE_ABS, PROJ_TYPE_FRAC, check_options, dump_options, g_fmt, or_null, parse_commandline,
     usage_exit,
 };
+use super::resample::{mri_seg2seg_pvf, surface_label2vol_opt};
 use super::surface::{
     annotation_index, annotation2label, mris_load_surf_subject, proj_norm_dist,
     proj_norm_frac_thick,
@@ -100,6 +111,8 @@ pub struct Run<'a, 'b> {
     pub err: &'a mut dyn Write,
     pub env: Environment,
     pub dir: Option<&'b std::path::Path>,
+    /// The thread count (0: every logical CPU); only printed (`--new-aseg2vol`).
+    pub threads: usize,
 }
 
 /// `mri_label2vol`'s entry point: its original arguments (without the program's name), the
@@ -115,6 +128,7 @@ pub fn run(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut 
             err: &mut terr,
             env: settings.env.clone(),
             dir: settings.dir.as_deref(),
+            threads: settings.threads,
         };
         match main(&mut g, &mut r, args) {
             Ok(()) => 0,
@@ -127,7 +141,7 @@ pub fn run(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut 
 }
 
 /// `MatrixPrint(stdout, m)`.
-fn print_matrix(g: &mut Globals, r: &mut Run, m: Option<&Matrix>) {
+pub(super) fn print_matrix(g: &mut Globals, r: &mut Run, m: Option<&Matrix>) {
     let mut buf = Vec::new();
     larmorx_freesurfer_core::matrix_ops::matrix_print(
         g,
@@ -338,13 +352,194 @@ fn multiply_const(g: &mut Globals, r: &mut Run, src: &Mri, k: f64) -> Result<Mri
     Ok(dst)
 }
 
-/// Part 2 of queue item 3.2-40, not ported yet (status 1).
-fn not_ported(r: &mut Run, what: &str) -> Fatal {
-    let _ = writeln!(
-        r.err,
-        "larmorx-freesurfer: mri_label2vol: {what} is not ported yet"
+/// `--new-aseg2vol`'s path (`mri_label2vol.cpp` 294-307): the transform from the segmentation to
+/// the template (`TransformRegDat2LTA`), the segmentation's labels but 0 (`MRIsegIdListNot0`),
+/// `resmm` (`--resmm`, else the segmentation's column size over `--upsample`'s factor, in
+/// `float`: -1 by default, so the size's opposite), [`mri_seg2seg_pvf`] with `--ttype`'s colour
+/// table; the command line recorded, the segmentation's colour table copied, the output written
+/// (status 1 when the writer fails), `mri_label2vol done`, status 0. `--hits` and `--pvf` are not
+/// written.
+fn new_aseg2vol(
+    g: &mut Globals,
+    r: &mut Run,
+    o: &super::options::Options,
+    aseg: &Mri,
+    t: &Mri,
+    rmat: Option<&Matrix>,
+    cmdline: &str,
+) -> Result<(), Fatal> {
+    let Some(aseg2vol) = transform_reg_dat2_lta(g, r.out, r.err, &aseg.vg, &t.vg, rmat)? else {
+        return Err(Fatal::Exit(1));
+    };
+    let segidlist = mri_seg_id_list_not0(g, r.err, aseg, 0)?;
+    let mut resmm = o.resmm;
+    if resmm == 0.0 {
+        resmm = f64::from(div(aseg.vg.xsize, o.upsample_factor as f32));
+    }
+    let ct = o.ct_tissue_type.as_ref();
+    let Some(mut outvol) = mri_seg2seg_pvf(g, r, aseg, &aseg2vol, resmm, &segidlist, ct)? else {
+        // a transform without an inverse: FreeSurfer then records the command line in no volume
+        return Err(Fatal::Exit(if g.notices.reproduce() { 139 } else { 1 }));
+    };
+    mri_add_command_line(g, r.err, &mut outvol, cmdline.as_bytes());
+    if aseg.ct.is_some() {
+        outvol.ct = ctab_deep_copy(g, r.err, aseg.ct.as_ref());
+    }
+    let out_name = o.out_vol_id.clone().unwrap_or_default();
+    if write_volume(g, r, &mut outvol, &out_name)? != 0 {
+        return Err(Fatal::Exit(1));
+    }
+    let _ = writeln!(r.out, "mri_label2vol done");
+    Ok(())
+}
+
+/// `--fill-ribbon`'s path (`mri_label2vol.cpp` 312-363): FreeSurfer's environment (`FSENVgetenv`:
+/// `FREESURFER_HOME` and its colour table; FS-1272 without them), the ribbon
+/// `<SUBJECTS_DIR>/<subject>/mri/ribbon.mgz` (`Loading <file>`; FreeSurfer takes the
+/// environment's `SUBJECTS_DIR`, not `--sd`'s: FS-1273), then each label read (`Loading <file>`;
+/// not in tkregister coordinates: `--tkr-template`'s conversion, FS-1261) or, with `--annot`,
+/// each annotation index's label; `Mapping`, the labels' vertices filled into the ribbon
+/// ([`surface_label2vol_opt`]), the command line recorded, the ribbon's colour table copied, the
+/// output written (the writer's status ends the program); with `--label-stat` `Mapping stats`
+/// and the stats' volume (no command line) written likewise; status 0.
+fn fill_ribbon(
+    g: &mut Globals,
+    sg: &mut SurfGlobals,
+    r: &mut Run,
+    o: &mut super::options::Options,
+    surf: &Mris,
+    nlabels: i32,
+    cmdline: &str,
+) -> Result<(), Fatal> {
+    let env = r.env.clone();
+    let fsenv = {
+        let err = &mut *r.err;
+        let dir = r.dir;
+        fsenv_getenv(g, &env, dir, &mut *r.out, |g, out, file| {
+            ctab_read_ascii(g, out, err, dir, file)
+        })
+    };
+    let Some(fsenv) = fsenv else {
+        g.notices.add(
+            &FS_1272,
+            "mri_label2vol --fill-ribbon without FreeSurfer's environment (FREESURFER_HOME and its colour table): FreeSurfer reads the missing record and crashes; here status 1",
+        );
+        return Err(Fatal::Exit(if g.notices.reproduce() { 139 } else { 1 }));
+    };
+    let sd = if fsenv.subjects_dir != o.subjects_dir {
+        g.notices.add(
+            &FS_1273,
+            format!(
+                "mri_label2vol --fill-ribbon: the ribbon from the environment's SUBJECTS_DIR {} (FreeSurfer's), not the subjects folder {} the program uses",
+                or_null(fsenv.subjects_dir.as_deref()),
+                or_null(o.subjects_dir.as_deref())
+            ),
+        );
+        if g.notices.reproduce() {
+            fsenv.subjects_dir.clone()
+        } else {
+            o.subjects_dir.clone()
+        }
+    } else {
+        fsenv.subjects_dir.clone()
+    };
+    let subject = o.subject.clone().unwrap_or_default();
+    let tmpstr = format!(
+        "{}/{}/mri/ribbon.mgz",
+        or_null(sd.as_deref()),
+        String::from_utf8_lossy(&subject)
     );
-    Fatal::Exit(1)
+    let _ = writeln!(r.out, "Loading {tmpstr}");
+    let Some(ribbon) = read_volume(g, r, &tmpstr)? else {
+        return Err(Fatal::Exit(1));
+    };
+    let mut labels: Vec<Option<Label>> = (0..nlabels.max(0)).map(|_| None).collect();
+    for nthlabel in 0..nlabels {
+        if o.annot_file.is_none() && o.aseg_fspec.is_none() {
+            let name = o.label_list[nthlabel as usize].clone();
+            let _ = writeln!(r.out, "Loading {name}");
+            let Some(mut l) = read_label(g, r, &name)? else {
+                let _ = writeln!(r.out, "ERROR reading {name}");
+                return Err(Fatal::Exit(1));
+            };
+            if l.coords != LABEL_COORDS_TKREG_RAS {
+                let Some(tk) = o.to_tkr_template.as_mut() else {
+                    let _ = r.out.write_all(b"ERROR: label is not in tkreg coords so you need to specify atemplate with --tkr-template MRI. The MRI should be the volumethat the label was created on\n");
+                    return Err(Fatal::Exit(1));
+                };
+                let _ = writeln!(r.out, "  Converting to TkRegister RAS");
+                g.notices.add(
+                    &FS_1261,
+                    format!(
+                        "mri_label2vol --fill-ribbon: the label {name} is not in tkregister coordinates (FreeSurfer converts another, unset label and crashes); here the label itself"
+                    ),
+                );
+                if g.notices.reproduce() {
+                    return Err(Fatal::Exit(139));
+                }
+                let mut io = label_coords::Io {
+                    out: &mut *r.out,
+                    err: &mut *r.err,
+                    env: &env,
+                };
+                let src = l.clone();
+                l = label_to_surface_ras(g, &mut io, &src, tk, None, LabelDst::Same)?;
+            }
+            labels[nthlabel as usize] = Some(l);
+        }
+        if o.annot_file.is_some() {
+            labels[nthlabel as usize] = annotation2label(g, sg, r, nthlabel, surf)?;
+        }
+    }
+    let _ = writeln!(r.out, "Mapping");
+    let lta = o.lta.take();
+    let res = surface_label2vol_opt(
+        g,
+        r,
+        &ribbon,
+        surf,
+        &labels,
+        lta.as_ref(),
+        o.do_stat_thresh,
+        o.stat_thresh,
+        false,
+    )?;
+    let Some(mut outvol) = res else {
+        // FreeSurfer records the command line in the volume it did not get: a crash
+        return Err(Fatal::Exit(if g.notices.reproduce() { 139 } else { 1 }));
+    };
+    mri_add_command_line(g, r.err, &mut outvol, cmdline.as_bytes());
+    if ribbon.ct.is_some() {
+        outvol.ct = ctab_deep_copy(g, r.err, ribbon.ct.as_ref());
+    }
+    let out_name = o.out_vol_id.clone().unwrap_or_default();
+    let e = write_volume(g, r, &mut outvol, &out_name)?;
+    if e != 0 {
+        return Err(Fatal::Exit(e));
+    }
+    if o.do_label_stat_vol {
+        let _ = writeln!(r.out, "Mapping stats");
+        let res = surface_label2vol_opt(
+            g,
+            r,
+            &ribbon,
+            surf,
+            &labels,
+            lta.as_ref(),
+            o.do_stat_thresh,
+            o.stat_thresh,
+            true,
+        )?;
+        let Some(mut statvol) = res else {
+            return Err(Fatal::Exit(if g.notices.reproduce() { 139 } else { 1 }));
+        };
+        let name = o.label_stat_vol_fspec.clone().unwrap_or_default();
+        let e = write_volume(g, r, &mut statvol, &name)?;
+        if e != 0 {
+            return Err(Fatal::Exit(e));
+        }
+    }
+    Ok(())
 }
 
 /// `--defects <surf> <defectno> <template> <offset> <merge> <out> [<label>]`, which FreeSurfer
@@ -642,12 +837,6 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
             let _ = writeln!(r.out, "ERROR: loading aseg {aspec}");
             return Err(Fatal::Exit(1));
         };
-        if o.use_new_aseg2vol {
-            return Err(not_ported(
-                r,
-                "--new-aseg2vol (MRIseg2SegPVF, part 2 of queue item 3.2-40)",
-            ));
-        }
         let Some(t) = temp.as_ref() else {
             g.notices.add(
                 &FS_1260,
@@ -662,6 +851,9 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
             );
             return Err(Fatal::Exit(1));
         };
+        if o.use_new_aseg2vol {
+            return new_aseg2vol(g, r, &o, &aseg, t, rmat.as_ref(), &cmdline);
+        }
         let Some(mut aseg2vol) =
             transform_reg_dat2_lta(g, r.out, r.err, &aseg.vg, &t.vg, rmat.as_ref())?
         else {
@@ -707,10 +899,8 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     let _ = writeln!(r.out, "nlabels = {nlabels}");
 
     if o.fill_ribbon {
-        return Err(not_ported(
-            r,
-            "--fill-ribbon (MRIsurf2VolOpt, part 2 of queue item 3.2-40)",
-        ));
+        let s = surf.as_ref().expect("check_options asks for a surface");
+        return fill_ribbon(g, &mut sg, r, &mut o, s, nlabels, &cmdline);
     }
 
     let t = temp.as_ref().expect("check_options asks for --temp");

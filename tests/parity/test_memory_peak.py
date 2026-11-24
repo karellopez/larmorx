@@ -23,7 +23,8 @@ fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``,
 (``FS_TEMP_FILE_CASES``, 2026-11-22), ``getfullpath`` (``GETFULLPATH_CASES``, 2026-11-22) and
 ``mri_vol2vol`` (``MRI_VOL2VOL_CASES``, 2026-11-23; its morph and ``--gcam`` on the classic
 recording, relay 54), ``mri_concat`` (``MRI_CONCAT_CASES``, 2026-11-23), ``mri_label2vol``
-(``MRI_LABEL2VOL_CASES``, 2026-11-24: ``defect2seg``'s two calls, the first that read a surface) and
+(``MRI_LABEL2VOL_CASES``, 2026-11-24: ``defect2seg``'s two calls, the first that read a surface;
+``--new-aseg2vol`` and ``--fill-ribbon`` from relay 57 of track A) and
 ``mri_segment`` (``MRI_SEGMENT_CASES``, 2026-11-24).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
@@ -3412,6 +3413,11 @@ MRI_LABEL2VOL_CASES = [
     ("proj", ["--label", "{label}/lh.cortex.label", "--temp", "{mri}/orig.mgz", "--identity",
               "--proj", "frac", "0", "1", "0.1", "--subject", "sub-01", "--hemi", "lh", "--o",
               "out.mgz"]),
+    # part 2 (relay 57): the tissue types' vote over 8 samples a voxel, the ribbon filled
+    ("new-aseg2vol", ["--seg", "{mri}/aseg.mgz", "--temp", "{mri}/rawavg.mgz", "--regheader",
+                      "--new-aseg2vol", "--ttype", "--resmm", "0.5", "--o", "out.mgz"]),
+    ("fill-ribbon", ["--label", "{label}/lh.cortex.label", "--fill-ribbon", "--subject",
+                     "sub-01", "--hemi", "lh", "--identity", "--o", "out.mgz"]),
 ]  # fmt: skip
 
 
@@ -3479,8 +3485,10 @@ def test_mri_label2vol_replica_needs_no_more_memory_than_freesurfer(tmp_path, na
 
     out = "out.mgz"
     o_dir = tmp_path / "freesurfer"
+    # --new-aseg2vol prints its time (``MRIseg2SegPVF(): done t = <seconds>, ...``)
+    volatile = (r"(?<=MRIseg2SegPVF\(\): done t = )[^,]*(?=,)",)
     code, fs_mib = _original_peak(
-        ["mri_label2vol", *words], env, "freesurfer", fresh(o_dir), o_dir, (), "freesurfer"
+        ["mri_label2vol", *words], env, "freesurfer", fresh(o_dir), o_dir, volatile, "freesurfer"
     )
     assert code == 0
     for mode in ("reproduce", "fix"):

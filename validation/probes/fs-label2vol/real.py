@@ -12,7 +12,14 @@ label/rh.nofix.cortex.label``). On each recorded run (``oracles/freesurfer-8.2.0
 official output (both sides read the same bytes). ``seg2cc`` calls ``mri_label2vol --seg <seg>
 --temp <vol> --regheader --o <out>`` for heads that are not conformed (none of the recorded six):
 its form runs here on the v8 runs with the head's ``aseg.mgz`` onto its native grid (``rawavg.mgz``)
-and back onto ``norm.mgz``. Each call: the official program through the oracle-output cache (one thread,
+and back onto ``norm.mgz``. Part 2's paths, which no recorded step takes, run on the v8 runs too
+(relay 57): ``--new-aseg2vol --ttype --resmm 0.5`` (the aseg onto ``rawavg.mgz``'s grid, 8 samples
+per voxel, the tissue types' vote), ``--fill-ribbon`` with ``label/lh.cortex.label`` and
+``--label-stat`` (the head's ``mri/ribbon.mgz``, ``surf/lh.white`` and ``surf/lh.thickness`` read
+from ``SUBJECTS_DIR``: keyed as inputs of the official run) and ``--fill-ribbon --annot
+label/rh.aparc.annot`` (an index of the atlas no vertex has makes FreeSurfer crash, FS-1268: a
+crash of the official run that the port's ``reproduce`` ends with the same signal's status counts
+as matched; ``fix`` maps the indices that have vertices). Each call: the official program through the oracle-output cache (one thread,
 ``FS_DISABLE_LANG=1``, ``FREESURFER_SEED=1234``: the defects' colour table takes random colours,
 which recon-all leaves to the clock), the port (``--port <larmorx-freesurfer>``) with ``reproduce``
 and ``fix``, each in a folder of its own; exit status, both streams and the files written compared
@@ -39,12 +46,14 @@ REPO = HERE.parents[2]
 sys.path.insert(0, str(REPO / "validation" / "src"))
 sys.path.insert(0, str(HERE))
 
-from check import canon  # noqa: E402
+from check import TIME, canon  # noqa: E402
 from larmorx_validation import oracle_cache  # noqa: E402
 from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env  # noqa: E402
 from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 
-POLICY = oracle_cache.Policy(threads=1, family="freesurfer", formats="freesurfer")
+POLICY = oracle_cache.Policy(
+    threads=1, family="freesurfer", formats="freesurfer", volatile=(TIME.pattern,)
+)
 SIZES = {0: 1, 1: 4, 3: 4, 4: 2}  # uchar, int, float, short
 
 
@@ -63,7 +72,8 @@ def image(b: bytes) -> bytes:
 
 
 def compare(port: Path, exe: Path, env: dict, work: Path, run: str, name: str,
-            args: list[str], inputs: dict[str, Path], recorded: Path | None = None) -> dict:  # fmt: skip
+            args: list[str], inputs: dict[str, Path], recorded: Path | None = None,
+            read: tuple[Path, ...] = ()) -> dict:  # fmt: skip
     """One call: the official program, the port with ``reproduce`` and ``fix``, each in a folder
     of its own (the files ``inputs`` names copied in first); the row (identical or not, the notices
     of ``fix``; the official output's image against ``recorded``'s)."""
@@ -79,7 +89,7 @@ def compare(port: Path, exe: Path, env: dict, work: Path, run: str, name: str,
         if side == "official":
             done = oracle_cache.run([exe.name, *args], env=env, cwd=d, outputs=[d],
                                     policy=POLICY, timeout=1200, runner="fs-label2vol-real",
-                                    inputs=[d / k for k in inputs])  # fmt: skip
+                                    inputs=[*(d / k for k in inputs), *read])  # fmt: skip
             rc, so, se = done.returncode, done.stdout, done.stderr
             ids: list[str] = []
         else:
@@ -93,11 +103,15 @@ def compare(port: Path, exe: Path, env: dict, work: Path, run: str, name: str,
                           for m in [re.match(r"larmorx: upstream defect (\S+)", x)] if m})  # fmt: skip
             rc, so = p.returncode, p.stdout
         written = {k: v for k, v in files(d).items() if canon(given.get(k, b"")) != v}
-        outs[side] = (rc, so, se, written, ids, d)
+        outs[side] = (rc, TIME.sub("<T>", so), se, written, ids, d)
     o = outs["official"][:4]
     row = {"run": run, "call": name, "status": outs["official"][0],
            "reproduce": outs["reproduce"][:4] == o, "fix": outs["fix"][:4] == o,
            "fix_notices": outs["fix"][4]}  # fmt: skip
+    # a crash of the official run (its unflushed output lost) that reproduce ends with too
+    if o[0] < 0 and outs["reproduce"][0] == 128 - o[0]:
+        row["crash_matched"] = True
+        row["reproduce"] = True
     if recorded is not None:
         out = outs["official"][5] / args[-2] if args[0] == "--defects" else None
         row["official_image_is_recorded"] = out is not None and image(out.read_bytes()) == image(
@@ -112,7 +126,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--port", type=lambda s: Path(s).resolve(), required=True)
     ap.add_argument("--json", type=Path)
     ap.add_argument("--runs", nargs="*", help="the runs (default: every -v8 and -classic run)")
-    ap.add_argument("--no-seg", action="store_true", help="only the defects' calls")
+    ap.add_argument("--no-seg", action="store_true", help="no segmentation's call")
+    ap.add_argument("--no-part2", action="store_true", help="no --new-aseg2vol, --fill-ribbon")
     a = ap.parse_args(argv)
     ws = workspace()
     fsh = ws / FS_HOME
@@ -162,6 +177,26 @@ def main(argv: list[str] | None = None) -> int:
                                 {"aseg.native.mgz": native, "norm.mgz": mri / "norm.mgz"}))  # fmt: skip
             shutil.rmtree(work / run / "seg-to-native")
             shutil.rmtree(work / run / "seg-to-conformed")
+        if not a.no_part2 and run.endswith("-v8"):
+            rows.append(compare(a.port, exe, env, work, run, "new-aseg2vol",
+                                ["--seg", "aseg.mgz", "--temp", "rawavg.mgz", "--regheader",
+                                 "--new-aseg2vol", "--ttype", "--resmm", "0.5",
+                                 "--o", "aseg.tt.mgz"],
+                                {"aseg.mgz": mri / "aseg.mgz", "rawavg.mgz": mri / "rawavg.mgz"}))  # fmt: skip
+            read = (sf / "lh.white", sf / "lh.thickness", sf / "rh.white", sf / "rh.thickness",
+                    mri / "ribbon.mgz")  # fmt: skip
+            rows.append(compare(a.port, exe, env, work, run, "fill-ribbon-label",
+                                ["--label", "lh.cortex.label", "--fill-ribbon", "--subject",
+                                 subj.name, "--hemi", "lh", "--identity", "--label-stat",
+                                 "stat.mgz", "--o", "cortex.ribbon.mgz"],
+                                {"lh.cortex.label": lab / "lh.cortex.label"}, read=read))  # fmt: skip
+            rows.append(compare(a.port, exe, env, work, run, "fill-ribbon-annot",
+                                ["--annot", "rh.aparc.annot", "--fill-ribbon", "--subject",
+                                 subj.name, "--hemi", "rh", "--identity",
+                                 "--o", "aparc.ribbon.mgz"],
+                                {"rh.aparc.annot": lab / "rh.aparc.annot"}, read=read))  # fmt: skip
+            for name in ("new-aseg2vol", "fill-ribbon-label", "fill-ribbon-annot"):
+                shutil.rmtree(work / run / name)
         shutil.rmtree(work / run / "defects-lh")
         shutil.rmtree(work / run / "defects-rh")
     summary = {
@@ -170,6 +205,7 @@ def main(argv: list[str] | None = None) -> int:
         "reproduce_identical": sum(r["reproduce"] for r in rows),
         "fix_identical": sum(r["fix"] for r in rows),
         "fix_differ_without_notice": sum(not r["fix"] and not r["fix_notices"] for r in rows),
+        "official_crashes_matched": sum(r.get("crash_matched", False) for r in rows),
         "official_image_is_recorded": sum(r.get("official_image_is_recorded", False) for r in rows),
         "with_a_record": sum("official_image_is_recorded" in r for r in rows),
         "rows": rows,

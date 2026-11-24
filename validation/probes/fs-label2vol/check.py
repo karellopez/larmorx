@@ -36,6 +36,7 @@ import gzip
 import hashlib
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -57,6 +58,10 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # FS-1258, FS-1259);
 # HANG (FS-1257: FreeSurfer never ends)
 SKIP = ("CRASH", "MEMORY", "HANG")
+
+#: ``--new-aseg2vol``'s time (``MRIseg2SegPVF(): done t = <seconds>, ...``): masked in the lines
+#: and volatile in the cache
+TIME = re.compile(r"(?<=MRIseg2SegPVF\(\): done t = )[^,]*(?=,)")
 
 MANIFEST = REPO / "crates-freesurfer" / "Cargo.toml"
 EXAMPLE = REPO / "crates-freesurfer" / "target" / "release" / "examples" / "fs_label2vol_probe"
@@ -115,16 +120,20 @@ def mask_command_lines(b: bytes) -> bytes:
     out = bytearray()
     i = 0
     key = b"ProgramName: "
-    while i < len(b):
-        if b.startswith(key, i) and len(out) >= 8:
+    while True:
+        k = b.find(key, i)
+        if k < 0:
+            out += b[i:]
+            return bytes(out)
+        out += b[i:k]
+        if len(out) >= 8:
             del out[-8:]
             out += b"<CMD>"
-            k = b.find(b"\0", i)
-            i = len(b) if k < 0 else k
-            continue
-        out.append(b[i])
-        i += 1
-    return bytes(out)
+            z = b.find(b"\0", k)
+            i = len(b) if z < 0 else z
+        else:
+            out += b[k : k + 1]
+            i = k + 1
 
 
 def written(d: Path, inputs: dict[str, bytes], dirs: list[str]) -> str:
@@ -200,7 +209,9 @@ def official_line(exe: Path, line: str, root: Path, k: int) -> str:
         env=env,
         cwd=d,
         outputs=[d],
-        policy=oracle_cache.Policy(threads=1, family="freesurfer", formats="freesurfer"),
+        policy=oracle_cache.Policy(
+            threads=1, family="freesurfer", formats="freesurfer", volatile=(TIME.pattern,)
+        ),
         timeout=30,
         runner="fs-label2vol-probe",
         inputs=[*inputs, layout(root)],
@@ -211,7 +222,7 @@ def official_line(exe: Path, line: str, root: Path, k: int) -> str:
 
     def mask(s: str | bytes) -> str:
         b = s.encode("utf-8", "surrogateescape") if isinstance(s, str) else s
-        return escape(b).replace(dd, "<DIR>")
+        return TIME.sub("<T>", escape(b).replace(dd, "<DIR>"))
 
     out = done.stdout_bytes
     files = written(d, given, dirs)

@@ -8,7 +8,10 @@
 //! its hits), two volume labels with their hits, a label with NaN, infinite and huge coordinates
 //! with its stat volume through a `register.dat`, a surface label projected along the normals by
 //! a fraction of the thickness, and an annotation, on volumes up to 12^3 and a surface of 66
-//! vertices (`tests/fs_label2vol/cases.rs`' `golden_cases`). Each case's line (exit status, both
+//! vertices; `--new-aseg2vol` with no sample per voxel (FS-1266), with the tissue types' vote and
+//! through a `register.dat`; `--fill-ribbon` with a label of NaN and infinite stats (from the
+//! label's text) and its stat volume, through an `.lta` whose destination is the ribbon, and with
+//! an annotation (`tests/fs_label2vol/cases.rs`' `golden_cases`). Each case's line (exit status, both
 //! streams and every file the run wrote, masked as the probe masks them) is hashed; the official
 //! program's value was recorded by `validation/probes/fs-label2vol/check.py --golden` on Linux
 //! x64, and every platform must give it with `reproduce` and the recorded default.
@@ -19,10 +22,11 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-24 by `check.py --golden` from the official program on Linux x64: 9 cases.
-const OFFICIAL_SHA256: &str = "aeabe265b849ca1002d79d2e07cc640fc12d97ca20468cc7dd9be3fe21d7e717";
+/// Recorded 2026-11-24 by `check.py --golden` from the official program on Linux x64: 15 cases
+/// (relay 57: part 2's six).
+const OFFICIAL_SHA256: &str = "f50d82be5500fd538efeaa58f05453303144525721334ce59d38d3afe5c0b139";
 /// The port's default on Linux x64 (FS-01's NUL bytes removed from the written volumes).
-const FIX_SHA256: &str = "9cb289bfca40e71fb04cc2f6ecd364930c72794d207a8fd168347cccf27caa2c";
+const FIX_SHA256: &str = "17475818fc453f38cbb8061dba1f5e8260aaf3544a1da5844d9c0b008b101953";
 
 fn cases_digest(mode: UpstreamDefects) -> String {
     let mut h = Sha256::new();

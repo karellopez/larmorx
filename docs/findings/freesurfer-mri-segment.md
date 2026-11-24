@@ -167,7 +167,14 @@ opened is skipped silently (`if (fp)`).
   2: §5.
 - Golden (`tests/mri_segment_golden.rs`, 11 cases on 32^3 volumes, a `float` one with NaNs and
   infinities by their bits): `reproduce` = the official program's value (`d4ca21c0...`, recorded by
-  `validation/probes/fs-segment/prog.py --golden`), default `735f6cf6...`.
+  `validation/probes/fs-segment/prog.py --golden`), default `735f6cf6...`. Relay 57: 8 cases, the
+  same paths (the defaults' case dropped: recon-all's call runs every step with other thresholds;
+  the NaN input and the unwritten output on `-thickenonly`'s short path; `-seg` with `-thicken 0`;
+  `-b` and `-polvlen` joined to `-keep` with `-noauto -thicken 0`; `-fillbg -fillv` kept on every
+  step, since the ventricles' search finds its two too-small segments only so): about 6 s per test
+  in a debug build instead of 15 (each full run about 2 s; and the inputs written as new files, not
+  truncated and rewritten, which ext4 flushes to the disk when they are closed: up to 1.3 s per
+  case on a busy disk). `reproduce` = official `17f6257b...`, default `e3ff2e21...`.
 - Memory (`tests/parity/test_memory_peak.py`, `MRI_SEGMENT_CASES`): recon-all's call on ds000005
   classic 134.8 MiB (FreeSurfer 139.0 in the same measurement), `-seg` 330.4 MiB (346.0).
 - Speed: 95 s at relay 56's first build (FreeSurfer 37 s), 53 s after the planar holes' candidate

@@ -269,5 +269,5 @@ read; 139 (signal 11) and 134 (the stack protector's abort) for FreeSurfer's cra
   + 10 identical, 0 different; by default 0 unexplained.
 - **The recorded steps**: recon-all's call on the 12 recorded heads (`freesurfer-replay run <run>
   mri_segment`): `wm.seg.mgz` and `segment.dat` FreeSurfer's in both modes (observed 24/24).
-- **Golden**: 11 cases on 32^3 volumes made with integer arithmetic (one `float` with NaNs and
+- **Golden**: 8 cases on 32^3 volumes made with integer arithmetic (one `float` with NaNs and
   infinities by their bits).

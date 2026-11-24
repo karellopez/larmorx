@@ -25,17 +25,29 @@ use sha2::{Digest, Sha256};
 /// The size of the coronal volumes.
 pub const N: i32 = 32;
 
-/// The command lines: recon-all's call, the defaults, the NaN volume, without the statistics and
-/// the thickening, the segmentation's path (`-seg`), the basal ganglia and ventricles, the
-/// strands' removal only (FS-1230), the edits kept, `-b` (FS-1220), an output into a folder that
-/// does not exist (FS-1226), an option given last (FS-1219: a crash).
+/// The command lines: recon-all's call (the only one through every step: the statistics twice,
+/// the strands' removal and thickening, `segment.dat`), the strands' removal only (FS-1230) on the
+/// NaN volume, without the statistics and the thickening, the segmentation's path (`-seg`), the
+/// basal ganglia and ventricles (FS-1227; every step: the ventricles' search finds two segments
+/// only so), the edits kept with `-b` (FS-1220) and `-polvlen`, an output into a folder that does
+/// not exist (FS-1226), an option given last (FS-1219: a crash). The other options' cases leave
+/// out the slow steps they do not need (`-noauto`, `-thicken 0`, `-thickenonly`), so the test
+/// takes a few seconds in a debug build.
 pub fn cases() -> Vec<Vec<String>> {
-    let c: [&[&str]; 11] = [
+    let c: [&[&str]; 8] = [
         &["-wsizemm", "13", "-mprage", "in.mgz", "out.mgz"],
-        &["in.mgz", "out.mgz"],
-        &["-wsizemm", "13", "-mprage", "nan.mgz", "out.mgz"],
+        &[
+            "-wsizemm",
+            "13",
+            "-mprage",
+            "-thickenonly",
+            "nan.mgz",
+            "out.mgz",
+        ],
         &["-noauto", "-thicken", "0", "in.mgz", "out.mgz"],
         &[
+            "-thicken",
+            "0",
             "-seg",
             "aseg.presurf.mgz",
             "3",
@@ -46,10 +58,10 @@ pub fn cases() -> Vec<Vec<String>> {
             "out.mgz",
         ],
         &["-fillbg", "-fillv", "in.mgz", "out.mgz"],
-        &["-thickenonly", "in.mgz", "out.mgz"],
-        &["-keep", "in.mgz", "keep.mgz"],
-        &["-b", "0.5", "-polvlen", "2", "in.mgz", "out.mgz"],
-        &["in.mgz", "nodir/out.mgz"],
+        &[
+            "-noauto", "-thicken", "0", "-b", "0.5", "-polvlen", "2", "-keep", "in.mgz", "keep.mgz",
+        ],
+        &["-thickenonly", "in.mgz", "nodir/out.mgz"],
         &["-slope"],
     ];
     c.iter()
@@ -58,19 +70,21 @@ pub fn cases() -> Vec<Vec<String>> {
 }
 
 /// The files each case may write (compared by digest; the inputs written again before each case).
-pub const OUTPUTS: [&[&str]; 11] = [
+pub const OUTPUTS: [&[&str]; 8] = [
     &["out.mgz", "segment.dat"],
-    &["out.mgz", "segment.dat"],
-    &["out.mgz", "segment.dat"],
+    &["out.mgz"],
     &["out.mgz"],
     &["out.mgz", "wm.pdf.dat", "ctx.pdf.dat"],
     &["out.mgz", "segment.dat"],
-    &["out.mgz"],
-    &["keep.mgz", "segment.dat"],
-    &["out.mgz", "segment.dat"],
-    &["segment.dat"],
+    &["keep.mgz"],
+    &[],
     &[],
 ];
+
+/// The inputs' names, removed before they are written again: a new file, never one truncated
+/// and rewritten (which some file systems flush to the disk when it is closed: seconds per case
+/// on a busy disk).
+pub const INPUTS: [&str; 4] = ["in.mgz", "nan.mgz", "aseg.presurf.mgz", "keep.mgz"];
 
 fn io() -> (std::io::Sink, std::io::Sink) {
     (std::io::sink(), std::io::sink())
@@ -195,13 +209,12 @@ pub fn write_inputs(dir: &Path) {
     });
     let (mut o, mut e) = io();
     std::fs::create_dir_all(dir).expect("a folder");
-    for (m, name) in [
-        (&mut vin, "in.mgz"),
-        (&mut vnan, "nan.mgz"),
-        (&mut aseg, "aseg.presurf.mgz"),
-        (&mut keep, "keep.mgz"),
-    ] {
+    for (m, name) in [&mut vin, &mut vnan, &mut aseg, &mut keep]
+        .into_iter()
+        .zip(INPUTS)
+    {
         let p = dir.join(name);
+        let _ = std::fs::remove_file(&p);
         mri_write(
             &mut g,
             &mut o,

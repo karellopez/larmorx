@@ -46,12 +46,14 @@ REPO = HERE.parents[2]
 sys.path.insert(0, str(REPO / "validation" / "src"))
 sys.path.insert(0, str(HERE))
 
-from check import canon  # noqa: E402
+from check import TIME, canon  # noqa: E402
 from larmorx_validation import oracle_cache  # noqa: E402
 from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env  # noqa: E402
 from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 
-POLICY = oracle_cache.Policy(threads=1, family="freesurfer", formats="freesurfer")
+POLICY = oracle_cache.Policy(
+    threads=1, family="freesurfer", formats="freesurfer", volatile=(TIME.pattern,)
+)
 SIZES = {0: 1, 1: 4, 3: 4, 4: 2}  # uchar, int, float, short
 
 
@@ -101,7 +103,7 @@ def compare(port: Path, exe: Path, env: dict, work: Path, run: str, name: str,
                           for m in [re.match(r"larmorx: upstream defect (\S+)", x)] if m})  # fmt: skip
             rc, so = p.returncode, p.stdout
         written = {k: v for k, v in files(d).items() if canon(given.get(k, b"")) != v}
-        outs[side] = (rc, so, se, written, ids, d)
+        outs[side] = (rc, TIME.sub("<T>", so), se, written, ids, d)
     o = outs["official"][:4]
     row = {"run": run, "call": name, "status": outs["official"][0],
            "reproduce": outs["reproduce"][:4] == o, "fix": outs["fix"][:4] == o,

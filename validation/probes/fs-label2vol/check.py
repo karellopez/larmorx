@@ -120,16 +120,20 @@ def mask_command_lines(b: bytes) -> bytes:
     out = bytearray()
     i = 0
     key = b"ProgramName: "
-    while i < len(b):
-        if b.startswith(key, i) and len(out) >= 8:
+    while True:
+        k = b.find(key, i)
+        if k < 0:
+            out += b[i:]
+            return bytes(out)
+        out += b[i:k]
+        if len(out) >= 8:
             del out[-8:]
             out += b"<CMD>"
-            k = b.find(b"\0", i)
-            i = len(b) if k < 0 else k
-            continue
-        out.append(b[i])
-        i += 1
-    return bytes(out)
+            z = b.find(b"\0", k)
+            i = len(b) if z < 0 else z
+        else:
+            out += b[k : k + 1]
+            i = k + 1
 
 
 def written(d: Path, inputs: dict[str, bytes], dirs: list[str]) -> str:

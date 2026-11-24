@@ -73,7 +73,7 @@ FS-1268's notice on 6; the 12 official defect volumes equal to the recordings. R
 `tests/fs_label2vol_official.rs` (seed 1, 600 cases, 49 `SKIP`, `bf8ecdd7...`). Golden: 15 cases,
 `f50d82be...` (official and `reproduce`), `17475818...` (`fix`). Memory: the seven calls of
 `test_memory_peak.py` within the rule (`--new-aseg2vol --ttype --resmm 0.5` 135 MiB against
-FreeSurfer's 206, `--fill-ribbon` 249 against 266). Speed (one thread, ds000005 v8): `--new-aseg2vol`
+FreeSurfer's 206, `--fill-ribbon` 248 against 267). Speed (one thread, ds000005 v8): `--new-aseg2vol`
 3.7 s against FreeSurfer's 2.8 s, `--fill-ribbon` 14.2 s against 5.1 s (a speed item). The Windows
 cross-check (TMP and TEMP behind a junction): the recorded test, the golden test and the crate's
 tests pass.

@@ -127,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
             "",
             "`validation/probes/fs-label2vol/real.py`: `defect2seg`'s two calls per run (the left "
             "hemisphere's defects into `orig.mgz` with the cortex label, the right's merged into "
-            "the left's volume) on the six classic and six v8 runs, and `seg2cc`'s form (`--seg "
+            "the left's volume) on the six classic and six v8 runs, and, on the v8 runs, `seg2cc`'s form (`--seg "
             "<seg> --temp <vol> --regheader`: the head's `aseg.mgz` onto its native grid "
             "`rawavg.mgz` and back onto `norm.mgz`), each run's own files "
             f"({', '.join(real['runs'])}; by kind: {kinds}): {real['calls']} calls, `reproduce` "

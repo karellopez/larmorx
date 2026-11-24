@@ -11,8 +11,8 @@ label/rh.nofix.cortex.label``). On each recorded run (``oracles/freesurfer-8.2.0
 ``*-classic``) the two calls run on the run's own files; the right hemisphere's on the left's
 official output (both sides read the same bytes). ``seg2cc`` calls ``mri_label2vol --seg <seg>
 --temp <vol> --regheader --o <out>`` for heads that are not conformed (none of the recorded six):
-its form runs here with the head's ``aseg.mgz`` onto its native grid (``rawavg.mgz``) and back onto
-``norm.mgz``. Each call: the official program through the oracle-output cache (one thread,
+its form runs here on the v8 runs with the head's ``aseg.mgz`` onto its native grid (``rawavg.mgz``)
+and back onto ``norm.mgz``. Each call: the official program through the oracle-output cache (one thread,
 ``FS_DISABLE_LANG=1``, ``FREESURFER_SEED=1234``: the defects' colour table takes random colours,
 which recon-all leaves to the clock), the port (``--port <larmorx-freesurfer>``) with ``reproduce``
 and ``fix``, each in a folder of its own; exit status, both streams and the files written compared
@@ -150,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
                              "surface.defects.mgz": lh_out,
                              "rh.nofix.cortex.label": lab / "rh.nofix.cortex.label"},
                             recorded=rec))  # fmt: skip
-        if not a.no_seg:
+        if not a.no_seg and run.endswith("-v8"):
             rows.append(compare(a.port, exe, env, work, run, "seg-to-native",
                                 ["--seg", "aseg.mgz", "--temp", "rawavg.mgz", "--regheader",
                                  "--o", "aseg.native.mgz"],

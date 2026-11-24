@@ -41,7 +41,7 @@ part 1, track A relay 56: every option and path but `--new-aseg2vol` and `--fill
 - `real.py --port <larmorx-freesurfer>`: `defect2seg`'s two calls per run on the six classic and
   six v8 recorded runs (the run's own surfaces, defect numbers, cortex labels and `orig.mgz`; the
   right hemisphere's call on the left's official output), the official volume's header and voxels
-  against the run's recorded `mri/surface.defects.mgz`, and `seg2cc`'s form (`--seg aseg.mgz
+  against the run's recorded `mri/surface.defects.mgz`, and on the v8 runs `seg2cc`'s form (`--seg aseg.mgz
   --temp rawavg.mgz --regheader`, then that output back onto `norm.mgz`), in
   `<inputs>/fs-label2vol-real/`.
 - `record.py`: `docs/validation/freesurfer-mri-label2vol.{json,md}`.

@@ -24,12 +24,15 @@
 
 pub mod arith;
 pub mod aseg;
+pub mod binvol;
+pub mod bright;
 pub mod cma;
 pub mod conform;
 pub mod crops;
 pub mod deriv;
 pub mod dilate;
 pub mod extract;
+pub mod fill;
 pub mod frames;
 pub mod geomblock;
 pub mod geometry;
@@ -49,6 +52,7 @@ pub mod pvlabel;
 pub mod region;
 pub mod regrid;
 pub mod resample;
+pub mod rotations;
 pub mod sample;
 pub mod segs;
 pub mod seqops;
@@ -56,8 +60,10 @@ pub mod setops;
 pub mod skull;
 pub mod stats;
 pub mod talairach;
+pub mod topo;
 pub mod v2v;
 pub mod vgcopy;
+pub mod vlist;
 pub mod voxelwise;
 pub mod voxnbhd;
 

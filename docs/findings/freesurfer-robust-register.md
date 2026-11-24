@@ -383,7 +383,8 @@ took <s> seconds.`) and the target, with the mask passed in (no `MRImask` then).
   one thread; logs `oracles/logs/fs-found-c-r49-speed{1,2}.log`, jsons `C/r49/speed{,2}-<c>.json`):
   `LS` 28.9 s against FreeSurfer's 22.9 s, `NCC` 48.8 s against 40.7 s, `MI` 45.9 s against 32.4 s
   (FreeSurfer's times from the fresh official runs of the first measurement); every byte of standard
-  output, standard error and the files identical with `reproduce`. `costs_bench` (fs.robust's example,
+  output, standard error and the files identical with `reproduce`. The record's own run (from a clean
+  commit, both fresh): `LS` 28.8 s against 20.1 s, `NCC` 48.7 against 38.7, `MI` 46.0 against 33.1. `costs_bench` (fs.robust's example,
   128^3 random bytes): the byte sampler 12.9 ns a sample against the general one's 86 ns; least squares
   34 ns a voxel. What is left (`timeline.py`, LS): the 128^3 level's evaluations (FreeSurfer about 16 ns a
   voxel there, its images in the cache), the pyramid (fs.filter's blur and fs.volume's B-spline halving:

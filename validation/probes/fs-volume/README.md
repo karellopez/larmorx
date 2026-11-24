@@ -17,6 +17,10 @@
   port notes FS-53, FS-58, FS-288, FS-290 or FS-294 (memory FreeSurfer does not own, crashes), counted
   and not compared; `fix` different only with a notice), and the hash the test checks. Run it inside
   `scripts/orchestration/boxed.sh`.
+- `bright_closed.py <worktree> <open probe> <replica example> <scratch>` (track E's relay 22,
+  2026-11-24): §59's FS-1233 text checked against the replica's default. The open probe's `fbnwm`
+  lines are converted to this probe's case format and the result compared with `models.py bright`'s
+  model: 92 lines with FS-1233, 92 as the model. Run it inside `scripts/orchestration/boxed.sh`.
 
 Commands (part 1, `transform.cpp`'s geometry functions): `vgwrite`, `vgread` (twice in the cycle),
 `vgprint0`, `getvg`, `copyvg`, `vgi2r`, `vgr2i`, `tkrv2r`, `vgeq0`. Part 2 (3.1-35's voxel arithmetic):

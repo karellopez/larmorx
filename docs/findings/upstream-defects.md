@@ -464,7 +464,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FS-890 | FreeSurfer 8.2.0 the voxel-list functions (`VLSTcreate`, `VLSTsort`, `VLSTcopy`, `VLSTcopyInto`, `VLSTadd`, `VLSTinList`, `VLSTcomputeStats`, `VLSTaddWithValue`) | a count or an index past what a list's arrays hold, and a sort of a destination of more voxels than its source, read or write past the arrays | a (memory) | none known | an error in both modes (rule B, 2026-11-16), named | – |
 | FS-891 | FreeSurfer 8.2.0 `VLSTsort` | each voxel's indices, coordinates and values move in the sort, its frame index does not: a list of several frames carries other voxels' frames afterwards | c | none (FreeSurfer sorts one-frame lists) | the frames move with their voxels (rule A, 2026-11-16), named; `reproduce` in place | – |
 | FS-892 | FreeSurfer 8.2.0 `VLSTcreate` | the list's maximum count is never set (0 for a new list), so `VLSTadd` refuses to add to it | c | none (no program adds to such a list) | kept (rule C, 2026-11-16) | – |
-| FS-893 | FreeSurfer 8.2.0 `VLSTcopy`, `VLSTcopyInto` | a copy of a list with spline slopes gets slope arrays of zeros, not the source's; a source with slopes but no parameterisation ends the program | c | none (no program copies a spline list) | kept (rule C, 2026-11-16) | – |
+| FS-893 | FreeSurfer 8.2.0 `VLSTcopy`, `VLSTcopyInto` | a copy of a list with spline slopes gets slope arrays of zeros, not the source's; a source with its first slope array whose copy then lacks one of the slope or parameterisation arrays ends the program | c | none (no program copies a spline list) | kept (rule C, 2026-11-16) | – |
 | FS-894 | CTN 3.0.6 `DCM_GetElement`, `DCM_GetElementValue` | the messages of a missing element name the routine `DCM_GetElementVM` for `DCM_GetElement`; `DCM_GetElementValue`'s message for a group that holds no element (its only element was its group length, read with `DCM_NOGROUPLENGTH`) shows the group's number where the element's goes | f | none (FreeSurfer prints CTN's stack as it is) | kept (rule C, 2026-11-16: messages only) | – |
 | FS-951 | CTN 3.0.6 `DCM_GetElementValue` | a sequence's value asked for with a request whose representation is not SQ (only the request's own representation is checked) is copied from the memory holding the sequence's list of items: memory contents, or a crash past it | a (memory contents) | none (FreeSurfer asks with the element `DCM_GetElement` gave: SQ, refused) | refused as for a sequence ("Cannot retrieve value of element with SQ representation", rule B, 2026-11-16), named; `reproduce` CTN's copy with those bytes not given (`ValueRead::unknown`) | – |
 | FS-952 | CTN 3.0.6 `DCM_GetElementValue` | a request of 4,294,967,295 bytes of pixel data left in the file (an encapsulated value, of undefined length, asked for whole) reads nothing (the count is refused) and the failed read's -1, taken as unsigned, equals the request: success, with nothing written into the caller's buffer | a (memory never written) | none (FreeSurfer refuses an undefined pixel length before asking) | "DCM failed to access file" (rule B, 2026-11-16), named; `reproduce` CTN's success with nothing written | – |
@@ -4452,7 +4452,10 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
   limits beyond int (FS-517).
 - **Evidence:** verified (`validation/probes/fs-volume`, part 16: FreeSurfer 8.2.0's functions from the unit oracle's
   build against the port; seeds 7 and 13, every comparable line identical with `reproduce`, `fix` different only with
-  its notices; FS-505 to FS-507 also by unit tests of the round trips). The mechanisms:
+  its notices; FS-505 to FS-507 also by unit tests of the round trips); the open probe
+  `validation/investigations/freesurfer-volume-probe/` (groups `vltawr`, `vltaxf`, `vltamisc`, `vrot` and `vrules25`,
+  2026-11-24, part 11b: FS-504's writers of an array without transforms (crashes), its point weights (memory) and its
+  coronal change (FreeSurfer ends in its matrix product in every run)). The mechanisms:
   `docs/findings/freesurfer-volume.md` §22 to §24 (closed to FreeSurfer's clean-room implementers).
 - **fMRIPrep:** none. **FreeSurfer:** none known on recon-all's paths (one-transform arrays, FreeSurfer's colour
   tables, square slices).
@@ -4545,8 +4548,11 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
   build against the port; seeds 7 and 13, 18,000 cases each, every comparable line identical with `reproduce`, `fix`
   different only with its notices); the open probe `validation/investigations/freesurfer-volume-probe/` (groups `vcc`
   and `vrules24`, 2026-11-24: `VLSTcreateInRegion`'s FS-889 (its hang ended by the alarm), FS-890 (a second frame past
-  the count) and FS-892 among their lines). The mechanisms: `docs/findings/freesurfer-volume.md` §26 and §27 (closed to
-  FreeSurfer's clean-room implementers).
+  the count) and FS-892 among their lines; groups `vltamisc`, `vlst` and `vrules25`, 2026-11-24, part 11b:
+  `LTAtransformAtPoint`'s weights, `VLSTcreate`'s border count (FS-888) into a list large enough and past new arrays
+  (FS-890), its two negative skips (FS-889, ended by the alarm), the sorts and copies past a list's arrays (FS-890),
+  the sort's frames (FS-891), the copies' slope arrays and their end (FS-893)). The mechanisms:
+  `docs/findings/freesurfer-volume.md` §26 and §27 (closed to FreeSurfer's clean-room implementers).
 - **fMRIPrep:** none. **FreeSurfer:** none known on recon-all's paths (`mri_ca_label`, `gcamorph.cpp` and `mrimorph.cpp`
   make whole one-frame lists with skip 0; recon-all's arrays hold one transform; subjects' paths are short).
 - **larmorx:** FS-888, FS-891 corrected by default (rule A); FS-886, FS-887, FS-889, FS-890 errors (rule B); FS-892,

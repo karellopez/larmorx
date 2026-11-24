@@ -56,6 +56,15 @@ nothing else).
         with ``--candidate``, the candidate's lines with ``reproduce`` (FreeSurfer's count) and
         ``fix`` (FS-483's decided count: the voxels the sums take).
 
+    python -P models.py bright --probe P --scratch DIR [--candidate C]
+        every ``fbnwm`` line of the groups vbright and vrules24 against §59's FS-1233 (a T1 or a
+        white-matter volume not of bytes): the default's result is the probe's own ``fbnwm`` of the
+        byte volumes §59 names (the T1's values as FS-802's default takes them, the white matter's
+        truncated and clamped to 0..255), with, for a T1 not of bytes, its labels written by value
+        into the probe's ``clone`` of the T1; counts the lines with FS-1233 and those whose default
+        result differs from FreeSurfer's. With ``--candidate``, the candidate's lines: with
+        ``reproduce`` the probe's, with ``fix`` the model's (notices taken out of standard error).
+
 The probe runs through the oracle-output cache (one thread, the family ``freesurfer``) when the
 validation package is importable (``PYTHONPATH=validation/src``), else directly. Exit status 1 when a
 line differs from its model.
@@ -1448,6 +1457,140 @@ def cov(runner, scratch: Path, candidate: Path | None = None) -> int:
     return 1 if bad else 0
 
 
+#: struct formats of a voxel of the types a T1 of ``fbnwm`` takes (the bright model)
+LABFMT = {1: "<i", 2: "<q", 3: "<f", 4: "<h", 10: "<H"}
+
+
+def t1_byte(v: float) -> int:
+    """FS-802's default (§59): a T1 value as a byte (truncated; below 0 and NaN 0, 256 up 255)."""
+    if math.isnan(v) or v < 0:
+        return 0
+    return 255 if v >= 256 else int(v)
+
+
+def wm_byte(v: float) -> int:
+    """FS-1233's default (§59): a white-matter value as a byte (truncated, clamped to 0..255)."""
+    if math.isnan(v) or v <= 0:
+        return 0
+    return int(min(v, 255.0))
+
+
+def bright_parts(line: str) -> tuple[list[str], list[str]] | None:
+    """An ``fbnwm`` line's T1 and white-matter W (47 tokens each: compare.py's ``w_of``), both
+    without a painting; None for another form."""
+    t = line.split(" ")
+    if len(t) != 97 or t[0] != "fbnwm" or t[48] != "0" or t[96] != "0":
+        return None
+    return t[1:48], t[49:96]
+
+
+def as_bytes(w: list[str], conv) -> str | None:
+    """W P of a byte volume of w's extent and header holding frame 0's values through conv: an
+    ``i`` fill of whole words and a painting of the voxels past the last whole word (the probe
+    fills whole words only); None outside the model (a type it does not decode, frames)."""
+    vv = vol_values(" ".join(w))
+    if vv is None or vv[0][3] != 1:
+        return None
+    (x, y, _z, _f), vals = vv
+    b = [conv(v) for v in vals]
+    n = len(b)
+    pad = b + [0] * (-n % 4) if n else [0, 0, 0, 0]
+    words = [
+        pad[i] | pad[i + 1] << 8 | pad[i + 2] << 16 | pad[i + 3] << 24
+        for i in range(0, len(pad), 4)
+    ]
+    out = list(w)
+    out[3], out[6] = "0", C.lfill(words)
+    tail = [(i, b[i]) for i in range(n - n % 4, n)]
+    paint = [str(len(tail))]
+    for i, v in tail:
+        paint += [str(i % x), str(i // x % y), str(i // (x * y)), C.f32(float(v))]
+    return " ".join(out + paint)
+
+
+def bright(runner, scratch: Path, candidate: Path | None = None) -> int:
+    """§59's MRIfindBrightNonWM with FS-1233 (a T1 or white matter not of bytes): ``reproduce``
+    FreeSurfer's line; the default FreeSurfer's labels for the byte volumes the section names (the
+    probe's own ``fbnwm`` of them), written by value into the probe's clone of the T1 (``clone``)
+    when the T1 is not of bytes."""
+    gen = C.Gen20(7)
+    tally: Counter[str] = Counter()
+    bad = 0
+    for group in ("vbright", "vrules24"):
+        lines = [ln for b in getattr(gen, group)() for ln in b.lines if ln.startswith("fbnwm ")]
+        # the byte volumes' lines and the T1's clone, two per line of another type
+        extra: list[str] = []
+        plan: list[tuple[int, int] | None] = []
+        for line in lines:
+            parts = bright_parts(line)
+            if parts is None or (parts[0][3] == "0" and parts[1][3] == "0"):
+                plan.append(None)
+                continue
+            t1, wm = parts
+            t1b = " ".join(t1) + " 0" if t1[3] == "0" else as_bytes(t1, t1_byte)
+            wmb = " ".join(wm) + " 0" if wm[3] == "0" else as_bytes(wm, wm_byte)
+            if t1b is None or wmb is None:
+                plan.append(None)
+                tally[f"{group}: outside the model"] += 1
+                continue
+            plan.append((len(extra), int(t1[3])))
+            extra.append(f"fbnwm {t1b} {wmb}")
+            extra.append(f"clone {' '.join(t1)} new")
+        b = C.Batch(group, f"bright-{group}", lines)
+        path = C.write_batch(scratch, b)
+        plain, memory = runner.probe_runs(b, path)
+        eb = C.Batch(group, f"bright-{group}-bytes", extra)
+        eplain, ememory = runner.probe_runs(eb, C.write_batch(scratch, eb))
+        runs = {}
+        if candidate is not None:
+            for mode in ("reproduce", "fix"):
+                runs[mode] = runner.candidate_run(candidate, b, path, mode)
+        for i, line in enumerate(lines):
+            fs_res, fs_so, fs_se = C.decode(plain[i])
+            fs = (fs_res.decode("latin-1"), fs_so.decode("latin-1"))
+            if plan[i] is None:
+                want_fix = fs
+                tally[f"{group}: lines of bytes"] += 1
+            else:
+                k, t1type = plan[i]
+                tally[f"{group}: lines with FS-1233"] += 1
+                if ememory[k] or ememory[k + 1] or memory[i]:
+                    tally[f"{group}: memory"] += 1
+                    continue
+                lres, lso, _ = C.decode(eplain[k])
+                if t1type == 0:
+                    want_fix = (lres.decode("latin-1"), lso.decode("latin-1"))
+                else:
+                    labels = bytes.fromhex(lres.decode().split(" ")[-1][1:])
+                    cres = C.decode(eplain[k + 1])[0].decode("latin-1").split(" ")
+                    vox = bytearray(bytes.fromhex(cres[-1][1:]))
+                    size = struct.calcsize(LABFMT[t1type])
+                    for j, v in enumerate(labels):
+                        if v:
+                            vox[j * size : (j + 1) * size] = struct.pack(LABFMT[t1type], v)
+                    want_fix = (" ".join([*cres[:-1], "x" + vox.hex()]), lso.decode("latin-1"))
+                tally[f"{group}: the default changes the result"] += want_fix != fs
+            if memory[i]:
+                tally[f"{group}: memory"] += 1
+                continue
+            for who, out in runs.items():
+                want = want_fix if who == "fix" else fs
+                res, so, se = C.decode(out[i]) if i < len(out) else (b"<missing>", b"", b"")
+                se = C.NOTICE.sub(b"", se)
+                got = (res.decode("latin-1"), so.decode("latin-1"))
+                if got == want and se == fs_se:
+                    tally[f"{group}: {who} as the model"] += 1
+                else:
+                    bad += 1
+                    if bad <= 5:
+                        print(f"DIFFERS ({who}): {group} line {i + 1}: {line[:90]}")
+                        print(f"    got   {got[1]!r} {se[:80]!r}\n    model {want[1]!r}")
+    for k, v in sorted(tally.items()):
+        print(f"bright: {k}: {v}")
+    print(f"bright: differ from the model: {bad}")
+    return 1 if bad else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -1465,18 +1608,21 @@ def main() -> int:
             "ltatypes",
             "region",
             "cov",
+            "bright",
         ],
     )
     ap.add_argument("--probe", type=Path, required=True)
     ap.add_argument("--scratch", type=Path, required=True)
-    ap.add_argument("--candidate", type=Path, help="region, cov: also check this candidate's lines")
+    ap.add_argument(
+        "--candidate", type=Path, help="region, cov, bright: also check this candidate's lines"
+    )
     ap.add_argument("--no-cache", action="store_true")
     a = ap.parse_args()
     scratch = a.scratch.resolve()
     scratch.mkdir(parents=True, exist_ok=True)
     runner = C.Runner(a.probe.resolve(), scratch, not a.no_cache)
-    if a.command in ("region", "cov"):
-        fn = region if a.command == "region" else cov
+    if a.command in ("region", "cov", "bright"):
+        fn = {"region": region, "cov": cov, "bright": bright}[a.command]
         return fn(runner, scratch, a.candidate.resolve() if a.candidate else None)
     return {
         "fs291": fs291,

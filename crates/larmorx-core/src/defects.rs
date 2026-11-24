@@ -3354,7 +3354,7 @@ defects! {
     FS_892 = "FS-892", "FreeSurfer", false,
         "a voxel list made from a volume (VLSTcreate) keeps its maximum count at 0 (a new list) or the given list's: adding a voxel to it (VLSTadd) is refused as too many voxels; kept (no program adds to such a list)";
     FS_893 = "FS-893", "FreeSurfer", false,
-        "copying a voxel list with spline slopes (VLSTcopy, VLSTcopyInto) gives the copy slope arrays of zeros instead of the source's slopes, and ends the program when the source has slopes but no parameterisation; kept (no program copies a spline list)";
+        "copying a voxel list with spline slopes (VLSTcopy, VLSTcopyInto) gives the copy slope arrays of zeros instead of the source's slopes, and ends the program when the source has its first slope array and the copy then lacks one of the three slope arrays or the parameterisation (the source without it and the destination too); kept (no program copies a spline list)";
     FS_894 = "FS-894", "CTN", false,
         "the messages of an element that is not found name the routine DCM_GetElementVM for a request of DCM_GetElement, and DCM_GetElementValue's message for a group that holds no element (a group whose only element was its group length, read with DCM_NOGROUPLENGTH) shows the group's number where the element's goes; kept (messages only)";
     FS_951 = "FS-951", "CTN", true,

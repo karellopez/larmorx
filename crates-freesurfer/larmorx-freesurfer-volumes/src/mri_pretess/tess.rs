@@ -17,6 +17,7 @@
 
 use std::io::Write;
 
+use larmorx_core::defects::FS_1286;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_mri::mri::{MRI_UCHAR, Mri};
@@ -306,8 +307,8 @@ impl<'a> Tess<'a> {
     /// One background corner direction `(1, sy, sz)`: a voxel not of the label whose corner
     /// neighbour is not of the label either, with the voxels next to the corner of the label
     /// (the face neighbour along x and those along x and y, y, y and z, x and z; the face
-    /// neighbour along z is not looked at): the brighter of the two (the corner neighbour when the
-    /// voxel is not brighter) gets the label.
+    /// neighbour along z is not looked at: FS-1286, kept, noted when it is not of the label): the
+    /// brighter of the two (the corner neighbour when the voxel is not brighter) gets the label.
     fn background_direction(
         &mut self,
         g: &mut Globals,
@@ -344,6 +345,12 @@ impl<'a> Tess<'a> {
                             && self.is(px)
                             && self.is(pxz)
                         {
+                            if !self.is(add(p, ez)) {
+                                g.notices.add(
+                                    &FS_1286,
+                                    "mri_pretess: a background corner configuration filled whose voxel along z is not of the label (FreeSurfer does not look at it): kept",
+                                );
+                            }
                             if self.orig(g, err, p)? > self.orig(g, err, corner)? {
                                 self.set(p);
                             } else {

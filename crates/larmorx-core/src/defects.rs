@@ -2133,6 +2133,8 @@ defects! {
         "mri_pretess changes a segmentation that is not of bytes to bytes before it starts (its values rounded and clamped to 0 to 255; above 255 the warning about forced scaling) and writes its output as bytes, so the labels above 255 of an int or float segmentation are lost: kept";
     FS_1285 = "FS-1285", "FreeSurfer", true,
         "mri_pretess ends with exit status 0 when its output cannot be written (a folder that does not exist): larmorx ends with 1";
+    FS_1286 = "FS-1286", "FreeSurfer", true,
+        "mri_pretess's removal of the background's corner configurations does not require the voxel next to the first background voxel along z to be of the label (it looks at the neighbour along x twice), so it also fills a configuration whose two background voxels are joined at an edge, choosing between them by other voxels' intensities than the edge removal would: kept";
     FS_1210 = "FS-1210", "FreeSurfer", true,
         "mri_cc -a 0 whose search for the callosum's seed fails (no column of the callosum's thickness near Talairach's origin, or 'could not find valid seed for the cc') uses the seed's Talairach millimetres as a voxel position (only the printed centre and the division counts depend on it): larmorx uses the seed's voxel";
     FS_974 = "FS-974", "FreeSurfer", true,

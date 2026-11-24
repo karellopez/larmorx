@@ -26,7 +26,8 @@
 //! Defects (`larmorx_core::defects`; the mechanisms in `docs/findings/freesurfer-mri-pretess.md`):
 //! FS-1281 (`-debug_voxel` without its values), FS-1282 (a label number outside 0 to 255),
 //! FS-1283 (no voxel of the label: a percentage that is not a number, kept), FS-1284 (a
-//! segmentation not of bytes, kept), FS-1285 (an unwritten output).
+//! segmentation not of bytes, kept), FS-1285 (an unwritten output); FS-1286 (the background
+//! corners' check, kept: [`super::tess`]).
 
 use std::io::Write;
 

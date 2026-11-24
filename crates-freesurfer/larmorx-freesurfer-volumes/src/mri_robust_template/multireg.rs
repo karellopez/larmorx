@@ -32,6 +32,9 @@
 //! (`MyMatrix::GeometricMean`), queue item 3.2-15: it ends here with FreeSurfer's step and `is not
 //! ported yet`.
 
+// the matrices and the inputs' lists are indexed as FreeSurfer's code indexes them
+#![allow(clippy::needless_range_loop)]
+
 use std::io::Write;
 
 use larmorx_core::cfmt::ostream;
@@ -688,10 +691,10 @@ impl MultiRegistration {
                     unreachable!("ErrorExit returns only for code 0");
                 }
             };
-            if name == "identity.nofile" {
-                if let Some(mi) = self.mri_mov.get(i) {
-                    lta_modify_src_dst_geom(g, r.out, r.err, &mut lta, Some(mi), Some(mi));
-                }
+            if name == "identity.nofile"
+                && let Some(mi) = self.mri_mov.get(i)
+            {
+                lta_modify_src_dst_geom(g, r.out, r.err, &mut lta, Some(mi), Some(mi));
             }
             if lta.xforms[0].src.valid == 0 {
                 log::error_exit(
@@ -1048,6 +1051,7 @@ impl MultiRegistration {
     /// `initialXforms(tpi, fixtp, maxres, iterate, epsit)`: see the module's notes; `tpi` from 1.
     /// FS-1092: a `tpi` past the inputs (FreeSurfer's index is then out of its vector: memory
     /// contents): an error in both modes.
+    #[allow(clippy::too_many_arguments)]
     pub fn initial_xforms(
         &mut self,
         g: &mut Globals,
@@ -1917,7 +1921,7 @@ impl MultiRegistration {
             let v2r = extract_i_to_r(g, r.out, r.err, &mean.vg)?;
             mri_set_voxel_to_ras_xform(g, r.out, r.err, r.env, &mut wtarg, &v2r)?;
             wtarg.mtype = MRI_FLOAT;
-            wtarg.vg.i_to_r = mean.vg.i_to_r.clone();
+            wtarg.vg.i_to_r = mean.vg.i_to_r;
             wtarg.vg.r_to_i = mean.vg.r_to_i.clone();
             let got = mri_linear_transform(g, r.out, r.err, wi, Some(&mut wtarg), &hinv)?;
             let mut wtarg = match got {

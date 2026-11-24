@@ -2134,7 +2134,15 @@ defects! {
     FS_1285 = "FS-1285", "FreeSurfer", true,
         "mri_pretess ends with exit status 0 when its output cannot be written (a folder that does not exist): larmorx ends with 1";
     FS_1286 = "FS-1286", "FreeSurfer", true,
-        "mri_pretess's removal of the background's corner configurations does not require the voxel next to the first background voxel along z to be of the label (it looks at the neighbour along x twice), so it also fills a configuration whose two background voxels are joined at an edge, choosing between them by other voxels' intensities than the edge removal would: kept";
+        "mri_pretess's (and mri_fill -topofix's) removal of the background's corner configurations does not require the voxel next to the first background voxel along z to be of the label (it looks at the neighbour along x twice), so it also fills a configuration whose two background voxels are joined at an edge, choosing between them by other voxels' intensities than the edge removal would: kept";
+    FS_1287 = "FS-1287", "FreeSurfer", true,
+        "mri_fill -topofix prints 'removing component' for each component of the background (but the largest) that touches only one hemisphere's label but leaves it as it is, and its count of removed components includes the kept ones (those touching both): larmorx fills such a component with that label and counts only the filled ones";
+    FS_1288 = "FS-1288", "FreeSurfer", true,
+        "mri_fill -topofix prints the left hemisphere's total of modified voxels with the right hemisphere's added to it: larmorx prints the left's own";
+    FS_1289 = "FS-1289", "FreeSurfer", true,
+        "mri_fill -topofix's counts of configurations it could not resolve without the other hemisphere's voxels (pbm) are almost always 0: an edge or background configuration is counted only when the label is the other hemisphere's, a corner direction reports its last configuration's flag (kept from the previous pass when a pass finds none): kept";
+    FS_1290 = "FS-1290", "FreeSurfer", true,
+        "mri_fill -topofix corrects each hemisphere's volume for both labels, so each of its two calls prints the share of modified voxels of the hemisphere that is not in it as -nan (0 out of 0): kept";
     FS_1210 = "FS-1210", "FreeSurfer", true,
         "mri_cc -a 0 whose search for the callosum's seed fails (no column of the callosum's thickness near Talairach's origin, or 'could not find valid seed for the cc') uses the seed's Talairach millimetres as a voxel position (only the printed centre and the division counts depend on it): larmorx uses the seed's voxel";
     FS_974 = "FS-974", "FreeSurfer", true,

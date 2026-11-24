@@ -29,6 +29,7 @@ pub mod mri_cc;
 pub mod mri_concat;
 pub mod mri_convert;
 pub mod mri_edit_wm_with_aseg;
+pub mod mri_fill;
 pub mod mri_info;
 pub mod mri_label2vol;
 pub mod mri_make_uchar;

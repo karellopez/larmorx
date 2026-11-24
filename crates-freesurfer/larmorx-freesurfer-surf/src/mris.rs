@@ -40,11 +40,11 @@ pub struct Face {
     pub ripflag: i8,
     pub oripflag: i8,
     pub marked: i32,
-    /// `norm` (`DMATRIX *`).
-    pub norm: Option<DMatrix>,
-    /// `gradNorm` (three `DMATRIX *`).
+    /// `norm` (`DMATRIX *`; boxed, as C's pointer: the face holds 8 bytes, not the matrix).
+    pub norm: Option<Box<DMatrix>>,
+    /// `gradNorm` (three `DMATRIX *`, boxed).
     #[allow(non_snake_case)]
-    pub gradNorm: [Option<DMatrix>; 3],
+    pub gradNorm: [Option<Box<DMatrix>>; 3],
 }
 
 /// `VERTEX_TOPOLOGY`.

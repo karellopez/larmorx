@@ -28,7 +28,8 @@ recording, relay 54), ``mri_concat`` (``MRI_CONCAT_CASES``, 2026-11-23), ``mri_l
 ``--new-aseg2vol`` and ``--fill-ribbon`` from relay 57 of track A),
 ``mri_segment`` (``MRI_SEGMENT_CASES``, 2026-11-24), ``mri_edit_wm_with_aseg``
 (``MRI_EDIT_WM_WITH_ASEG_CASES``, 2026-11-24), the tcsh scripts ``seg2cc`` and ``mergeseg``
-(``SCRIPT_CASES``, 2026-11-24) and ``mri_pretess`` (``MRI_PRETESS_CASES``, 2026-11-24).
+(``SCRIPT_CASES``, 2026-11-24), ``mri_pretess`` (``MRI_PRETESS_CASES``, 2026-11-24) and
+``mri_fill`` (``MRI_FILL_CASES``, 2026-11-25).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -3957,3 +3958,98 @@ def test_mri_pretess_replica_needs_no_more_memory_than_freesurfer(tmp_path, name
         )
         c = fsfiles.compare(o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out)
         assert c.same, f"mri_pretess {name} ({mode}): {c.verdict} {c.detail}"
+
+
+#: ``mri_fill``: recon-all's call on ds000005 sub-01's classic files (``mri`` the recording's
+#: folder; the cutting planes' log into the case's folder) and the fill without a segmentation
+#: (the cutting planes found, two flood fills combined), one thread.
+MRI_FILL_CASES = [
+    (
+        "aseg",
+        "ds000005-sub-01-classic",
+        [
+            "-a",
+            "cut.log",
+            "-xform",
+            "{mri}/transforms/talairach.lta",
+            "-segmentation",
+            "{mri}/aseg.presurf.mgz",
+            "-ctab",
+            "{lut}",
+            "{mri}/wm.mgz",
+            "filled.mgz",
+        ],
+    ),
+    (
+        "noseg",
+        "ds000005-sub-01-classic",
+        ["-xform", "{mri}/transforms/talairach.lta", "{mri}/wm.mgz", "filled.mgz"],
+    ),
+]
+
+
+@pytest.mark.parametrize(("name", "run", "args"), MRI_FILL_CASES)
+def test_mri_fill_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, run, args):
+    from larmorx_validation.freesurfer import files as fsfiles
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / "mri_fill" if ws else None
+    mri = (
+        ws / "oracles" / "freesurfer-8.2.0" / "runs" / run / "subjects" / "sub-01" / "mri"
+        if ws
+        else None
+    )
+    if exe is None or not exe.is_file() or not (mri / "wm.mgz").is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000005 recording was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    lut = ws / FS_HOME / "SubCorticalMassLUT.txt"
+    words = [a.format(mri=mri, lut=lut) for a in args]
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        "FS_DISABLE_LANG": "1",
+        **freesurfer_env(),
+    }
+
+    def fresh(d: Path):
+        def reset() -> None:
+            if d.exists():
+                shutil.rmtree(d)
+            d.mkdir()
+
+        reset()
+        return reset
+
+    out = words[-1]
+    o_dir = tmp_path / "freesurfer"
+    code, fs_mib = _original_peak(
+        ["mri_fill", *words],
+        env,
+        "freesurfer",
+        fresh(o_dir),
+        o_dir,
+        (r"filling took \S+ minutes",),
+        "freesurfer",
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        fresh(r_dir)
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_fill", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(f"mri_fill {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"mri_fill {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        c = fsfiles.compare(o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out)
+        assert c.same, f"mri_fill {name} ({mode}): {c.verdict} {c.detail}"

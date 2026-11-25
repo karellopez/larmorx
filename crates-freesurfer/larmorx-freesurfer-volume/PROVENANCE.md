@@ -168,7 +168,9 @@ here); `include/macros.h`'s `MAX`; the official build's operand orders from the 
   `MRIvoxelToTalairachVoxelEx` (267-275), `MRItalairachToVoxelEx` (279-287), `MRItalairachVoxelToVoxelEx` (302-310),
   `MRItoTalairachExInterp` (315-328), `MRItoTalairachEx` (330-343; 3.1-39's), `MRIfromTalairachEx` (347-361; 3.1-39's);
   operand orders from `talairachex.cpp.o`. Changes: FS-487, FS-488 (errors where FreeSurfer crashes; no matrix for a
-  transform array without transforms, both modes).
+  transform array without transforms, both modes). Relay 59 of track D: the resamplings' matrix print ends with
+  `MatrixPrint`'s `fflush(stdout)` on the caller's standard output (it went to a sink: a crash after it lost what
+  FreeSurfer keeps).
 - `src/mriset.rs` (3.1-38; relay 22, taken first for fs.filter): `utils/mriset.cpp` `MRIdilateUchar` (1642-1721),
   `MRIdilate` (1723-1822). Changes: none.
 - `src/mriset.rs` (3.1-38; relay 23): the rest of `utils/mriset.cpp`'s reached functions: `MRIunion` (108-140),

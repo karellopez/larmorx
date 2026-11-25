@@ -181,7 +181,7 @@ def small(d: Path, rng: np.random.Generator) -> None:
         encoding="utf-8",
     )
     (s / "bad.xfm").write_text("not a transform\n", encoding="utf-8")
-    ctab = FS_HOME_DIR() / "SubCorticalMassLUT.txt"
+    ctab = fs_home_dir() / "SubCorticalMassLUT.txt"
     shutil.copy(ctab, s / "lut.txt")
     (s / "bad_lut.txt").write_text("", encoding="utf-8")
     (s / "points.dat").write_text(
@@ -192,7 +192,7 @@ def small(d: Path, rng: np.random.Generator) -> None:
     (tr / "atl.m3d").write_bytes(b"\x00\x01\x02\x03 not a morph")
 
 
-def FS_HOME_DIR() -> Path:  # noqa: N802
+def fs_home_dir() -> Path:
     ws = workspace()
     if ws is None:
         raise SystemExit("no workspace with oracles/")
@@ -200,7 +200,7 @@ def FS_HOME_DIR() -> Path:  # noqa: N802
 
 
 def official() -> Path:
-    return FS_HOME_DIR() / "bin" / "mri_fill"
+    return fs_home_dir() / "bin" / "mri_fill"
 
 
 def base_env(home: Path) -> dict[str, str]:
@@ -269,9 +269,23 @@ def cases() -> list[Case]:
         Case(["-a", "nodir/log.txt", *IO]),
         Case(["-T", "x", *IO]),
         # options without their values (each as the last argument)
-        *(Case([o]) for o in ("-rval", "-lval", "-fillven", "-segmentation", "-topofix",
-                              "-xform", "-ctab", "-T", "-F", "-a", "-L", "-atlas"))
-        ,
+        *(
+            Case([o])
+            for o in (
+                "-rval",
+                "-lval",
+                "-fillven",
+                "-segmentation",
+                "-topofix",
+                "-xform",
+                "-ctab",
+                "-T",
+                "-F",
+                "-a",
+                "-L",
+                "-atlas",
+            )
+        ),
         Case(["-debug_voxel", "1", "2"]),
         Case(["-lh", "1", "2"]),
         Case(["-CV", "1"]),
@@ -371,7 +385,7 @@ def heads(ws: Path) -> tuple[Path, list[Case]]:
             for f in ("wm.mgz", "aseg.presurf.mgz", "norm.mgz", "filled.mgz"):
                 shutil.copy(rec / f, m)
             shutil.copy(rec / "transforms" / "talairach.lta", m / "transforms")
-            shutil.copy(FS_HOME_DIR() / "SubCorticalMassLUT.txt", m / "lut.txt")
+            shutil.copy(fs_home_dir() / "SubCorticalMassLUT.txt", m / "lut.txt")
             img = nib.load(str(m / "filled.mgz"))
             data = np.asarray(img.dataobj).copy()
             data[120:124, 100:104, 120:124] = 0
@@ -387,12 +401,42 @@ def heads(ws: Path) -> tuple[Path, list[Case]]:
             Case([*x, *sg, "-topofix", "norm.mgz", *io], folder=run),
             Case([*x, *sg, "-lhonly", *io], folder=run),
             Case([*x, *sg, "-rhonly", "-rval", "120", *io], folder=run),
-            Case([*x, "-C", "0", "-20", "18", "-P", "-2", "-15", "-17", "-a", "cut.log",
-                  "-L", "cc.txt", "-D", *io], folder=run),  # fmt: skip
+            Case(
+                [
+                    *x,
+                    "-C",
+                    "0",
+                    "-20",
+                    "18",
+                    "-P",
+                    "-2",
+                    "-15",
+                    "-17",
+                    "-a",
+                    "cut.log",
+                    "-L",
+                    "cc.txt",
+                    "-D",
+                    *io,
+                ],
+                folder=run,
+            ),
             Case([*x, "-CV", "128", "110", "128", *io], folder=run),
             Case([*x, "-fillonly", "-rhv", "100", "120", "128", *io], folder=run),
-            Case([*x, *sg, "-auto-man", "filled.mgz", "filled_edit.mgz", "edits.txt",
-                  "-ctab", "lut.txt", *io], folder=run),  # fmt: skip
+            Case(
+                [
+                    *x,
+                    *sg,
+                    "-auto-man",
+                    "filled.mgz",
+                    "filled_edit.mgz",
+                    "edits.txt",
+                    "-ctab",
+                    "lut.txt",
+                    *io,
+                ],
+                folder=run,
+            ),
         ]
     return root, out
 
@@ -418,9 +462,7 @@ def status(code: int | None) -> int | None:
 
 
 def notices(text: str) -> list[str]:
-    return sorted(
-        {m.group(1) for m in re.finditer(r"larmorx: upstream defect (\S+) ", text)}
-    )
+    return sorted({m.group(1) for m in re.finditer(r"larmorx: upstream defect (\S+) ", text)})
 
 
 def listing(folder: Path) -> dict[str, tuple[int, int]]:

@@ -145,7 +145,8 @@ impl Process {
         }
         for lt in &lta.xforms {
             for (g, which) in [(&lt.src, "src"), (&lt.dst, "dst")] {
-                if g.valid != 1 {
+                // `valid` of any value but 0 passes (observed: `vltaxf`, a destination of `valid` 2)
+                if g.valid == 0 {
                     self.error_exit(
                         codes::BAD_PARM,
                         format!("LTAchangeType: {which} geometry must be valid\n").as_bytes(),

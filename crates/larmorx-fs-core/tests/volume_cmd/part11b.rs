@@ -25,9 +25,10 @@ fn make_dir(name: &[u8]) -> std::io::Result<()> {
         std::fs::create_dir(path)
     }
 }
+
 use super::bspline::getlta;
 use super::part11a::getvl;
-use super::{getw, paint, putlta};
+use super::{D, getw, paint, putlta, putres};
 
 /// A voxel list (printed) by the commands of §65: `max_vox nvox type`, `self` (the list's volume
 /// is the call's, or the list has none and the call none), then the first `len` voxels (at most
@@ -247,6 +248,30 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
             putm_res(l, &r, m.as_ref());
             l.puti(i64::from(e));
         }
+        "ltaxf" => {
+            let mut a = getw(p, l)?;
+            paint(p, l, &mut a)?;
+            let mut d = if l.take("new") {
+                D::New
+            } else {
+                D::W(Box::new(getw(p, l)?))
+            };
+            let mut lta = getlta(p, l)?;
+            let interp = l.geti();
+            p.flush();
+            let dm = match &mut d {
+                D::W(m) => Some(m.as_mut()),
+                _ => None,
+            };
+            let r = if interp < 0 {
+                p.lta_transform(&mut a, dm, &mut lta)?
+            } else {
+                p.lta_transform_interp(&mut a, dm, &mut lta, interp)?
+            };
+            p.flush();
+            putres(l, r, &a, None, &d);
+            putlta(l, Some(&lta));
+        }
         "ltacor" => {
             let mut lta = getlta(p, l)?;
             p.flush();
@@ -273,6 +298,57 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
             p.flush();
             l.puti(i64::from(r));
             putlta(l, Some(&lta));
+        }
+        "devxfm" => {
+            let mk = l.geti();
+            let subj = l.getx();
+            let sd = if l.take("null") { None } else { Some(l.getx()) };
+            let name = if l.take("null") { None } else { Some(l.getx()) };
+            let ok = l.geti();
+            let ob = if ok == 1 || ok == 2 { l.getx() } else { Vec::new() };
+            let xb = if l.take("nofile") { None } else { Some(l.getx()) };
+            let mut x = l.getm(p)?;
+            let root = path_of(b"subjects");
+            rmtree(&root);
+            let mut base = b"subjects/".to_vec();
+            base.extend_from_slice(&subj);
+            let sub = |s: &[u8]| {
+                let mut b = base.clone();
+                b.extend_from_slice(s);
+                b
+            };
+            if mk >= 1 {
+                let _ = make_dir(b"subjects");
+                let _ = make_dir(&base);
+            }
+            if mk >= 2 {
+                let _ = make_dir(&sub(b"/mri"));
+                let _ = make_dir(&sub(b"/mri/transforms"));
+                match ok {
+                    1 => {
+                        let _ = std::fs::write(path_of(&sub(b"/mri/orig.mgz")), &ob);
+                    }
+                    2 => {
+                        let _ = std::fs::write(path_of(&sub(b"/mri/orig.mgh")), &ob);
+                    }
+                    3 => {
+                        let _ = make_dir(&sub(b"/mri/orig"));
+                    }
+                    _ => {}
+                }
+                if let Some(xb) = &xb {
+                    let mut t = b"/mri/transforms/".to_vec();
+                    t.extend_from_slice(name.as_deref().unwrap_or(b"talairach.xfm"));
+                    let _ = std::fs::write(path_of(&sub(&t)), xb);
+                }
+            }
+            p.flush();
+            p.errno = 0;
+            let r = p.devolve_xfm_with_subjects_dir(&subj, x.as_mut(), name.as_deref(), sd.as_deref());
+            p.flush();
+            rmtree(&root);
+            let r = r?;
+            putm_res(l, &r, x.as_ref());
         }
         "ltadvg" => {
             let mut g = VolGeom::default();

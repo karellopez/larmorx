@@ -2,62 +2,62 @@
  "tool": "mri_coreg",
  "upstream": "FreeSurfer 8.2.0",
  "status": "experimental",
- "queue": "3.2-17 (mri_coreg, the whole program but --landmarks and --landmarks-2d)",
- "commit": "b5e8d6be2a5b",
+ "queue": "3.2-17 (mri_coreg, the whole program)",
+ "commit": "32e612e031b1",
  "date": "2026-11-25",
  "platform": "Linux x86_64",
  "probe": [
   {
    "seed": 1,
    "family": "seeded",
-   "cases": 111,
-   "reproduce_equal": 103,
+   "cases": 125,
+   "reproduce_equal": 117,
    "reproduce_differ": 0,
-   "skipped": 7,
+   "skipped": 8,
    "skipped_but_identical": 3,
-   "not_ported": 1,
-   "fix_differ": 17,
+   "not_ported": 0,
+   "fix_differ": 21,
    "fix_differ_without_notice": 0,
-   "official_sha256_skip": "cd00e6db550678ecff3512523e601f9ffcf30f91fa612ee4e3bc9e4210fc477e"
+   "official_sha256_skip": "d21a4202a0023562f3853f666b251b91cbd53c7b61e1a18c715013cfe72df793"
   },
   {
    "seed": 1,
    "family": "seeded",
-   "cases": 171,
-   "reproduce_equal": 156,
+   "cases": 185,
+   "reproduce_equal": 170,
    "reproduce_differ": 0,
-   "skipped": 14,
+   "skipped": 15,
    "skipped_but_identical": 10,
-   "not_ported": 1,
-   "fix_differ": 17,
+   "not_ported": 0,
+   "fix_differ": 21,
    "fix_differ_without_notice": 0,
-   "official_sha256_skip": "5d23cee413c31bf15557cbe2c957a9cf8bb2336cdcba63f27700a29274fa5f50"
+   "official_sha256_skip": "7329f11f7a3e8aa41c91038f946f5742ec6481414409b815c5a403e8d04fb930"
   },
   {
    "seed": 7,
    "family": "seeded",
-   "cases": 171,
-   "reproduce_equal": 157,
+   "cases": 185,
+   "reproduce_equal": 171,
    "reproduce_differ": 0,
-   "skipped": 13,
+   "skipped": 14,
    "skipped_but_identical": 9,
-   "not_ported": 1,
-   "fix_differ": 17,
+   "not_ported": 0,
+   "fix_differ": 21,
    "fix_differ_without_notice": 0,
-   "official_sha256_skip": "b03cf006dec7c4c4370991e7e052e8ffb81843e5147969d199c528466327862b"
+   "official_sha256_skip": "8fe8656d08aef1132a3e9b875311ef2c2e63c21ff7325463b916b150d01efa51"
   },
   {
    "seed": 13,
    "family": "seeded",
-   "cases": 171,
-   "reproduce_equal": 156,
+   "cases": 185,
+   "reproduce_equal": 170,
    "reproduce_differ": 0,
-   "skipped": 14,
-   "skipped_but_identical": 10,
-   "not_ported": 1,
-   "fix_differ": 17,
+   "skipped": 15,
+   "skipped_but_identical": 11,
+   "not_ported": 0,
+   "fix_differ": 21,
    "fix_differ_without_notice": 0,
-   "official_sha256_skip": "17c0647eb5b529d7e72af3bf940e0c9b0e196dbf971112f3fc4a9716cf59e137"
+   "official_sha256_skip": "691a15a0fac9556a405bdff449821e2f852cc59a5dc948904619339cf289c34b"
   }
  ],
  "real": [
@@ -77,13 +77,13 @@
    },
    "seconds": {
     "official": 39.0,
-    "reproduce": 54.0,
-    "fix": 52.0
+    "reproduce": 52.6,
+    "fix": 53.8
    },
    "peak_mib": {
     "official": 413.629,
-    "reproduce": 344.1,
-    "fix": 344.0
+    "reproduce": 344.8,
+    "fix": 344.8
    }
   },
   {
@@ -102,13 +102,13 @@
    },
    "seconds": {
     "official": 38.8,
-    "reproduce": 54.0,
-    "fix": 52.2
+    "reproduce": 52.5,
+    "fix": 53.3
    },
    "peak_mib": {
     "official": 412.949,
-    "reproduce": 345.0,
-    "fix": 344.7
+    "reproduce": 345.1,
+    "fix": 344.9
    }
   },
   {
@@ -127,13 +127,13 @@
    },
    "seconds": {
     "official": 36.7,
-    "reproduce": 52.3,
-    "fix": 51.1
+    "reproduce": 51.3,
+    "fix": 51.0
    },
    "peak_mib": {
     "official": 413.004,
-    "reproduce": 344.4,
-    "fix": 344.4
+    "reproduce": 344.2,
+    "fix": 344.2
    }
   },
   {
@@ -152,12 +152,12 @@
    },
    "seconds": {
     "official": 34.8,
-    "reproduce": 47.2,
-    "fix": 47.0
+    "reproduce": 50.4,
+    "fix": 46.9
    },
    "peak_mib": {
     "official": 412.75,
-    "reproduce": 344.9,
+    "reproduce": 344.6,
     "fix": 344.9
    }
   },
@@ -177,13 +177,13 @@
    },
    "seconds": {
     "official": 36.5,
-    "reproduce": 55.2,
-    "fix": 54.6
+    "reproduce": 55.9,
+    "fix": 54.4
    },
    "peak_mib": {
     "official": 433.062,
-    "reproduce": 363.7,
-    "fix": 365.1
+    "reproduce": 364.3,
+    "fix": 364.7
    }
   },
   {
@@ -202,13 +202,13 @@
    },
    "seconds": {
     "official": 36.8,
-    "reproduce": 55.3,
-    "fix": 55.0
+    "reproduce": 55.8,
+    "fix": 54.9
    },
    "peak_mib": {
     "official": 433.207,
-    "reproduce": 364.2,
-    "fix": 364.0
+    "reproduce": 365.0,
+    "fix": 364.6
    }
   },
   {
@@ -227,12 +227,12 @@
    },
    "seconds": {
     "official": 30.9,
-    "reproduce": 45.8,
-    "fix": 45.8
+    "reproduce": 45.7,
+    "fix": 45.7
    },
    "peak_mib": {
     "official": 412.75,
-    "reproduce": 344.2,
+    "reproduce": 344.5,
     "fix": 344.5
    }
   },
@@ -252,25 +252,25 @@
    },
    "seconds": {
     "official": 31.1,
-    "reproduce": 46.0,
-    "fix": 45.5
+    "reproduce": 46.1,
+    "fix": 45.4
    },
    "peak_mib": {
     "official": 413.594,
-    "reproduce": 343.1,
+    "reproduce": 344.0,
     "fix": 344.2
    }
   }
  ],
  "golden": {
-  "reproduce": "1e9c03d944ef5c07ca876b55df624c0d824540dcbb07674000e799438dbdf5e8",
-  "fix": "dda58a68640b7dd568f61ff26de1f797d0ac5880c05ac815d77225a2cd260a0f"
+  "reproduce": "233a6061d1dbe00586051b1ca1b8ed03ae60a5e95de0e03acb66fd5a6292f979",
+  "fix": "efa1a0ace764d7b93b9c900984c5bdab46c441d252c11b0f879fb7ecb242c012"
  },
  "memory": [
   {
    "case": "fmriprep",
    "mode": "reproduce",
-   "larmorx_mib": 344.8,
+   "larmorx_mib": 344.9,
    "freesurfer_mib": 413.3
   },
   {

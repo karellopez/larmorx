@@ -25,12 +25,11 @@ room's plan is in `specs/mri_coreg.md` §11.
 - `record.py`: the validation record `docs/validation/freesurfer-mri-coreg.{json,md}` from the
   summaries above (from a clean commit).
 
-Relay 52's measurements (from the clean commit 43c734cd, log
-`oracles/logs/fs-found-c-r52-record.log`): see the validation record. Before it (the same code but
-the speed changes, which the golden digest and the prelude confirm): the prelude 100 identical, 0
-different, 7 undefined (3 identical anyway), 1 not ported; seed 1 x 80 167 identical, 0 different
-after the masking of earlier runs' folders, 17 undefined (13 identical anyway); every real call
-identical in every byte in both modes.
+Relay 52's measurements (the record from the clean commit 32e612e0, log
+`oracles/logs/fs-found-c-r52-record.log`; `docs/validation/freesurfer-mri-coreg.md`): the prelude
+125 cases: 117 identical, 0 different, 8 undefined (3 identical anyway); the prelude and 60 seeded
+pairs, seeds 1, 7, 13: 170, 171, 170 identical, 0 different; the golden cases 6/6; fMRIPrep's and
+bbregister's calls on the four heads 8/8 identical in every byte in both modes.
 
 Two lessons kept in the scripts:
 - FreeSurfer's standard output is the C library's buffer: a crash keeps only what was flushed and

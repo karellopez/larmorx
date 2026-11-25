@@ -404,7 +404,8 @@ def mask(text: str, port: bool, folder: Path) -> str:
     text = TOOK.sub("filling took <t> minutes", text)
     text = text.replace(str(folder), "<folder>")
     if port:
-        text = "".join(x for x in text.splitlines(True) if not x.startswith("larmorx: "))
+        # the notices follow at the end, also after a line cut short by a crash
+        text = re.sub(r"larmorx: upstream defect [^\n]*\n", "", text)
     return text
 
 
@@ -418,7 +419,7 @@ def status(code: int | None) -> int | None:
 
 def notices(text: str) -> list[str]:
     return sorted(
-        {m.group(1) for m in re.finditer(r"^larmorx: upstream defect (\S+) ", text, re.M)}
+        {m.group(1) for m in re.finditer(r"larmorx: upstream defect (\S+) ", text)}
     )
 
 

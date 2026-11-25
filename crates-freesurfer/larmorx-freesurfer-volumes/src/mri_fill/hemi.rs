@@ -7,14 +7,14 @@
 //! `count_voxel_diagonals`, `count_diagonals`) and `fill_with_aseg`, recon-all's path.
 //!
 //! Defects (`larmorx_core::defects`; the mechanisms in `docs/findings/freesurfer-mri-fill.md`):
-//! FS-1291 and FS-1300 (voxels outside a volume), FS-1296 (fills that never end: an error in both modes, rule
+//! FS-1291 and FS-1300 (voxels outside a volume), FS-1302 (a fill's seed outside the volume), FS-1296 (fills that never end: an error in both modes, rule
 //! B), FS-1297 (the diagonals' third derivative is always 0, kept: rule D, to be measured).
 
 #![allow(non_upper_case_globals)]
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_1296, FS_1297, FS_1300};
+use larmorx_core::defects::{FS_1296, FS_1297, FS_1300, FS_1302};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
@@ -30,7 +30,7 @@ use larmorx_freesurfer_volume::mriset::mri_set_label_values;
 
 use super::local::{
     Ax, SEGFAULT, Vals, WM_EDITED_OFF_VAL, WM_EDITED_ON_VAL, WM_MIN_VAL, bytes, bytes_mut, ix,
-    set_vox, vox,
+    place, set_vox, vox,
 };
 use super::main::{NAME, Run};
 
@@ -357,6 +357,37 @@ pub fn mri_fill_volume(
     z_seed: i32,
     fill_val: i32,
 ) -> Result<(), Fatal> {
+    let at = place(fill, x_seed, y_seed, z_seed);
+    if at != Some(true) {
+        // FS-1302: FreeSurfer writes the seed's byte where the place lands (crashing outside the
+        // buffer) and fills from it
+        g.notices.add(
+            &FS_1302,
+            format!(
+                "mri_fill fills from the seed ({x_seed}, {y_seed}, {z_seed}), outside the volume{}",
+                if at.is_none() {
+                    ": FreeSurfer crashes"
+                } else {
+                    ""
+                }
+            ),
+        );
+        if g.notices.reproduce() {
+            if at.is_none() {
+                return Err(Fatal::Exit(SEGFAULT));
+            }
+        } else {
+            log::error_exit(
+                g,
+                r.err,
+                ERROR_BADPARM,
+                &format!(
+                    "{NAME}: the fill's seed ({x_seed}, {y_seed}, {z_seed}) lies outside the volume ({} x {} x {})",
+                    fill.vg.width, fill.vg.height, fill.vg.depth
+                ),
+            )?;
+        }
+    }
     set_vox(g, fill, x_seed, y_seed, z_seed, fill_val as u8);
     if g.gdiag == 0 {
         let _ = write!(r.err, "filling volume: pass 1 of 3...");

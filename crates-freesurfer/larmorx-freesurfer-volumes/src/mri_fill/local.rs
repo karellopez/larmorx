@@ -121,6 +121,18 @@ fn off(m: &Mri, x: i32, y: i32, z: i32) -> Off {
     Off::Wrapped(b as usize)
 }
 
+/// Whether `(x, y, z)` lies in the volume (`Some(true)`), past a row's end but in its buffer
+/// (`Some(false)`), or in memory the volume does not own (`None`).
+pub fn place(m: &Mri, x: i32, y: i32, z: i32) -> Option<bool> {
+    if inside(m, x, y, z).is_some() {
+        return Some(true);
+    }
+    match off(m, x, y, z) {
+        Off::Wrapped(_) => Some(false),
+        Off::Outside => None,
+    }
+}
+
 /// `MRIvox(m, x, y, z)`: byte `x` of row `y` of slice `z`. Outside the volume: FS-1291 or FS-1300
 /// (see the module's text).
 #[inline]

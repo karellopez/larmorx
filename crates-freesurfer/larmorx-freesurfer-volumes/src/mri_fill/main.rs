@@ -21,14 +21,15 @@
 //! FS-1291 and FS-1300 (voxels outside a volume), FS-1292 (an option without its values), FS-1293, FS-1294,
 //! FS-1295 ([`super::planes`]), FS-1296, FS-1297 ([`super::hemi`]), FS-1298 (a step that returns no
 //! volume: FreeSurfer goes on and crashes), FS-1299 (an output that is not written: status 0);
-//! FS-1287 to FS-1290 (`-topofix`: [`super::topofix`]). `-atlas` (the ventricles filled from an
+//! FS-1301 (`-lhonly` and `-rhonly` without a segmentation crash), FS-1302 (a seed outside the
+//! volume: [`super::hemi`]); FS-1287 to FS-1290 (`-topofix`: [`super::topofix`]). `-atlas` (the ventricles filled from an
 //! atlas after the fill) is not ported yet: no recorded step reaches it.
 
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use larmorx_core::defects::{FS_1292, FS_1298, FS_1299};
+use larmorx_core::defects::{FS_1292, FS_1298, FS_1299, FS_1301};
 use larmorx_freesurfer_core::cstd::{atof, atoi, fmt_f, format_double};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE, DIAG_WRITE, diag_init};
 use larmorx_freesurfer_core::globals::Globals;
@@ -1945,29 +1946,33 @@ pub fn main(g: &mut Globals, r: &mut Run, o: &mut Options, args: &[String]) -> R
             let mut lh_im = mri_copy(g, r.out, r.err, &lh_fill, None)?.unwrap_new();
             let mut rh_im = mri_copy(g, r.out, r.err, &rh_fill, None)?.unwrap_new();
             let _ = writeln!(r.err, "refilling left hemisphere...");
-            mri_fill_volume(
-                g,
-                r,
-                &mut s,
-                &mut lh_fill,
-                &mut lh_im,
-                wm_lh.0,
-                wm_lh.1,
-                wm_lh.2,
-                lhv,
-            )?;
+            if refill(g, rhonly, "left") {
+                mri_fill_volume(
+                    g,
+                    r,
+                    &mut s,
+                    &mut lh_fill,
+                    &mut lh_im,
+                    wm_lh.0,
+                    wm_lh.1,
+                    wm_lh.2,
+                    lhv,
+                )?;
+            }
             let _ = writeln!(r.err, "refilling right hemisphere...");
-            mri_fill_volume(
-                g,
-                r,
-                &mut s,
-                &mut rh_fill,
-                &mut rh_im,
-                wm_rh.0,
-                wm_rh.1,
-                wm_rh.2,
-                rhv,
-            )?;
+            if refill(g, lhonly, "right") {
+                mri_fill_volume(
+                    g,
+                    r,
+                    &mut s,
+                    &mut rh_fill,
+                    &mut rh_im,
+                    wm_rh.0,
+                    wm_rh.1,
+                    wm_rh.2,
+                    rhv,
+                )?;
+            }
             drop(lh_im);
             drop(rh_im);
             let _ = writeln!(r.err, "combining hemispheres...");
@@ -2113,6 +2118,28 @@ pub fn main(g: &mut Globals, r: &mut Run, o: &mut Options, args: &[String]) -> R
         return Err(Fatal::Exit(1));
     }
     Ok(())
+}
+
+/// FS-1301: whether the refill of a hemisphere runs. FreeSurfer refills both, also the one
+/// `-lhonly` or `-rhonly` left out, whose seed (-1, -1, -1) is outside the volume (it crashes);
+/// by default that one is not refilled.
+fn refill(g: &mut Globals, other_only: bool, side: &str) -> bool {
+    if !other_only {
+        return true;
+    }
+    g.notices.add(
+        &FS_1301,
+        if g.notices.reproduce() {
+            format!(
+                "mri_fill -lhonly/-rhonly without a segmentation refills the {side} hemisphere it left out, from a seed outside the volume, as FreeSurfer (which crashes)"
+            )
+        } else {
+            format!(
+                "mri_fill -lhonly/-rhonly without a segmentation: the {side} hemisphere it left out is not refilled (FreeSurfer refills it from a seed outside the volume and crashes)"
+            )
+        },
+    );
+    g.notices.reproduce()
 }
 
 /// `-atlas`'s ventricle filling after the fill (`MRI3DreadSmall`, `mriReadBinaryProbabilities`,

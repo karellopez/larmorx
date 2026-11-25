@@ -2145,6 +2145,10 @@ defects! {
         "mri_fill -topofix corrects each hemisphere's volume for both labels, so each of its two calls prints the share of modified voxels of the hemisphere that is not in it as -nan (0 out of 0): kept";
     FS_1291 = "FS-1291", "FreeSurfer", true,
         "mri_fill reads and writes voxels past the end or the start of an image's rows (a seed's face neighbours at the border, the degenerate locations' diagonal checks of the last columns): FreeSurfer uses the neighbouring row's voxel there; larmorx reads the row's border voxel and writes nothing";
+    FS_1301 = "FS-1301", "FreeSurfer", true,
+        "mri_fill -lhonly or -rhonly without a segmentation always crashes: after the degenerate locations it refills both hemispheres, also the one it left out, from that one's seed (-1, -1, -1), outside the volume: larmorx refills only the hemisphere it filled";
+    FS_1302 = "FS-1302", "FreeSurfer", true,
+        "mri_fill fills from a seed outside the volume (-fillonly with -rhv or -lhv outside it, or a volume of fewer slices than the seed's): FreeSurfer writes the seed into its buffer's neighbouring row, or crashes when that is memory it does not own: larmorx ends with an error";
     FS_1300 = "FS-1300", "FreeSurfer", true,
         "mri_fill reads and writes rows and slices its volumes do not have (the degenerate locations' diagonal checks of the last rows and slices, the cutting plane's columns on volumes of other heights than widths, seeds far outside the volume) and runs past the end of a volume of a single slice, row or column, which crashes: memory it does not own; larmorx reads 0 and writes nothing there in both modes, and ends the fill of such a volume with an error";
     FS_1292 = "FS-1292", "FreeSurfer", true,

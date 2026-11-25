@@ -26,7 +26,9 @@ use larmorx_core::defects::{
 };
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
-use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc, matrix_multiply};
+use larmorx_freesurfer_core::matrix::{
+    MATRIX_REAL, Matrix, matrix_alloc, matrix_multiply, mul_rows4, rows4x4,
+};
 use larmorx_freesurfer_core::matrix_ops::matrix_inverse;
 use larmorx_freesurfer_core::romp;
 use larmorx_freesurfer_core::timer::Timer;
@@ -84,6 +86,7 @@ fn round_half_away(v: f64) -> f64 {
 
 /// A `double` assigned to an `int` (`cvttsd2si`): FS-12 outside the `int` range (NaN 0 and the
 /// range's ends by default, `INT_MIN` with `reproduce`).
+#[inline]
 fn to_int(g: &mut Globals, x: f64, what: &str) -> i32 {
     if x.is_nan() || x >= 2147483648.0 || x <= -2147483649.0 {
         g.notices.add(
@@ -98,7 +101,8 @@ fn to_int(g: &mut Globals, x: f64, what: &str) -> i32 {
         }
         return if x > 0.0 { i32::MAX } else { i32::MIN };
     }
-    x.trunc() as i32
+    // within the range `as` truncates toward zero as `trunc` does (no libm call)
+    x as i32
 }
 
 /// `MIN(a, b)`: `a < b ? a : b`.
@@ -379,6 +383,8 @@ pub fn mri_seg2seg_pvf(
     }
 
     let (sw, sh, sd) = (seg.vg.width, seg.vg.height, seg.vg.depth);
+    // the segmentation's voxels read without MRIgetVoxVal's checks (the same values)
+    let seg_reader = seg.frame_reader(0);
     let mut nperf = vec![0.0f32; segidlist.len()];
     let mut nhits = 0i32;
     for c in 0..vg.width {
@@ -409,7 +415,10 @@ pub fn mri_seg2seg_pvf(
                             if sa < 0 || sa >= sd {
                                 continue;
                             }
-                            let v = mri_get_vox_val(g, r.err, seg, ca, ra, sa, 0, 0)?;
+                            let v = match seg_reader.as_ref().and_then(|rd| rd.get(ca, ra, sa)) {
+                                Some(v) => v,
+                                None => mri_get_vox_val(g, r.err, seg, ca, ra, sa, 0, 0)?,
+                            };
                             let segid = to_int(g, f64::from(v), "MRIseg2SegPVF's label");
                             if segid == 0 {
                                 continue;
@@ -601,6 +610,8 @@ pub fn mri_surf2vol_opt(
     let mm = matrix_multiply(g, r.out, r.err, inv_r.as_ref(), Some(&t), None)?.into_new();
 
     let hash = Mht::create_vertex_table_resolution(g, r.err, surf, CURRENT_VERTICES, 16.0)?;
+    // the vertices' positions read once (the surface does not change here): the same searches
+    let positions = hash.vertex_positions(surf);
 
     let alloc = |g: &mut Globals, r: &mut Run| -> Result<Matrix, Fatal> {
         Ok(matrix_alloc(g, r.out, r.err, 4, 1, MATRIX_REAL)?.expect("a 4 x 1 matrix"))
@@ -610,24 +621,43 @@ pub fn mri_surf2vol_opt(
     let mut crs_ribbon = alloc(g, r)?;
     let mut surf_ras = alloc(g, r)?;
     let vinv = v.inv_xforms[0].m_l.clone();
+    // the two 4 x 4 matrices' rows, read once (the products' sums as MatrixMultiply's)
+    let vinv_rows = vinv.as_ref().and_then(rows4x4);
+    let ribbon_reader = ribbon.frame_reader(0);
+    let mm_rows = mm.as_ref().and_then(rows4x4);
     for c in 0..volsurf.vg.width {
         for rr in 0..volsurf.vg.height {
             for s in 0..volsurf.vg.depth {
                 crs.set_relt(1, 1, c as f32);
                 crs.set_relt(2, 1, rr as f32);
                 crs.set_relt(3, 1, s as f32);
-                matrix_multiply(
-                    g,
-                    r.out,
-                    r.err,
-                    vinv.as_ref(),
-                    Some(&crs),
-                    Some(&mut crs_ribbon),
-                )?;
-                // FreeSurfer reads rptr[1][2] and rptr[1][3] of the 4 x 1 vector: its rows 2 and 3
-                let c_r = nint(g, f64::from(crs_ribbon.relt(1, 1)));
-                let r_r = nint(g, f64::from(crs_ribbon.relt(1, 2)));
-                let s_r = nint(g, f64::from(crs_ribbon.relt(1, 3)));
+                let crs4 = [c as f32, rr as f32, s as f32, 1.0];
+                // the 4 x 4 product without the general function's checks (the same sums), else
+                // the general one
+                let ribbon_crs = match &vinv_rows {
+                    Some(rows) => mul_rows4(rows, crs4),
+                    None => {
+                        matrix_multiply(
+                            g,
+                            r.out,
+                            r.err,
+                            vinv.as_ref(),
+                            Some(&crs),
+                            Some(&mut crs_ribbon),
+                        )?;
+                        // FreeSurfer reads rptr[1][2] and rptr[1][3] of the 4 x 1 vector: its
+                        // rows 2 and 3
+                        [
+                            crs_ribbon.relt(1, 1),
+                            crs_ribbon.relt(1, 2),
+                            crs_ribbon.relt(1, 3),
+                            0.0,
+                        ]
+                    }
+                };
+                let c_r = nint(g, f64::from(ribbon_crs[0]));
+                let r_r = nint(g, f64::from(ribbon_crs[1]));
+                let s_r = nint(g, f64::from(ribbon_crs[2]));
                 if c_r < 0 || c_r >= ribbon.vg.width {
                     continue;
                 }
@@ -637,31 +667,45 @@ pub fn mri_surf2vol_opt(
                 if s_r < 0 || s_r >= ribbon.vg.depth {
                     continue;
                 }
-                let rv = mri_get_vox_val(g, r.err, ribbon, c_r, r_r, s_r, 0, 0)?;
+                let rv = match ribbon_reader.as_ref().and_then(|rd| rd.get(c_r, r_r, s_r)) {
+                    Some(v) => v,
+                    None => mri_get_vox_val(g, r.err, ribbon, c_r, r_r, s_r, 0, 0)?,
+                };
                 let ribval = to_int(g, f64::from(rv), "MRIsurf2VolOpt's ribbon value");
                 if ribval != 3 && ribval != 42 {
-                    for f in 0..nframes {
-                        mri_set_vox_val(g, r.err, &mut volsurf, c, rr, s, f, 0.0, 0)?;
-                    }
+                    // FreeSurfer sets the voxel's frames to 0: each voxel is visited once and
+                    // the volume starts at 0, so the writes change nothing (left out)
                     continue;
                 }
-                matrix_multiply(
-                    g,
-                    r.out,
-                    r.err,
-                    mm.as_ref(),
-                    Some(&crs),
-                    Some(&mut surf_ras),
-                )?;
-                let x = surf_ras.relt(1, 1);
-                let y = surf_ras.relt(2, 1);
-                let z = surf_ras.relt(3, 1);
+                let [x, y, z, _] = match &mm_rows {
+                    Some(rows) => mul_rows4(rows, crs4),
+                    None => {
+                        matrix_multiply(
+                            g,
+                            r.out,
+                            r.err,
+                            mm.as_ref(),
+                            Some(&crs),
+                            Some(&mut surf_ras),
+                        )?;
+                        [
+                            surf_ras.relt(1, 1),
+                            surf_ras.relt(2, 1),
+                            surf_ras.relt(3, 1),
+                            0.0,
+                        ]
+                    }
+                };
                 let (dmin, mut nmin, mut vtxnomin) = (1000.0f32, -1i32, -1i32);
                 let skip = (surf.hemisphere == LEFT_HEMISPHERE && ribval != 3)
                     || (surf.hemisphere == RIGHT_HEMISPHERE && ribval != 42);
                 if !skip {
-                    let (mut vtxno, mut d) =
-                        hash.find_closest_vertex_no_xyz(g, r.err, surf, [x, y, z])?;
+                    let (mut vtxno, mut d) = match &positions {
+                        Some(pos) => {
+                            hash.find_closest_vertex_no_xyz_at(g, r.err, surf, pos, [x, y, z])?
+                        }
+                        None => hash.find_closest_vertex_no_xyz(g, r.err, surf, [x, y, z])?,
+                    };
                     if vtxno < 0 {
                         g.notices.add(
                             &FS_1271,

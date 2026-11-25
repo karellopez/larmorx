@@ -106,7 +106,26 @@ pub fn vertex_coord2xyz_float(
     v: &Vertex,
     which: i32,
 ) -> Result<(f32, f32, f32), Fatal> {
-    Ok(match which {
+    match vertex_coords(v, which) {
+        Some(p) => Ok(p),
+        None => {
+            log::error_exit(
+                g,
+                err,
+                ERROR_UNSUPPORTED,
+                &format!("MRISvertexCoord2XYZ_float: unsupported which {which}"),
+            )?;
+            // With exceptions on and a code of 0 ErrorExit returns; ERROR_UNSUPPORTED is never 0.
+            unreachable!("ErrorExit with a non-zero code always ends the call")
+        }
+    }
+}
+
+/// [`vertex_coord2xyz_float`]'s coordinates, `None` for a `which` it does not support (its
+/// error).
+#[inline]
+pub fn vertex_coords(v: &Vertex, which: i32) -> Option<(f32, f32, f32)> {
+    Some(match which {
         ORIGINAL_VERTICES => (v.origx, v.origy, v.origz),
         TMP_VERTICES => (v.tx, v.ty, v.tz),
         CANONICAL_VERTICES => (v.cx, v.cy, v.cz),
@@ -119,16 +138,7 @@ pub fn vertex_coord2xyz_float(
         VERTEX_NORMALS => (v.nx, v.ny, v.nz),
         PIAL_NORMALS => (v.pnx, v.pny, v.pnz),
         WHITE_NORMALS => (v.wnx, v.wny, v.wnz),
-        _ => {
-            log::error_exit(
-                g,
-                err,
-                ERROR_UNSUPPORTED,
-                &format!("MRISvertexCoord2XYZ_float: unsupported which {which}"),
-            )?;
-            // With exceptions on and a code of 0 ErrorExit returns; ERROR_UNSUPPORTED is never 0.
-            unreachable!("ErrorExit with a non-zero code always ends the call")
-        }
+        _ => return None,
     })
 }
 

@@ -86,11 +86,9 @@ fn a_short_text_named_mgz_is_refused_at_once() {
             true,
         );
         assert!(!got && status == 0, "{status} {text}");
+        // the name as the reader resolved it (the folder's form differs by system)
         assert!(
-            text.contains(&format!(
-                "mghRead({}, -1): read error",
-                d.path().join(name).display()
-            )) || text.contains(&format!("mghRead({name}, -1): read error")),
+            text.contains("mghRead(") && text.contains(&format!("{name}, -1): read error")),
             "{text}"
         );
         // FS-01: the error message's NUL byte

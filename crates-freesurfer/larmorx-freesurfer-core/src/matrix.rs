@@ -799,6 +799,7 @@ impl Acc {
 /// for 4 or more terms GCC 8.4.0 adds them in blocks of four, `val + p0`, `p1 + val`, `p2 + val`,
 /// `val + p3`, and the rest (or all of fewer than 4) as `val + p` (the disassembly of the unit
 /// oracle's `matrix.cpp.o`: `mulps`, `addss` after `shufps` and `unpckhps`).
+#[inline]
 fn dot_float(a: &[f32], b: &[f32]) -> f32 {
     let n = a.len();
     let blocks = if n >= 4 { n / 4 } else { 0 };
@@ -815,6 +816,31 @@ fn dot_float(a: &[f32], b: &[f32]) -> f32 {
         val = sse::add(val, sse::mul(b[i], a[i]));
     }
     val
+}
+
+/// `MatrixMultiply(m1, v, m3)` of a 4 x 4 real matrix and a 4 x 1 real vector into a 4 x 1 real
+/// one, for loops over many voxels: the product's four rows, the same `float` sums as
+/// [`matrix_multiply`] gives (its row-by-column [`dot_float`]); `None` for another shape or type
+/// (the caller then calls [`matrix_multiply`]).
+#[inline]
+pub fn mul4x4_vec4(m1: &Matrix, v: [f32; 4]) -> Option<[f32; 4]> {
+    Some(mul_rows4(&rows4x4(m1)?, v))
+}
+
+/// The rows of a 4 x 4 real matrix, for [`mul_rows4`]; `None` for another shape or type.
+pub fn rows4x4(m1: &Matrix) -> Option<[[f32; 4]; 4]> {
+    if m1.rows != 4 || m1.cols != 4 || m1.mtype != MATRIX_REAL {
+        return None;
+    }
+    Some(std::array::from_fn(|row| {
+        std::array::from_fn(|i| m1.relt(row as i32 + 1, i as i32 + 1))
+    }))
+}
+
+/// [`mul4x4_vec4`] of the matrix whose rows [`rows4x4`] gave.
+#[inline]
+pub fn mul_rows4(rows: &[[f32; 4]; 4], v: [f32; 4]) -> [f32; 4] {
+    std::array::from_fn(|row| dot_float(&rows[row], &v))
 }
 
 pub(crate) fn multiply(

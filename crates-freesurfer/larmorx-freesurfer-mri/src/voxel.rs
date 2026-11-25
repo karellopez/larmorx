@@ -124,6 +124,58 @@ impl Mri {
     }
 }
 
+/// One frame of a volume's voxels read without [`mri_get_vox_val`]'s checks, for loops over many
+/// voxels ([`Mri::frame_reader`]; relay 59 of track A, `mri_label2vol`'s resamplings): `get(c,
+/// r, s)` is `MRIgetVoxVal(mri, c, r, s, frame)` for a voxel within the extent (the same value);
+/// `None` elsewhere (the caller then calls [`mri_get_vox_val`], which says what FreeSurfer does).
+pub struct FrameReader<'a> {
+    mri: &'a Mri,
+    size: u64,
+    base: u64,
+}
+
+impl Mri {
+    /// A [`FrameReader`] of frame `frame`; `None` for a volume `MRIgetVoxVal` reads otherwise
+    /// (without voxels, a complex or another type) or a frame it does not have.
+    pub fn frame_reader(&self, frame: i32) -> Option<FrameReader<'_>> {
+        if self.chunk.is_none() || !(0..self.nframes).contains(&frame) {
+            return None;
+        }
+        let size = match self.mtype {
+            MRI_UCHAR => 1,
+            MRI_SHORT | MRI_USHRT => 2,
+            MRI_RGB | MRI_INT | MRI_FLOAT => 4,
+            MRI_LONG => 8,
+            _ => return None,
+        };
+        Some(FrameReader {
+            mri: self,
+            size,
+            base: (frame as u64).wrapping_mul(self.vox_per_vol),
+        })
+    }
+}
+
+impl FrameReader<'_> {
+    /// The voxel's value as `MRIgetVoxVal` gives it, for a voxel within the extent.
+    #[inline]
+    pub fn get(&self, c: i32, r: i32, s: i32) -> Option<f32> {
+        let m = self.mri;
+        if !((0..m.vg.width).contains(&c)
+            && (0..m.vg.height).contains(&r)
+            && (0..m.vg.depth).contains(&s))
+        {
+            return None;
+        }
+        let idx = (c as u64)
+            .wrapping_add((r as u64).wrapping_mul(m.vox_per_row))
+            .wrapping_add((s as u64).wrapping_mul(m.vox_per_slice))
+            .wrapping_add(self.base);
+        let o = m.fits(i128::from(idx.wrapping_mul(self.size) as i64), self.size)?;
+        Some(m.value_at(o))
+    }
+}
+
 /// What `MRIgetVoxVal` returns for a type it does not read (`-10000000000.9` as a `float`).
 const NO_TYPE: f32 = -10000000000.9_f64 as f32;
 

@@ -241,3 +241,10 @@ which NaN a product or sum of two keeps: the cross product's second element `z1*
 the cross term times its element of `v3`, the second term plus the first, then the third plus that (new `pub fn
 triple_product` on the nine elements, used by fs.gca's node volumes). `DMatrixAddMul`'s order (`dmatrix.cpp.o`) was
 checked for track C: unchanged.
+
+## Relay 59 (track A)
+
+- `matrix.rs`: `mul4x4_vec4`, `rows4x4`, `mul_rows4`: `MatrixMultiply` of a 4 x 4 real matrix and a 4 x 1
+  real vector for loops over many voxels (speed only: the same `dot_float` on the same values, the rows
+  read once). `utils.rs`: `nint`'s conversion inline, `x as i32` for `x.trunc() as i32` within the int
+  range (the same values, no `trunc` call).

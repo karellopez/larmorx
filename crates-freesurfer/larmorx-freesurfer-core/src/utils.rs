@@ -354,6 +354,7 @@ pub fn delta_angle(angle1: f32, angle2: f32) -> f32 {
 }
 
 /// The conversion `(int) x` of `nint` and `nint2` (FS-12).
+#[inline]
 fn to_int(g: &mut Globals, x: f64, what: &str) -> i32 {
     if x.is_nan() || x >= 2147483648.0 || x <= -2147483649.0 {
         g.notices.add(
@@ -368,7 +369,8 @@ fn to_int(g: &mut Globals, x: f64, what: &str) -> i32 {
         }
         return if x > 0.0 { i32::MAX } else { i32::MIN };
     }
-    x.trunc() as i32
+    // within the range `as` truncates toward zero as `trunc` does (no libm call)
+    x as i32
 }
 
 /// `DListStats(dlist, nlist, stats)`: `[nlist, mean, stddev, min, max]` of the list: the sum and
@@ -409,6 +411,7 @@ pub fn dlist_stats(out: &mut dyn Write, dlist: Option<&[f64]>, nlist: i32) -> Op
 }
 
 /// `nint(f)`: `f + 0.5` (or `f - 0.5` below 0) truncated (FS-12).
+#[inline]
 pub fn nint(g: &mut Globals, f: f64) -> i32 {
     to_int(g, if f < 0.0 { f - 0.5 } else { f + 0.5 }, "nint")
 }

@@ -35,10 +35,13 @@ impl Process {
         interp: i32,
     ) -> Result<VolOut, Stop> {
         if lta.kind == lta_type::REGISTER_DAT {
-            self.put_out(b"warning: changing input transform type from REGISTER_DAT to VOX_TO_VOX\n");
+            self.put_out(
+                b"warning: changing input transform type from REGISTER_DAT to VOX_TO_VOX\n",
+            );
             self.lta_change_type(lta, lta_type::LINEAR_VOX_TO_VOX)?;
         }
-        let first = (lta.xforms.len() == 1).then(|| (lta.xforms[0].src.clone(), lta.xforms[0].dst.clone()));
+        let first =
+            (lta.xforms.len() == 1).then(|| (lta.xforms[0].src.clone(), lta.xforms[0].dst.clone()));
         if let Some((tsrc, tdst)) = first {
             return self.lta_move_one(src, dst, lta, interp, &tsrc, &tdst, true);
         }
@@ -82,7 +85,11 @@ impl Process {
         }
         let ras = match lta.kind {
             lta_type::LINEAR_RAS_TO_RAS => {
-                let m = if forward { &lta.xforms[0] } else { &lta.inv_xforms[0] };
+                let m = if forward {
+                    &lta.xforms[0]
+                } else {
+                    &lta.inv_xforms[0]
+                };
                 m.m_l.clone()
             }
             lta_type::LINEAR_VOX_TO_VOX => {
@@ -92,13 +99,21 @@ impl Process {
                     (None, None) => unreachable!("a destination"),
                 };
                 let dgeom = d.geom.clone();
-                let m = if forward { &lta.xforms[0] } else { &lta.inv_xforms[0] };
+                let m = if forward {
+                    &lta.xforms[0]
+                } else {
+                    &lta.inv_xforms[0]
+                };
                 let m = m.m_l.clone();
                 self.lta_vox_to_ras(m.as_ref(), tsrc, tdst, &src.geom, &dgeom, !forward)?
             }
             lta_type::LINEAR_PHYSVOX_TO_PHYSVOX => {
                 self.lta_change_type(lta, lta_type::LINEAR_RAS_TO_RAS)?;
-                let m = if forward { &lta.xforms[0] } else { &lta.inv_xforms[0] };
+                let m = if forward {
+                    &lta.xforms[0]
+                } else {
+                    &lta.inv_xforms[0]
+                };
                 m.m_l.clone()
             }
             _ => {
@@ -108,7 +123,12 @@ impl Process {
         };
         match (made, dst) {
             (Some(mut m), _) => {
-                match self.mri_apply_ras_linear_transform_interp(src, Dst::Given(&mut m), ras.as_ref(), interp)? {
+                match self.mri_apply_ras_linear_transform_interp(
+                    src,
+                    Dst::Given(&mut m),
+                    ras.as_ref(),
+                    interp,
+                )? {
                     VolOut::Nothing => Ok(VolOut::Nothing),
                     VolOut::Given => Ok(VolOut::New(m)),
                     other => Ok(other),
@@ -151,20 +171,33 @@ impl Process {
             Returned::New(x) => Some(x),
             _ => None,
         };
-        Ok(match self.matrix_multiply(a.as_ref(), r2i.as_ref(), None)? {
-            Returned::New(x) => Some(x),
-            _ => None,
-        })
+        Ok(
+            match self.matrix_multiply(a.as_ref(), r2i.as_ref(), None)? {
+                Returned::New(x) => Some(x),
+                _ => None,
+            },
+        )
     }
 
     /// The destination of one transform when none is given (§63 step 2; §67's differences with
     /// `forward` false: the clone first, its Talairach name kept).
-    fn lta_new_destination(&mut self, src: &Mri, tdst: &VolGeom, forward: bool) -> Result<Mri, Stop> {
+    fn lta_new_destination(
+        &mut self,
+        src: &Mri,
+        tdst: &VolGeom,
+        forward: bool,
+    ) -> Result<Mri, Stop> {
         if forward {
             if tdst.valid == 1 {
                 let g = &src.geom;
                 let _ = g;
-                let mut d = self.mri_alloc_sequence(tdst.width, tdst.height, tdst.depth, src.kind, src.nframes)?;
+                let mut d = self.mri_alloc_sequence(
+                    tdst.width,
+                    tdst.height,
+                    tdst.depth,
+                    src.kind,
+                    src.nframes,
+                )?;
                 self.mri_copy_header(src, Some(&mut d))?;
                 self.use_vol_geom(tdst, &mut d)?;
                 if self.gdiag & DIAG_VERBOSE != 0 {
@@ -240,7 +273,13 @@ impl Process {
                     let inv = if n == 0 {
                         Some(zero.clone())
                     } else {
-                        self.lta_transform_at_point(lta, x as f32, y as f32, z as f32, Some(&mut point))?;
+                        self.lta_transform_at_point(
+                            lta,
+                            x as f32,
+                            y as f32,
+                            z as f32,
+                            Some(&mut point),
+                        )?;
                         match self.matrix_inverse(Some(&point), None)? {
                             Returned::New(m) => Some(m),
                             _ => None,

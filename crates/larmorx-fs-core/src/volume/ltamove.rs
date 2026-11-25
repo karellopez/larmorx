@@ -138,7 +138,10 @@ impl Process {
                     self.matrix_copy(m, Output::Given(&mut out))?;
                     Ok(Returned::New(out))
                 } else {
-                    Ok(Returned::New(m.cloned().unwrap_or_else(|| Matrix::zeros(4, 4, MATRIX_REAL))))
+                    Ok(Returned::New(
+                        m.cloned()
+                            .unwrap_or_else(|| Matrix::zeros(4, 4, MATRIX_REAL)),
+                    ))
                 }
             }
         }
@@ -147,7 +150,10 @@ impl Process {
     /// `LTAvoxelTransformToCoronalRasTransform(lta)` (§63): the first matrix `M` becomes `W (M
     /// V)` (`float` products, `V` the world-to-voxel and `W` the voxel-to-world matrices of a 256³
     /// coronal volume), the array's type RAS-to-RAS. Returns 0. No transform: FS-504.
-    pub fn lta_voxel_transform_to_coronal_ras_transform(&mut self, lta: &mut Lta) -> Result<i32, Stop> {
+    pub fn lta_voxel_transform_to_coronal_ras_transform(
+        &mut self,
+        lta: &mut Lta,
+    ) -> Result<i32, Stop> {
         if lta.xforms.is_empty() {
             self.lta_fs504(
                 "LTAvoxelTransformToCoronalRasTransform",

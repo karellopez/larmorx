@@ -9,9 +9,9 @@ use larmorx_core::math;
 
 use super::ltachain::LtaInto;
 use super::sample::FLT_EPSILON;
+use crate::maths::elements::Region as MRegion;
 use crate::maths::matrix::{MATRIX_REAL, Matrix};
 use crate::maths::{Output, Returned};
-use crate::maths::elements::Region as MRegion;
 use crate::mri::Lta;
 use crate::process::{Process, Stop};
 use crate::sse;
@@ -114,8 +114,8 @@ impl Process {
         m: Option<&mut Matrix>,
     ) -> Result<Returned<Matrix>, Stop> {
         let mut t = identity4();
-        for k in 0..3 {
-            t.set(k as i32 + 1, 4, sse::narrow(p[k]));
+        for (k, &v) in p.iter().enumerate().take(3) {
+            t.set(k as i32 + 1, 4, sse::narrow(v));
         }
         let mut cs = [(0.0f32, 0.0f32); 3];
         for (k, v) in cs.iter_mut().enumerate() {
@@ -175,7 +175,10 @@ impl Process {
                 };
                 for f in [&z, &s] {
                     let cur = acc.clone();
-                    if self.matrix_multiply_d(Some(&cur), Some(f), Some(&mut acc))?.is_nothing() {
+                    if self
+                        .matrix_multiply_d(Some(&cur), Some(f), Some(&mut acc))?
+                        .is_nothing()
+                    {
                         return Ok(Returned::Nothing);
                     }
                 }
@@ -197,7 +200,11 @@ impl Process {
     }
 
     /// `MatrixMultiply(a, b, NULL)`: the new product, or none.
-    fn new_product(&mut self, a: Option<&Matrix>, b: Option<&Matrix>) -> Result<Option<Matrix>, Stop> {
+    fn new_product(
+        &mut self,
+        a: Option<&Matrix>,
+        b: Option<&Matrix>,
+    ) -> Result<Option<Matrix>, Stop> {
         Ok(match self.matrix_multiply(a, b, None)? {
             Returned::New(m) => Some(m),
             _ => None,
@@ -217,8 +224,8 @@ impl Process {
             self.put_out(b"ERROR: TranformExtractAffineParams() input matrix is NULL\n");
             return Ok(false);
         };
-        for k in 0..3 {
-            p[k] = sse::widen(m.at(k as i32 + 1, 4));
+        for (k, v) in p.iter_mut().enumerate().take(3) {
+            *v = sse::widen(m.at(k as i32 + 1, 4));
         }
         let mut q = Matrix::zeros(4, 4, MATRIX_REAL);
         let mut r = Matrix::zeros(4, 4, MATRIX_REAL);
@@ -262,7 +269,10 @@ impl Process {
     pub fn lta_mat2_rot_mat(&mut self, lta: &mut Lta) -> Result<i32, Stop> {
         self.lta_invert(lta, LtaInto::Itself)?;
         if lta.xforms.first().and_then(|t| t.m_l.as_ref()).is_none() {
-            self.lta_fs504("LTAmat2RotMat", "an array without a first transform's matrix")?;
+            self.lta_fs504(
+                "LTAmat2RotMat",
+                "an array without a first transform's matrix",
+            )?;
             return Ok(0);
         }
         let mut p = [0.0f64; 12];
@@ -277,7 +287,11 @@ impl Process {
             Returned::New(x) => Some(x),
             _ => None,
         };
-        let dst = lta.xforms[0].m_l.as_mut().map(Output::Given).unwrap_or(Output::New);
+        let dst = lta.xforms[0]
+            .m_l
+            .as_mut()
+            .map(Output::Given)
+            .unwrap_or(Output::New);
         self.matrix_copy(rot.as_ref(), dst)?;
         self.lta_invert(lta, LtaInto::Itself)?;
         let m = lta.xforms.first().and_then(|t| t.m_l.clone());

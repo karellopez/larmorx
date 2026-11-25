@@ -336,9 +336,7 @@ impl Process {
         let name = "VLSTsort";
         let (mut d, given) = match dst {
             Some(d) => (d, true),
-            None => match self.vlst_copy(src, None, 0, src.nvox)? {
-                (d, _) => (d, false),
-            },
+            None => (self.vlst_copy(src, None, 0, src.nvox)?.0, false),
         };
         if given && src.nvox < 0 {
             self.errno = 12;
@@ -388,7 +386,9 @@ impl Process {
                 if keep_frames {
                     self.note(
                         &FS_891,
-                        format!("{name}: the frame indices stayed in place while their voxels moved"),
+                        format!(
+                            "{name}: the frame indices stayed in place while their voxels moved"
+                        ),
                     );
                 } else {
                     self.note(
@@ -434,7 +434,11 @@ impl Process {
 
     /// `VLSTcomputeStats(vl)` (§65) with the list's volume `mri`: the mean and deviation of
     /// frame 0's values at the first `nvox` voxels (0 and 0 without a volume or voxels).
-    pub fn vlst_compute_stats(&mut self, vl: &mut VoxelList, mri: Option<&Mri>) -> Result<(), Stop> {
+    pub fn vlst_compute_stats(
+        &mut self,
+        vl: &mut VoxelList,
+        mri: Option<&Mri>,
+    ) -> Result<(), Stop> {
         let Some(mri) = mri else {
             vl.mean = 0.0;
             vl.std = 0.0;
@@ -508,7 +512,12 @@ impl Process {
             }
         }
         let [a, b, c, e] = news;
-        for (slot, new) in [(&mut d.mx, a), (&mut d.my, b), (&mut d.mz, c), (&mut d.t, e)] {
+        for (slot, new) in [
+            (&mut d.mx, a),
+            (&mut d.my, b),
+            (&mut d.mz, c),
+            (&mut d.t, e),
+        ] {
             if let Some(n) = new {
                 *slot = n;
             }

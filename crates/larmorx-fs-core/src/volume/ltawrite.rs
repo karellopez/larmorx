@@ -56,7 +56,13 @@ fn row13(b: &mut Vec<u8>, m: &Matrix, r: i32) {
 /// `regio_print_register`'s text (`specs/freesurfer-io.md` §75) with the method `round`: the
 /// subject (`subject-unknown` when empty), the three numbers `%f`, the matrix's first three rows
 /// (`%18.15e ` each), `0 0 0 1`, `round`.
-pub fn register_text(subject: &[u8], inplane: f32, between: f32, intensity: f32, r: &Matrix) -> Vec<u8> {
+pub fn register_text(
+    subject: &[u8],
+    inplane: f32,
+    between: f32,
+    intensity: f32,
+    r: &Matrix,
+) -> Vec<u8> {
     let mut b = Vec::with_capacity(400);
     if subject.is_empty() {
         b.extend_from_slice(b"subject-unknown");
@@ -143,7 +149,10 @@ impl Process {
         match lta.xforms.first().and_then(|t| t.m_l.as_ref()) {
             Some(m) if m.rows >= 3 && m.cols >= 4 => Ok(m.clone()),
             _ => {
-                self.lta_fs504(function, "an array without a first transform's 3 x 4 matrix")?;
+                self.lta_fs504(
+                    function,
+                    "an array without a first transform's 3 x 4 matrix",
+                )?;
                 Err(Stop::Exit(252))
             }
         }
@@ -221,7 +230,10 @@ impl Process {
         f: &mut dyn TransformOutputs,
     ) -> Result<i32, Stop> {
         if lta.xforms.is_empty() {
-            self.lta_fs504("LTAwrite", "an array without transforms written as register.dat")?;
+            self.lta_fs504(
+                "LTAwrite",
+                "an array without transforms written as register.dat",
+            )?;
             return Ok(0);
         }
         let m = self.lta_first_matrix(lta, "LTAwrite")?;
@@ -271,7 +283,10 @@ impl Process {
             self.lta_change_type(&mut one, lta_type::FSLREG_TYPE)?;
         }
         if one.kind != lta_type::FSLREG_TYPE {
-            self.error_printf(codes::BAD_PARM, b"ltaFSLwrite: could not convert to FSL format");
+            self.error_printf(
+                codes::BAD_PARM,
+                b"ltaFSLwrite: could not convert to FSL format",
+            );
             return Ok(codes::BAD_PARM);
         }
         let m = self.lta_first_matrix(&one, "ltaFSLwrite")?;
@@ -336,7 +351,11 @@ impl Process {
         b.extend_from_slice(format!("width  {}\n", vg.width).as_bytes());
         b.extend_from_slice(format!("height {}\n", vg.height).as_bytes());
         b.extend_from_slice(format!("depth  {}\n", vg.depth).as_bytes());
-        for (name, v) in [("xsize  ", vg.xsize), ("ysize  ", vg.ysize), ("zsize  ", vg.zsize)] {
+        for (name, v) in [
+            ("xsize  ", vg.xsize),
+            ("ysize  ", vg.ysize),
+            ("zsize  ", vg.zsize),
+        ] {
             b.extend_from_slice(name.as_bytes());
             b.extend_from_slice(&sprintf_f64(b"%f", sse::widen(v)));
             b.push(b'\n');

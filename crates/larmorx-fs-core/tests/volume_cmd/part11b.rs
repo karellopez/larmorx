@@ -434,8 +434,16 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
             let sd = if l.take("null") { None } else { Some(l.getx()) };
             let name = if l.take("null") { None } else { Some(l.getx()) };
             let ok = l.geti();
-            let ob = if ok == 1 || ok == 2 { l.getx() } else { Vec::new() };
-            let xb = if l.take("nofile") { None } else { Some(l.getx()) };
+            let ob = if ok == 1 || ok == 2 {
+                l.getx()
+            } else {
+                Vec::new()
+            };
+            let xb = if l.take("nofile") {
+                None
+            } else {
+                Some(l.getx())
+            };
             let mut x = l.getm(p)?;
             let mut base = b"subjects/".to_vec();
             base.extend_from_slice(&subj);
@@ -529,7 +537,11 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
             let (res, given) = p.vlst_sort(&src, dst)?;
             p.flush();
             l.out(if given { "given" } else { "new" });
-            let n = if given { a_d.max(0) as usize } else { res.nvox.max(0) as usize };
+            let n = if given {
+                a_d.max(0) as usize
+            } else {
+                res.nvox.max(0) as usize
+            };
             putvl(l, Some(&res), n);
             putvl(l, Some(&src), a_s.max(0) as usize);
         }

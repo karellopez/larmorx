@@ -624,7 +624,13 @@ impl Process {
 
     /// The C library's `sin` or `cos` of a double (§18): an infinite argument gives x86-64's
     /// default NaN (sign set) in both modes; else [`Process::libm`].
-    pub(crate) fn c_trig(&mut self, name: &str, x: f64, cr: fn(f64) -> f64, glibc: fn(f64) -> f64) -> f64 {
+    pub(crate) fn c_trig(
+        &mut self,
+        name: &str,
+        x: f64,
+        cr: fn(f64) -> f64,
+        glibc: fn(f64) -> f64,
+    ) -> f64 {
         if x.is_infinite() {
             return f64::from_bits(sse::NAN64);
         }

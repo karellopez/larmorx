@@ -4780,7 +4780,9 @@ const PART11B: &[(&str, Make)] = &[
         format!("{w} 0 {dst} {lta} {}", g.pick(&["-1", "0", "1", "3"]))
     }),
     ("ltacor", |g| p11b_lta(g, &["0"], 1).0),
-    ("fixmni", |g| format!("{} {} {}", g.f(true), g.f(true), g.f(true))),
+    ("fixmni", |g| {
+        format!("{} {} {}", g.f(true), g.f(true), g.f(true))
+    }),
     ("ltamod", |g| {
         let (lta, pool, s, d) = p11b_lta(g, &["0", "1"], 2);
         let a = if g.one_in(3) {
@@ -4796,15 +4798,23 @@ const PART11B: &[(&str, Make)] = &[
         let t = dbits([f64::from(f32::EPSILON), 1e-3, 0.0, f64::NAN][g.below(4) as usize]);
         format!("{lta} {a} {b} {t}")
     }),
-    ("angrm", |g| format!("{} {} {}", g.d(true), g.d(true), g.d(true))),
+    ("angrm", |g| {
+        format!("{} {} {}", g.d(true), g.d(true), g.d(true))
+    }),
     ("affp2m", |g| {
         let p: Vec<String> = (0..12).map(|_| g.d(true)).collect();
-        let m = if g.one_in(2) { "null".to_owned() } else { g.mat4() };
+        let m = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            g.mat4()
+        };
         format!("{} {m}", p.join(" "))
     }),
     ("affm2p", |g| g.mat4()),
     ("ltarot", |g| p11b_lta(g, &["0", "1"], 1).0),
-    ("rmsmj", |g| format!("{} {} {}", pool_mat(g), pool_mat(g), g.d(true))),
+    ("rmsmj", |g| {
+        format!("{} {} {}", pool_mat(g), pool_mat(g), g.d(true))
+    }),
     ("vlcre", |g| {
         let e = ext(g, 2, 4);
         let k = pi(g, &[0, 3]);
@@ -4814,15 +4824,29 @@ const PART11B: &[(&str, Make)] = &[
             g.pick(&["3f800000", "00000000"]),
             g.pick(&["3f800000", "40000000"]),
         );
-        let l = if g.one_in(3) { "null".to_owned() } else { vf(g) };
+        let l = if g.one_in(3) {
+            "null".to_owned()
+        } else {
+            vf(g)
+        };
         format!("{w} {lo} {hi} {l} {} {}", g.int(0, 2), g.int(0, 1))
     }),
     ("vlsort", |g| {
         let a = vf(g);
-        let b = if g.one_in(2) { "null".to_owned() } else { vf(g) };
+        let b = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            vf(g)
+        };
         format!("{a} {b}")
     }),
-    ("vlfree", |g| if g.one_in(2) { "null".to_owned() } else { vf(g) }),
+    ("vlfree", |g| {
+        if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            vf(g)
+        }
+    }),
     ("vlstat", |g| {
         let a = vf(g);
         let m = if g.one_in(3) {
@@ -4835,7 +4859,11 @@ const PART11B: &[(&str, Make)] = &[
     }),
     ("vlcopy", |g| {
         let a = vf(g);
-        let b = if g.one_in(2) { "null".to_owned() } else { vf(g) };
+        let b = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            vf(g)
+        };
         format!("{} {a} {b} {} {}", g.int(0, 1), g.int(0, 2), g.int(0, 3))
     }),
     ("vladd", |g| {
@@ -4905,8 +4933,16 @@ const PART11C: &[(&str, Make)] = &[
     }),
     ("ltacmp", |g| {
         let (lta, ..) = p11b_lta(g, &["0", "1"], 2);
-        let left = if g.one_in(3) { "null".to_owned() } else { pool_mat(g) };
-        let right = if g.one_in(3) { "null".to_owned() } else { g.mat4() };
+        let left = if g.one_in(3) {
+            "null".to_owned()
+        } else {
+            pool_mat(g)
+        };
+        let right = if g.one_in(3) {
+            "null".to_owned()
+        } else {
+            g.mat4()
+        };
         match g.below(3) {
             0 => format!("{lta} {left} {right} 0"),
             1 => {
@@ -4938,7 +4974,11 @@ fn crc32(b: &[u8]) -> u32 {
     for &x in b {
         c ^= u32::from(x);
         for _ in 0..8 {
-            c = if c & 1 != 0 { (c >> 1) ^ 0xedb8_8320 } else { c >> 1 };
+            c = if c & 1 != 0 {
+                (c >> 1) ^ 0xedb8_8320
+            } else {
+                c >> 1
+            };
         }
     }
     !c
@@ -4965,8 +5005,14 @@ fn mgh_header(g: &mut G, ras: bool, pad: usize) -> Vec<u8> {
     }
     o.extend_from_slice(&i16::from(ras).to_be_bytes());
     if ras {
-        let mut f: Vec<u32> = (0..3).map(|_| u32::from_str_radix(&g.size(false), 16).unwrap_or(0)).collect();
-        f.extend(g.cosines(false).iter().map(|s| u32::from_str_radix(s, 16).unwrap_or(0)));
+        let mut f: Vec<u32> = (0..3)
+            .map(|_| u32::from_str_radix(&g.size(false), 16).unwrap_or(0))
+            .collect();
+        f.extend(
+            g.cosines(false)
+                .iter()
+                .map(|s| u32::from_str_radix(s, 16).unwrap_or(0)),
+        );
         f.extend((0..3).map(|_| g.fbits(false)));
         for x in f {
             o.extend_from_slice(&x.to_be_bytes());
@@ -5008,7 +5054,12 @@ fn part11b_writers() {
             if g.one_in(2) {
                 pre.push("+env=FSLOUTPUTTYPE=NIFTI_GZ".to_owned());
             }
-            lines.push(format!("{} ltawrmem {} {lta} {}", pre.join(" "), g.int(0, 1), xh(name.as_bytes())));
+            lines.push(format!(
+                "{} ltawrmem {} {lta} {}",
+                pre.join(" "),
+                g.int(0, 1),
+                xh(name.as_bytes())
+            ));
         }
         for _ in 0..16 {
             let mk = pi(&mut g, &[0, 1, 2, 2, 2]);
@@ -5030,7 +5081,11 @@ fn part11b_writers() {
             let orig = match ok {
                 1 => {
                     let h = mgh_header(&mut g, ras, 4);
-                    let b = if g.one_in(6) { b"not gzip".to_vec() } else { gzip_stored(&h) };
+                    let b = if g.one_in(6) {
+                        b"not gzip".to_vec()
+                    } else {
+                        gzip_stored(&h)
+                    };
                     format!("1 {}", xh(&b))
                 }
                 2 => format!("2 {}", xh(&mgh_header(&mut g, ras, 0))),
@@ -5053,7 +5108,11 @@ fn part11b_writers() {
             } else {
                 xh(text.as_bytes())
             };
-            let m = if g.one_in(4) { pool_mat(&mut g) } else { "null".to_owned() };
+            let m = if g.one_in(4) {
+                pool_mat(&mut g)
+            } else {
+                "null".to_owned()
+            };
             lines.push(format!(
                 "{pre}{diag}devxfmmem {mk} {} {sdx} {name} {orig} {xb} {m}",
                 xh(subj.as_bytes())

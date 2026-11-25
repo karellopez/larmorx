@@ -100,8 +100,11 @@ impl Process {
             );
             self.error_exit(
                 codes::BAD_PARM,
-                format!("DevolveXFM: a path of {} bytes (FreeSurfer writes past its buffer here)\n", path.len())
-                    .as_bytes(),
+                format!(
+                    "DevolveXFM: a path of {} bytes (FreeSurfer writes past its buffer here)\n",
+                    path.len()
+                )
+                .as_bytes(),
             )?;
         }
         Ok(())

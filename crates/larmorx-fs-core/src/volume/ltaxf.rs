@@ -45,6 +45,24 @@ impl Process {
         self.lta_move_octree(src, dst, lta, false)
     }
 
+    /// `LTAinverseTransformInterp(src, dst, lta, interp)` (§67): [`Process::lta_transform_interp`]
+    /// with the array's inverse transforms as it holds them (no REGISTER_DAT change; one
+    /// transform's destination takes the inverse's destination centre only, its Talairach name
+    /// kept); no transform or several: the octree path of the forward transforms, unchanged.
+    pub fn lta_inverse_transform_interp(
+        &mut self,
+        src: &mut Mri,
+        dst: Option<&mut Mri>,
+        lta: &mut Lta,
+        interp: i32,
+    ) -> Result<VolOut, Stop> {
+        if lta.xforms.len() == 1 {
+            let (tsrc, tdst) = (lta.inv_xforms[0].src.clone(), lta.inv_xforms[0].dst.clone());
+            return self.lta_move_one(src, dst, lta, interp, &tsrc, &tdst, false);
+        }
+        self.lta_move_octree(src, dst, lta, true)
+    }
+
     /// One transform (§63 step 2; §67 step 2 with `forward` false): the destination when none is
     /// given, then the RAS resampling by the array's type.
     #[allow(clippy::too_many_arguments)]
@@ -76,7 +94,7 @@ impl Process {
                 let dgeom = d.geom.clone();
                 let m = if forward { &lta.xforms[0] } else { &lta.inv_xforms[0] };
                 let m = m.m_l.clone();
-                self.lta_vox_to_ras(m.as_ref(), tsrc, tdst, &src.geom, &dgeom)?
+                self.lta_vox_to_ras(m.as_ref(), tsrc, tdst, &src.geom, &dgeom, !forward)?
             }
             lta_type::LINEAR_PHYSVOX_TO_PHYSVOX => {
                 self.lta_change_type(lta, lta_type::LINEAR_RAS_TO_RAS)?;
@@ -84,11 +102,7 @@ impl Process {
                 m.m_l.clone()
             }
             _ => {
-                let name = if forward { "LTAtransform" } else { "LTAinverseTransform" };
-                self.error_exit(
-                    codes::BAD_PARM,
-                    format!("{name}: unknown linear transform\n").as_bytes(),
-                )?;
+                self.error_exit(codes::BAD_PARM, b"LTAtransform: unknown linear transform\n")?;
                 return Ok(VolOut::Nothing);
             }
         };
@@ -107,9 +121,10 @@ impl Process {
         }
     }
 
-    /// The RAS matrix of a voxel-to-voxel transform (§63): `(i2r M) r2i` with the transform's
-    /// destination geometry's voxel-to-RAS (else the destination volume's, after its three
-    /// lines) and its source geometry's RAS-to-voxel (else the source volume's).
+    /// The RAS matrix of a voxel-to-voxel transform (§63; §67's inverse with `inv`): `(i2r M)
+    /// r2i` with the transform's destination geometry's voxel-to-RAS (else the destination
+    /// volume's, after its three lines) and its source geometry's RAS-to-voxel (else the source
+    /// volume's).
     pub(crate) fn lta_vox_to_ras(
         &mut self,
         m: Option<&Matrix>,
@@ -117,17 +132,19 @@ impl Process {
         tdst: &VolGeom,
         src: &VolGeom,
         dst: &VolGeom,
+        inv: bool,
     ) -> Result<Option<Matrix>, Stop> {
+        let lta = if inv { "LTA inv" } else { "LTA" };
         let i2r = if tdst.valid != 0 {
             self.vg_i_to_r(tdst)?
         } else {
-            self.put_err(b"INFO: LTA dst geometry information missing!\n      We assume that the dst volume passed is the\n      same as the dst for the transform.\n");
+            self.put_err(format!("INFO: {lta} dst geometry information missing!\n      We assume that the dst volume passed is the\n      same as the dst for the transform.\n").as_bytes());
             self.extract_i_to_r(dst)?
         };
         let r2i = if tsrc.valid != 0 {
             self.vg_r_to_i(tsrc)?
         } else {
-            self.put_err(b"INFO: LTA src geometry information missing!\n      We assume that the src volume passed is the\n      same as the src for the transform.\n");
+            self.put_err(format!("INFO: {lta} src geometry information missing!\n      We assume that the src volume passed is the\n      same as the src for the transform.\n").as_bytes());
             self.extract_r_to_i(src)?
         };
         let a = match self.matrix_multiply(Some(&i2r), m, None)? {
@@ -171,9 +188,12 @@ impl Process {
         }
         let mut d = self.mri_clone_new(src)?;
         if tdst.valid == 1 {
-            self.use_vol_geom(tdst, &mut d)?;
+            // the centre only: the extent, sizes and cosines stay the source's (§67)
+            d.geom.c = tdst.c;
+            d.geom.ras_good_flag = 1;
+            self.reinit_cache(&mut d.geom)?;
             if self.gdiag & DIAG_VERBOSE != 0 {
-                self.put_err(b"INFO: Modifying dst geometry, using the transform dst\n");
+                self.put_err(b"INFO: Modifying dst c_(r,a,s), using the transform dst\n");
             }
         } else if self.env.is_set("USE_AVERAGE305") {
             self.put_err(b"INFO: Environmental variable USE_AVERAGE305 set\nINFO: Modifying dst c_(r,a,s), using average_305 values\n");
@@ -200,13 +220,8 @@ impl Process {
         let _ = inverse;
         self.put_err(b"applying octree transform to image...\n");
         let mut made: Option<Mri> = None;
-        let given = dst.is_some();
-        if !given {
-            let mut d = self.mri_clone_new(src)?;
-            if !inverse {
-                d.transform_fname.clear();
-            }
-            made = Some(d);
+        if dst.is_none() {
+            made = Some(self.mri_clone_new(src)?);
         }
         let d: &mut Mri = match (made.as_mut(), dst) {
             (Some(m), _) => m,

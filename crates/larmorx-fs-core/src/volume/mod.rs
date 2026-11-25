@@ -42,6 +42,7 @@ pub mod image;
 pub mod info;
 pub mod linear;
 pub mod ltachain;
+pub mod ltaconv;
 pub mod ltaops;
 pub mod ltamove;
 pub mod ltaread;

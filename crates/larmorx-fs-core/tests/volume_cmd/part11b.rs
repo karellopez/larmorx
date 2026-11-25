@@ -6,6 +6,7 @@ use larmorx_fs_core::files::path_of;
 use larmorx_fs_core::maths::Returned;
 use larmorx_fs_core::maths::matrix::Matrix;
 use larmorx_fs_core::mri::{Mri, VolGeom};
+use larmorx_fs_core::volume::ltaconv::{ComposeInto, Composed};
 use larmorx_fs_core::volume::ltaread::TransformInputs;
 use larmorx_fs_core::volume::ltawrite::TransformOutputs;
 use larmorx_fs_core::volume::vlist::VoxelList;
@@ -323,7 +324,7 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
             putm_res(l, &r, m.as_ref());
             l.puti(i64::from(e));
         }
-        "ltaxf" => {
+        "ltaxf" | "ltaixf" => {
             let mut a = getw(p, l)?;
             paint(p, l, &mut a)?;
             let mut d = if l.take("new") {
@@ -338,7 +339,9 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
                 D::W(m) => Some(m.as_mut()),
                 _ => None,
             };
-            let r = if interp < 0 {
+            let r = if c == "ltaixf" {
+                p.lta_inverse_transform_interp(&mut a, dm, &mut lta, interp)?
+            } else if interp < 0 {
                 p.lta_transform(&mut a, dm, &mut lta)?
             } else {
                 p.lta_transform_interp(&mut a, dm, &mut lta, interp)?
@@ -346,6 +349,55 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
             p.flush();
             putres(l, r, &a, None, &d);
             putlta(l, Some(&lta));
+        }
+        // -- §67
+        "ltav2r" | "ltar2v" => {
+            let mut lta = getlta(p, l)?;
+            let s = getwn(p, l)?;
+            let d = getwn(p, l)?;
+            p.flush();
+            let r = if c == "ltav2r" {
+                p.lta_voxel_to_ras_xform(&mut lta, s.as_ref(), d.as_ref())?
+            } else {
+                p.lta_ras_to_voxel_xform(&mut lta, s.as_ref(), d.as_ref())?
+            };
+            p.flush();
+            l.puti(i64::from(r));
+            putlta(l, Some(&lta));
+        }
+        "ltacmp" => {
+            let mut src = getlta(p, l)?;
+            let left = l.getm(p)?;
+            let right = l.getm(p)?;
+            let k = l.geti();
+            let mut other = if k == 1 { Some(getlta(p, l)?) } else { None };
+            p.flush();
+            let into = match (k, other.as_mut()) {
+                (1, Some(o)) => ComposeInto::Given(o),
+                (2, _) => ComposeInto::Itself,
+                _ => ComposeInto::New,
+            };
+            let r = p.lta_compose(&mut src, left.as_ref(), right.as_ref(), into)?;
+            p.flush();
+            match r {
+                Composed::New(n) => {
+                    l.out("new");
+                    putlta(l, Some(&n));
+                    if let Some(o) = &other {
+                        putlta(l, Some(o));
+                    }
+                    putlta(l, Some(&src));
+                }
+                Composed::Given if k == 2 => {
+                    l.out("self");
+                    putlta(l, Some(&src));
+                }
+                Composed::Given => {
+                    l.out("given");
+                    putlta(l, other.as_ref());
+                    putlta(l, Some(&src));
+                }
+            }
         }
         "ltacor" => {
             let mut lta = getlta(p, l)?;

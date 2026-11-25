@@ -51,6 +51,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--golden", required=True)
     ap.add_argument("--golden-fix", required=True)
     ap.add_argument("--commit", help="the clean commit the runs were made from (default: HEAD's)")
+    ap.add_argument(
+        "--official-times",
+        type=Path,
+        help="a real.py summary whose official runs were fresh (the record's are served by the "
+        "oracle-output cache, which keeps no time): FreeSurfer's seconds taken from it",
+    )
+    ap.add_argument("--prelude", type=int, default=111, help="the prelude's case count")
     a = ap.parse_args(argv)
     keys = ("seed", "family", "cases", "reproduce_equal", "reproduce_differ", "skipped",
             "skipped_but_identical", "not_ported", "fix_differ", "fix_differ_without_notice",
@@ -59,6 +66,13 @@ def main(argv: list[str] | None = None) -> int:
         {k: json.loads(p.read_text(encoding="utf-8")).get(k, 0) for k in keys} for p in a.probe
     ]
     real = json.loads(a.real.read_text(encoding="utf-8"))
+    fresh = {}
+    if a.official_times:
+        for r in json.loads(a.official_times.read_text(encoding="utf-8"))["rows"]:
+            fresh[(r["head"], r["recipe"])] = r["seconds"]["official"]
+    for r in real["rows"]:
+        if r["served"] and (r["head"], r["recipe"]) in fresh:
+            r["seconds"]["official"] = fresh[(r["head"], r["recipe"])]
     rows = [
         {
             "head": r["head"],
@@ -125,7 +139,8 @@ def main(argv: list[str] | None = None) -> int:
         "`brainmask.mgz` the reference, its `aparc+aseg.mgz` the reference's mask) and the BOLD "
         "reference fMRIPrep registered (`desc-coreg_boldref`); exit status, both streams (the times "
         "masked; larmorx's notices aside) and every file, byte for byte; times and peaks at one "
-        "thread:",
+        "thread (FreeSurfer's from its fresh run of the same call the same day: the record's own "
+        "official runs are served by the oracle-output cache):",
         "",
     ]
     for r in rows:
@@ -155,8 +170,10 @@ def main(argv: list[str] | None = None) -> int:
         "",
     ]
     for p in probes:
+        n = p["cases"] - a.prelude
+        what = "the prelude" if n == 0 else f"the prelude and {n} seeded pairs, seed {p['seed']}"
         md.append(
-            f"- seed {p['seed']}: {p['cases']} cases; `reproduce` {p['reproduce_equal']} identical, "
+            f"- {what}: {p['cases']} cases; `reproduce` {p['reproduce_equal']} identical, "
             f"{p['reproduce_differ']} different, {p['skipped']} undefined "
             f"({p['skipped_but_identical']} of them identical anyway), {p['not_ported']} not ported; "
             f"`fix` {p['fix_differ'] - p['fix_differ_without_notice']} different with a notice, "

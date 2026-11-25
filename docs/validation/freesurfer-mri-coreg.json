@@ -1,0 +1,283 @@
+{
+ "tool": "mri_coreg",
+ "upstream": "FreeSurfer 8.2.0",
+ "status": "experimental",
+ "queue": "3.2-17 (mri_coreg, the whole program but --landmarks and --landmarks-2d)",
+ "commit": "b5e8d6be2a5b",
+ "date": "2026-11-25",
+ "platform": "Linux x86_64",
+ "probe": [
+  {
+   "seed": 1,
+   "family": "seeded",
+   "cases": 111,
+   "reproduce_equal": 103,
+   "reproduce_differ": 0,
+   "skipped": 7,
+   "skipped_but_identical": 3,
+   "not_ported": 1,
+   "fix_differ": 17,
+   "fix_differ_without_notice": 0,
+   "official_sha256_skip": "cd00e6db550678ecff3512523e601f9ffcf30f91fa612ee4e3bc9e4210fc477e"
+  },
+  {
+   "seed": 1,
+   "family": "seeded",
+   "cases": 171,
+   "reproduce_equal": 156,
+   "reproduce_differ": 0,
+   "skipped": 14,
+   "skipped_but_identical": 10,
+   "not_ported": 1,
+   "fix_differ": 17,
+   "fix_differ_without_notice": 0,
+   "official_sha256_skip": "5d23cee413c31bf15557cbe2c957a9cf8bb2336cdcba63f27700a29274fa5f50"
+  },
+  {
+   "seed": 7,
+   "family": "seeded",
+   "cases": 171,
+   "reproduce_equal": 157,
+   "reproduce_differ": 0,
+   "skipped": 13,
+   "skipped_but_identical": 9,
+   "not_ported": 1,
+   "fix_differ": 17,
+   "fix_differ_without_notice": 0,
+   "official_sha256_skip": "b03cf006dec7c4c4370991e7e052e8ffb81843e5147969d199c528466327862b"
+  },
+  {
+   "seed": 13,
+   "family": "seeded",
+   "cases": 171,
+   "reproduce_equal": 156,
+   "reproduce_differ": 0,
+   "skipped": 14,
+   "skipped_but_identical": 10,
+   "not_ported": 1,
+   "fix_differ": 17,
+   "fix_differ_without_notice": 0,
+   "official_sha256_skip": "17c0647eb5b529d7e72af3bf940e0c9b0e196dbf971112f3fc4a9716cf59e137"
+  }
+ ],
+ "real": [
+  {
+   "head": "ds000005-sub-01",
+   "recipe": "fmriprep",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 39.0,
+    "reproduce": 54.0,
+    "fix": 52.0
+   },
+   "peak_mib": {
+    "official": 413.629,
+    "reproduce": 344.1,
+    "fix": 344.0
+   }
+  },
+  {
+   "head": "ds000005-sub-01",
+   "recipe": "bbregister",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 38.8,
+    "reproduce": 54.0,
+    "fix": 52.2
+   },
+   "peak_mib": {
+    "official": 412.949,
+    "reproduce": 345.0,
+    "fix": 344.7
+   }
+  },
+  {
+   "head": "ds000228-sub-pixar008",
+   "recipe": "fmriprep",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 36.7,
+    "reproduce": 52.3,
+    "fix": 51.1
+   },
+   "peak_mib": {
+    "official": 413.004,
+    "reproduce": 344.4,
+    "fix": 344.4
+   }
+  },
+  {
+   "head": "ds000228-sub-pixar008",
+   "recipe": "bbregister",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 34.8,
+    "reproduce": 47.2,
+    "fix": 47.0
+   },
+   "peak_mib": {
+    "official": 412.75,
+    "reproduce": 344.9,
+    "fix": 344.9
+   }
+  },
+  {
+   "head": "ds005454-sub-16",
+   "recipe": "fmriprep",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 36.5,
+    "reproduce": 55.2,
+    "fix": 54.6
+   },
+   "peak_mib": {
+    "official": 433.062,
+    "reproduce": 363.7,
+    "fix": 365.1
+   }
+  },
+  {
+   "head": "ds005454-sub-16",
+   "recipe": "bbregister",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 36.8,
+    "reproduce": 55.3,
+    "fix": 55.0
+   },
+   "peak_mib": {
+    "official": 433.207,
+    "reproduce": 364.2,
+    "fix": 364.0
+   }
+  },
+  {
+   "head": "ds002422-sub-02",
+   "recipe": "fmriprep",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 30.9,
+    "reproduce": 45.8,
+    "fix": 45.8
+   },
+   "peak_mib": {
+    "official": 412.75,
+    "reproduce": 344.2,
+    "fix": 344.5
+   }
+  },
+  {
+   "head": "ds002422-sub-02",
+   "recipe": "bbregister",
+   "reproduce": {
+    "status": true,
+    "stdout": true,
+    "stderr": true,
+    "files": true
+   },
+   "fix": {
+    "status": true,
+    "stdout": true,
+    "files": true
+   },
+   "seconds": {
+    "official": 31.1,
+    "reproduce": 46.0,
+    "fix": 45.5
+   },
+   "peak_mib": {
+    "official": 413.594,
+    "reproduce": 343.1,
+    "fix": 344.2
+   }
+  }
+ ],
+ "golden": {
+  "reproduce": "1e9c03d944ef5c07ca876b55df624c0d824540dcbb07674000e799438dbdf5e8",
+  "fix": "dda58a68640b7dd568f61ff26de1f797d0ac5880c05ac815d77225a2cd260a0f"
+ },
+ "memory": [
+  {
+   "case": "fmriprep",
+   "mode": "reproduce",
+   "larmorx_mib": 344.8,
+   "freesurfer_mib": 413.3
+  },
+  {
+   "case": "fmriprep",
+   "mode": "fix",
+   "larmorx_mib": 345.0,
+   "freesurfer_mib": 413.3
+  }
+ ]
+}

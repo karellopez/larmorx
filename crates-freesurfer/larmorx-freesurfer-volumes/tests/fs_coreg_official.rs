@@ -17,12 +17,14 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded by `check.py --seed 1 --n 0` (the official program, Linux x64, one thread).
+/// Recorded 2026-11-25 (relay 52, from the clean commit b5e8d6be) by `check.py --seed 1 --n 0`
+/// (the official program, Linux x64, one thread): 111 cases, 103 identical, 7 undefined, 1 not
+/// ported.
 const OFFICIAL_SHA256_SKIP: &str =
-    "0000000000000000000000000000000000000000000000000000000000000000";
+    "cd00e6db550678ecff3512523e601f9ffcf30f91fa612ee4e3bc9e4210fc477e";
 /// The same with the registrations as `SLOW` (a debug build's).
 const OFFICIAL_SHA256_SKIP_DEBUG: &str =
-    "0000000000000000000000000000000000000000000000000000000000000000";
+    "d19881de02690e5ae587838724f2ff3c527f18980e0c35faeebf8451446dfeb9";
 /// The cases a debug build runs.
 const DEBUG_CASES: usize = 52;
 

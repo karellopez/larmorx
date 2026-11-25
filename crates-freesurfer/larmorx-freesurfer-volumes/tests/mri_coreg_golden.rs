@@ -17,10 +17,11 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded by `check.py --golden` from the official program on Linux x64.
-const OFFICIAL_SHA256: &str = "0000000000000000000000000000000000000000000000000000000000000000";
-/// The port's default on Linux x64.
-const FIX_SHA256: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+/// Recorded 2026-11-25 (relay 52, from the clean commit b5e8d6be) by `check.py --golden` from the
+/// official program on Linux x64: 5 cases, each identical with the port's `reproduce`.
+const OFFICIAL_SHA256: &str = "1e9c03d944ef5c07ca876b55df624c0d824540dcbb07674000e799438dbdf5e8";
+/// The port's default on Linux x64 (one case differs from `reproduce`, with its notice).
+const FIX_SHA256: &str = "dda58a68640b7dd568f61ff26de1f797d0ac5880c05ac815d77225a2cd260a0f";
 
 /// The cases run side by side (each in its own folder, with its own state), hashed in order.
 fn cases_digest(mode: UpstreamDefects) -> String {

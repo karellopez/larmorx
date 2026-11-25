@@ -72,6 +72,19 @@ Closed to FreeSurfer clean-room implementers (written from FreeSurfer's source,
   copies it (`MatrixCopy(NULL)`); `MRIconformNoScale` uses `MRIresample`'s result unchecked: an error
   in both modes (not measured).
 
+- **FS-1326** (class a): `ReadSTVPairFile`'s `int sno, tno; double sx, ...` are declared once
+  before the loop: a number `sscanf` does not read keeps the previous line's value, and on the
+  first line memory never written (the official output of the probe's `part.txt` case changed from
+  run to run: once VNL's `suspicious return value (2) from SVDC` with a NaN matrix, once not).
+- **FS-1327** (class a): `ComputeReg` returns `NULL` for a singular `XtX`; `ComputeLTA` goes on:
+  `TKR` `MatrixInverse(NULL, NULL)` (`ErrorExit`, status 252), `VOX` `LTAchangeType`'s
+  `MatrixMultiply(NULL, ...)` (`ErrorExit`, status 252), `RAS` `LTAwrite` opens the file and crashes
+  on the matrix (measured: an empty `lm.lta`, `CRASH 11`).
+  Reproduced so with `reproduce`; a clear error by default.
+- `ReadCoords`: `sxyzfile.find("json") > 0 && txyzfile.find("json") > 0` is true unless a name
+  *starts* with `json` (`find` returns `npos` for a name without it): any name not starting with
+  `json` is read as a JSON point set (rule C: kept; the probe's `json1` case).
+
 ## 3. Standard output at a crash
 
 FreeSurfer's `stdout` is fully buffered (4,096 bytes) when redirected; `MatrixPrint`, the dither

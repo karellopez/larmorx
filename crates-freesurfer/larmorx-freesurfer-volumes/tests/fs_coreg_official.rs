@@ -7,7 +7,7 @@
 //! each case's line with `reproduce` hashed in order, the cases where FreeSurfer's result is
 //! undefined and the one not ported as `SKIP`, against the hash `validation/probes/fs-coreg/check.py
 //! --seed 1 --n 0` recorded from the official program (`official_sha256_skip`). A debug build
-//! compares the first 52 cases (the command line and the stand-alone options) and hashes the
+//! compares the first 66 cases (the command line and the stand-alone options) and hashes the
 //! registrations as `SLOW` (`official_sha256_skip_debug`); the default (`fix`) may differ only with
 //! a notice.
 
@@ -26,14 +26,14 @@ const OFFICIAL_SHA256_SKIP: &str =
 const OFFICIAL_SHA256_SKIP_DEBUG: &str =
     "d19881de02690e5ae587838724f2ff3c527f18980e0c35faeebf8451446dfeb9";
 /// The cases a debug build runs.
-const DEBUG_CASES: usize = 52;
+const DEBUG_CASES: usize = 66;
 
 /// FreeSurfer's result is undefined (`check.py`'s `SKIP`): a case with one of these notices, but
 /// FS-1323's division by 0, which `reproduce` gives as FreeSurfer does (`CRASH 8`).
 const SKIP: &[&str] = &[
     "FS-1313", "FS-1314", "FS-1316", "FS-1318", "FS-1319", "FS-1320", "FS-1321", "FS-1322",
-    "FS-1323", "FS-167", "FS-58", "FS-288", "FS-290", "FS-294", "FS-441", "FS-302", "FS-303",
-    "FS-304", "FS-305", "FS-306", "FS-307", "FS-308", "FS-309", "FS-310",
+    "FS-1323", "FS-1326", "FS-167", "FS-58", "FS-288", "FS-290", "FS-294", "FS-441", "FS-302",
+    "FS-303", "FS-304", "FS-305", "FS-306", "FS-307", "FS-308", "FS-309", "FS-310",
 ];
 
 fn skipped(line: &str, ids: &[&str]) -> bool {

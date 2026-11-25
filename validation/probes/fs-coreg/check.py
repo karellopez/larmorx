@@ -53,7 +53,8 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # FS-1313 (more than 10 --sep), FS-1314 (--threads without a number), FS-1316 (a number never
 # read), FS-1318 (--lrrev without a left-right axis), FS-1319 (a brute force that never ends),
 # FS-1320 (the percentile past the sorted values), FS-1321 (a sample outside a volume),
-# FS-1322 (--dof above 12), FS-1323 (--sep 0 or less); the readers' and writers'
+# FS-1322 (--dof above 12), FS-1323 (--sep 0 or less), FS-1326 (a landmark never read); the
+# readers' and writers'
 # (fs-robust-register's SKIP): FS-167, FS-58, FS-288, FS-290, FS-294, FS-441, FS-302 to FS-310
 SKIP = (
     "FS-1313",
@@ -65,6 +66,7 @@ SKIP = (
     "FS-1321",
     "FS-1322",
     "FS-1323",
+    "FS-1326",
     "FS-167",
     "FS-58",
     "FS-288",
@@ -75,7 +77,7 @@ SKIP = (
 )
 NOT_PORTED = "is not ported yet"
 #: the prelude's command-line and stand-alone cases (`fs_coreg_official.rs`' debug build)
-DEBUG_CASES = 52
+DEBUG_CASES = 66
 #: the times (both sides): Powell's, the whole run's (the head, the tail kept)
 TIMES = (
     (re.compile(r"OptTimeSec +[0-9.]+ sec"), "OptTimeSec <T> sec"),

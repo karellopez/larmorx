@@ -213,6 +213,59 @@ fn mask_bytes_of(g: &mut Gen, im: &Img, ty: i32, name: &str) -> Vec<u8> {
     write_as(&mut image(g, &m), name)
 }
 
+/// The landmarks' files: a pair file of matching points (`mris_apply_reg --stvp`'s), two points
+/// only, a line short of numbers, and the same points as two JSON point sets (and one of three,
+/// and one whose name starts with `json`).
+fn landmark_files() -> Vec<(String, Vec<u8>)> {
+    let mut out: Vec<(String, Vec<u8>)> = Vec::new();
+    let pts: [([f64; 3], [f64; 3]); 6] = [
+        ([10.0, -5.5, 3.25], [11.5, -4.0, 2.75]),
+        ([-12.0, 8.0, 1.5], [-10.25, 9.5, 0.5]),
+        ([4.5, 14.0, -9.0], [6.0, 15.25, -9.75]),
+        ([-3.0, -11.5, 12.0], [-1.75, -10.0, 11.5]),
+        ([15.25, 2.0, -6.5], [16.5, 3.75, -7.0]),
+        ([-7.5, 6.25, 9.75], [-6.0, 7.5, 9.25]),
+    ];
+    let mut pairs = String::new();
+    for (k, (a, b)) in pts.iter().enumerate() {
+        pairs.push_str(&format!(
+            "{k} {} {} {} {} {} {} {}\n",
+            a[0],
+            a[1],
+            a[2],
+            k + 100,
+            b[0],
+            b[1],
+            b[2]
+        ));
+    }
+    out.push(("pairs.txt".to_owned(), pairs.clone().into_bytes()));
+    let two: String = pairs.lines().take(2).map(|l| format!("{l}\n")).collect();
+    out.push(("two.txt".to_owned(), two.into_bytes()));
+    out.push((
+        "part.txt".to_owned(),
+        b"0 1.5 2.5\n1 2 3 4 5 6 7 8\n".to_vec(),
+    ));
+    let json = |ps: &[[f64; 3]]| -> Vec<u8> {
+        let mut t = String::from("{\n    \"data_type\": \"fs_pointset\",\n    \"points\": [\n");
+        for (k, p) in ps.iter().enumerate() {
+            t.push_str(&format!(
+                "        {{\n            \"coordinates\": {{\n                \"x\": {},\n                \"y\": {},\n                \"z\": {}\n            }},\n            \"legacy_stat\": 1\n        }}{}\n",
+                p[0], p[1], p[2], if k + 1 < ps.len() { "," } else { "" }
+            ));
+        }
+        t.push_str("    ],\n    \"vox2ras\": \"scanner_ras\"\n}\n");
+        t.into_bytes()
+    };
+    let sp: Vec<[f64; 3]> = pts.iter().map(|p| p.0).collect();
+    let tp: Vec<[f64; 3]> = pts.iter().map(|p| p.1).collect();
+    out.push(("s.json".to_owned(), json(&sp)));
+    out.push(("t.json".to_owned(), json(&tp)));
+    out.push(("t3.json".to_owned(), json(&tp[..3])));
+    out.push(("json1".to_owned(), json(&sp)));
+    out
+}
+
 /// The prelude: the command line's own paths and failures, the stand-alone options, and one
 /// case of each registration option on the base pair.
 pub fn prelude() -> Vec<String> {
@@ -283,6 +336,7 @@ pub fn prelude() -> Vec<String> {
     let mut lfiles = files.clone();
     lfiles.push(("a.lta".to_owned(), lta_ras.clone()));
     lfiles.push(("v.lta".to_owned(), lta_vox.clone()));
+    lfiles.extend(landmark_files());
     for a in [
         s(&["--mat2par", "a.lta"]),
         s(&["--mat2par-vox", "a.lta"]),
@@ -376,6 +430,139 @@ pub fn prelude() -> Vec<String> {
         s(&["--rms", "50", "rms.txt"]),
         s(&["--rms", "50", "nodir/rms.txt", "a.lta", "v.lta"]),
         s(&["--landmarks", "a", "b", "c", "d", "e", "f"]),
+        s(&[
+            "--landmarks",
+            "pairs.txt",
+            "stvp",
+            "RAS",
+            "mov.mgz",
+            "ref.mgz",
+            "lm.lta",
+        ]),
+        s(&[
+            "--landmarks",
+            "pairs.txt",
+            "stvp",
+            "VOX",
+            "mov.mgz",
+            "ref.mgz",
+            "lm.lta",
+            "lm.json",
+        ]),
+        s(&[
+            "--landmarks",
+            "pairs.txt",
+            "stvp",
+            "TKR",
+            "mov.mgz",
+            "ref.mgz",
+            "lm.lta",
+            "lm.json",
+            "x",
+        ]),
+        s(&[
+            "--s",
+            "bert",
+            "--landmarks-2d",
+            "pairs.txt",
+            "stvp",
+            "RAS",
+            "mov.mgz",
+            "ref.mgz",
+            "lm.lta",
+            "lm.json",
+        ]),
+        s(&[
+            "--landmarks",
+            "pairs.txt",
+            "stvp",
+            "ras",
+            "mov.mgz",
+            "ref.mgz",
+            "lm.lta",
+        ]),
+        s(&[
+            "--landmarks",
+            "nofile.txt",
+            "stvp",
+            "RAS",
+            "mov.mgz",
+            "ref.mgz",
+            "lm.lta",
+        ]),
+        s(&[
+            "--landmarks",
+            "two.txt",
+            "stvp",
+            "RAS",
+            "mov.mgz",
+            "ref.mgz",
+            "lm.lta",
+        ]),
+        s(&[
+            "--landmarks",
+            "two.txt",
+            "stvp",
+            "VOX",
+            "mov.mgz",
+            "ref.mgz",
+            "lm.lta",
+        ]),
+        s(&[
+            "--landmarks",
+            "two.txt",
+            "stvp",
+            "TKR",
+            "mov.mgz",
+            "ref.mgz",
+            "lm.lta",
+        ]),
+        s(&[
+            "--landmarks",
+            "part.txt",
+            "stvp",
+            "RAS",
+            "mov.mgz",
+            "ref.mgz",
+            "lm.lta",
+        ]),
+        s(&[
+            "--landmarks",
+            "s.json",
+            "t.json",
+            "RAS",
+            "mov.mgz",
+            "ref.mgz",
+            "lm.lta",
+            "lm.json",
+        ]),
+        s(&[
+            "--landmarks",
+            "s.json",
+            "t3.json",
+            "RAS",
+            "mov.mgz",
+            "ref.mgz",
+            "lm.lta",
+        ]),
+        s(&[
+            "--landmarks",
+            "json1",
+            "t.json",
+            "RAS",
+            "mov.mgz",
+            "ref.mgz",
+            "lm.lta",
+        ]),
+        s(&[
+            "--landmarks",
+            "pairs.txt",
+            "stvp",
+            "RAS",
+            "nofile.mgz",
+            "ref.mgz",
+            "lm.lta",
+        ]),
         s(&["--init-reg", "nofile.lta"]),
         s(&[
             "--mov",
@@ -695,13 +882,18 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
 
 /// The golden cases (`tests/mri_coreg_golden.rs`): fMRIPrep's call (one separation, its
 /// tolerances, the brute force narrowed) on the base pair, the 12-parameter schema with every
-/// output, the 2-D schema, a subject's mask, and two stand-alone options.
+/// output, the 2-D schema, and three stand-alone options (`--landmarks` with its point set).
 pub fn golden_cases() -> Vec<String> {
     let mut g = Gen::new(0x676f_6c64);
     let p = Pair::base();
     let mut files = p.files(&mut g);
     files.push(("a.lta".to_owned(), init_lta(&p, 1)));
     files.push(("seg.mgz".to_owned(), seg_bytes(&mut g, &p.refv, "seg.mgz")));
+    files.extend(
+        landmark_files()
+            .into_iter()
+            .filter(|(n, _)| n == "pairs.txt"),
+    );
     let req = s(&["--mov", "mov.mgz", "--ref", "ref.mgz", "--reg", "reg.lta"]);
     let with = |extra: &[&str]| -> Vec<String> {
         let mut a = req.clone();
@@ -775,6 +967,21 @@ pub fn golden_cases() -> Vec<String> {
         ),
         line(&[], &files, &[], &s(&["--mat2par", "a.lta"])),
         line(&[], &files, &[], &s(&["--lrrev", "a.lta", "lr.lta"])),
+        line(
+            &[],
+            &files,
+            &[],
+            &s(&[
+                "--landmarks",
+                "pairs.txt",
+                "stvp",
+                "TKR",
+                "mov.mgz",
+                "ref.mgz",
+                "lm.lta",
+                "lm.json",
+            ]),
+        ),
     ]
 }
 

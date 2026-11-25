@@ -57,7 +57,7 @@ def main(argv: list[str] | None = None) -> int:
         help="a real.py summary whose official runs were fresh (the record's are served by the "
         "oracle-output cache, which keeps no time): FreeSurfer's seconds taken from it",
     )
-    ap.add_argument("--prelude", type=int, default=111, help="the prelude's case count")
+    ap.add_argument("--prelude", type=int, default=125, help="the prelude's case count")
     a = ap.parse_args(argv)
     keys = ("seed", "family", "cases", "reproduce_equal", "reproduce_differ", "skipped",
             "skipped_but_identical", "not_ported", "fix_differ", "fix_differ_without_notice",
@@ -96,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
         "tool": "mri_coreg",
         "upstream": "FreeSurfer 8.2.0",
         "status": "experimental",
-        "queue": "3.2-17 (mri_coreg, the whole program but --landmarks and --landmarks-2d)",
+        "queue": "3.2-17 (mri_coreg, the whole program)",
         "commit": a.commit or commit(),
         "date": datetime.date.today().isoformat(),
         "platform": f"{platform.system()} {platform.machine()}",
@@ -120,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
         "",
         f"Status `experimental`. Generated {rec['date']} on {rec['platform']} from commit "
         f"`{rec['commit']}` with `validation/probes/fs-coreg/record.py` (queue item 3.2-17: the "
-        "whole program but `--landmarks` and `--landmarks-2d`, not ported yet).",
+        "whole program).",
         "",
         "- **Replica:** crates-freesurfer/larmorx-freesurfer-volumes (src/mri_coreg/) on the volume "
         "and filter functions of larmorx-freesurfer-volume and -filter, Powell's minimiser of "
@@ -157,7 +157,8 @@ def main(argv: list[str] | None = None) -> int:
         "`validation/probes/fs-coreg/check.py`: the command line (no argument, the help with the "
         "settings so far, the version, unknown options, missing arguments, the checks, case-blind "
         "names), the stand-alone options (`--mat2par`, `--mat2par-vox`, `--mat2rot`, `--par2mat` with "
-        "a number that does not read, `--lrrev`, `--rms` with every failure, `--init-reg`, "
+        "a number that does not read, `--lrrev`, `--rms` with every failure, `--landmarks` and "
+        "`--landmarks-2d` with pair files and JSON point sets, `--init-reg`, "
         "`--init-reg-save-only`), every registration option on a small BOLD-like volume and a brain "
         "reference (the schemas, the dithers, the smoothing, separations, tolerances, the masks, the "
         "intensity dither volume, every output file, `--conf-ref`, the initial transforms, the "
@@ -166,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
         "then seeded pairs of every type and orientation with random options. Exit status, both "
         "streams and every file written, case by case; counted apart: the cases whose result in "
         "FreeSurfer is undefined (`check.py`'s `SKIP`: memory contents, crashes' output, runs that "
-        "never end; most of them identical anyway) and the path not ported:",
+        "never end; most of them identical anyway):",
         "",
     ]
     for p in probes:
@@ -183,10 +184,11 @@ def main(argv: list[str] | None = None) -> int:
         "",
         "## Golden cases",
         "",
-        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_coreg_golden.rs`: 5 cases on small "
+        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_coreg_golden.rs`: 6 cases on small "
         "volumes made with integer arithmetic (fMRIPrep's call with a reference mask and a narrowed "
         "brute force, the 12-parameter schema with every output and an initial registration, the "
-        "2-D schema with the centroids and a RAS-to-RAS output, `--mat2par`, `--lrrev`), on every "
+        "2-D schema with the centroids and a RAS-to-RAS output, `--mat2par`, `--lrrev`, "
+        "`--landmarks` with its point set), on every "
         f"platform: `reproduce` `{a.golden}` (the official program's value on the same inputs, "
         f"`check.py --golden`), `fix` `{a.golden_fix}`.",
         "",
@@ -205,7 +207,7 @@ def main(argv: list[str] | None = None) -> int:
         "",
         "## Defects",
         "",
-        "FS-1313 to FS-1325 (`larmorx_core::defects`; `docs/findings/freesurfer-coreg.md`); the "
+        "FS-1313 to FS-1327 (`larmorx_core::defects`; `docs/findings/freesurfer-coreg.md`); the "
         "spec `specs/mri_coreg.md` §10.",
         "",
     ]

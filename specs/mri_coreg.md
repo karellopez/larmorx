@@ -1,7 +1,6 @@
 # `mri_coreg` (FreeSurfer 8.2.0): behaviour spec
 
-Status: queue item 3.2-17 (track C relay 52): the whole program but `--landmarks` and
-`--landmarks-2d` (not ported: "is not ported yet", status 1). Written by the replica's author as
+Status: queue item 3.2-17 (track C relay 52): the whole program. Written by the replica's author as
 the spec writer: behaviour, conventions and messages, for the clean room (`larmorx-fs-volumes`),
 which works from this file, the library modules' specs (`specs/freesurfer-core.md` for the version
 options, `FSENVgetenv`, `nint` and the C library's numbers; `freesurfer-maths.md` for the matrices
@@ -317,7 +316,25 @@ values: a scale not optimised prints 0.0000), `Final opt parameters ` with the s
   `register.dat`; Jenkinson's RMS difference (`RMSregDiffMJ`) written as `%20.10f\n` to `file` unless
   it is `nofile`, printed `rms <%20.10f>`; status 0. FS-1317 for two or three arguments, an output
   that does not open, a registration without a matrix.
-- `--landmarks`, `--landmarks-2d` (6 arguments needed): not ported.
+- `--landmarks sxyz txyz coords mov targ outlta [pointset]` (6 arguments needed; `--landmarks-2d`
+  the same in 2-D): the two volumes' headers read (status 1 when not); the coordinates' type `RAS`,
+  `VOX` or `TKR` (exactly; else `ERROR: unrecognized coord type name <name>` and `   Expecting RAS,
+  VOX, or TKR`, status 1); the points: with `txyz` `stvp`, `sxyz` a pair file (each line up to the
+  first empty one `<n> <sx> <sy> <sz> <m> <tx> <ty> <tz>` read as `sscanf` does, a number that does
+  not read keeping the previous line's: FS-1326 for one never read; a file that does not open:
+  `ReadSTVPairFile(): <strerror> <file>`, status 1); otherwise, unless a name starts with `json`
+  (`ERROR: reglandmarks only accepts stvp files right now`, status 1), both are JSON point sets
+  (`freesurfer-io.md`'s `loadfsPointSet`; different counts: `ERROR: RegLandmarks::ReadJsonPair(): dim
+  mismatch <n1> <n2>`, status 1). The map: `X` the source points with a column of ones (`float`), `y`
+  the target points; `normalized condition = <%g>` (`MatrixNSConditionNumber` of `X` with each column
+  divided by its length); `beta = inverse(Xt X) (Xt y)` as `((inverse(Xt X) Xt) y)` in `float`
+  (`MatrixMultiply`); the 4 x 4 matrix's rows 1 to 3 `beta`'s columns (2-D: rows 1 and 2 from the
+  first two columns, `[3][3] = 1`, the translations from `beta`'s third row); FS-1327 for a singular
+  `Xt X`; `TKR`: the matrix inverted. An LTA of it from `mov` to `targ` of the coordinates' type
+  (`TKR`: `REGISTER_DAT`, with `LTAcreate`'s reminder line), converted to RAS to RAS, its subject
+  `--s`'s or `unknown`, written; with exactly seven arguments the source points mapped by its matrix
+  (`MatrixMultiplyD` of the point as `float`) saved as a JSON point set (`fsPointSet::save`). The
+  writer's status.
 - `--init-reg reg0.lta` (not stand-alone): read (status 1 when not), converted to RAS to RAS,
   inverted, its twelve parameters the initial ones; `--no-cras0`.
 
@@ -350,8 +367,11 @@ separation of 0 or less: an error by default; with `reproduce` `--sep 0` ends wi
 its first histogram as FreeSurfer's division by 0 does, and a negative one runs where no column is
 sampled and is an error where FreeSurfer's loop never ends), FS-1324 (`--init-cost-only`,
 `--params`, `--final-cost` that do not open: FreeSurfer crashes), FS-1325 (a singular final matrix,
-`--conf-ref` on a reference that does not conform: an error in both modes). FreeSurfer's crashes
-(FS-1315, FS-1317, FS-1324) give status 139 with `reproduce` after the output FreeSurfer's buffer
+`--conf-ref` on a reference that does not conform: an error in both modes), FS-1326 (a landmark
+never read: 0), FS-1327 (a singular landmark system: with `RAS` FreeSurfer crashes, the output LTA left
+empty; with `VOX` the change of type's `MatrixMultiply(): m1 is null`, with `TKR` `MatrixInverse:
+NULL input matrix!` end it, status 252). FreeSurfer's crashes
+(FS-1315, FS-1317, FS-1324, FS-1327's `RAS`) give status 139 with `reproduce` after the output FreeSurfer's buffer
 had written out (§9); an error (status 1) by default.
 
 The usage text (`print_usage`) is in the replica's `options.rs` as FreeSurfer prints it: the clean

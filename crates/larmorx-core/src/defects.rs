@@ -3569,6 +3569,10 @@ defects! {
         "mri_coreg's --init-cost-only, --params and --final-cost files that do not open: the program writes through no file and crashes; a clear error by default";
     FS_1325 = "FS-1325", "FreeSurfer", true,
         "mri_coreg with a singular final voxel-to-voxel matrix writes a registration without a matrix, and --conf-ref goes on with no volume when the reference does not conform; a clear error in both modes";
+    FS_1326 = "FS-1326", "FreeSurfer", true,
+        "mri_coreg --landmarks with a pair file whose first line does not hold every number uses values never written (memory contents); taken as 0, noted";
+    FS_1327 = "FS-1327", "FreeSurfer", true,
+        "mri_coreg --landmarks with points whose least-squares system is singular (fewer than four points in general position, three for --landmarks-2d) goes on with no matrix: it crashes with RAS coordinates (the output LTA left empty) and ends with an error with VOX and TKR ones; a clear error by default";
 }
 
 /// The register entry with ID `id`.

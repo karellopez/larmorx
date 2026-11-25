@@ -376,7 +376,7 @@ pub fn parse_commandline(
             return Err(standalone::lrrev(g, r, &rest[0], &rest[1])?);
         } else if is("--landmarks") || is("--landmarks-2d") {
             need(6, r)?;
-            return Err(standalone::landmarks(g, r, option));
+            return Err(standalone::landmarks(g, r, c, rest, is("--landmarks-2d"))?);
         } else if is("--rms") {
             if rest.len() < 2 {
                 return Err(cmd_arg_n_err(r.err, option, 4));

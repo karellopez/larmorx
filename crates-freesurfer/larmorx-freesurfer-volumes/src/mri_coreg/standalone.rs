@@ -16,7 +16,10 @@
 //!   give (FreeSurfer's approximation); the writer's status.
 //! - `--rms radius file reg1 reg2`: Jenkinson's RMS difference of the two registrations within the
 //!   radius, written to `file` (unless it is `nofile`) and printed; status 0.
-//! - `--landmarks`, `--landmarks-2d`: not ported yet (no recorded step uses them).
+//! - `--landmarks sxyz txyz coords mov targ outlta [pointset]`, `--landmarks-2d ...`: the
+//!   least-squares affine map of matching points (`RegLandmarks`: an `stvp` pair file or two JSON
+//!   point sets; `RAS`, `VOX` or `TKR` coordinates) as an LTA; with a seventh argument the mapped
+//!   source points as a JSON point set (FS-1326, FS-1327).
 //!
 //! Defects: FS-1316 (a number `sscanf` does not read where FreeSurfer goes on with the
 //! variable it never wrote: `--par2mat`'s parameters, `--rms`'s radius; printed as 0 here,
@@ -28,14 +31,18 @@
 use std::io::Write;
 
 use larmorx_core::cfmt;
-use larmorx_core::defects::{FS_1316, FS_1317, FS_1318};
+use larmorx_core::defects::{FS_1316, FS_1317, FS_1318, FS_1326, FS_1327};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
-use larmorx_freesurfer_core::matrix::matrix_multiply;
-use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc, matrix_copy};
-use larmorx_freesurfer_core::matrix_ops::matrix_inverse;
+use larmorx_freesurfer_core::matrix::{
+    MATRIX_REAL, Matrix, matrix_alloc, matrix_copy, matrix_multiply, matrix_multiply_d,
+};
+use larmorx_freesurfer_core::matrix_decomp::matrix_ns_condition_number;
+use larmorx_freesurfer_core::matrix_ops::{matrix_inverse, matrix_normalize_col, matrix_transpose};
 use larmorx_freesurfer_gca::transform::GcaLtaIo;
-use larmorx_freesurfer_io::mriio::mri_read_volume;
+use larmorx_freesurfer_io::identify::MRI_VOLUME_TYPE_UNKNOWN;
+use larmorx_freesurfer_io::mriio::{mri_read_header, mri_read_volume};
+use larmorx_freesurfer_io::pointset::{Point as PsPoint, PointSet, load_fs_point_set};
 use larmorx_freesurfer_mri::lta::{LINEAR_RAS_TO_RAS, LINEAR_VOX_TO_VOX, Lta, REGISTER_DAT};
 use larmorx_freesurfer_mri::mri::{MRI_UCHAR, Mri, mri_alloc_from_vol_geom};
 use larmorx_freesurfer_volume::coords::dircos_to_orientation_string;
@@ -293,10 +300,268 @@ pub fn lrrev(g: &mut Globals, r: &mut Run, name: &str, out_name: &str) -> Result
     Ok(Fatal::Exit(st))
 }
 
-/// `--landmarks` / `--landmarks-2d`: not ported yet.
-pub fn landmarks(_g: &mut Globals, r: &mut Run, option: &str) -> Fatal {
-    let _ = writeln!(r.err, "{NAME}: {option} is not ported yet");
-    Fatal::Exit(1)
+/// `RegLandmarks`'s coordinates: the source's and the target's points.
+struct Landmarks {
+    sxyz: Vec<[f64; 3]>,
+    txyz: Vec<[f64; 3]>,
+}
+
+/// `ReadSTVPairFile(file)`: each line up to the first empty one `<sno> <sx> <sy> <sz> <tno> <tx>
+/// <ty> <tz>` (`sscanf`; a number that does not read keeps the previous line's, FS-1326 for one
+/// never read: 0); a file that does not open: `ReadSTVPairFile(): <strerror> <file>`, `None`.
+fn read_stvp(g: &mut Globals, r: &mut Run, file: &str, lm: &mut Landmarks) -> bool {
+    let path = match r.dir {
+        Some(d) => d.join(file),
+        None => std::path::PathBuf::from(file),
+    };
+    if path.is_dir() {
+        // an `ifstream` opens a folder; its first read fails as at the end: no point
+        return true;
+    }
+    let bytes = match std::fs::read(&path) {
+        Ok(b) => b,
+        Err(e) => {
+            let code = larmorx_freesurfer_core::log::errno_of(&e).unwrap_or(2);
+            let _ = writeln!(
+                r.out,
+                "ReadSTVPairFile(): {} {file}",
+                larmorx_freesurfer_core::log::strerror(code)
+            );
+            return false;
+        }
+    };
+    // `int sno, tno; double sx, ...` declared once: a value `sscanf` leaves keeps the last line's
+    let mut v: [Option<f64>; 8] = [None; 8];
+    for line in bytes.split(|&b| b == b'\n') {
+        if line.is_empty() {
+            break;
+        }
+        let text = String::from_utf8_lossy(line);
+        let mut b = larmorx_freesurfer_core::cscan::Bytes::new(text.as_bytes());
+        let mut sc = larmorx_freesurfer_core::cscan::Scanf::new(&mut b);
+        for (k, slot) in v.iter_mut().enumerate() {
+            let x = if k == 0 || k == 4 {
+                sc.d(&mut g.errno, true).map(f64::from)
+            } else {
+                sc.lf(&mut g.errno, true)
+            };
+            match x {
+                Some(x) => *slot = Some(x),
+                None => break,
+            }
+        }
+        let _ = sc.finish(&mut g.errno);
+        let mut get = |k: usize| -> f64 {
+            v[k].unwrap_or_else(|| {
+                g.notices.add(
+                    &FS_1326,
+                    format!("mri_coreg --landmarks: {file}: a number never read (FreeSurfer uses a variable it never wrote): 0"),
+                );
+                0.0
+            })
+        };
+        let (sx, sy, sz) = (get(1), get(2), get(3));
+        let (tx, ty, tz) = (get(5), get(6), get(7));
+        lm.sxyz.push([sx, sy, sz]);
+        lm.txyz.push([tx, ty, tz]);
+    }
+    true
+}
+
+/// `ComputeReg(NULL)` / `ComputeReg2D(NULL)`: the least-squares affine map of the source points
+/// onto the target's (`beta = inverse(Xt X) Xt y`, `float` matrices), its condition printed
+/// (`normalized condition = <%g>`); `None` when `Xt X` is singular.
+fn compute_reg(
+    g: &mut Globals,
+    r: &mut Run,
+    lm: &Landmarks,
+    two_d: bool,
+) -> Result<Option<Matrix>, Fatal> {
+    let n = lm.sxyz.len() as i32;
+    let d = if two_d { 2 } else { 3 };
+    let mut x = matrix_alloc(g, r.out, r.err, n, d + 1, MATRIX_REAL)?.expect("a matrix");
+    let mut y = matrix_alloc(g, r.out, r.err, n, d, MATRIX_REAL)?.expect("a matrix");
+    for (row, (s, t)) in lm.sxyz.iter().zip(&lm.txyz).enumerate() {
+        let row = row as i32 + 1;
+        x.set_relt(row, d + 1, 1.0);
+        for c in 0..d as usize {
+            x.set_relt(row, c as i32 + 1, s[c] as f32);
+            y.set_relt(row, c as i32 + 1, t[c] as f32);
+        }
+    }
+    let xnorm = matrix_normalize_col(g, r.out, r.err, &x, None, None)?.into_new();
+    let xcond = match xnorm.as_ref() {
+        Some(m) => matrix_ns_condition_number(g, r.out, r.err, m)?,
+        None => 0.0,
+    };
+    let _ = writeln!(
+        r.out,
+        "normalized condition = {}",
+        cfmt::g(f64::from(xcond), 6)
+    );
+    let xt = matrix_transpose(g, r.out, r.err, &x, None)?.into_new();
+    let xtx = matrix_multiply(g, r.out, r.err, xt.as_ref(), Some(&x), None)?.into_new();
+    let Some(ixtx) = matrix_inverse(g, r.out, r.err, xtx.as_ref(), None)?.into_new() else {
+        return Ok(None);
+    };
+    let ixtxxt = matrix_multiply(g, r.out, r.err, Some(&ixtx), xt.as_ref(), None)?.into_new();
+    let beta = matrix_multiply(g, r.out, r.err, ixtxxt.as_ref(), Some(&y), None)?
+        .into_new()
+        .expect("a product");
+    let mut rm = matrix_alloc(g, r.out, r.err, 4, 4, MATRIX_REAL)?.expect("a 4 x 4 matrix");
+    rm.set_relt(4, 4, 1.0);
+    for rr in 0..d {
+        for c in 0..d + if two_d { 0 } else { 1 } {
+            rm.set_relt(rr + 1, c + 1, beta.relt(c + 1, rr + 1));
+        }
+    }
+    if two_d {
+        rm.set_relt(3, 3, 1.0);
+        rm.set_relt(1, 4, beta.relt(3, 1));
+        rm.set_relt(2, 4, beta.relt(3, 2));
+    }
+    Ok(Some(rm))
+}
+
+/// `--landmarks sxyz txyz coords mov targ outlta [pointset]` (`--landmarks-2d`: the 2-D map,
+/// `two_d`): `RegLandmarks::ComputeLTA` (the volumes' headers, the coordinates' type `RAS`, `VOX`
+/// or `TKR`, the points from an `stvp` pair file or two JSON point sets, the least-squares map,
+/// inverted for `TKR`, as an LTA converted to RAS to RAS), the subject (`--s`'s or `unknown`), the
+/// LTA written; with exactly seven arguments the source points mapped by it saved as a JSON point
+/// set. The writer's status; status 1 where the LTA cannot be made.
+pub fn landmarks(
+    g: &mut Globals,
+    r: &mut Run,
+    c: &CmdArgs,
+    a: &[String],
+    two_d: bool,
+) -> Result<Fatal, Fatal> {
+    let env = r.env.clone();
+    let Some(src) = mri_read_header(g, r.out, r.err, &env, r.dir, &a[3], MRI_VOLUME_TYPE_UNKNOWN)?
+    else {
+        return Ok(Fatal::Exit(1));
+    };
+    let Some(trg) = mri_read_header(g, r.out, r.err, &env, r.dir, &a[4], MRI_VOLUME_TYPE_UNKNOWN)?
+    else {
+        return Ok(Fatal::Exit(1));
+    };
+    let coordtype = match a[2].as_str() {
+        "RAS" => LINEAR_RAS_TO_RAS,
+        "VOX" => LINEAR_VOX_TO_VOX,
+        "TKR" => REGISTER_DAT,
+        other => {
+            let _ = writeln!(r.out, "ERROR: unrecognized coord type name {other}");
+            let _ = writeln!(r.out, "   Expecting RAS, VOX, or TKR");
+            return Ok(Fatal::Exit(1));
+        }
+    };
+    let mut lm = Landmarks {
+        sxyz: Vec::new(),
+        txyz: Vec::new(),
+    };
+    // `ReadCoords()`: `stvp` as the second name reads the first as a pair file; otherwise both
+    // as JSON point sets unless a name starts with `json` (`find("json") > 0`: a name without it
+    // also passes)
+    if a[1] == "stvp" {
+        if !read_stvp(g, r, &a[0], &mut lm) {
+            return Ok(Fatal::Exit(1));
+        }
+    } else if !a[0].starts_with("json") && !a[1].starts_with("json") {
+        let ps1 = load_fs_point_set(g, r.err, r.dir, &a[0])?;
+        let ps2 = load_fs_point_set(g, r.err, r.dir, &a[1])?;
+        if ps1.npoints() != ps2.npoints() {
+            let _ = writeln!(
+                r.out,
+                "ERROR: RegLandmarks::ReadJsonPair(): dim mismatch {} {}",
+                ps1.npoints(),
+                ps2.npoints()
+            );
+            return Ok(Fatal::Exit(1));
+        }
+        for (p1, p2) in ps1.points.iter().zip(&ps2.points) {
+            lm.sxyz.push([p1.x, p1.y, p1.z]);
+            lm.txyz.push([p2.x, p2.y, p2.z]);
+        }
+    } else {
+        let _ = writeln!(
+            r.out,
+            "ERROR: reglandmarks only accepts stvp files right now"
+        );
+        return Ok(Fatal::Exit(1));
+    }
+    let Some(mut rm) = compute_reg(g, r, &lm, two_d)? else {
+        // FS-1327: FreeSurfer goes on with no matrix: for `TKR` its inverse ends the program
+        // (`MatrixInverse: NULL input matrix!`); for `VOX` the change of type's product does
+        // (`MatrixMultiply(): m1 is null`); for `RAS` the writer opens the file and crashes (the
+        // file left empty: its buffer never written)
+        g.notices.add(
+            &FS_1327,
+            "mri_coreg --landmarks: the points' least-squares system is singular (FreeSurfer goes on with no matrix)",
+        );
+        if !g.notices.reproduce() {
+            let _ = writeln!(
+                r.err,
+                "{NAME}: --landmarks: the points' least-squares system is singular (FreeSurfer goes on with no matrix and crashes)"
+            );
+            return Ok(Fatal::Exit(1));
+        }
+        if coordtype == REGISTER_DAT {
+            matrix_inverse(g, r.out, r.err, None, None)?;
+            return Ok(Fatal::Exit(1));
+        }
+        if coordtype == LINEAR_VOX_TO_VOX {
+            // the change of type multiplies the missing matrix (`MatrixMultiply(): m1 is null`)
+            let id = Matrix::real(4, 4);
+            let mut lta = lta_create(g, r.out, r.err, &src, &trg, &id, coordtype)?;
+            lta.xforms[0].m_l = None;
+            change_type(g, r, &mut lta, LINEAR_RAS_TO_RAS)?;
+            return Ok(Fatal::Exit(139));
+        }
+        if coordtype == LINEAR_RAS_TO_RAS {
+            let path = match r.dir {
+                Some(d) => d.join(&a[5]),
+                None => std::path::PathBuf::from(&a[5]),
+            };
+            let _ = std::fs::File::create(path);
+        }
+        return Ok(Fatal::Exit(139));
+    };
+    if coordtype == REGISTER_DAT {
+        let rin = rm.clone();
+        if matrix_inverse(g, r.out, r.err, Some(&rin), Some(&mut rm))?.is_null() {
+            return Ok(Fatal::Exit(1));
+        }
+    }
+    let mut lta = lta_create(g, r.out, r.err, &src, &trg, &rm, coordtype)?;
+    change_type(g, r, &mut lta, LINEAR_RAS_TO_RAS)?;
+    set_subject(&mut lta, c.subject.as_deref());
+    let st = write_lta(g, r, &lta, &a[5])?;
+    // `Coords2PointSet(lta)`: each source point mapped by the transform (`float` matrices,
+    // `MatrixMultiplyD`)
+    let mut ps = PointSet::default();
+    if let Some(m) = first_matrix(&lta).cloned() {
+        for s in &lm.sxyz {
+            let mut ras =
+                matrix_alloc(g, r.out, r.err, 4, 1, MATRIX_REAL)?.expect("a 4 x 1 matrix");
+            ras.set_relt(4, 1, 1.0);
+            for (k, v) in s.iter().enumerate() {
+                ras.set_relt(k as i32 + 1, 1, *v as f32);
+            }
+            let nr = matrix_multiply_d(g, r.out, r.err, Some(&m), Some(&ras), None)?
+                .into_new()
+                .expect("a product");
+            ps.add(PsPoint {
+                x: f64::from(nr.relt(1, 1)),
+                y: f64::from(nr.relt(2, 1)),
+                z: f64::from(nr.relt(3, 1)),
+                ..PsPoint::default()
+            });
+        }
+    }
+    if a.len() == 7 {
+        ps.save(r.dir, &a[6]);
+    }
+    Ok(Fatal::Exit(st))
 }
 
 /// `--rms radius file reg1 reg2` (`a`: the arguments after the option, at least 2).

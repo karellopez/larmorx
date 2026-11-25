@@ -6,7 +6,8 @@ room's plan is in `specs/mri_coreg.md` §11.
 
 - `check.py --seed <s> --n <n> [--json out.json] [--dump lines.jsonl]`: the cases of the replica's
   example `fs_coreg_probe` (`crates-freesurfer/larmorx-freesurfer-volumes/tests/fs_coreg/cases.rs`):
-  a prelude of 111 (the command line's paths and failures, the stand-alone options, every
+  a prelude of 125 (the command line's paths and failures, the stand-alone options with
+  `--landmarks`' pair files and point sets, every
   registration option on a 20 x 20 x 14 "BOLD" volume of 2.4 mm voxels onto a 32^3 reference of
   1.5 mm, a subject's folder and FreeSurfer's environment), then `n` seeded pairs of every type and
   orientation with random options. Each case runs through the official program

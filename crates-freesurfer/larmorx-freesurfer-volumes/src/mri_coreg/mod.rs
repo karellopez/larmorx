@@ -10,7 +10,8 @@
 //!
 //! - [`options`]: the command line (`parse_commandline`, `check_options`, `dump_options`, the
 //!   usage and help texts) and its stand-alone options ([`standalone`]: `--mat2par`,
-//!   `--mat2par-vox`, `--mat2rot`, `--par2mat`, `--lrrev`, `--rms`, each its work at once).
+//!   `--mat2par-vox`, `--mat2rot`, `--par2mat`, `--lrrev`, `--rms`, `--landmarks`,
+//!   `--landmarks-2d`, each its work at once).
 //! - [`coreg`]: the registration (`COREG` and its functions: the joint histogram, the cost, the
 //!   brute-force search, Powell's minimisation, the preprocessing).
 //! - [`main`]: the program itself (`main`), its entry point [`main::run`].

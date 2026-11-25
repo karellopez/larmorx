@@ -318,6 +318,14 @@ const GOLDEN: &[(&str, &str)] = &[
         "ee5d16a95fb5770acb84fc410bc1a7f5b861fa71eeba0f59e009b4273431df39",
     ),
     (
+        "part11c.fix",
+        "a1613f76d512c31ebb799ca6f8279ffff9548ae59b020cd8e52b7ace33261c23",
+    ),
+    (
+        "part11c.reproduce",
+        "8c6ddaf3e3c3a19eab637e94eba6684ad7cb7e347e9d4bdb2f1d57eee4e71db8",
+    ),
+    (
         "part11b-writers.fix",
         "bbf2a654af4edf7ba270490be593ec3eeaf80ba93478f300fe9881f95eb2b97e",
     ),
@@ -4850,6 +4858,69 @@ const PART11B: &[(&str, Make)] = &[
 #[test]
 fn part11b_moves_rotations_and_voxel_lists() {
     group("part11b", PART11B, 4);
+}
+
+/// M of a pool geometry (W P), or none, or (rarely) a volume of `ras_good_flag` 0.
+fn p11c_m(g: &mut G, pool: &[(String, String)], k: usize) -> String {
+    if g.one_in(4) {
+        return "null".to_owned();
+    }
+    let w = pool_w(pool, k);
+    if g.one_in(6) {
+        // a pool W: the extent, type, frames, header flag, fill, three sizes, `ras_good_flag`
+        let mut t: Vec<&str> = w.split(' ').collect();
+        t[10] = "0";
+        return format!("{} 0", t.join(" "));
+    }
+    format!("{w} 0")
+}
+
+/// Part 11c (§67).
+const PART11C: &[(&str, Make)] = &[
+    ("ltaixf", |g| {
+        let (lta, pool, s, d) = p11b_lta(g, &["0", "1", "2", "1", "0", "14"], 2);
+        let w = pool_w(&pool, s);
+        let dst = if g.one_in(2) {
+            "new".to_owned()
+        } else {
+            pool_w(&pool, d)
+        };
+        format!("{w} 0 {dst} {lta} {}", g.pick(&["0", "1", "3"]))
+    }),
+    ("ltav2r", |g| {
+        let (lta, pool, s, d) = p11b_lta(g, &["0", "1", "2"], 3);
+        let a = p11c_m(g, &pool, s);
+        let b = p11c_m(g, &pool, d);
+        format!("{lta} {a} {b}")
+    }),
+    ("ltar2v", |g| {
+        let (lta, pool, s, d) = p11b_lta(g, &["0", "1", "2"], 3);
+        let a = if g.one_in(8) {
+            "null".to_owned()
+        } else {
+            format!("{} 0", pool_w(&pool, s))
+        };
+        let b = p11c_m(g, &pool, d);
+        format!("{lta} {a} {b}")
+    }),
+    ("ltacmp", |g| {
+        let (lta, ..) = p11b_lta(g, &["0", "1"], 2);
+        let left = if g.one_in(3) { "null".to_owned() } else { pool_mat(g) };
+        let right = if g.one_in(3) { "null".to_owned() } else { g.mat4() };
+        match g.below(3) {
+            0 => format!("{lta} {left} {right} 0"),
+            1 => {
+                let (other, ..) = p11b_lta(g, &["0", "1"], 2);
+                format!("{lta} {left} {right} 1 {other}")
+            }
+            _ => format!("{lta} {left} {right} 2"),
+        }
+    }),
+];
+
+#[test]
+fn part11c_inverse_move_conversions_and_composition() {
+    group("part11c", PART11C, 6);
 }
 
 /// The bytes as `x<hex>`.

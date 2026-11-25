@@ -420,7 +420,7 @@ impl Coreg {
                     }
                 }
                 Err((c, rr, s)) => {
-                    return Err(super::standalone::crash(
+                    return Err(super::standalone::refuse(
                         g,
                         r,
                         &FS_1321,
@@ -948,7 +948,7 @@ fn conv1d(v1: &[f64], v2: &[f64], vc: &mut [f64]) {
     }
     for (n, d) in vc.iter_mut().enumerate() {
         if d.is_nan() {
-            let kmin = if n + 1 >= n2 { n + 1 - n2 } else { 0 };
+            let kmin = (n + 1).saturating_sub(n2);
             let kmax = if n + 1 < n1 { n } else { n1 - 1 };
             let mut s = 0.0;
             for k in kmin..=kmax {
@@ -1131,12 +1131,8 @@ pub fn mri_to_uchar_vect(
                     dval = mri_get_vox_val(g, r.err, dv, c, rr, s, 0, 0)?;
                 }
                 let mut val = mri_get_vox_val(g, r.err, mri, c, rr, s, 0, 0)? + dval;
-                if val < 0.0 {
-                    val = 0.0;
-                }
-                if val > 255.0 {
-                    val = 255.0;
-                }
+                // C's two comparisons (a NaN kept)
+                val = val.clamp(0.0, 255.0);
                 a.push(nint(g, f64::from(val)) as u8);
             }
         }

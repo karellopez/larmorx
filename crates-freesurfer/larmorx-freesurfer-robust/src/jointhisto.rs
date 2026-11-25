@@ -555,7 +555,7 @@ mod tests {
                 let density = [1u64, 4, 16, 64, 256, 1024][(case % 6) as usize];
                 for (idx, v) in a.histo.iter_mut().enumerate() {
                     // whole rows of zeros in some cases
-                    if case % 3 == 1 && (idx / N) % 5 == 0 {
+                    if case % 3 == 1 && (idx / N).is_multiple_of(5) {
                         continue;
                     }
                     let r = next();

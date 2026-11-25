@@ -339,18 +339,20 @@ last flush (the dither lines, each volume's preprocessing, each `#@#` and `#BF#`
 
 FS-1313 (more than 10 `--sep`: an error in both modes), FS-1314 (`--threads` without a number: the
 count kept), FS-1315 (`--s` without an environment record, or a name of 3,000 bytes or more:
-FreeSurfer crashes, status 139 with `reproduce`; an error by default), FS-1316 (`--par2mat`'s and
-`--rms`'s numbers that do not read: 0), FS-1317 (`--rms`'s crashes), FS-1318 (`--lrrev` without a
-left-right axis), FS-1319 (a brute-force step that does not advance: FreeSurfer never ends; an error
-in both modes), FS-1320 (the percentile past the sorted values: the last value by default, 0 with
-`reproduce`, which is what FreeSurfer reads in every case measured), FS-1321 (a sample outside the
-volumes: a NaN coordinate), FS-1322 (`--dof` above 12 with schema 1: an error), FS-1323 (a separation
-of 0 or less: an error by default; with `reproduce` `--sep 0` ends with status 136 at its first
-histogram as FreeSurfer's division by 0 does, and a negative one runs where no column is sampled
-and is an error where FreeSurfer's loop never ends), FS-1324 (`--init-cost-only`, `--params`,
-`--final-cost` that do not open: FreeSurfer crashes), FS-1325 (a singular final matrix, `--conf-ref`
-on a reference that does not conform: FreeSurfer crashes). The crashes give status 139 with
-`reproduce` after the output FreeSurfer's buffer had written out (§9); an error (status 1) by default.
+FreeSurfer crashes), FS-1316 (`--par2mat`'s and `--rms`'s numbers that do not read: 0), FS-1317
+(`--rms` with two or three arguments, an output that does not open, a registration without a
+matrix: FreeSurfer crashes), FS-1318 (`--lrrev` without a left-right axis: an error in both
+modes), FS-1319 (a brute-force step that does not advance: FreeSurfer never ends; an error in both
+modes), FS-1320 (the percentile past the sorted values: the last value by default, 0 with
+`reproduce`, which is what FreeSurfer read in every case measured), FS-1321 (a NaN coordinate: an
+error in both modes), FS-1322 (`--dof` above 12 with schema 1: an error in both modes), FS-1323 (a
+separation of 0 or less: an error by default; with `reproduce` `--sep 0` ends with status 136 at
+its first histogram as FreeSurfer's division by 0 does, and a negative one runs where no column is
+sampled and is an error where FreeSurfer's loop never ends), FS-1324 (`--init-cost-only`,
+`--params`, `--final-cost` that do not open: FreeSurfer crashes), FS-1325 (a singular final matrix,
+`--conf-ref` on a reference that does not conform: an error in both modes). FreeSurfer's crashes
+(FS-1315, FS-1317, FS-1324) give status 139 with `reproduce` after the output FreeSurfer's buffer
+had written out (§9); an error (status 1) by default.
 
 The usage text (`print_usage`) is in the replica's `options.rs` as FreeSurfer prints it: the clean
 room takes it from the official program's output (`mri_coreg` with no argument, and `--help` for

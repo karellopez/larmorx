@@ -420,27 +420,27 @@ pub fn parse_commandline(
             used = 1;
         } else if is("--trans") {
             need(3, r)?;
-            for k in 0..3 {
-                scan_lf_into(g, &rest[k], &mut c.params[k]);
+            for (k, a) in rest.iter().take(3).enumerate() {
+                scan_lf_into(g, a, &mut c.params[k]);
             }
             c.cras0 = 0;
             used = 3;
         } else if is("--rot") {
             need(3, r)?;
-            for k in 0..3 {
-                scan_lf_into(g, &rest[k], &mut c.params[3 + k]);
+            for (k, a) in rest.iter().take(3).enumerate() {
+                scan_lf_into(g, a, &mut c.params[3 + k]);
             }
             used = 3;
         } else if is("--scale") {
             need(3, r)?;
-            for k in 0..3 {
-                scan_lf_into(g, &rest[k], &mut c.params[6 + k]);
+            for (k, a) in rest.iter().take(3).enumerate() {
+                scan_lf_into(g, a, &mut c.params[6 + k]);
             }
             used = 3;
         } else if is("--shear") {
             need(3, r)?;
-            for k in 0..3 {
-                scan_lf_into(g, &rest[k], &mut c.params[9 + k]);
+            for (k, a) in rest.iter().take(3).enumerate() {
+                scan_lf_into(g, a, &mut c.params[9 + k]);
             }
             used = 3;
         } else if is("--init-reg") {

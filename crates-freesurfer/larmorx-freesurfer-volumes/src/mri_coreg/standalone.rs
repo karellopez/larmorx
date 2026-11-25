@@ -23,7 +23,7 @@
 //! noted), FS-1317 (`--rms` with 2 or 3 arguments reads its missing names past the command line
 //! and crashes; `--rms`'s output file that does not open: FreeSurfer writes through a `NULL`
 //! file and crashes), FS-1318 (`--lrrev` of a source whose axes hold no left-right one: FreeSurfer
-//! writes outside its vector).
+//! writes outside its vector: an error in both modes).
 
 use std::io::Write;
 
@@ -79,7 +79,7 @@ pub fn read_volume(g: &mut Globals, r: &mut Run, name: &str) -> Result<Option<Mr
 
 /// The first transform's matrix (FreeSurfer reads it without a check: an array that holds none
 /// is FS-504's, fs.volume's).
-fn first_matrix<'a>(lta: &'a Lta) -> Option<&'a Matrix> {
+fn first_matrix(lta: &Lta) -> Option<&Matrix> {
     lta.xforms.first().and_then(|x| x.m_l.as_ref())
 }
 
@@ -190,8 +190,8 @@ pub fn par2mat(g: &mut Globals, r: &mut Run, c: &CmdArgs, a: &[String]) -> Resul
     Ok(Fatal::Exit(st))
 }
 
-/// FS-1317 and FS-1318: a crash of FreeSurfer's (`reproduce`: status 139, after the defined
-/// output), a clear error by default (status 1).
+/// A crash of FreeSurfer's (FS-1315, FS-1317, FS-1324: measured): `reproduce` status 139, after
+/// the output FreeSurfer's buffer had written out; a clear error by default (status 1).
 pub fn crash(
     g: &mut Globals,
     r: &mut Run,
@@ -202,6 +202,19 @@ pub fn crash(
     if g.notices.reproduce() {
         return Fatal::Exit(139);
     }
+    let _ = writeln!(r.err, "{NAME}: {what}");
+    Fatal::Exit(1)
+}
+
+/// What FreeSurfer does from memory it corrupts or never wrote (FS-1318, FS-1321, FS-1322,
+/// FS-1325): a clear error in both modes (status 1), named.
+pub fn refuse(
+    g: &mut Globals,
+    r: &mut Run,
+    id: &'static larmorx_core::defects::Defect,
+    what: &str,
+) -> Fatal {
+    g.notices.add(id, format!("mri_coreg {what}"));
     let _ = writeln!(r.err, "{NAME}: {what}");
     Fatal::Exit(1)
 }
@@ -238,7 +251,7 @@ pub fn lrrev(g: &mut Globals, r: &mut Run, name: &str, out_name: &str) -> Result
     }
     let _ = writeln!(r.out, "k={k} ndim={ndim}");
     if k < 0 {
-        return Ok(crash(
+        return Ok(refuse(
             g,
             r,
             &FS_1318,

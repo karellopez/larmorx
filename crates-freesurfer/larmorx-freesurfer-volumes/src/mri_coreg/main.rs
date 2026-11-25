@@ -67,7 +67,7 @@ use super::coreg::{
 use super::options::{
     CmdArgs, RunInfo, check_options, dump_options, or_null, parse_commandline, usage_exit,
 };
-use super::standalone::{change_type, crash, read_volume, set_subject, write_lta};
+use super::standalone::{change_type, crash, read_volume, refuse, set_subject, write_lta};
 use crate::mri_mask::main::Cout;
 
 /// The program's name as `argv[0]` gives it (fMRIPrep and `bbregister` run it by name).
@@ -289,7 +289,7 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
 
     // checks of what FreeSurfer cannot run (FS-1322, FS-1323), before the work
     if c.optschema == 1 && c.dof > 12 {
-        return Err(crash(
+        return Err(refuse(
             g,
             r,
             &FS_1322,
@@ -331,7 +331,7 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
         ref_vol = match conform_no_scale(g, r, &ref_vol)? {
             Some(m) => m,
             None => {
-                return Err(crash(
+                return Err(refuse(
                     g,
                     r,
                     &FS_1325,
@@ -637,7 +637,7 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
 
     let inv = matrix_inverse(g, r.out, r.err, co.v2v.as_ref(), None)?.into_new();
     let Some(inv) = inv else {
-        return Err(crash(
+        return Err(refuse(
             g,
             r,
             &FS_1325,

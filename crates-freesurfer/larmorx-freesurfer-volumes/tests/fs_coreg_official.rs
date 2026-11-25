@@ -7,7 +7,7 @@
 //! each case's line with `reproduce` hashed in order, the cases where FreeSurfer's result is
 //! undefined and the one not ported as `SKIP`, against the hash `validation/probes/fs-coreg/check.py
 //! --seed 1 --n 0` recorded from the official program (`official_sha256_skip`). A debug build
-//! compares the first 49 cases (the command line and the stand-alone options) and hashes the
+//! compares the first 52 cases (the command line and the stand-alone options) and hashes the
 //! registrations as `SLOW` (`official_sha256_skip_debug`); the default (`fix`) may differ only with
 //! a notice.
 
@@ -24,7 +24,7 @@ const OFFICIAL_SHA256_SKIP: &str =
 const OFFICIAL_SHA256_SKIP_DEBUG: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
 /// The cases a debug build runs.
-const DEBUG_CASES: usize = 49;
+const DEBUG_CASES: usize = 52;
 
 /// FreeSurfer's result is undefined (`check.py`'s `SKIP`): a case with one of these notices, but
 /// FS-1323's division by 0, which `reproduce` gives as FreeSurfer does (`CRASH 8`).
@@ -41,27 +41,29 @@ fn skipped(line: &str, ids: &[&str]) -> bool {
             .any(|x| SKIP.contains(x) && !(*x == "FS-1323" && line.starts_with("CRASH 8")))
 }
 
+/// A case's `reproduce` line and notices, its `fix` line and notices.
+type Row = (String, Vec<&'static str>, String, Vec<&'static str>);
+
 /// The lines (`limit`: the first ones, the rest `SLOW`) side by side, hashed in order; and the
 /// cases where the default differs from `reproduce` without a notice.
 fn digest(limit: usize) -> (String, Vec<usize>) {
     let lines = cases::generate(1, 0);
-    let rows: Vec<Option<(String, Vec<&'static str>, String, Vec<&'static str>)>> =
-        std::thread::scope(|sc| {
-            let hs: Vec<_> = lines
-                .iter()
-                .enumerate()
-                .map(|(k, line)| {
-                    sc.spawn(move || {
-                        (k < limit).then(|| {
-                            let (r, ids) = cases::run_line(line, UpstreamDefects::Reproduce);
-                            let (f, fids) = cases::run_line(line, UpstreamDefects::Fix);
-                            (r, ids, f, fids)
-                        })
+    let rows: Vec<Option<Row>> = std::thread::scope(|sc| {
+        let hs: Vec<_> = lines
+            .iter()
+            .enumerate()
+            .map(|(k, line)| {
+                sc.spawn(move || {
+                    (k < limit).then(|| {
+                        let (r, ids) = cases::run_line(line, UpstreamDefects::Reproduce);
+                        let (f, fids) = cases::run_line(line, UpstreamDefects::Fix);
+                        (r, ids, f, fids)
                     })
                 })
-                .collect();
-            hs.into_iter().map(|h| h.join().expect("a case")).collect()
-        });
+            })
+            .collect();
+        hs.into_iter().map(|h| h.join().expect("a case")).collect()
+    });
     let mut h = Sha256::new();
     let mut bad = Vec::new();
     for (k, row) in rows.into_iter().enumerate() {

@@ -3554,21 +3554,21 @@ defects! {
     FS_1317 = "FS-1317", "FreeSurfer", true,
         "mri_coreg --rms with two or three arguments reads the missing registration names past the command line and crashes, as it does when its output file does not open or a registration holds no matrix; a clear error by default";
     FS_1318 = "FS-1318", "FreeSurfer", true,
-        "mri_coreg --lrrev of a transform whose source volume has no left-right axis (an orientation without L or R) writes outside its vector (memory corruption); a clear error by default";
+        "mri_coreg --lrrev of a transform whose source volume has no left-right axis (an orientation without L or R) writes outside its vector (memory corruption); a clear error in both modes";
     FS_1319 = "FS-1319", "FreeSurfer", true,
         "mri_coreg's brute-force search never ends when its step does not advance the parameter (--bf-lim 0, a negative --bf-nsamp, a step below the parameter's precision); a clear error in both modes";
     FS_1320 = "FS-1320", "FreeSurfer", true,
         "mri_coreg's saturation percentile reads past its sorted values when the percentile's place rounds to the last value or beyond (--sat 100, or the default 99.99 on a volume of fewer than 5,000 voxels: memory contents); the last value by default, 0 with reproduce, noted";
     FS_1321 = "FS-1321", "FreeSurfer", true,
-        "mri_coreg samples outside a volume's voxels, and crashes, where a mapped coordinate is not a number (parameters or matrices that are NaN); a clear error by default";
+        "mri_coreg samples outside a volume's voxels where a mapped coordinate is not a number (parameters or matrices that are NaN); a clear error in both modes";
     FS_1322 = "FS-1322", "FreeSurfer", true,
-        "mri_coreg --dof above 12 (with the default parameter schema) reads and writes past its 12 parameters (memory corruption); a clear error by default";
+        "mri_coreg --dof above 12 (with the default parameter schema) reads and writes past its 12 parameters (memory corruption: a result that depends on memory); a clear error in both modes";
     FS_1323 = "FS-1323", "FreeSurfer", true,
         "mri_coreg --sep 0 divides by zero (a crash) and a negative --sep never ends; a clear error in both modes";
     FS_1324 = "FS-1324", "FreeSurfer", true,
         "mri_coreg's --init-cost-only, --params and --final-cost files that do not open: the program writes through no file and crashes; a clear error by default";
     FS_1325 = "FS-1325", "FreeSurfer", true,
-        "mri_coreg crashes with a singular final voxel-to-voxel matrix (it writes a registration without a matrix), and --conf-ref goes on with no volume when the reference does not conform; a clear error by default";
+        "mri_coreg with a singular final voxel-to-voxel matrix writes a registration without a matrix, and --conf-ref goes on with no volume when the reference does not conform; a clear error in both modes";
 }
 
 /// The register entry with ID `id`.

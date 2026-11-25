@@ -372,6 +372,9 @@ pub fn prelude() -> Vec<String> {
         s(&["--rms", "-3", "rms.txt", "a.lta", "v.lta"]),
         s(&["--rms", "0", "rms.txt", "a.lta", "v.lta"]),
         s(&["--rms", "50", "rms.txt", "a.lta", "nofile.lta"]),
+        s(&["--rms", "50", "rms.txt", "a.lta"]),
+        s(&["--rms", "50", "rms.txt"]),
+        s(&["--rms", "50", "nodir/rms.txt", "a.lta", "v.lta"]),
         s(&["--landmarks", "a", "b", "c", "d", "e", "f"]),
         s(&["--init-reg", "nofile.lta"]),
         s(&[

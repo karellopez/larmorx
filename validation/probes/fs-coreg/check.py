@@ -75,7 +75,7 @@ SKIP = (
 )
 NOT_PORTED = "is not ported yet"
 #: the prelude's command-line and stand-alone cases (`fs_coreg_official.rs`' debug build)
-DEBUG_CASES = 49
+DEBUG_CASES = 52
 #: the times (both sides): Powell's, the whole run's (the head, the tail kept)
 TIMES = (
     (re.compile(r"OptTimeSec +[0-9.]+ sec"), "OptTimeSec <T> sec"),

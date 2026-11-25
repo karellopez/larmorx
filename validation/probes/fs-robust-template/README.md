@@ -48,6 +48,14 @@ mean space, queue 3.2-15); the golden cases' official value `5ee82ce6...`; the s
 identical in every byte with `reproduce` and the default. The recorded test
 (`tests/fs_robtmpl_official.rs`) holds seed 1's first 150 cases.
 
+Measured 2026-11-25 (relay 51) from the clean commit 8c86afa7, with the new `libdecidedtemplate.so`
+(the decided `clog` added) and `--pade`: seeds 1, 7, 13 x 300: 294, 292, 293 identical, 0 different,
+6, 8, 7 `SKIP`, 0 not ported (the prelude's affine case against the rebuild); `--exe` with the plain
+rebuild: the official binary's hash on seed 1 x 300 (`61fb3708...`); `--family affine` seeds 1 and 7 x
+150: 150 and 150 identical against `pade/mri_robust_template`, 0 different (the unpatched official
+binary differs on all of them: FS-1311); golden `654cb4a5...` (7 cases); the six real calls identical
+in every byte in both modes.
+
 Every run in a memory box (`scripts/orchestration/boxed.sh`); no case sets `DIAG_NO` or `DIAG`
 (FreeSurfer's licence check would print the licence file; `check.py` and `real.py` refuse such
 cases); the official side runs with `FS_DISABLE_LANG=1`.

@@ -28,11 +28,15 @@ on real heads too. Queue items 3.2-28, 3.2-29 and 3.5-29 (track A, relay 58).
   255.
 - `record.py`: `docs/validation/freesurfer-seg2cc`, `-mergeseg`, `-fscalc` (`.json`, `.md`).
 
-## Results (relay 58)
+## Results (relay 58; relay 59)
 
 - `check.py --heavy`: 149 cases, 141 identical with `reproduce` (2 of them heavy), 8 not
   reproduced, 0 different; the default 98 identical, 47 differing each with a notice, 4 not
-  reproduced, 0 without a notice. fs_time's lines identical but their figures.
+  reproduced, 0 without a notice. fs_time's lines identical but their figures. Relay 59: the
+  unreadable volumes (`vol/text.mgz`, subject `b`'s segmentation) are a 13-byte text again, now
+  that the default refuses a header the file cuts (FS-167, rule B): the same counts; FreeSurfer
+  and `reproduce` refuse the text's frame count (FS-760), the default reads nothing (`mghRead(...):
+  read error`), as for the empty files relay 58 used.
 - `replay.sh`: 12 of 12 recorded steps reproduced in each mode (`aseg.auto.mgz`,
   `transforms/cc_up.lta`, `scripts/seg2cc.log`: provenance only).
 - `real.py`: ds000005, ds002422, ds005454 (v8) cut to 256 x 256 x 255: identical in both modes (status

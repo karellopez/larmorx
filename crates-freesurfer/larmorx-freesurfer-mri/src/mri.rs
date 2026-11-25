@@ -16,7 +16,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_55, FS_56, FS_60, FS_206, FS_252, FS_760};
+use larmorx_core::defects::{FS_55, FS_56, FS_60, FS_206, FS_252, FS_760, FS_1342};
 use larmorx_freesurfer_core::alloc::{self, CALLOC_LIMIT, MACHINE_BYTES};
 use larmorx_freesurfer_core::cname::CName;
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, verbose_on};
@@ -502,6 +502,37 @@ pub fn frames_calloc_fails(g: &mut Globals, n: i32) -> bool {
     fails
 }
 
+/// FS-1342: whether the index table of axis `slot` (`n` entries of 4 bytes, all written) fails,
+/// `filled` holding the bytes FreeSurfer has written before it (the frame records, the earlier
+/// tables; the table's added): past [`MACHINE_BYTES`] FreeSurfer's outcome depends on the
+/// machine (it fills them before reading a voxel), and the port answers as a machine that refuses
+/// the table, in both modes, with the notice (as FS-760's frames).
+pub fn index_tables_fail(
+    g: &mut Globals,
+    filled: &mut u64,
+    nframes: i32,
+    slot: usize,
+    n: i32,
+) -> bool {
+    let bytes = (n as u64).wrapping_mul(4);
+    *filled = filled.saturating_add(bytes);
+    if *filled <= MACHINE_BYTES {
+        return false;
+    }
+    g.notices.add(
+        &FS_1342,
+        format!(
+            "the {} axis's index table of {n} entries ({bytes} bytes): with the frame records of \
+             {nframes} frames and the tables before it, {} bytes FreeSurfer fills before reading a \
+             voxel, which succeed or fail with the machine's memory; refused as by a machine \
+             without that memory",
+            ["x", "y", "z"][slot],
+            *filled
+        ),
+    );
+    true
+}
+
 /// A boundary index table of `len` (`calloc(len + 2 MAX_INDEX, sizeof(int))`), offset by
 /// `MAX_INDEX`: index `i` in `[-MAX_INDEX, len + MAX_INDEX)` gives 0 at or below 0, `len - 1` at or
 /// beyond `len`, `i` between.
@@ -778,10 +809,11 @@ impl Mri {
             )?;
         }
         // initIndices
+        let mut filled = (nframes.max(0) as u64).wrapping_mul(SIZEOF_MRI_FRAME);
         for slot in 0..3 {
             let len = [w, h, d][slot];
             let n = len.wrapping_add(2 * MAX_INDEX);
-            if n < 0 {
+            if n < 0 || index_tables_fail(g, &mut filled, nframes, slot, n) {
                 g.errno = ENOMEM;
                 log::error_exit(
                     g,

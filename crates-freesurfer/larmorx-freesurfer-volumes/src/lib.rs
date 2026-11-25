@@ -113,6 +113,10 @@ pub const PROGRAMS: &[Program] = &[
         run: mri_normalize::main::run,
     },
     Program {
+        name: mri_fill::main::NAME,
+        run: mri_fill::main::run,
+    },
+    Program {
         name: mri_pretess::main::NAME,
         run: mri_pretess::main::run,
     },

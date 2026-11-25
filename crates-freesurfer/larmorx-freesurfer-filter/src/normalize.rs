@@ -638,14 +638,7 @@ pub fn mri_norm_init(
                 }
                 let _ = err.write_all(b"talairach transform\n");
                 let mut buf: Vec<u8> = Vec::new();
-                matrix_print(
-                    g,
-                    Some(&mut buf as &mut dyn Write),
-                    &mut std::io::sink(),
-                    err,
-                    Some(m_l),
-                    5,
-                );
+                matrix_print(g, Some(&mut buf as &mut dyn Write), out, err, Some(m_l), 5);
                 let _ = err.write_all(&buf);
                 get_vol_geom(&mri.vg, &mut lt.src);
                 get_vol_geom(&mri.vg, &mut lt.dst);

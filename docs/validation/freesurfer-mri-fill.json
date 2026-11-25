@@ -1,0 +1,129 @@
+{
+ "name": "freesurfer-mri-fill",
+ "tool": "mri_fill (FreeSurfer 8.2.0)",
+ "status": "experimental",
+ "larmorx_commit": "6b32db819e09",
+ "generated": "2026-11-25",
+ "platform": "Linux x86_64",
+ "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/mri_fill/) on larmorx-freesurfer-volume (the Talairach resamplings, the planes, masks and labels), larmorx-freesurfer-filter (the distance transform, the Voronoi diagram, the largest connected component, MRIsegment), the larmorx-freesurfer program",
+ "reference": "FreeSurfer 8.2.0's official program ($FREESURFER_HOME/bin/mri_fill) and its recon-all runs' recorded mri_fill steps (oracles/freesurfer-8.2.0/runs/)",
+ "replay": {
+  "reproduce": {
+   "runs": [
+    "ds000005-sub-01-classic",
+    "ds000005-sub-01-v8",
+    "ds000228-sub-pixar008-classic",
+    "ds000228-sub-pixar008-v8",
+    "ds002422-sub-02-classic",
+    "ds002422-sub-02-v8",
+    "ds004173-sub-603309-classic",
+    "ds004173-sub-603309-v8",
+    "ds005003-sub-RS001-classic",
+    "ds005003-sub-RS001-v8",
+    "ds005454-sub-16-classic",
+    "ds005454-sub-16-v8"
+   ],
+   "steps": 12,
+   "verdicts": {
+    "REPRODUCED": 12
+   },
+   "seconds": {
+    "recorded": 538.4,
+    "replayed": 496.9
+   }
+  },
+  "fix": {
+   "runs": [
+    "ds000005-sub-01-classic",
+    "ds000005-sub-01-v8",
+    "ds000228-sub-pixar008-classic",
+    "ds000228-sub-pixar008-v8",
+    "ds002422-sub-02-classic",
+    "ds002422-sub-02-v8",
+    "ds004173-sub-603309-classic",
+    "ds004173-sub-603309-v8",
+    "ds005003-sub-RS001-classic",
+    "ds005003-sub-RS001-v8",
+    "ds005454-sub-16-classic",
+    "ds005454-sub-16-v8"
+   ],
+   "steps": 12,
+   "verdicts": {
+    "REPRODUCED": 12
+   },
+   "seconds": {
+    "recorded": 538.4,
+    "replayed": 508.7
+   }
+  }
+ },
+ "program": [
+  {
+   "seed": 1,
+   "cases": 111,
+   "verdicts": {
+    "identical": 108,
+    "fix-identical": 60,
+    "fix-explained": 48,
+    "reproduce-skip": 3,
+    "fix-skip": 3
+   },
+   "heads": 0,
+   "heads_verdicts": {}
+  },
+  {
+   "seed": 2,
+   "cases": 111,
+   "verdicts": {
+    "identical": 108,
+    "fix-identical": 59,
+    "fix-explained": 49,
+    "reproduce-skip": 3,
+    "fix-skip": 3
+   },
+   "heads": 0,
+   "heads_verdicts": {}
+  },
+  {
+   "seed": 1,
+   "cases": 0,
+   "verdicts": {},
+   "heads": 18,
+   "heads_verdicts": {
+    "identical": 18,
+    "fix-identical": 15,
+    "fix-explained": 3
+   }
+  }
+ ],
+ "golden_sha256": {
+  "reproduce": "ec22af2bfebe2c0a95509cf74b3fa75b45929cee850be0dc8aff378c2403edf5",
+  "fix": "23ad50df36543734ae8503e53ce4ea80e8a25b365750565e02449d33fa49c08b"
+ },
+ "memory": [
+  {
+   "case": "mri_fill aseg",
+   "mode": "reproduce",
+   "larmorx_mib": 525.1,
+   "freesurfer_mib": 945.1
+  },
+  {
+   "case": "mri_fill aseg",
+   "mode": "fix",
+   "larmorx_mib": 525.6,
+   "freesurfer_mib": 945.1
+  },
+  {
+   "case": "mri_fill noseg",
+   "mode": "reproduce",
+   "larmorx_mib": 146.5,
+   "freesurfer_mib": 154.8
+  },
+  {
+   "case": "mri_fill noseg",
+   "mode": "fix",
+   "larmorx_mib": 147.2,
+   "freesurfer_mib": 154.8
+  }
+ ]
+}

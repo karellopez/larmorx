@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The comparison loop of ``specs/freesurfer-volume.md`` §69 (parts 1 to 10, §54 to §57): seeded cases of every
+"""The comparison loop of ``specs/freesurfer-volume.md`` §69 (parts 1 to 11c, §54 to §57): seeded cases of every
 group, run on the probe ``fs_volume_probe`` (FreeSurfer 8.2.0's volume functions, a black box) and on
 a candidate program that takes the same commands (README.md beside this file), compared line by
 line.
@@ -8118,6 +8118,14 @@ class Gen22(Gen21):
         L.append(f"ltacmp {s1} null {m41} 1 {other}")
         L.append(f"ltacmp {one_arr(1, 'null')} {left} null 0")
         L.append(f"ltacmp {two_arr(0)} {left} {right} 1 {two_arr(1, gbv, gav)}")
+        # an unknown type after the destination step's lines: the inverse's destination geometry
+        # not valid, alone and with USE_AVERAGE305
+        L.append(f"ltaixf {src} 0 new {ix(14, id_=gc0)} 1")
+        L.append(f"+env=USE_AVERAGE305=1 ltaixf {src} 0 new {ix(21, id_=gc0)} 1")
+        # FS-956 with a left product that fails, into a new array and into a transform without a
+        # matrix
+        L.append(f"ltacmp {s1} {m33} {right} 0")
+        L.append(f"ltacmp {s1} {m33} {right} 1 {nom}")
         # FS-504: FreeSurfer reads a transform the array does not hold (an error in both modes)
         return [Batch("vrules26", "vrules26", L, both="FS-504")]
 

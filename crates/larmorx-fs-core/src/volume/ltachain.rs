@@ -256,6 +256,23 @@ impl Process {
     /// transform whose matrix is smaller than 4 x 4, or absent, ends the program after its
     /// `1 4 4` line. Returns 0.
     pub fn lta_print(&mut self, lta: &Lta) -> Result<i32, Stop> {
+        match self.lta_print_text(lta) {
+            Ok(b) => {
+                self.put_out(&b);
+                Ok(0)
+            }
+            Err(b) => {
+                self.put_out(&b);
+                self.flush();
+                self.lta_fs504("LTAprint", "a transform without a 4 x 4 matrix")?;
+                Ok(0)
+            }
+        }
+    }
+
+    /// `LTAprint`'s text ([`Process::lta_print`]); `Err` with the text up to the `1 4 4` line of
+    /// a transform whose matrix is smaller than 4 x 4, or absent (FS-504's end follows).
+    pub(crate) fn lta_print_text(&mut self, lta: &Lta) -> Result<Vec<u8>, Vec<u8>> {
         let mut b = format!("type      = {} ", lta.kind).into_bytes();
         b.extend_from_slice(match lta.kind {
             lta_type::LINEAR_VOX_TO_VOX => b"# LINEAR_VOX_TO_VOX\n",
@@ -277,12 +294,7 @@ impl Process {
             b.extend_from_slice(b"\n1 4 4\n");
             let m = match &t.m_l {
                 Some(m) if m.rows >= 4 && m.cols >= 4 => m,
-                _ => {
-                    self.put_out(&b);
-                    self.flush();
-                    self.lta_fs504("LTAprint", "a transform without a 4 x 4 matrix")?;
-                    return Ok(0);
-                }
+                _ => return Err(b),
             };
             for r in 1..=4 {
                 for c in 1..=4 {
@@ -308,7 +320,6 @@ impl Process {
             b.extend_from_slice(&sprintf_f64(b"%f", sse::widen(lta.fscale)));
             b.push(b'\n');
         }
-        self.put_out(&b);
-        Ok(0)
+        Ok(b)
     }
 }

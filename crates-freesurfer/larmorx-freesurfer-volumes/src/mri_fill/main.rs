@@ -1710,9 +1710,8 @@ pub fn main(g: &mut Globals, r: &mut Run, o: &mut Options, args: &[String]) -> R
             mri_dilate(g, r.out, r.err, Pair::Same(&mut p))?;
             mri_pons = Some(p);
         }
-    } else {
+    } else if let Some(seg) = mri_seg.as_ref() {
         let _ = write!(r.out, "Erasing brainstem...");
-        let seg = mri_seg.as_ref().expect("read above");
         mri_set_label_values(
             g,
             r.out,

@@ -594,14 +594,11 @@ pub fn mri_combine_hemispheres(
 fn block_derivs(
     g: &mut Globals,
     m: &Mri,
-    x0: i32,
-    y0: i32,
-    z0: i32,
+    b0: (i32, i32, i32),
     dir: usize,
-    x: i32,
-    y: i32,
-    z: i32,
+    p: (i32, i32, i32),
 ) -> i32 {
+    let ((x0, y0, z0), (x, y, z)) = (b0, p);
     match dir {
         0 => i32::from(vox(g, m, x0 + 1, y, z)) - i32::from(vox(g, m, x0, y, z)),
         1 => i32::from(vox(g, m, x, y0 + 1, z)) - i32::from(vox(g, m, x, y0, z)),
@@ -648,7 +645,7 @@ fn is_diagonal(
                 for x in x0..=x0 + 1 {
                     let (bx, by, bz) = ((x - x0) as usize, (y - y0) as usize, (z - z0) as usize);
                     if i32::from(vox(g, m, x, y, z)) < WM_MIN_VAL {
-                        let d = block_derivs(g, m, x0, y0, z0, dir, x, y, z);
+                        let d = block_derivs(g, m, (x0, y0, z0), dir, (x, y, z));
                         block[bx][by][bz] = d;
                         if d.wrapping_mul(dsign) < 0 {
                             diagonal = true;
@@ -682,7 +679,7 @@ fn count_diagonals(g: &mut Globals, m: &Mri, x0: i32, y0: i32, z0: i32) -> i32 {
             for y in y0..=y0 + 1 {
                 for x in x0..=x0 + 1 {
                     if i32::from(vox(g, m, x, y, z)) < WM_MIN_VAL {
-                        let d = block_derivs(g, m, x0, y0, z0, dir, x, y, z);
+                        let d = block_derivs(g, m, (x0, y0, z0), dir, (x, y, z));
                         if d.wrapping_mul(dsign) < 0 {
                             diagonals += 1;
                         } else {
@@ -865,6 +862,7 @@ fn is_right(label: i32) -> bool {
 }
 
 /// The cerebral white matter and cortex of one side within the window (`MRIlabelsInNbhd` twice).
+#[allow(clippy::too_many_arguments)]
 fn side_count(
     g: &mut Globals,
     r: &mut Run,

@@ -992,7 +992,9 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
 /// (`--debug`, relay 49).
 pub fn golden_cases() -> Vec<String> {
     let mut g = Gen::new(32);
-    let mut a = Img::base(32, MRI_UCHAR);
+    // relay 52: the registrations on 16^3 images (one pyramid level, as 32^3 gave; `--satit`
+    // adds its small-image warning), so a debug build's test takes seconds
+    let mut a = Img::base(16, MRI_UCHAR);
     let mut b = a;
     b.shift = [5, -3, 2];
     b.shear = 1;
@@ -1002,7 +1004,7 @@ pub fn golden_cases() -> Vec<String> {
     a.ty = MRI_SHORT;
     b.ty = MRI_FLOAT;
     b.size = [1.0, 1.0, 1.5];
-    b.dims = [32, 32, 22];
+    b.dims = [16, 16, 11];
     let smov = write_as(&mut image(&mut g, &a), "smov.mgz");
     let fdst = write_as(&mut image(&mut g, &b), "fdst.mgz");
     let files = vec![
@@ -1119,7 +1121,10 @@ pub fn golden_cases() -> Vec<String> {
     let mut f = Img::base(32, MRI_FLOAT);
     f.noise = 4;
     let test_files = vec![
-        ("mov.mgz".to_owned(), files[0].1.clone()),
+        (
+            "mov.mgz".to_owned(),
+            write_as(&mut image(&mut g, &Img::base(32, MRI_UCHAR)), "mov.mgz"),
+        ),
         (
             "f32.mgz".to_owned(),
             write_as(&mut image(&mut g, &f), "f32.mgz"),

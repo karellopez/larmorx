@@ -217,35 +217,93 @@ impl JointHisto {
         for f in &mut filter {
             *f = div64(*f, fsum);
         }
+        // The source's sums, `htmp[i][j] = sum_k histo[i][k] f[k - j + t]` over the taps that fall
+        // inside the histogram, then `histo[i][j] = sum_k htmp[k][j] f[k - i + t]`, each in the
+        // order of `k` from `j - t` (`i - t`) up, here (relay 52) computed by spreading each
+        // term over the sums it enters, `k` in that order, so every sum gets the same additions
+        // in the same order. With a finite filter a term of a zero bin is a zero, which leaves
+        // a sum as it is (a sum starts at +0 and is never -0), so zero bins are skipped. Plain
+        // arithmetic; a sum that ends as a NaN (a NaN met on the way stays one) is summed again
+        // with x86-64's NaN rules (`add64`, `mul64`). Every result has the source's bits; a
+        // debug build's golden cases take seconds instead of tens of seconds.
         let t = t as isize;
         let n = N as isize;
+        let taps = |c: isize| -> Option<(usize, usize)> {
+            let lo = (c - t).max(0);
+            let hi = (c + t).min(n - 1);
+            (lo <= hi).then_some((lo as usize, hi as usize))
+        };
+        let tap = |k: usize, c: usize| filter[(k as isize - c as isize + t) as usize];
+        // the sum of `vals(k) f[k - c + t]` over `c`'s taps, with x86-64's NaN rules
+        let exact = |c: usize, vals: &dyn Fn(usize) -> f64| -> f64 {
+            let mut d = 0.0;
+            if let Some((lo, hi)) = taps(c as isize) {
+                for k in lo..=hi {
+                    d = add64(d, mul64(vals(k), tap(k, c)));
+                }
+            }
+            d
+        };
+        let finite = filter.iter().all(|f| f.is_finite());
         let mut htmp = vec![0.0f64; N * N];
         for i in 0..N {
-            for j in 0..n {
-                let mut dtmp = 0.0;
-                for (count, k) in (j - t..=j + t).enumerate() {
-                    if k < 0 || k >= n {
-                        continue;
-                    }
-                    dtmp = add64(dtmp, mul64(self.at(i, k as usize), filter[count]));
+            let src = &self.histo[i * N..(i + 1) * N];
+            let dst = &mut htmp[i * N..(i + 1) * N];
+            for (k, &h) in src.iter().enumerate() {
+                if h == 0.0 && finite {
+                    continue;
                 }
-                htmp[i * N + j as usize] = dtmp;
+                if let Some((lo, hi)) = taps(k as isize) {
+                    // `j` from `lo` up takes the taps `k - j + t` from `k - lo + t` down
+                    let f = &filter[(k as isize - hi as isize + t) as usize
+                        ..=(k as isize - lo as isize + t) as usize];
+                    for (d, f) in dst[lo..=hi].iter_mut().zip(f.iter().rev()) {
+                        *d += h * *f;
+                    }
+                }
+            }
+            for (j, d) in dst.iter_mut().enumerate() {
+                if d.is_nan() {
+                    *d = exact(j, &|k| src[k]);
+                }
+            }
+        }
+        let mut out = vec![0.0f64; N * N];
+        for k in 0..N {
+            let src = &htmp[k * N..(k + 1) * N];
+            // the row's span of non-zero bins (all of it for a filter that is not finite)
+            let (j0, j1) = if finite {
+                match (
+                    src.iter().position(|&h| h != 0.0),
+                    src.iter().rposition(|&h| h != 0.0),
+                ) {
+                    (Some(a), Some(b)) => (a, b),
+                    _ => continue,
+                }
+            } else {
+                (0, N - 1)
+            };
+            if let Some((lo, hi)) = taps(k as isize) {
+                for i in lo..=hi {
+                    let f = tap(k, i);
+                    let dst = &mut out[i * N + j0..=i * N + j1];
+                    for (d, h) in dst.iter_mut().zip(&src[j0..=j1]) {
+                        *d += *h * f;
+                    }
+                }
             }
         }
         self.sum = 0.0;
-        for i in 0..n {
+        for i in 0..N {
             for j in 0..N {
-                let mut dtmp = 0.0;
-                for (count, k) in (i - t..=i + t).enumerate() {
-                    if k < 0 || k >= n {
-                        continue;
-                    }
-                    dtmp = add64(dtmp, mul64(htmp[k as usize * N + j], filter[count]));
+                let d = &mut out[i * N + j];
+                if d.is_nan() {
+                    *d = exact(i, &|k| htmp[k * N + j]);
                 }
-                self.histo[i as usize * N + j] = dtmp;
-                self.sum = add64(self.sum, dtmp);
+                self.sum = add64(self.sum, *d);
             }
         }
+        self.histo = out;
     }
 
     /// `normalize()`: the histogram divided by its sum, unless that is 0 or 1.
@@ -263,19 +321,19 @@ impl JointHisto {
     /// `computeRCsums()`: `histo * ones(n, 1)` and `ones(1, n) * histo` (vnl's products: each
     /// sum from 0 in the index order).
     fn compute_rc_sums(&mut self) {
-        for i in 0..N {
-            let mut r = 0.0;
-            for k in 0..N {
-                r = add64(r, mul64(self.at(i, k), 1.0));
+        for (i, r) in self.rowsum.iter_mut().enumerate() {
+            let mut sum = 0.0;
+            for h in &self.histo[i * N..(i + 1) * N] {
+                sum = add64(sum, mul64(*h, 1.0));
             }
-            self.rowsum[i] = r;
+            *r = sum;
         }
-        for j in 0..N {
-            let mut c = 0.0;
-            for k in 0..N {
-                c = add64(c, mul64(1.0, self.at(k, j)));
+        // each column's sum over the rows in their order, kept for all columns at once
+        self.colsum.iter_mut().for_each(|c| *c = 0.0);
+        for k in 0..N {
+            for (c, h) in self.colsum.iter_mut().zip(&self.histo[k * N..(k + 1) * N]) {
+                *c = add64(*c, mul64(1.0, *h));
             }
-            self.colsum[j] = c;
         }
     }
 
@@ -285,11 +343,11 @@ impl JointHisto {
         self.compute_rc_sums();
         let mut mi = 0.0;
         for i in 0..N {
-            for j in 0..N {
-                let d = self.at(i, j);
-                if d != 0.0 {
-                    let q = div64(d, mul64(self.rowsum[i], self.colsum[j]));
-                    mi = add64(mi, mul64(d, libm.log2(q)));
+            let r = self.rowsum[i];
+            for (d, c) in self.histo[i * N..(i + 1) * N].iter().zip(&self.colsum) {
+                if *d != 0.0 {
+                    let q = div64(*d, mul64(r, *c));
+                    mi = add64(mi, mul64(*d, libm.log2(q)));
                 }
             }
         }
@@ -418,6 +476,111 @@ impl JointHisto {
 mod tests {
     use super::*;
     use larmorx_core::defects::UpstreamDefects;
+
+    /// `smooth` as the source writes it (each sum over `k` from `j - t` to `j + t`, the taps
+    /// outside skipped, x86-64's NaN rules on every operation): the reference of relay 52's
+    /// faster form.
+    fn smooth_reference(h: &mut JointHisto, libm: &Libm, fwhm: f64) {
+        let mut sm = fwhm / (8.0 * std::f64::consts::LN_2).sqrt();
+        if sm < 0.001 {
+            sm = 0.001;
+        }
+        let t = double_to_int_x86((3.0 * sm + 0.5).floor());
+        let len = (2 * t + 1).max(0) as usize;
+        let mut filter = vec![0.0f64; len];
+        let mut fsum = 0.0f64;
+        let sm2 = -sm * sm;
+        for (k, i) in (-t..=t).enumerate() {
+            filter[k] = libm.exp(f64::from(i * i) / sm2);
+            fsum = add64(fsum, filter[k]);
+        }
+        for f in &mut filter {
+            *f = div64(*f, fsum);
+        }
+        let t = t as isize;
+        let n = N as isize;
+        let mut htmp = vec![0.0f64; N * N];
+        for i in 0..N {
+            for j in 0..n {
+                let mut dtmp = 0.0;
+                for (count, k) in (j - t..=j + t).enumerate() {
+                    if k < 0 || k >= n {
+                        continue;
+                    }
+                    dtmp = add64(dtmp, mul64(h.at(i, k as usize), filter[count]));
+                }
+                htmp[i * N + j as usize] = dtmp;
+            }
+        }
+        h.sum = 0.0;
+        for i in 0..n {
+            for j in 0..N {
+                let mut dtmp = 0.0;
+                for (count, k) in (i - t..=i + t).enumerate() {
+                    if k < 0 || k >= n {
+                        continue;
+                    }
+                    dtmp = add64(dtmp, mul64(htmp[k as usize * N + j], filter[count]));
+                }
+                h.histo[i as usize * N + j] = dtmp;
+                h.sum = add64(h.sum, dtmp);
+            }
+        }
+    }
+
+    /// The faster `smooth` gives the source's bits: sparse and dense histograms, zero rows,
+    /// negative zeros, infinities and NaNs of several payloads (built from their bits), small
+    /// and wide filters, both modes' `exp`.
+    #[test]
+    fn smooth_matches_the_source_bit_for_bit() {
+        let mut state = 0x2545_f491_4f6c_dd1du64;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        let specials = [
+            f64::from_bits(0x7ff8_0000_0000_0001),
+            f64::from_bits(0xfff8_0000_0000_0123),
+            f64::from_bits(0x7ff4_0000_0000_0000),
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            -0.0,
+        ];
+        for mode in [UpstreamDefects::Reproduce, UpstreamDefects::Fix] {
+            let libm = Libm::new(mode);
+            for case in 0..12u64 {
+                let mut a = JointHisto::new();
+                let density = [1u64, 4, 16, 64, 256, 1024][(case % 6) as usize];
+                for (idx, v) in a.histo.iter_mut().enumerate() {
+                    // whole rows of zeros in some cases
+                    if case % 3 == 1 && (idx / N) % 5 == 0 {
+                        continue;
+                    }
+                    let r = next();
+                    if r % 1024 < density {
+                        *v = (r >> 20) as f64 / 4096.0;
+                    }
+                }
+                if case >= 6 {
+                    for _ in 0..(case - 5) {
+                        let r = next();
+                        let s = specials[(r % specials.len() as u64) as usize];
+                        a.histo[((r >> 8) % (N * N) as u64) as usize] = s;
+                    }
+                }
+                let fwhm = [7.0, 0.5, 40.0, 7.0][(case % 4) as usize];
+                let mut b = JointHisto::new();
+                b.histo.clone_from(&a.histo);
+                a.smooth(&libm, fwhm);
+                smooth_reference(&mut b, &libm, fwhm);
+                let bits = |h: &JointHisto| h.histo.iter().map(|v| v.to_bits()).collect::<Vec<_>>();
+                assert!(bits(&a) == bits(&b), "case {case} {mode:?}");
+                assert_eq!(a.sum.to_bits(), b.sum.to_bits(), "case {case} {mode:?}");
+            }
+        }
+    }
 
     /// A histogram of one bin: every cost's closed form.
     #[test]

@@ -218,10 +218,7 @@ def official_line(exe: Path, line: str, root: Path, k: int) -> str:
         inputs=inputs,
     )
     rc = done.returncode
-    if rc is None:
-        status = "TIMEOUT"
-    else:
-        status = f"EXIT {rc & 0xFF}" if rc >= 0 else f"CRASH {-rc}"
+    status = "TIMEOUT" if rc is None else f"EXIT {rc & 0xFF}" if rc >= 0 else f"CRASH {-rc}"
     dd = escape(str(d).encode())
 
     def m(s: str | bytes) -> str:
@@ -338,7 +335,7 @@ def main(argv: list[str] | None = None) -> int:
                 counts["fix_differ_without_notice"] += 1
                 fix_bad.append(k)
     h = hashlib.sha256()
-    for k, (c, (r, ids)) in enumerate(zip(official, rep, strict=True)):
+    for c, (r, ids) in zip(official, rep, strict=True):
         h.update(("SKIP" if skipped(r, ids) or NOT_PORTED in r else c).encode())
         h.update(b"\n")
     hd = hashlib.sha256()
@@ -363,7 +360,7 @@ def main(argv: list[str] | None = None) -> int:
                 "fix_differ",
                 "fix_differ_without_notice",
             )
-        },  # fmt: skip
+        },
         "official_sha256_skip": h.hexdigest(),
         "official_sha256_skip_debug": hd.hexdigest(),
         "first_differ": differ[:20],

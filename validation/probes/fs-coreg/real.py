@@ -225,12 +225,12 @@ def main(argv: list[str] | None = None) -> int:
                 "official": o["seconds"],
                 "reproduce": rep["seconds"],
                 "fix": fix["seconds"],
-            },  # fmt: skip
+            },
             "peak_mib": {
                 "official": o["peak_mib"],
                 "reproduce": rep["peak_mib"],
                 "fix": fix["peak_mib"],
-            },  # fmt: skip
+            },
             "served": o["served"],
             "files": o["files"],
             "first_difference": None

@@ -60,12 +60,22 @@ use crate::mht::{Mht, MhtFnoUsage, Pt, TABLE_CENTER, TABLE_SIZE, coerce, corner,
 use crate::mris::Mris;
 use crate::props2::face_barycentric_coords_raw;
 use crate::tritri::narrow;
-use crate::views::vertex_coord2xyz_float;
+use crate::views::{vertex_coord2xyz_float, vertex_coords};
 
 /// `MinDistSq`'s start: nothing beyond 1,000 mm is returned.
 const MIN_DIST_SQ: f64 = 1e6;
 /// The vertex search's limit on its shells (`max_mhts_MAX`); the face search has none.
 const MAX_MHTS_VERTEX: i32 = 5;
+
+/// The positions (`which`, the table's) of a surface's vertices, `None` for a ripped one, taken
+/// once for many vertex searches of one table while the surface does not change
+/// ([`Mht::find_closest_vertex_no_xyz_at`]; relay 59 of track A, for `mri_label2vol
+/// --fill-ribbon`'s 16.7 million voxels): the same answers as reading the vertices' records, from
+/// 16 contiguous bytes a vertex instead of a record of some 500.
+pub struct VertexPositions {
+    which: i32,
+    pos: Vec<Option<[f32; 3]>>,
+}
 
 /// What a search looks for.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -84,6 +94,9 @@ struct Search<'a> {
     best: i32,
     best_sq: f64,
     edges: HashSet<u64>,
+    /// The vertices' positions taken beforehand (a vertex search only), else read from the
+    /// surface.
+    pos: Option<&'a [Option<[f32; 3]>]>,
 }
 
 impl<'a> Search<'a> {
@@ -141,12 +154,19 @@ impl<'a> Search<'a> {
                     if self.beyond(g, n, self.mris.nvertices, "vertex") {
                         continue;
                     }
-                    let vtx = self.mris.vertex(n as usize);
-                    if vtx.ripflag != 0 {
-                        continue;
+                    // the positions taken beforehand: the same coordinates, a ripped vertex None
+                    match self.pos.and_then(|pos| pos.get(n as usize)) {
+                        Some(Some(p)) => *p,
+                        Some(None) => continue,
+                        None => {
+                            let vtx = self.mris.vertex(n as usize);
+                            if vtx.ripflag != 0 {
+                                continue;
+                            }
+                            let (x, y, z) = vertex_coord2xyz_float(g, err, vtx, self.mht.which())?;
+                            [x, y, z]
+                        }
                     }
-                    let (x, y, z) = vertex_coord2xyz_float(g, err, vtx, self.mht.which())?;
-                    [x, y, z]
                 }
                 Kind::Face { .. } => {
                     if self.beyond(g, n, self.mht.nfaces.min(self.mris.nfaces), "face") {
@@ -250,6 +270,31 @@ impl Mht {
         in_max_mhts: i32,
         kind: Kind,
     ) -> Result<(i32, f64), Fatal> {
+        self.generic_at(
+            g,
+            err,
+            mris,
+            None,
+            probe,
+            in_max_distance_mm,
+            in_max_mhts,
+            kind,
+        )
+    }
+
+    /// [`Mht::generic`] with the vertices' positions taken beforehand (`pos`, a vertex search).
+    #[allow(clippy::too_many_arguments)]
+    fn generic_at(
+        &self,
+        g: &mut Globals,
+        err: &mut dyn Write,
+        mris: &Mris,
+        pos: Option<&VertexPositions>,
+        probe: Pt,
+        in_max_distance_mm: f64,
+        in_max_mhts: i32,
+        kind: Kind,
+    ) -> Result<(i32, f64), Fatal> {
         let mhtres = f64::from(self.vres());
         let (mut max_distance_mm, mut max_mhts);
         if in_max_mhts == -1 {
@@ -285,6 +330,9 @@ impl Mht {
             best: -1,
             best_sq: MIN_DIST_SQ,
             edges: HashSet::new(),
+            pos: pos
+                .filter(|p| kind == Kind::Vertex && p.which == self.which())
+                .map(|p| p.pos.as_slice()),
         };
         let mut vox = [0i64; 3];
         let mut near8 = [0i64; 3];
@@ -512,6 +560,43 @@ impl Mht {
     ) -> Result<(i32, f32), Fatal> {
         let probe = p.map(f64::from);
         let (vno, d) = self.generic(g, err, mris, probe, 1000.0, 1, Kind::Vertex)?;
+        Ok((vno, narrow(d)))
+    }
+
+    /// The positions of `mris`'s vertices this table's searches read ([`VertexPositions`]), for
+    /// many searches while the surface does not change; `None` for a position set the vertices
+    /// do not have (the searches then read the vertices, and their error is the same).
+    pub fn vertex_positions(&self, mris: &Mris) -> Option<VertexPositions> {
+        let vs = mris.vertices.as_deref().unwrap_or(&[]);
+        let n = usize::try_from(mris.nvertices).unwrap_or(0).min(vs.len());
+        let mut pos = Vec::with_capacity(n);
+        for v in &vs[..n] {
+            pos.push(if v.ripflag != 0 {
+                None
+            } else {
+                let (x, y, z) = vertex_coords(v, self.which())?;
+                Some([x, y, z])
+            });
+        }
+        Some(VertexPositions {
+            which: self.which(),
+            pos,
+        })
+    }
+
+    /// [`Mht::find_closest_vertex_no_xyz`] reading the vertices' positions taken beforehand
+    /// ([`Mht::vertex_positions`] of the same surface, unchanged since): the same answer.
+    pub fn find_closest_vertex_no_xyz_at(
+        &self,
+        g: &mut Globals,
+        err: &mut dyn Write,
+        mris: &Mris,
+        pos: &VertexPositions,
+        p: [f32; 3],
+    ) -> Result<(i32, f32), Fatal> {
+        self.check_vertices(g, err)?;
+        let probe = p.map(f64::from);
+        let (vno, d) = self.generic_at(g, err, mris, Some(pos), probe, 1000.0, 1, Kind::Vertex)?;
         Ok((vno, narrow(d)))
     }
 

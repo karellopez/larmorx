@@ -19,7 +19,7 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `utils/mri.cpp` 108-535 | `MRI::Shape::Shape`, both `MRI::MRI`, `initGCAMorphLabel`, `initSlices`, `initIndices`, `~MRI` (Rust's drop), `intentName`, `intentCode`, `MRIfree`, `MRIalloc`, `MRIallocSequence`, `MRIallocHeader` | `mri.rs` |
 | `utils/mri.cpp` 589-745 | `MRIxfmCRS2XYZ`, `MRImatrixOfDirectionCosines`, `MRImatrixOfVoxelSizes`, `MRImatrixOfTranslations`, `extract_i_to_r`, `extract_r_to_i`, `MRIsetVox2RASFromMatrix` | `vol_geom.rs` |
 | `utils/mri.cpp` 1383-1430 | `MRIp0ToCRAS` | `vol_geom.rs` |
-| `utils/mri.cpp` 1470-1880 | `MRIsizeof`, `MRIgetVoxDx`/`Dy`/`Dz`, `MRIgetVoxVal`, `MRIsetVoxVal` (with the `*seq_vox` macros of `mri.h` and `long32` of `machine.h`; relay 42: the types without a case touch no voxel, so FS-58 only for the eight types with one) | `mri.rs`, `voxel.rs` |
+| `utils/mri.cpp` 1470-1880 | `MRIsizeof`, `MRIgetVoxDx`/`Dy`/`Dz`, `MRIgetVoxVal`, `MRIsetVoxVal` (with the `*seq_vox` macros of `mri.h` and `long32` of `machine.h`; relay 42: the types without a case touch no voxel, so FS-58 only for the eight types with one; relay 59: `FrameReader`, `MRIgetVoxVal` within the extent without its checks, the same values) | `mri.rs`, `voxel.rs` |
 | `utils/mri.cpp` 3836 | `MRIreInitCache` | `vol_geom.rs` |
 | `utils/mri.cpp` 6198, 13221, 16256, 16279 | `MRIcopyHeader`, `MRIcopyPulseParameters`, `MRIcopyVolGeomToMRI`, `MRIcopyVolGeomFromMRI` | `mri.rs` |
 | `utils/transform.cpp` 365, 381 | `MRIallocFromVolGeom`, `useVolGeomToMRI` | `mri.rs` |

@@ -2945,6 +2945,8 @@ defects! {
         "seg2cc with a relative SUBJECTS_DIR runs mri_cc (and for a segmentation not conformed to its smallest voxel also mri_label2vol's merge steps) inside the subject's mri folder, where the relative name does not lead to the subject: they fail; corrected: the programs get the subjects folder's absolute name";
     FS_1341 = "FS-1341", "FreeSurfer", true,
         "mergeseg stops with 'SUBJECTS_DIR: Undefined variable.' (status 1) when SUBJECTS_DIR is not set, after making its temporary folder, although it never uses the subjects folder; corrected: its log line 'setenv SUBJECTS_DIR' is left empty and the merge is made";
+    FS_1342 = "FS-1342", "FreeSurfer", true,
+        "reading a volume whose header asks for extents of hundreds of millions of voxels (or making a volume of them), with no voxels to read (a depth or frame count of 0) or few: FreeSurfer keeps and fills 4 bytes of memory for each voxel of each extent before it reads a voxel (8 GiB for an extent of 2,147,000,000; besides the frames' records, FS-760), so past the machine's memory it ends at once (could not allocate <n> elt index array, status 254) and below it fills the memory: the outcome depends on the machine";
     FS_758 = "FS-758", "FreeSurfer", true,
         "reading a compressed GCA atlas (.gcz) whose compressed data is damaged: damaged at its start, the version is taken from memory contents; damaged after the nodes and priors, the reading never ends";
     FS_432 = "FS-432", "FreeSurfer", true,

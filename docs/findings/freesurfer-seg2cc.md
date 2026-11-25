@@ -84,7 +84,7 @@ seg2cc's second path runs `mri_convert <norm> <n>.conf.mgz --conform_min`, which
 geometry with a validity flag FreeSurfer never sets (FS-1053, mri_convert's: memory contents; the
 port prints 0 with the notice). The probe masks the line `valid   : <n>`.
 
-## A finding of this relay: a short text named `.mgz` in the default mode (not yet corrected)
+## A finding of this relay: a short text named `.mgz` in the default mode (corrected in relay 59)
 
 `mri_binarize --i text.mgz ...` (and every reader of a volume) with a 13-byte text file named
 `.mgz`: zlib reads it as plain data, the MGH header's integers are the text's bytes (width
@@ -98,6 +98,11 @@ as FS-760). Not corrected in this relay: the probe's unreadable volumes are empt
 first read fails in both modes). The correction (next relay): a header the file cuts before its
 type (rule B, `mghRead(<name>, <frame>): read error`) and index tables past the machine's memory
 refused as FS-760's frames.
+
+Corrected in track A's relay 59 (`docs/findings/freesurfer-io.md`, FS-167's section): by default a
+file that ends before the header's voxel type is `mghRead(<name>, <frame>): read error` (rule B),
+and index tables past the machine's memory are refused in both modes (FS-1342). The probe's
+unreadable volumes are the 13-byte text again (`vol/text.mgz`, subject `b`'s segmentation).
 
 ## Speed and memory
 

@@ -645,7 +645,7 @@ pub fn write_fixture(dir: &Path) {
     files.push((m_mri.join("norm.mgz"), 0));
     let b_mri = subj.join("b").join("mri");
     put(&mut g, &mut norm, &b_mri.join("norm.mgz"));
-    std::fs::write(b_mri.join("aseg.auto_noCCseg.mgz"), "").expect("written");
+    std::fs::write(b_mri.join("aseg.auto_noCCseg.mgz"), "not a volume\n").expect("written");
     files.push((b_mri.join("norm.mgz"), 0));
     files.push((b_mri.join("aseg.auto_noCCseg.mgz"), 0));
     // n: not conformed to its smallest voxel (32 x 32 x 30)
@@ -681,9 +681,9 @@ pub fn write_fixture(dir: &Path) {
     let mut b = volume(&mut g, MRI_INT, n, |x, y, z| ((x + y * z) % 9) as u32);
     put(&mut g, &mut b, &vol.join("b.mgz"));
     std::fs::write(vol.join("ctab.txt"), CTAB).expect("written");
-    // an empty file: neither mode reads a header (a short text there makes the default fill
-    // index tables sized by the text's bytes: relay 58's finding, not in these cases)
-    std::fs::write(vol.join("text.mgz"), "").expect("written");
+    // a short text: its header ends before the voxel type (by default a read error, FS-167;
+    // FreeSurfer, and `reproduce`, refuse the frame count its bytes give, FS-760)
+    std::fs::write(vol.join("text.mgz"), "not a volume\n").expect("written");
     std::fs::write(dir.join("xopts.txt"), "mri_cc -x 1\nmri_normalize -y\n").expect("written");
     std::fs::write(dir.join("xopts2.txt"), "mri_cc -x 1\n# a note\nmri_cc -y\n").expect("written");
     std::fs::write(dir.join("xopts3.txt"), "mri_cc -x 1\n\n\n").expect("written");

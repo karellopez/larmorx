@@ -1198,7 +1198,12 @@ its four bytes are not all there), width, height, depth, frames, type and degree
 (`int`s), the RAS flag (`short`), and when the flag is above 0 fifteen floats (the voxel sizes x, y,
 z; the x, y and z direction cosines; the centre); 254 bytes after the flag in all (194 after the
 floats). A tensor volume (type 6) has 9 frames whatever the header says. The intent is
-`(version >> 8) & 0xffff`.
+`(version >> 8) & 0xffff`. A file that ends before the type's last byte (inside the 20 bytes of
+sizes and type after the version): by default the same `mghRead(<name>, <frame>): read error`, no
+volume, with FS-167's notice (rule B: a 13-byte text named `.mgz` would otherwise give sizes from its
+bytes and fill index tables of gigabytes); with `reproduce` reading goes on, the cut numbers as the
+cut-number rule below says (memory contents, or the earlier number's bytes). A file cut after the
+type is read as before in both modes.
 
 - **The header alone:** a volume without voxels (fs.mri's `MRIallocHeader`; its messages for
   extents that are not above 0), then the data skipped: `frames x width x height x depth x bytes per

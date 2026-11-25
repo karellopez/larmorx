@@ -2,8 +2,8 @@
  "name": "freesurfer-seg2cc",
  "tool": "seg2cc (FreeSurfer 8.2.0)",
  "status": "experimental",
- "larmorx_commit": "1c296beb80bd",
- "generated": "2026-11-24",
+ "larmorx_commit": "5b604fe96384",
+ "generated": "2026-11-25",
  "platform": "Linux x86_64",
  "replica": "crates-freesurfer/larmorx-freesurfer-volumes (src/seg2cc/, src/script.rs), the larmorx-freesurfer program",
  "reference": "FreeSurfer 8.2.0's official script ($FREESURFER_HOME/bin/seg2cc, /bin/tcsh 6.21.00, GNU coreutils 8.32, GNU time 1.9)",
@@ -18,20 +18,20 @@
   "fix-explained": 37,
   "fix-unmodelled": 1
  },
- "official_sha256_all": "8ab64559e5fbe0b0786bcc743e0d0b9ff5a4638c5498f2695e7ea9bd4a2b45d7",
+ "official_sha256_all": "ff0eabd6989763aaa9c6c3e06212adbec7fde91fa136fa6be27d4b031b51e493",
  "golden_sha256": "3bb3c52c3edc783925c16d73ff2f6eddaa692f151a551a51650c03abe10950aa",
  "memory": [
   {
    "program": "seg2cc",
    "mode": "reproduce",
-   "larmorx_mib": 329.8,
-   "freesurfer_mib": 345.3
+   "larmorx_mib": 329.7,
+   "freesurfer_mib": 346.0
   },
   {
    "program": "seg2cc",
    "mode": "fix",
-   "larmorx_mib": 330.6,
-   "freesurfer_mib": 345.3
+   "larmorx_mib": 331.1,
+   "freesurfer_mib": 346.0
   }
  ],
  "recorded_steps": {
@@ -48,9 +48,9 @@
    "reproduce": "identical",
    "fix": "identical",
    "seconds": {
-    "official": 56.7,
-    "reproduce": 54.8,
-    "fix": 54.4
+    "official": 57.1,
+    "reproduce": 52.8,
+    "fix": 57.3
    },
    "official_status": "status 0"
   },
@@ -59,9 +59,9 @@
    "reproduce": "identical",
    "fix": "identical",
    "seconds": {
-    "official": 56.7,
-    "reproduce": 54.6,
-    "fix": 55.8
+    "official": 56.2,
+    "reproduce": 53.5,
+    "fix": 54.6
    },
    "official_status": "status 0"
   },
@@ -70,9 +70,9 @@
    "reproduce": "identical",
    "fix": "identical",
    "seconds": {
-    "official": 53.3,
-    "reproduce": 57.4,
-    "fix": 55.6
+    "official": 59.0,
+    "reproduce": 57.1,
+    "fix": 53.0
    },
    "official_status": "status 0"
   }

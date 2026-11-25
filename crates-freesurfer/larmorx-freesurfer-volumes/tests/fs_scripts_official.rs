@@ -15,9 +15,10 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-24 by `check.py` from the official scripts: every case but the heavy ones (`full`), and
-/// the quick ones a debug build runs; their counts and those not reproduced.
-const OFFICIAL_SHA256: &str = "8ab64559e5fbe0b0786bcc743e0d0b9ff5a4638c5498f2695e7ea9bd4a2b45d7";
+/// Recorded 2026-11-25 by `check.py` from the official scripts (relay 59: the unreadable volumes a
+/// 13-byte text again): every case but the heavy ones (`full`), and the quick ones a debug build
+/// runs; their counts and those not reproduced.
+const OFFICIAL_SHA256: &str = "ff0eabd6989763aaa9c6c3e06212adbec7fde91fa136fa6be27d4b031b51e493";
 const N: usize = 147;
 const UNMODELLED: usize = 8;
 const OFFICIAL_SHA256_QUICK: &str =

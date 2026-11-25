@@ -36,8 +36,8 @@ use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::defects::{
-    FS_53, FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257, FS_421, FS_432, FS_666, FS_672,
-    FS_717, FS_841, FS_842,
+    FS_53, FS_76, FS_167, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257, FS_421, FS_432, FS_666,
+    FS_672, FS_717, FS_841, FS_842,
 };
 use larmorx_freesurfer_core::diag::{self, DIAG_INFO, DIAG_SHOW};
 use larmorx_freesurfer_core::globals::Globals;
@@ -1233,7 +1233,10 @@ fn zread(fp: &mut ZnzFile, buf: &mut [u8], size: usize, nmemb: usize) -> i64 {
 ///
 /// The header: version, width, height, depth, frames, type, dof (big-endian `int`s), the flag of
 /// the RAS fields (`short`) and, when it is above 0, the voxel sizes, the direction cosines and
-/// the centre (15 floats); 256 bytes in all after the flag. Without voxels the data are skipped;
+/// the centre (15 floats); 256 bytes in all after the flag. A file that ends before the version
+/// gives `mghRead(<name>, <frame>): read error`; one that ends before the voxel type gives it too
+/// by default (FS-167, rule B; with `reproduce` FreeSurfer's sizes from memory contents or the
+/// earlier number's bytes). Without voxels the data are skipped;
 /// with them they are read slice by slice (`mghRead(<name>): could not read <n> bytes at slice
 /// <z>`; types: uchar, short, unsigned short, int, float, tensor (9 frames), float complex; another
 /// `mghRead: unsupported type <t>`); `frame` 0 or more reads that frame alone, below -1 the first
@@ -1299,11 +1302,36 @@ pub fn mgh_read(
     // writes there): a number the file cuts keeps the earlier number's bytes (the first one's are
     // memory contents); the short's are another call's (memory contents)
     let mut slot = fio::Slot49::new();
+    let before = g.notices.clone();
+    let start = fp.tell();
     let width = fio::znz_read_int_in(g, err, &mut fp, &mut slot);
     let height = fio::znz_read_int_in(g, err, &mut fp, &mut slot);
     let depth = fio::znz_read_int_in(g, err, &mut fp, &mut slot);
     let mut nframes = fio::znz_read_int_in(g, err, &mut fp, &mut slot);
     let mtype = fio::znz_read_int_in(g, err, &mut fp, &mut slot);
+    let sizes_end = fp.tell();
+    if !g.notices.reproduce() && start >= 0 && sizes_end >= start && sizes_end - start < 20 {
+        // FS-167 (rule B): a file that ends before the header's voxel type gives FreeSurfer
+        // sizes and a type from memory contents (or the earlier number's bytes), and it goes on
+        // with them (a text named .mgz: index tables of gigabytes); refused here as a read error
+        let got = sizes_end - start;
+        g.notices = before;
+        g.notices.add(
+            &FS_167,
+            format!(
+                "mghRead: the file ends {got} bytes into the header's 20 bytes of sizes and voxel \
+                 type: refused as a read error (FreeSurfer goes on with sizes and a type from \
+                 memory contents or the earlier number's bytes)"
+            ),
+        );
+        log::error_printf(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!("mghRead({fname}, {frame}): read error"),
+        );
+        return Ok(None);
+    }
     let dof = fio::znz_read_int_in(g, err, &mut fp, &mut slot);
     let mut unused = UNUSED_SPACE_SIZE - 2;
     let good_ras_flag = i32::from(fio::znz_read_short(g, err, &mut fp));

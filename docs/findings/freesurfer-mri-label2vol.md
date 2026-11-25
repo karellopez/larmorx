@@ -215,6 +215,28 @@ design, documented in the function's comment: a negative `resmm` is a factor), `
 value 1 for every label, `--hits`/`--pvf`/`--offset` ignored by both paths, the `FSENVgetenv`
 colour table read for nothing.
 
+## Speed (relay 59, the same outputs)
+
+On ds000005's v8 head, one thread (`OMP_NUM_THREADS=1`), FreeSurfer 8.2.0 and the port alternately
+(times in seconds, three rounds; the files compared byte for byte by `real.py` on the six heads):
+
+| call | FreeSurfer | before (relay 57) | relay 59 |
+|---|---|---|---|
+| `--label lh.cortex.label --fill-ribbon --hemi lh --identity --label-stat stat.mgz` | 9.3-9.9 | 28.9-29.5 | 8.9-9.0 |
+| `--seg aseg.mgz --temp rawavg.mgz --regheader --new-aseg2vol --ttype --resmm 0.5` | 2.7-2.9 | 3.4-3.5 | 2.7-2.8 |
+
+Where the time went (a sampling profile through `gdb`: `perf` is not allowed on this machine):
+`--fill-ribbon` spent 87 % in the surface hash's closest-vertex search, which read each candidate
+vertex's position from its record (some 500 bytes, the position and the rip flag in two cache
+lines); the search now reads the positions taken once before the loop (`Mht::vertex_positions`,
+16 bytes a vertex; the same candidates in the same order, the same arithmetic). Then the per-voxel
+4 x 4 products (the matrices' rows read once, the same float sums as `MatrixMultiply`), `nint`'s
+conversion (an inline `as` within the int range instead of a `trunc` call), the voxel reads (fs.mri's
+`FrameReader`: `MRIgetVoxVal` within the extent without its checks) and `MRIsurf2VolOpt`'s writes of
+0 into its fresh volume for voxels outside the ribbon (each voxel is visited once, so they change
+nothing; left out). `--new-aseg2vol` gained from the same conversion and voxel reads. FreeSurfer's
+`MRIseg2SegPVF` also runs on every CPU by default; the port's loop is still one thread.
+
 ## Memory
 
 The first program in the memory test that reads a surface: `MRISread` of `lh.orig.nofix`

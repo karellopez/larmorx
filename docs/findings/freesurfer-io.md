@@ -37,6 +37,21 @@ with 0 and note it; the probe compares those bytes as wildcards (`?`). Seen in t
 stack held 0 for `fread1`'s byte, 0x00 for `fread2`'s, and earlier strings' bytes for the doubles
 (`a0122532435f0000`): memory contents indeed.
 
+`mghRead`'s header (relay 59, from relay 58's finding): the six sizes after the version are read
+with `znzreadInt` and never checked, so a file that ends inside them (a short text named `.mgz`:
+zlib reads a file that is not gzip as plain data) gives sizes and a type from the text's bytes and
+the earlier number's or memory contents. With the old default (missing bytes 0) the 13 bytes `not a
+volume\n` gave width 1,629,517,423, height 1,819,635,045, depth and frames 0: no voxel to read,
+but `MRI::initIndices` filled index tables of about 13.8 GB (`(extent + 1000) * 4` bytes each); a
+2 GiB memory box killed `mri_binarize --i t.mgz`. With `reproduce` (FreeSurfer's bytes) the frame
+count is the depth's bytes and FS-760 refuses it (status 254, as the official program). Rule B now:
+by default a file that ends before the type's last byte is `mghRead(<name>, <frame>): read error`
+(the version's own message), no volume, FS-167's notice; `reproduce` unchanged. A header cut after
+the type (dof, the RAS flag, the geometry) is read as before in both modes. Index tables past the
+machine's memory (frame records and tables filled before any voxel is read beyond 16 GiB) are
+refused in both modes as FS-760's frames are: FS-1342 (fs.mri's `Mri::new_beyond`; the tests in
+`larmorx-freesurfer-io/tests/mgh_cut_header.rs`).
+
 ### FS-176: swapLong64 returns through a double
 
 `machine.cpp` 37-53: `double w; ... w = *((long64 *)(pVar)); return w;`: the reversed 64-bit integer

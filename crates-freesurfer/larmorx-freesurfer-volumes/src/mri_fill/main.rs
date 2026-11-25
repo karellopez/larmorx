@@ -18,7 +18,7 @@
 //! split against the callosum's Talairach x.
 //!
 //! Defects (`larmorx_core::defects`; the mechanisms in `docs/findings/freesurfer-mri-fill.md`):
-//! FS-1291 (voxels outside a volume), FS-1292 (an option without its values), FS-1293, FS-1294,
+//! FS-1291 and FS-1300 (voxels outside a volume), FS-1292 (an option without its values), FS-1293, FS-1294,
 //! FS-1295 ([`super::planes`]), FS-1296, FS-1297 ([`super::hemi`]), FS-1298 (a step that returns no
 //! volume: FreeSurfer goes on and crashes), FS-1299 (an output that is not written: status 0);
 //! FS-1287 to FS-1290 (`-topofix`: [`super::topofix`]). `-atlas` (the ventricles filled from an
@@ -33,7 +33,9 @@ use larmorx_freesurfer_core::cstd::{atof, atoi, fmt_f, format_double};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE, DIAG_WRITE, diag_init};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::help_xml::output_help_xml;
-use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_NOFILE, Fatal, errno_of};
+use larmorx_freesurfer_core::log::{
+    self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NOFILE, Fatal, errno_of,
+};
 use larmorx_freesurfer_core::matrix_ops::matrix_print;
 use larmorx_freesurfer_core::run::{Environment, Settings};
 use larmorx_freesurfer_core::system;
@@ -2114,8 +2116,10 @@ pub fn main(g: &mut Globals, r: &mut Run, o: &mut Options, args: &[String]) -> R
 }
 
 /// `-atlas`'s ventricle filling after the fill (`MRI3DreadSmall`, `mriReadBinaryProbabilities`,
-/// `MRIfillVentricle`, ...): not ported yet: FreeSurfer's checks of the environment,
-/// then a clear message and status 1. No recorded step reaches it.
+/// `MRIfillVentricle`, ...): not ported yet: FreeSurfer's checks of the environment and of the
+/// morph file (`<SUBJECTS_DIR>/<subject>/mri/transforms/<atlas>.m3d`: it must open and start with
+/// the old 3D morph's magic number), then a clear message and status 1. No recorded step reaches
+/// it.
 fn atlas_not_ported(
     g: &mut Globals,
     r: &mut Run,
@@ -2144,9 +2148,50 @@ fn atlas_not_ported(
         "{sd}/{}/mri/transforms/{atlas}.m3d",
         sname.unwrap_or("(null)")
     );
+    // MRI3DreadSmall's checks: the file opens and starts with the old 3D morph's magic number
+    let bytes = match std::fs::read(resolve(r.dir, &fname)) {
+        Ok(b) => b,
+        Err(e) => {
+            g.errno = errno_of(&e).unwrap_or(0);
+            log::error_printf(
+                g,
+                r.err,
+                ERROR_NOFILE,
+                &format!("MRI3DreadSmall: could not open file {fname}"),
+            );
+            log::error_exit(
+                g,
+                r.err,
+                ERROR_NOFILE,
+                &format!("{NAME}: could not open transform file {fname}\n"),
+            )?;
+            return Ok(());
+        }
+    };
+    let magic = bytes
+        .get(..4)
+        .map(|b| u32::from_be_bytes([b[0], b[1], b[2], b[3]]));
+    if magic != Some(M3D_MAGIC) {
+        log::error_printf(
+            g,
+            r.err,
+            ERROR_BADFILE,
+            &format!("file {fname} not an old 3d morph file.\nTry a new 3d morph read routine.\n"),
+        );
+        log::error_exit(
+            g,
+            r.err,
+            ERROR_NOFILE,
+            &format!("{NAME}: could not open transform file {fname}\n"),
+        )?;
+        return Ok(());
+    }
     let _ = writeln!(
         r.err,
         "{NAME}: -atlas (filling ventricles using atlas {atlas} with {fname}) is not ported yet"
     );
     Err(Fatal::Exit(1))
 }
+
+/// `M3D_MAGIC` (`include/mrimorph.h`): an old 3D morph file's first four bytes (big-endian).
+const M3D_MAGIC: u32 = 0xabcd_ef42;

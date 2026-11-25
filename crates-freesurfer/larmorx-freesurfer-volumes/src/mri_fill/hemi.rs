@@ -7,14 +7,14 @@
 //! `count_voxel_diagonals`, `count_diagonals`) and `fill_with_aseg`, recon-all's path.
 //!
 //! Defects (`larmorx_core::defects`; the mechanisms in `docs/findings/freesurfer-mri-fill.md`):
-//! FS-1291 (voxels outside a volume), FS-1296 (fills that never end: an error in both modes, rule
+//! FS-1291 and FS-1300 (voxels outside a volume), FS-1296 (fills that never end: an error in both modes, rule
 //! B), FS-1297 (the diagonals' third derivative is always 0, kept: rule D, to be measured).
 
 #![allow(non_upper_case_globals)]
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_1291, FS_1296, FS_1297};
+use larmorx_core::defects::{FS_1296, FS_1297, FS_1300};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal};
@@ -74,14 +74,14 @@ fn hang(g: &mut Globals, r: &mut Run, what: &str) -> Result<(), Fatal> {
 
 /// A volume of one slice (`fill_brain`), or of one slice, row or column (`fill_holes`, `all`):
 /// FreeSurfer's sweeps start at 1 and stop at the extent less one, which an extent of 1 never
-/// meets: they run off the volume and crash (FS-1291).
+/// meets: they run off the volume and crash (FS-1300).
 fn check_extent(g: &mut Globals, r: &mut Run, m: &Mri, all: bool) -> Result<(), Fatal> {
     let (w, h, d) = (m.vg.width, m.vg.height, m.vg.depth);
     if d >= 2 && (!all || (w >= 2 && h >= 2)) {
         return Ok(());
     }
     g.notices.add(
-        &FS_1291,
+        &FS_1300,
         format!(
             "mri_fill fills a volume of {w} x {h} x {d} voxels: FreeSurfer's sweeps run past its end and crash"
         ),

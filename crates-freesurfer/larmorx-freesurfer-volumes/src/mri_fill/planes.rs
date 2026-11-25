@@ -9,7 +9,7 @@
 //! `mri_cc`'s `find_corpus_callosum` and `find_cc_slice` (`crate::mri_cc::wm`) search differently.
 //!
 //! Defects (`larmorx_core::defects`; the mechanisms in `docs/findings/freesurfer-mri-fill.md`):
-//! FS-1291 (voxels outside a volume, [`super::local`]), FS-1293 (voxels smaller than 0.5 mm: more
+//! FS-1291 and FS-1300 (voxels outside a volume, [`super::local`]), FS-1293 (voxels smaller than 0.5 mm: more
 //! slices than FreeSurfer's tables hold, an error in both modes), FS-1294 (the pons' backup
 //! searches in the input's space, kept), FS-1295 (`-D`'s statistics file that does not open:
 //! FreeSurfer crashes).

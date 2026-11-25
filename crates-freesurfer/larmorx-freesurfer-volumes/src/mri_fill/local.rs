@@ -6,14 +6,14 @@
 //! constants of `include/mri.h` the program uses.
 //!
 //! FreeSurfer's `MRIvox(mri, x, y, z)` is `((BUFTYPE *)mri->slices[z][y])[x]`: a column past a
-//! row's end is the next (or previous) row's byte in the volume's buffer, a row or slice the
-//! volume does not have is memory it does not own. Where the program reaches such a place
-//! (FS-1291), `reproduce` gives FreeSurfer's byte of the buffer and the default the row's border
-//! voxel; a row or slice outside reads 0 and writes nowhere in both modes.
+//! row's end is the next (or previous) row's byte in the volume's buffer (FS-1291: `reproduce`
+//! gives FreeSurfer's byte of the buffer, the default the row's border voxel); a row or slice the
+//! volume does not have, or an index table read past its margin, is memory it does not own
+//! (FS-1300: 0 read and nothing written in both modes).
 
 use std::io::Write;
 
-use larmorx_core::defects::FS_1291;
+use larmorx_core::defects::{FS_1291, FS_1300};
 use larmorx_freesurfer_core::affine::float_to_int;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
@@ -66,7 +66,7 @@ pub enum Ax {
 
 /// `m->xi[i]`, `m->yi[i]`, `m->zi[i]`: the boundary index tables (0 at or below 0, the last voxel
 /// at or past the end). Past the tables' margin (`MAX_INDEX` entries on each side) FreeSurfer
-/// reads memory it does not own: FS-1291, the table's end value in both modes.
+/// reads memory it does not own: FS-1300, the table's end value in both modes.
 #[inline]
 pub fn ix(g: &mut Globals, m: &Mri, a: Ax, i: i32) -> i32 {
     let (t, len) = match a {
@@ -80,7 +80,7 @@ pub fn ix(g: &mut Globals, m: &Mri, a: Ax, i: i32) -> i32 {
         return t[k as usize];
     }
     g.notices.add(
-        &FS_1291,
+        &FS_1300,
         format!("mri_fill reads index table entry {i} of an axis of {len} voxels, past the table"),
     );
     if i <= 0 { 0 } else { (len - 1).max(0) }
@@ -121,8 +121,8 @@ fn off(m: &Mri, x: i32, y: i32, z: i32) -> Off {
     Off::Wrapped(b as usize)
 }
 
-/// `MRIvox(m, x, y, z)`: byte `x` of row `y` of slice `z`. Outside the volume: FS-1291 (see the
-/// module's text).
+/// `MRIvox(m, x, y, z)`: byte `x` of row `y` of slice `z`. Outside the volume: FS-1291 or FS-1300
+/// (see the module's text).
 #[inline]
 pub fn vox(g: &mut Globals, m: &Mri, x: i32, y: i32, z: i32) -> u8 {
     if let Some(i) = inside(m, x, y, z) {
@@ -130,7 +130,11 @@ pub fn vox(g: &mut Globals, m: &Mri, x: i32, y: i32, z: i32) -> u8 {
     }
     let o = off(m, x, y, z);
     g.notices.add(
-        &FS_1291,
+        if matches!(o, Off::Wrapped(_)) {
+            &FS_1291
+        } else {
+            &FS_1300
+        },
         format!("mri_fill reads voxel ({x}, {y}, {z}) outside a volume"),
     );
     match o {
@@ -144,7 +148,8 @@ pub fn vox(g: &mut Globals, m: &Mri, x: i32, y: i32, z: i32) -> u8 {
 }
 
 /// `MRIvox(m, x, y, z) = v` (see [`vox`]): outside the volume FreeSurfer's other byte of the
-/// buffer with `reproduce`, nowhere by default; a row or slice it does not have nowhere (FS-1291).
+/// buffer with `reproduce`, nowhere by default (FS-1291); a row or slice it does not have nowhere
+/// (FS-1300).
 #[inline]
 pub fn set_vox(g: &mut Globals, m: &mut Mri, x: i32, y: i32, z: i32, v: u8) {
     if let Some(i) = inside(m, x, y, z) {
@@ -155,7 +160,11 @@ pub fn set_vox(g: &mut Globals, m: &mut Mri, x: i32, y: i32, z: i32, v: u8) {
     }
     let o = off(m, x, y, z);
     g.notices.add(
-        &FS_1291,
+        if matches!(o, Off::Wrapped(_)) {
+            &FS_1291
+        } else {
+            &FS_1300
+        },
         format!("mri_fill writes voxel ({x}, {y}, {z}) outside a volume"),
     );
     if let Off::Wrapped(b) = o

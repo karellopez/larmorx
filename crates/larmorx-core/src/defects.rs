@@ -2143,6 +2143,24 @@ defects! {
         "mri_fill -topofix's counts of configurations it could not resolve without the other hemisphere's voxels (pbm) are almost always 0: an edge or background configuration is counted only when the label is the other hemisphere's, a corner direction reports its last configuration's flag (kept from the previous pass when a pass finds none): kept";
     FS_1290 = "FS-1290", "FreeSurfer", true,
         "mri_fill -topofix corrects each hemisphere's volume for both labels, so each of its two calls prints the share of modified voxels of the hemisphere that is not in it as -nan (0 out of 0): kept";
+    FS_1291 = "FS-1291", "FreeSurfer", true,
+        "mri_fill reads and writes voxels outside its volumes at the images' borders (a seed's face neighbours, the degenerate locations' diagonal checks of the last columns, rows and slices, the cutting plane's columns on volumes of other heights than widths) and crashes on a volume of a single slice, row or column: FreeSurfer uses its buffer's neighbouring row there, or memory it does not own; larmorx reads the row's border voxel, writes nothing outside, and ends the fill of such a volume with an error";
+    FS_1292 = "FS-1292", "FreeSurfer", true,
+        "mri_fill with an option given without all its values reads past its arguments: -rval, -lval, -debug_voxel, -fillven, -lh, -rh, -lhv, -rhv, -PV, -CV, -P, -C, -T, -F and -auto-man crash (exit status 139), -segmentation, -topofix and -atlas print (null) and the help (exit status 0), -xform, -a, -L and -ctab fail to open '(null)': larmorx prints that the option needs its values, exit status 1";
+    FS_1293 = "FS-1293", "FreeSurfer", true,
+        "mri_fill on volumes of voxels smaller than 0.5 mm looks at more cutting-plane slices than it has room for (memory it does not own), and with voxels of 15 mm or more reads a slice it never made: larmorx ends with an error in both modes";
+    FS_1294 = "FS-1294", "FreeSurfer", false,
+        "mri_fill without a segmentation, when its first search for the pons fails, searches again in the input volume's own space with Talairach coordinates (the brainstem's backup search, then the plane at Talairach (-2, -15, -17)): kept";
+    FS_1295 = "FS-1295", "FreeSurfer", true,
+        "mri_fill -D (the cutting planes' statistics appended to cc.log and pons.log in the working folder) crashes when such a file cannot be opened: larmorx ends with an error, exit status 1";
+    FS_1296 = "FS-1296", "FreeSurfer", true,
+        "mri_fill never ends on some settings: -T 27 or more (the hole filling fills holes with 0 again and again), equal fill values for the two hemispheres when they overlap, or a fill value that does not change a voxel stored as a byte (256, or below 5) where degenerate locations are filled: larmorx ends with an error in both modes";
+    FS_1297 = "FS-1297", "FreeSurfer", false,
+        "mri_fill without a segmentation fills degenerate locations (voxels joined diagonally) found along x and y only: its test along z compares each voxel with itself: kept (to be measured on the surfaces of that fill)";
+    FS_1298 = "FS-1298", "FreeSurfer", true,
+        "mri_fill goes on without a volume where a step gives none (a white matter of a type that cannot be made bytes; -auto-man's two volumes of different extents) and crashes: larmorx ends with an error, exit status 1";
+    FS_1299 = "FS-1299", "FreeSurfer", true,
+        "mri_fill ends with exit status 0 when its output cannot be written (also -fillonly's output and the planes.mgz of -F): larmorx ends with 1";
     FS_1210 = "FS-1210", "FreeSurfer", true,
         "mri_cc -a 0 whose search for the callosum's seed fails (no column of the callosum's thickness near Talairach's origin, or 'could not find valid seed for the cc') uses the seed's Talairach millimetres as a voxel position (only the printed centre and the division counts depend on it): larmorx uses the seed's voxel";
     FS_974 = "FS-974", "FreeSurfer", true,

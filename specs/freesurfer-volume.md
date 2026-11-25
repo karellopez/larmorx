@@ -3635,9 +3635,17 @@ state (each probe call is a process of its own), FS-514's threads (the loop runs
   skipped. A face neighbour (one offset) that is set gives -1 (`removed`), otherwise +1 (`added`); an edge (two
   offsets) whose three other voxels (the diagonal one and the two face ones along its axes) are all unset gives -1
   (`added`), all set +1 (`removed`), any other count nothing; a corner (three offsets) whose seven other voxels are all
-  unset gives +1 (`added`), all set -1 (`removed`), any other count nothing. A voxel outside the volume on an axis the
-  function tests counts as unset (the diagonal voxel on all three, a face voxel on its own axis); reads it makes
-  without testing (the other axes, when the centre lies outside the volume) go through the voxel functions. When `(c,
+  unset gives +1 (`added`), all set -1 (`removed`), any other count nothing. Which axes are tested for lying outside
+  the volume: the voxel at the offset itself (the face neighbour, an edge's diagonal voxel, a corner's diagonal voxel)
+  on all three axes, the centre's own coordinates included (so a face neighbour, or an edge's diagonal voxel, of a
+  centre that lies outside the volume on another axis counts as unset); every other voxel of an edge or a corner only on
+  the axes along which it is offset from the centre (an edge's two face voxels on their one axis each; a corner's three
+  face voxels on their one axis, its three edge voxels on their two axes). A voxel outside on a tested axis counts as
+  unset; on the axes not tested (when the centre itself lies outside the volume on such an axis) the voxel is read
+  through the voxel functions (fs.mri §5) at those coordinates (**(observed)**: `vtopo`'s `qecc` of a 2 x 3 x 2 byte
+  volume at the centre `(-1, 3, 0)`: the face `( 1  0  0)` is voxel `(0, 3, 0)`, outside on the row axis, so `added`,
+  although a read through the voxel functions there lands on a set voxel; and of a 2 x 7 x 6 volume at `(2, 6, 5)`: the
+  face `( 0 -1  0)`, voxel `(2, 5, 5)`, outside on the column axis, `added`). When `(c,
   r, s)` equals FreeSurfer's debugging voxel `(Gx, Gy, Gz)` (each -1 unless a program sets them): `  debug vox <c> <r>
   <s>` (two spaces first), then for each change a line `<kind> <dc> <dr> <ds> <word> dEC=<total>` (`<kind>` `face`,
   `edge` or `vertex`, each offset `%2d`, `<word>` `added` or `removed` as above, the running total after the change),
@@ -3695,9 +3703,12 @@ three are C++ classes whose public fields the caller sets before calling their m
     is not checked against `fend` or the frames: a new output of `fend - fstart` frames below 0 ends the program at the
     allocation (fs.mri's message, `MRIalloc: could not allocate <n> frame`, status 254; **(observed)**: `vbin`), and no
     frame is binarized when `fstart` is not below `fend`. With `invert` the on and off values are swapped for the call
-    (the dump again with `m_debug`) and restored after. Each voxel (columns outermost, then rows, slices): outside the
-    mask or on a zeroed edge (`qualifies` with `f` -1), every frame off; otherwise each frame on where it qualifies
-    (`qualifies` without the mask), else off, into frame `f - fstart` (values stored as `float`, then as the output's
+    and restored after. With `m_debug` the dump is printed a second time once the output is settled (after the frame
+    range is stored and the values swapped), with or without `invert`: its `fstart`, `fend`, `on` and `off` are those
+    the call uses (**(observed)**: `vrules24`, `BinType` 3 and 2 with `m_debug` 1: two dumps, the second with the stored
+    range, then the `nhits` line; `vdem`'s thresholded and matched morphs with `mm_debug`). Each voxel (columns
+    outermost, then rows, slices): outside the mask or on a zeroed edge (`qualifies` with `f` -1), every frame off;
+    otherwise each frame on where it qualifies (`qualifies` without the mask), else off, into frame `f - fstart` (values stored as `float`, then as the output's
     type stores them). FreeSurfer writes the first case's off value into frame `f` (FS-803; by default `f - fstart`).
     `nhits` (stored in the structure): the on voxels, with `invert` the voxels times frames minus them (32-bit
     arithmetic). With `m_debug` `BinarizeMRI: nhits = <n>` at the end (**(observed)**: `vbin`; `vrules24`, every message,
@@ -3728,10 +3739,13 @@ three are C++ classes whose public fields the caller sets before calling their m
     the voxel itself (0) or none; a `morphtype` other than 1 or 2 visits every voxel, counts no offset, and so changes a
     voxel (to 0) only for a negative `nnbrsthresh` (**(observed)**: `vdem`; `vrules24`).
   - `morph(invol, thmin, thmax, mask, outvol)` and `morph(invol, matchlist, mask, outvol)`: `check(invol, mask, outvol)`
-    (`NULL` after its error); a volume of several frames has frame `frame` copied first (`copyFrame`: FreeSurfer copies
-    into bytes, FS-808; by default the input's type); then binarized (`BinarizeMRI` type 1 with the thresholds, or type 2
-    with the list, within the mask, `m_debug` as `mm_debug`; `NULL` passed on) and `morph` of the result. The result is
-    a new volume (`outvol` is only checked). FreeSurfer's `morph` then selects frame `frame` again from the one-frame
+    (`NULL` after its error); a volume of several frames has frame `frame` copied first (`copyFrame`, of `mm_mritype`:
+    a type chosen (0 or above) is the copy's type in both modes, with no notice; for -1 FreeSurfer copies into bytes,
+    and when the input is not of bytes that is FS-808: its notice in both modes, `reproduce` bytes, by default the
+    input's own type; **(observed)**: `vdem`, `float` volumes of 3 and 2 frames copied with `mm_mritype` 1 and 3, into
+    `int` and `float`: the `float` copy keeps a NaN, which passes the thresholds 99.5 and 60, `nhits = 1`, where a byte
+    copy gives 0); then binarized (`BinarizeMRI` type 1 with the thresholds, or type 2 with the list, within the mask,
+    `m_debug` as `mm_debug`; `NULL` passed on) and `morph` of the result. The result is a new volume (`outvol` is only checked). FreeSurfer's `morph` then selects frame `frame` again from the one-frame
     binarized volume (FS-805; by default frame 0). With `mm_debug`, the binarization's dumps and its `nhits` line come
     before the morph's own lines (**(observed)**: `vdem`; `vrules24`, two frames with frames 0 and 1, a frame past them,
     an output of another extent).

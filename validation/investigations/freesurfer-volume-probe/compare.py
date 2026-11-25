@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The comparison loop of ``specs/freesurfer-volume.md`` §69 (parts 1 to 10, §54 to §57): seeded cases of every
+"""The comparison loop of ``specs/freesurfer-volume.md`` §69 (parts 1 to 11c, §54 to §57): seeded cases of every
 group, run on the probe ``fs_volume_probe`` (FreeSurfer 8.2.0's volume functions, a black box) and on
 a candidate program that takes the same commands (README.md beside this file), compared line by
 line.
@@ -7761,6 +7761,375 @@ class Gen21(Gen20):
         ]
 
 
+class Gen22(Gen21):
+    """Relay 23: §67 (the inverse move, the conversions between voxel and RAS coordinates, the
+    composition)."""
+
+    @staticmethod
+    def ginit() -> str:
+        """Gf (the fs.mri probe's) of a geometry as a new array leaves it (fs.mri §20): not valid,
+        256 x 256 x 256 voxels of 1 mm, the coronal direction cosines, centre 0, no shear,
+        ``ras_good_flag`` 0, the name ``unknown``, no cached matrices."""
+        one, zero, m1 = f32(1.0), f32(0.0), f32(-1.0)
+        f = [one, one, one, "0", m1, zero, zero, zero, zero, m1, zero, one, zero, *[zero] * 6]
+        return " ".join(["0", "256", "256", "256", *f, xs("unknown"), "0", "null"])
+
+    @staticmethod
+    def lt_text(m: str, a: str, b: str, c=None, s: float = 1.0, ty: int = 0) -> str:
+        """LT (README.md): centre c (3 float texts, zeros), spread s, the matrix m, zero
+        derivative matrices, the type, label 0, the geometries a and b (Gf texts)."""
+        c = c or [f32(0.0)] * 3
+        return " ".join([*c, f32(s), m, Z44, Z44, str(ty), "0", a, b])
+
+    def lt_alloc(self) -> str:
+        """A transform as a new array leaves it (fs.mri §20, no volume): centre 0, spread 10000,
+        the identity, type -1, both geometries ``ginit``."""
+        return self.lt_text(IDENT, self.ginit(), self.ginit(), s=10000.0, ty=-1)
+
+    @staticmethod
+    def arri(ty: int, fw: list[str], inv: list[str], subj: str = "", fscale: float = 1.0) -> str:
+        """An array (README.md, LTA) of the given transforms and inverse transforms (LT texts)."""
+        return f"{len(fw)} {ty} {f32(fscale)} {xs(subj)} {' '.join(fw + inv)}"
+
+    # -- §67
+    def vltaixf(self) -> list[Batch]:
+        """§67: LTAinverseTransformInterp: sources of up to 4 x 4 x 4 voxels and 2 frames of
+        bytes, ints, floats and shorts; new destinations and given ones of other extents, types and
+        frames; arrays of 0 to 3 transforms of the voxel, RAS and physical-voxel types (and
+        tkregister and others, which end the program), their inverse transforms given (near the
+        inverse scaling, the identity, any affine) or as a new array leaves them, the inverses'
+        geometries of valid 1, 0 and 2, the source's, the destination's or a third one; nearest,
+        trilinear, sinc, cubic and B-spline sampling; USE_AVERAGE305 set, empty and unset;
+        DIAG_VERBOSE and DIAG_HEARTBEAT."""
+        r = self.rng("vltaixf")
+        L = []
+        for _ in range(200):
+            nf = r.choice([1, 1, 2])
+            sd = (r.randint(1, 4), r.randint(1, 4), r.randint(1, 4))
+            s, sg = self.p9vol(r, sd, r.choice([0, 1, 3, 3, 4]), nf)
+            td = (r.randint(1, 4), r.randint(1, 4), r.randint(1, 4))
+            tg = self.rgeo(r, td)
+            ug = self.rgeo(r, (r.randint(1, 4), r.randint(1, 4), r.randint(1, 4)))
+            n = r.choice([1, 1, 1, 1, 1, 0, 2, 3])
+            ty = r.choice([0, 0, 1, 1, 2]) if r.random() < 0.93 else r.choice([14, 3, 12, 15, 21])
+            fw, inv = [], []
+            for _ in range(n):
+                sc = r.choice([1.0, 1.0, 0.5, 2.0])
+                if ty == 1 and n == 1 and r.random() < 0.4:
+                    m = self.affine(r)
+                else:
+                    m = self.near(r, scale=sc, t=1.0)
+                if ty == 2 and r.random() < 0.9:
+                    va = vb = 1
+                else:
+                    va, vb = r.choice([1, 1, 1, 0]), r.choice([1, 1, 1, 0, 2])
+                c = [f32(r.uniform(-2, 5)) for _ in range(3)]
+                fw.append(
+                    self.lt_text(
+                        m,
+                        self.gnamed(sg, "", va),
+                        self.gnamed(tg, "", vb),
+                        c,
+                        r.choice([1.0, 10000.0, 0.5]),
+                    )
+                )
+                k = r.random()
+                if k < 0.15:
+                    inv.append(self.lt_alloc())
+                    continue
+                if k < 0.7:
+                    mi = self.near(r, scale=1.0 / sc, t=1.0)
+                elif k < 0.85:
+                    mi = IDENT
+                else:
+                    mi = self.affine(r, special=0.05)
+                ia, ib = r.choice([1, 1, 1, 0, 2]), r.choice([1, 1, 1, 0, 2])
+                # the inverse runs from the destination to the source; its destination geometry
+                # sometimes a third one, so that its centre is not the source's
+                igs = tg if r.random() < 0.8 else ug
+                igd = sg if r.random() < 0.5 else ug
+                inv.append(self.lt_text(mi, self.gnamed(igs, "", ia), self.gnamed(igd, "", ib)))
+            arr = self.arri(ty, fw, inv)
+            if r.random() < 0.85:
+                out = "new"
+            else:
+                od = (r.randint(1, 4), r.randint(1, 4), r.randint(1, 4))
+                if n != 1 and r.random() < 0.7:
+                    # the octree walks the source's extent: a destination of it
+                    od = sd
+                out, _ = self.p9vol(r, od, r.choice([3, 1]), r.choice([1, 2]))
+            interp = r.choice([0, 1, 1, 2, 3, 5])
+            pre = ""
+            if r.random() < 0.15:
+                pre += r.choice(["+env=USE_AVERAGE305=true ", "+env=USE_AVERAGE305= "])
+            if r.random() < 0.15:
+                pre += f"+gdiag={r.choice([DIAG_VERBOSE, DIAG_HEARTBEAT, DIAG_VERBOSE | DIAG_HEARTBEAT]):x} "
+            L.append(f"{pre}ltaixf {s} 0 {out} {arr} {interp}")
+        # FS-504: FreeSurfer reads a transform the array does not hold (an error in both modes)
+        return [Batch("vltaixf", "vltaixf", L, both="FS-504")]
+
+    def vltacv(self) -> list[Batch]:
+        """§67: LTAvoxelToRasXform and LTArasToVoxelXform (alternately): arrays of 0 to 3
+        transforms of every type between the pool's geometries (valid 1, 0, 2; named and not),
+        matrices affine, near a scaling, special (the identity, singular, NaN, other sizes, none);
+        source and destination volumes of the transforms' geometries or others (some with
+        ras_good_flag 0), or none."""
+        r = self.rng("vltacv")
+        pool = self.pool(r)
+        L = []
+        for i in range(240):
+            cmd = "ltav2r" if i % 2 == 0 else "ltar2v"
+            n = r.choice([0, 1, 1, 1, 1, 1, 2, 2, 3, 3])
+            if cmd == "ltav2r":
+                ty = r.choice([0, 0, 1, 2, 14]) if r.random() < 0.9 else r.choice([3, 12, 15, 21])
+            else:
+                ty = r.choice([1, 1, 1, 2, 14, 0]) if r.random() < 0.9 else r.choice([3, 12, 21])
+            ia, ib = r.randrange(len(pool)), r.randrange(len(pool))
+            lts = []
+            for _ in range(n):
+                if r.random() < 0.7:
+                    a, b = ia, ib
+                else:
+                    a, b = r.randrange(len(pool)), r.randrange(len(pool))
+                k = r.random()
+                if k < 0.6:
+                    m = self.affine(r, special=0.03)
+                elif k < 0.85:
+                    m = self.near(r)
+                else:
+                    m = self.xmat(r)
+                va, vb = r.choice([1, 1, 1, 0]), r.choice([1, 1, 1, 0, 2])
+                lts.append(
+                    (
+                        m,
+                        self.gnamed(pool[a], r.choice(["", "s.mgz"]), va),
+                        self.gnamed(pool[b], r.choice(["", "d.mgz"]), vb),
+                        [self.fv(r) for _ in range(3)],
+                        r.choice([1.0, 10000.0]),
+                    )
+                )
+            arr = self.arrn(ty, lts)
+
+            def vol(j: int) -> str:
+                dims, f = pool[j] if r.random() < 0.85 else pool[r.randrange(len(pool))]
+                f = list(f)
+                if r.random() < 0.15:
+                    f[3] = "0"
+                nv = dims[0] * dims[1] * dims[2]
+                return self.pk((dims, f), [r.randint(0, 9) for _ in range(nv)], t=0) + " 0"
+
+            p_null = 0.3 if cmd == "ltav2r" else 0.06
+            src = "null" if r.random() < p_null else vol(ia)
+            # ltar2v without a destination: FS-957 (FreeSurfer crashes)
+            dst = "null" if r.random() < (0.3 if cmd == "ltav2r" else 0.1) else vol(ib)
+            L.append(f"{cmd} {arr} {src} {dst}")
+        # FS-504: FreeSurfer reads a transform the array does not hold (an error in both modes)
+        return [Batch("vltacv", "vltacv", L, both="FS-504")]
+
+    def vltacmp(self) -> list[Batch]:
+        """§67: LTAcompose: sources of 0 to 2 transforms of the voxel, RAS, physical-voxel and
+        tkregister types; left and right matrices (none, affine, any 4 x 4 with special values,
+        other sizes); into a new array, another array of 0 to 2 transforms or the source itself."""
+        r = self.rng("vltacmp")
+        pool = self.pool(r)
+        L = []
+
+        def arr() -> str:
+            n = r.choice([1, 1, 1, 2]) if r.random() > 0.06 else 0
+            ty = r.choice([0, 1, 1, 2, 14])
+            lts = []
+            for _ in range(n):
+                a, b = r.sample(range(len(pool)), 2)
+                k = r.random()
+                if k < 0.7:
+                    m = self.affine(r, special=0.03)
+                elif k < 0.9:
+                    m = self.near(r)
+                else:
+                    m = self.xmat(r)
+                lts.append(
+                    (
+                        m,
+                        self.gnamed(pool[a], r.choice(["", "s.mgz"]), r.choice([1, 1, 0])),
+                        self.gnamed(pool[b], r.choice(["", "d.mgz"]), r.choice([1, 1, 0, 2])),
+                        [self.fv(r) for _ in range(3)],
+                        r.choice([1.0, 10000.0, 0.5]),
+                    )
+                )
+            return self.arrn(ty, lts, r.choice(["", "bert"]), r.choice([1.0, 0.5]))
+
+        def side() -> str:
+            k = r.random()
+            if k < 0.35:
+                return "null"
+            if k < 0.85:
+                return self.affine(r, special=0.03)
+            if k < 0.93:
+                return self.mat(r, 4, 4, special=0.05)
+            return self.mat(r, r.choice([3, 4]), r.choice([3, 4, 1]))
+
+        for _ in range(200):
+            src = arr()
+            left, right = side(), side()
+            k = r.choice([0, 0, 1, 1, 2])
+            line = f"ltacmp {src} {left} {right} {k}"
+            if k == 1:
+                line += f" {arr()}"
+            L.append(line)
+        # FS-504: FreeSurfer reads a transform the array does not hold (an error in both modes)
+        return [Batch("vltacmp", "vltacmp", L, both="FS-504")]
+
+    def vrules26(self) -> list[Batch]:
+        """The fixed cases of §67."""
+        L = []
+        P = self.plain
+        z0, one = f32(0.0), f32(1.0)
+        ga = P((3, 2, 2))
+        gb = P((2, 3, 2), sizes=(2.0, 1.0, 1.0), c=(5.0, -3.0, 1.0))
+        gc = P((3, 2, 2), c=(-7.0, 2.5, 4.0))
+        gav, gbv, gcv = self.gnamed(ga, "a.mgz"), self.gnamed(gb, "b.mgz"), self.gnamed(gc)
+        ga0, gb0 = self.gnamed(ga, valid=0), self.gnamed(gb, valid=0)
+        gc0, gc2 = self.gnamed(gc, valid=0), self.gnamed(gc, valid=2)
+        m = "4 4 " + " ".join(
+            f32(x) for x in [1, 0, 0, 2.5, 0, 0, -1, 1, 0, 1, 0, -0.5, 0, 0, 0, 1]
+        )
+        # its inverse, exactly
+        mi = "4 4 " + " ".join(
+            f32(x) for x in [1, 0, 0, -2.5, 0, 0, 1, 0.5, 0, -1, 0, 1, 0, 0, 0, 1]
+        )
+        nanm = m.split()
+        nanm[2 + 3] = QNAN
+        nanm = " ".join(nanm)
+        sing = "4 4 " + " ".join([z0] * 15 + [one])
+        m33 = "3 3 " + " ".join(f32(1.0 if i % 4 == 0 else 0.0) for i in range(9))
+        m41 = "4 1 " + " ".join(f32(x) for x in (1.0, 2.0, 3.0, 1.0))
+        src = self.lab(ga, [float(i) for i in range(12)], t=3)
+
+        def ix(ty, fm=m, fs_=gav, fd=gbv, im=mi, is_=gbv, id_=gav):
+            return self.arri(ty, [self.lt_text(fm, fs_, fd)], [self.lt_text(im, is_, id_)])
+
+        empty = self.arri(1, [], [])
+        # LTAinverseTransformInterp, one RAS transform, no destination: the inverse's destination
+        # geometry valid 1 (its centre), 2 and 0 (not 1), with USE_AVERAGE305 and DIAG_VERBOSE
+        for g in (gcv, gc2, gc0):
+            for pre in ("", "+env=USE_AVERAGE305=1 ", f"+gdiag={DIAG_VERBOSE:x} "):
+                L.append(f"{pre}ltaixf {src} 0 new {ix(1, id_=g)} 1")
+        # voxel transforms with the inverse's geometries missing (the INFO lines, the destination's
+        # first), and both present
+        for is_, id_ in ((gb0, ga0), (gbv, ga0), (gb0, gav), (gbv, gav)):
+            L.append(f"ltaixf {src} 0 new {ix(0, is_=is_, id_=id_)} 0")
+        # the inverse as a new array leaves it, voxel and RAS types
+        for ty in (0, 1):
+            arr = self.arri(ty, [self.lt_text(m, gav, gbv)], [self.lt_alloc()])
+            L.append(f"ltaixf {src} 0 new {arr} 1")
+        # physical-voxel: changed to RAS-to-RAS first, the inverse filled again (the given one
+        # dropped); with a geometry not valid (the change's error)
+        alloc_inv = [self.lt_alloc()]
+        L.append(f"ltaixf {src} 0 new {self.arri(2, [self.lt_text(m, gav, gbv)], alloc_inv)} 1")
+        L.append(f"ltaixf {src} 0 new {self.arri(2, [self.lt_text(m, ga0, gbv)], alloc_inv)} 1")
+        # tkregister (no change first) and other types: the program ends
+        for ty in (14, 3, 12, 15, 21):
+            L.append(f"ltaixf {src} 0 new {ix(ty)} 1")
+        # a given destination of another extent, type and frames
+        dv = self.lab(P((2, 2, 3)), [0] * 24, t=1, nf=2)
+        L.append(f"ltaixf {src} 0 {dv} {ix(1)} 1")
+        # no transform (the zero matrix: every voxel the source's first); two, one singular; the
+        # heartbeat at depths 1 and 3
+        L.append(f"ltaixf {src} 0 new {empty} 0")
+        two_fw = [
+            self.lt_text(IDENT, gav, gav),
+            self.lt_text(sing, gav, gav, [f32(2.0), one, one], 0.5),
+        ]
+        L.append(f"ltaixf {src} 0 new {self.arri(1, two_fw, [self.lt_alloc()] * 2)} 0")
+        for d in (1, 3):
+            v = self.lab(P((2, 2, d)), [1.0] * (4 * d), t=3)
+            L.append(f"+gdiag={DIAG_HEARTBEAT:x} ltaixf {v} 0 new {empty} 0")
+
+        def one_arr(ty, mm=m, a=gav, b=gbv):
+            return self.arrn(ty, [(mm, a, b, [z0] * 3, 1.0)])
+
+        def two_arr(ty, a=gav, b=gbv):
+            return self.arrn(ty, [(m, a, b, [z0] * 3, 1.0), (mi, a, b, [z0] * 3, 1.0)])
+
+        three = self.arrn(1, [(m, gav, gbv, [z0] * 3, 1.0)] * 2 + [(mi, gav, gbv, [z0] * 3, 1.0)])
+        va = self.lab(ga, [1] * 12, t=0) + " 0"
+        vb = self.lab(gb, [2] * 12, t=0) + " 0"
+        gb_bad = list(gb[1])
+        gb_bad[3] = "0"
+        vb0 = self.lab((gb[0], gb_bad), [2] * 12, t=0) + " 0"
+        # LTAvoxelToRasXform: from the transforms' own geometries (FS-955's direction), valid or
+        # not; with volumes, one and two transforms; the source only (the destination the
+        # source); the destination only (not read); no transform; a matrix of another size (no
+        # matrix), NaN, none (the program ends); any type becomes RAS-to-RAS
+        L.append(f"ltav2r {one_arr(0, IDENT)} null null")
+        L.append(f"ltav2r {one_arr(0)} null null")
+        L.append(f"ltav2r {one_arr(0, a=ga0, b=gb0)} null null")
+        L.append(f"ltav2r {one_arr(0)} {va} {vb}")
+        L.append(f"ltav2r {two_arr(0)} {va} {vb}")
+        L.append(f"ltav2r {one_arr(0)} {va} null")
+        L.append(f"ltav2r {one_arr(0)} null {vb}")
+        L.append(f"ltav2r {self.arrn(0, [])} null null")
+        L.append(f"ltav2r {one_arr(0, m33)} {va} {vb}")
+        L.append(f"ltav2r {one_arr(0, m33)} null null")
+        L.append(f"ltav2r {one_arr(0, nanm)} {va} {vb}")
+        L.append(f"ltav2r {one_arr(0, 'null')} {va} {vb}")
+        for ty in (1, 2, 14, 21):
+            L.append(f"ltav2r {one_arr(ty)} {va} {vb}")
+        # LTArasToVoxelXform: a voxel array left alone (no volume read); one transform; two and
+        # three (FS-954); no destination with a transform (FS-957) and without; no source with
+        # and without a transform; a volume of ras_good_flag 0 (its geometries not valid); a
+        # matrix of another size; other types
+        L.append(f"ltar2v {one_arr(0)} null null")
+        L.append(f"ltar2v {one_arr(1)} {va} {vb}")
+        L.append(f"ltar2v {two_arr(1)} {va} {vb}")
+        L.append(f"ltar2v {three} {va} {vb}")
+        L.append(f"ltar2v {one_arr(1)} {va} null")
+        L.append(f"ltar2v {self.arrn(1, [])} {va} null")
+        L.append(f"ltar2v {self.arrn(1, [])} null null")
+        L.append(f"ltar2v {one_arr(1)} null {vb}")
+        L.append(f"ltar2v {one_arr(1)} {va} {vb0}")
+        L.append(f"ltar2v {one_arr(1, m33)} {va} {vb}")
+        for ty in (2, 14, 21):
+            L.append(f"ltar2v {one_arr(ty)} {va} {vb}")
+        # LTAcompose: a new array with no matrices (a new array's fields), left only, right only,
+        # both (FS-956) into a new array and into another, both in place (no notice), left and
+        # right alone in place and into another; a source or a destination of no transforms
+        # (FS-504); a destination transform without a matrix; products of other sizes; a source
+        # without a matrix (the program ends); arrays of two transforms (the first ones only)
+        left = "4 4 " + " ".join(f32(x) for x in [2, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
+        right = "4 4 " + " ".join(f32(x) for x in [1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 1, -2, 0, 0, 0, 1])
+        s1 = one_arr(1)
+        other = self.arrn(0, [(IDENT, gcv, gcv, [f32(4.0)] * 3, 2.0)], "bert", 0.5)
+        L.append(f"ltacmp {s1} null null 0")
+        L.append(f"ltacmp {s1} {left} null 0")
+        L.append(f"ltacmp {s1} null {right} 0")
+        L.append(f"ltacmp {s1} {left} {right} 0")
+        L.append(f"ltacmp {s1} {left} {right} 1 {other}")
+        L.append(f"ltacmp {s1} {left} {right} 2")
+        L.append(f"ltacmp {s1} {left} null 2")
+        L.append(f"ltacmp {s1} null {right} 2")
+        L.append(f"ltacmp {s1} null {right} 1 {other}")
+        L.append(f"ltacmp {s1} null null 1 {other}")
+        L.append(f"ltacmp {self.arrn(1, [])} {left} null 0")
+        L.append(f"ltacmp {s1} {left} null 1 {self.arrn(1, [])}")
+        nom = self.arrn(0, [("null", gcv, gcv, [z0] * 3, 1.0)])
+        L.append(f"ltacmp {s1} {left} {right} 1 {nom}")
+        L.append(f"ltacmp {s1} {m33} null 0")
+        L.append(f"ltacmp {s1} null {m41} 1 {other}")
+        L.append(f"ltacmp {one_arr(1, 'null')} {left} null 0")
+        L.append(f"ltacmp {two_arr(0)} {left} {right} 1 {two_arr(1, gbv, gav)}")
+        # an unknown type after the destination step's lines: the inverse's destination geometry
+        # not valid, alone and with USE_AVERAGE305
+        L.append(f"ltaixf {src} 0 new {ix(14, id_=gc0)} 1")
+        L.append(f"+env=USE_AVERAGE305=1 ltaixf {src} 0 new {ix(21, id_=gc0)} 1")
+        # FS-956 with a left product that fails, into a new array and into a transform without a
+        # matrix
+        L.append(f"ltacmp {s1} {m33} {right} 0")
+        L.append(f"ltacmp {s1} {m33} {right} 1 {nom}")
+        # FS-504: FreeSurfer reads a transform the array does not hold (an error in both modes)
+        return [Batch("vrules26", "vrules26", L, both="FS-504")]
+
+
 GROUPS = [
     "vgblock",
     "vgcopy",
@@ -7841,6 +8210,10 @@ GROUPS = [
     "vrot",
     "vlst",
     "vrules25",
+    "vltaixf",
+    "vltacv",
+    "vltacmp",
+    "vrules26",
 ]
 
 # ---- running ------------------------------------------------------------------------------------
@@ -7998,7 +8371,7 @@ def licence_guard(b: Batch) -> None:
 
 
 def all_batches(gen: Gen, groups: list[str]) -> list[Batch]:
-    gen = gen if isinstance(gen, Gen21) else Gen21(gen.seed)
+    gen = gen if isinstance(gen, Gen22) else Gen22(gen.seed)
     out = []
     for g in groups:
         out += getattr(gen, g)()

@@ -419,7 +419,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FS-805 | FreeSurfer 8.2.0 `DEMorphBinVol::morph` (thresholds, match lists) | with a frame other than 0, the one-frame binarized volume has that frame selected again: frame 1 reads past it, a later frame gives no output | c | none known | its frame 0 (rule A, 2026-11-15), named; `reproduce` FreeSurfer's selection | – |
 | FS-806 | FreeSurfer 8.2.0 `DEMorphBinVol::check`, `copyFrame` | a frame equal to the number of frames is accepted and read past the volume | a (memory) | none known | out of range, their error (rule B, 2026-11-15), named; `reproduce` reads it | – |
 | FS-807 | FreeSurfer 8.2.0 `DEMorphBinVol::morph` | a neighbourhood other than 1 to 3, a morphology type other than 1 or 2 or a frame out of range prints its error and goes on to make a result | e | none known | no result after the error (rule B, 2026-11-15), as the other `morph`s do, named; `reproduce` goes on | – |
-| FS-808 | FreeSurfer 8.2.0 `DEMorphBinVol::morph` (thresholds, match lists) | a volume of several frames has its chosen frame copied into bytes (rounded and clamped to 0..255) before its thresholds or labels are compared; a one-frame volume is compared as it is | c | none known | the copy keeps the input's type (rule A, 2026-11-15; the class's own documentation), named; `reproduce` bytes | – |
+| FS-808 | FreeSurfer 8.2.0 `DEMorphBinVol::morph` (thresholds, match lists) | a volume of several frames has its chosen frame copied into bytes (rounded and clamped to 0..255) before its thresholds or labels are compared, when no working type is chosen (the default); a one-frame volume is compared as it is, a chosen working type is the copy's | c | none known | the copy keeps the input's type (rule A, 2026-11-15; the class's own documentation), named; `reproduce` bytes | – |
 | FS-809 | zlib 1.2.11 `deflatePrime` (Ubuntu 22.04's build) | called while compressed bytes wait behind some already handed out (a `deflate` that ran out of output space), it puts its bits at the position the waiting count gives, not after the waiting bytes: it overwrites bytes handed out, and the next `deflate` hands out bytes it never wrote | a (memory: never written) | none known (zlib.h places the call before the first `deflate`) | after the waiting bytes (rule A, 2026-11-15), named; `reproduce` zlib's placement, the unset bytes the buffer's (zeros or older bytes) | – |
 | FS-810 | zlib 1.2.11 `deflatePrime` | does not check that its bits fit behind the waiting bytes: repeated calls write past the pending buffer, and the next `deflate` reads past it | a (out of bounds) | none known | refused (`Z_BUF_ERROR`) in both modes (rule B, 2026-11-15), named | – |
 | FS-811 | zlib 1.2.11 `deflate_stored`, `fill_window` | storing (level 0) can slide its window while more bytes wait to be hashed than lie before the position; after a switch to compressing (`deflateParams`) the next fill reads about 4 GiB before the window: a crash (zlib 1.2.12 limits the count) | a (crash) | none known | the count limited to the position where zlib would read, in both modes (a crash is never reproduced), named | – |
@@ -4530,12 +4530,15 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
   from a first frame above 0 writes masked and edge voxels into the wrong output frames (FS-803); the binary
   dilation and erosion read a voxel's own value from a frame its working copy lacks (FS-804), select the chosen
   frame again from the one-frame binarized volume (FS-805), accept a frame one past the last (FS-806), go on after
-  their own check fails (FS-807) and compare a multi-frame input's thresholds with its byte copy (FS-808).
+  their own check fails (FS-807) and compare a multi-frame input's thresholds with its byte copy when no working type
+  is chosen (FS-808).
 - **Evidence:** verified (`validation/probes/fs-volume`, part 17: FreeSurfer 8.2.0's functions from the unit oracle's
   build against the port; seeds 7 and 13, 11,000 cases each, every comparable line identical with `reproduce`, `fix`
   different only with its notices); the open probe `validation/investigations/freesurfer-volume-probe/` (groups
   `vbright`, `vbin`, `vdem` and `vrules24`, 2026-11-24: FS-802's values in floats, shorts and ints, FS-803's crashes,
-  FS-804's to FS-806's frames past a one-frame copy, FS-807's and FS-808's settings among their lines). The mechanisms:
+  FS-804's to FS-806's frames past a one-frame copy, FS-807's and FS-808's settings among their lines; `vdem`, 2026-11-25:
+  FreeSurfer's copies of two- and three-frame `float` volumes with the working types `int` and `float`, the `float`
+  copy keeping a NaN that passes the thresholds, as a byte copy would not). The mechanisms:
   `docs/findings/freesurfer-volume.md` §25 (closed to FreeSurfer's clean-room implementers).
 - **fMRIPrep:** none. **FreeSurfer:** none known on recon-all's paths (`mris_place_surface` reads a byte
   `brain.finalsurfs`; its ventricle fill morphs frame 0 of a one-frame volume).
@@ -4585,8 +4588,11 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
   matrix into another array keeps only the right product (FS-956).
 - **Evidence:** verified (`validation/probes/fs-volume`, part 19: FreeSurfer 8.2.0's functions from the unit oracle's
   build against the port; seeds 7 and 13, 4,000 cases each, every comparable line identical with `reproduce`, `fix`
-  different only with its notices; every FS-957 case of seed 7, 111, is a segmentation fault of the original). The
-  mechanisms: `docs/findings/freesurfer-volume.md` §28 (closed to FreeSurfer's clean-room implementers).
+  different only with its notices; every FS-957 case of seed 7, 111, is a segmentation fault of the original); the open
+  probe `validation/investigations/freesurfer-volume-probe/` (groups `vltacv`, `vltacmp` and `vrules26`, 2026-11-25,
+  part 11c: FS-954 with two and three transforms, FS-955 with valid and invalid geometries, FS-956 into a new array, into
+  another and in place (both products there), FS-957's crashes). The mechanisms:
+  `docs/findings/freesurfer-volume.md` §28 (closed to FreeSurfer's clean-room implementers).
 - **fMRIPrep:** none. **FreeSurfer:** none on recon-all's default steps (the callers are `mri_nl_align`,
   `mri_linear_align`, `mri_hires_register`, `mri_jacobian`, `mris_ca_deform`, `mri_apply_bias`; arrays of one transform).
 - **larmorx:** FS-954, FS-956, FS-957 corrected by default (rule A), `reproduce` FreeSurfer's (FS-957: an error where it

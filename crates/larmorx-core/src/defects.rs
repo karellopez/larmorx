@@ -3300,7 +3300,7 @@ defects! {
     FS_807 = "FS-807", "FreeSurfer", true,
         "dilating or eroding a binary volume (DEMorphBinVol) with a neighbourhood other than 1 to 3, a morphology type other than 1 or 2, or a frame out of range prints its error and goes on: a result is made with those settings";
     FS_808 = "FS-808", "FreeSurfer", true,
-        "dilating or eroding a thresholded or label-matched volume of several frames (DEMorphBinVol's thresholds and match lists) copies the chosen frame into bytes first (values rounded and clamped to 0 to 255), so its thresholds and labels compare with the bytes; a one-frame volume is compared as it is";
+        "dilating or eroding a thresholded or label-matched volume of several frames (DEMorphBinVol's thresholds and match lists) with no working type chosen (its default) copies the chosen frame into bytes first (values rounded and clamped to 0 to 255), so its thresholds and labels compare with the bytes; a one-frame volume is compared as it is, and a chosen working type is the copy's type";
     FS_809 = "FS-809", "zlib 1.2.11", true,
         "deflatePrime called while compressed bytes wait to be handed out behind some already handed out (a deflate call that ran out of output space) puts its bits at the position given by the number of waiting bytes instead of after them: it overwrites bytes already handed out, and the next deflate call hands out bytes it never wrote (memory contents)";
     FS_810 = "FS-810", "zlib 1.2.11", true,

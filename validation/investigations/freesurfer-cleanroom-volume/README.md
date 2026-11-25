@@ -28,13 +28,13 @@ PYTHONPATH=validation/src scripts/orchestration/boxed.sh 16 python -P \
 The golden cases: `cargo test -p larmorx-fs-core --test golden_volume` (record with
 `FS_CORE_GOLDEN_RECORD=1 ... -- --nocapture`); under the AArch64 NaN emulation, the test binary
 (`target/<profile>/deps/golden_volume-*`) with `LD_PRELOAD=<scratch>/libnan_trap.so NAN_TRAP_ARM=1
-NAN_TRAP_DIR=<scratch>/nt`, the library built from `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`
-as that folder's README says. The defects' own tests: `cargo test -p larmorx-fs-core --test defects_volume`.
+NAN_TRAP_DIR=<scratch>/nt`, the orchestrator's prebuilt library (a clean room uses it prebuilt and does not
+open its source folder). The defects' own tests: `cargo test -p larmorx-fs-core --test defects_volume`.
 
-## Results (2026-11-24, relay 22, seed 7, every group of the volume spec's §69.2 to part 11a and the B-spline spec's §9; the probe's reference hashes are the specs', the probe of commit `ca062ad1`)
+## Results (2026-11-25, relay 23, seed 7, every group of the volume spec's §69.2, parts 1 to 11c, and the B-spline spec's §9; the probe's reference hashes are the specs', the probe of commit `ca062ad1`)
 
 `compare.py` per group: calls, identical, FreeSurfer did not finish, memory, defect corrected,
-unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay22-chain-a.log`).
+unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay23-chain-a.log`).
 
 | Group | Calls | reproduce | fix |
 |---|---|---|---|
@@ -108,10 +108,34 @@ unexplained (log `<workspace>/oracles/logs/fs-cleanroom-2-relay22-chain-a.log`).
 | vbright | 100 | 100 / 0 / 0 / 0 / **0** | 27 / 0 / 0 / 73 / **0** |
 | vtopo | 380 | 371 / 0 / 9 / 0 / **0** | 354 / 0 / 13 / 13 / **0** |
 | vbin | 340 | 328 / 12 / 0 / 0 / **0** | 321 / 12 / 0 / 7 / **0** |
-| vdem | 355 | 331 / 0 / 24 / 0 / **0** | 295 / 0 / 42 / 18 / **0** |
+| vdem | 355 | 331 / 0 / 24 / 0 / **0** | 298 / 0 / 42 / 15 / **0** |
 | vcc | 200 | 200 / 0 / 0 / 0 / **0** | 199 / 0 / 0 / 1 / **0** |
 | vrules24 | 123 | 116 / 4 / 3 / 0 / **0** | 95 / 4 / 5 / 19 / **0** |
-| all | 22,238 | 20,947 / 996 / 267 / 28 / **0** | 16,195 / 996 / 682 / 4,365 / **0** |
+| vltawr | 180 | 180 / 0 / 0 / 0 / **0** | 149 / 0 / 0 / 31 / **0** |
+| vltaxf | 200 | 193 / 6 / 1 / 0 / **0** | 142 / 6 / 3 / 49 / **0** |
+| vltamisc | 270 | 270 / 0 / 0 / 0 / **0** | 258 / 0 / 0 / 12 / **0** |
+| vrot | 240 | 240 / 0 / 0 / 0 / **0** | 204 / 0 / 0 / 36 / **0** |
+| vlst | 322 | 310 / 4 / 5 / 3 / **0** | 223 / 4 / 5 / 90 / **0** |
+| vrules25 | 145 | 135 / 6 / 4 / 0 / **0** | 111 / 6 / 4 / 24 / **0** |
+| vltaixf | 200 | 197 / 1 / 2 / 0 / **0** | 148 / 1 / 2 / 49 / **0** |
+| vltacv | 240 | 227 / 13 / 0 / 0 / **0** | 184 / 13 / 0 / 43 / **0** |
+| vltacmp | 200 | 178 / 6 / 12 / 4 / **0** | 108 / 6 / 12 / 74 / **0** |
+| vrules26 | 77 | 73 / 3 / 1 / 0 / **0** | 50 / 3 / 1 / 23 / **0** |
+| all | 24,312 | 22,950 / 1,035 / 292 / 35 / **0** | 17,775 / 1,035 / 709 / 4,793 / **0** |
+
+Relay 23 (83 groups, 24,312 calls: the whole volume spec, §1 to §68, and fs.bspline): `reproduce` 22,950
+identical, 1,035 where FreeSurfer did not finish, 292 memory lines, the 35 lines §69.3 allows, **none
+unexplained**; `fix` 17,775 identical (1,035 not finished, 709 memory, 4,793 corrected by a noted defect),
+none unexplained. Part 11b (§62 to §66): `vltawr`, `vltamisc` and `vrot` identical with `reproduce` in every
+line; `vltaxf` but FreeSurfer's crashes (FS-323's indices far outside, FS-52's and FS-53's destinations of other
+extents and frames) and one memory line; `vlst` but FS-890's sorts and copies past a list's arrays and
+FS-888's border count past new arrays; `vrules25` but FS-504's crashes (the writers, the point weights and the
+coronal change given no transform), FS-890's and FS-889's two hangs. Part 11c (§67): `vltaixf`, `vltacv`,
+`vltacmp` and `vrules26` but FreeSurfer's crashes and memory lines (FS-504, FS-957, a missing source, FS-53).
+Items 137 to 139 as the spec states them: one change, item 139 (a chosen `mm_mritype` is `DEMorphBinVol`'s copy
+type in both modes, FS-808 only for -1 with an input not of bytes); `vtopo`, `vbin`, `vdem` and `vrules24` none
+unexplained in both modes. `models.py region`, `cov` and `bright`: none different. fs.mri (16 groups, 9,511
+calls): none unexplained in either mode.
 
 Relay 22 (73 groups, 22,238 calls; part 11b's six groups, `vltawr`, `vltaxf`, `vltamisc`, `vrot`, `vlst` and
 `vrules25`, are in the probe but not yet in the candidate, which ends at their first command: left out of the
@@ -220,9 +244,16 @@ run it and what it showed).
   `part10c`; part 11a's 19 commands (the fill onto another grid with upsampling, the bright voxels of
   every T1 and white-matter type, the topology steps with masks, the binary-volume classes with
   invalid settings and frames, the transform factors, the voxel lists in boxes), the group
-  `part11a`), both modes, 72 SHA-256 over 36 groups. Identical in debug and release builds and
-  under the AArch64 NaN emulation of both (every test of the crate: 231 in each of the four
-  configurations, relay 22).
+  `part11a`; part 11b's 17 commands without files (the geometry dump, the point weights, the
+  moves of one, several and no transforms of every type, the coronal change, `FixMNITal`'s
+  special values, the geometry change at four thresholds, the rotations and affine parameters,
+  the voxel lists), the group `part11b`; the writers and `DevolveXFMWithSubjectsDir` in memory,
+  `ltawrmem` and `devxfmmem` (every writer by extension and type, the user and creation-time
+  variables, names that do not open; subject folders with `orig.mgz` as a stored gzip stream,
+  `orig.mgh`, a slice folder and `not gzip`, MNI and damaged transforms, given matrices), the group
+  `part11b-writers`; part 11c's 4 commands, the group `part11c`), both modes, 78 SHA-256 over 39
+  groups. Identical in debug and release builds and under the AArch64 NaN emulation of both (every
+  test of the crate: 238 in each of the four configurations, relay 23).
 - `cargo test -p larmorx-fs-core --test defects_volume`: each defect of the spec's §69.4 (FS-265,
   FS-285 to FS-318) and FS-332, FS-258 noted in both modes on a line of the comparison's own batches
   (the shortest), FS-292, FS-296, FS-297, FS-302, FS-305, FS-311 to FS-315 and FS-258 on lines
@@ -267,7 +298,10 @@ run it and what it showed).
   range of 100,000,001 bins, not probed) on a line written for it; part 11a's FS-802 to FS-808, FS-1233,
   FS-889 and FS-890 on `vrules24`'s lines (each noted in both modes, the modes' results different where
   the correction changes them; FS-889's negative skip and FS-890's second frame end in both modes with
-  larmorx's own messages); FS-503 has no notice (one
+  larmorx's own messages); part 11b's FS-504 (a writer given no transform), FS-167 (`DevolveXFM`'s `not
+  gzip` header), FS-888, FS-889 (`VLSTcreate`'s negative skip), FS-890 (a sort into more voxels) and FS-891
+  on `vrules25`'s lines, the writer and `DevolveXFM` lines in their in-memory forms; part 11c's FS-954,
+  FS-956, FS-957 (both outcomes) and FS-504 on `vrules26`'s lines; FS-503 has no notice (one
   histogram's sums at any thread count); also FS-12, FS-47, ITK-112, FS-52, FS-53 and FS-58.
 - Speed (part 4; the spec's plan names none): one batch line each through the probe and the
   candidate, end to end, best of 3: 20,000 points on a 32^3 float volume, trilinear 1.3x faster than

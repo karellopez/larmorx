@@ -1,8 +1,10 @@
 # fs.volume's clean room: what black-box runs showed (unrestricted)
 
-The clean room of FreeSurfer 8.2.0's volume functions, parts 1 to 11a of the spec and §54 to §57
+The clean room of FreeSurfer 8.2.0's volume functions, the whole spec, parts 1 to 11c and §54 to §57
 (`crates/larmorx-fs-core/src/volume/`, the rest of queue item C3.1-05), was written from
-[`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) §1 to §53, §54 to §61 and §64's and §65's functions of `mri_cc` (part 9: volume-to-volume
+[`specs/freesurfer-volume.md`](../../specs/freesurfer-volume.md) §1 to §68 (part 11b: writing a transform
+array, a volume moved by one, the MNI and tkregister helpers, rotations and affine parameters, voxel lists;
+part 11c: the inverse move, the conversions between voxel and RAS arrays, their composition; part 9: volume-to-volume
 resampling, frame covariance and PCA, the false discovery rate, regions, voxel neighbourhood measures;
 part 10a: the Talairach helpers, dilation and the segment helpers; part 10b: conforming, the set
 operations, morphology, masks and counts; part 10c: the volume histograms; part 11a: filling a coarser grid,
@@ -21,6 +23,13 @@ fs.bspline's clean room, which the cubic B-spline paths of §29 and §31 use, ha
 
 ## The comparison
 
+- **Relay 23 (2026-11-25):** the 83 groups of the whole spec and fs.bspline (24,312 calls; part 11b's
+  `vltawr`, `vltaxf`, `vltamisc`, `vrot`, `vlst` and the fixed group `vrules25`, part 11c's `vltaixf`,
+  `vltacv`, `vltacmp` and the fixed group `vrules26` added; the probe of commit `ca062ad1`). `reproduce`:
+  22,950 identical, 1,035 where FreeSurfer did not finish, 292 memory lines, the 35 lines §69.3 allows, none
+  unexplained. `fix`: 17,775 identical, 1,035 not finished, 709 memory, 4,793 corrected by a noted defect,
+  none other. fs.mri's 16 groups: none unexplained in either mode; `models.py region`, `cov` and `bright`
+  with the candidate: none different. Log `oracles/logs/fs-cleanroom-2-relay23-chain-a.log`.
 - **Relay 22 (2026-11-24):** the 73 groups of parts 1 to 11a (22,238 calls; part 11a's `vfill`, `vbright`,
   `vtopo`, `vbin`, `vdem`, `vcc` and the fixed group `vrules24` added; the probe of commit `ca062ad1`, whose
   part 11b groups wait for the next relay). `reproduce`: 20,947 identical, 996 where FreeSurfer did not finish,
@@ -395,6 +404,48 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
 - **How we know:** *validated* (`vaseg`, `vsegs`, `vcrops`, `vrules15`, `vrules16`, both modes,
   2026-11-23, relay 17; the defect tests in `tests/defects_volume.rs`).
 
+## Part 11c: the inverse move, the conversions between voxel and RAS arrays, the composition (§67, §68)
+
+- **What:** `vltaixf` (200 calls), `vltacv` (240), `vltacmp` (200) and the fixed group `vrules26` (77) are
+  identical with `reproduce` in every line but where FreeSurfer crashed or read memory it does not own
+  (FS-504's sources and destinations of no transforms, FS-957's missing destination volume and a missing
+  source, FS-53's destinations of other frames). `fix`: every other line identical or corrected by a noted
+  defect (FS-954's conversions each into its own transform, FS-956's right product after the left one,
+  FS-957's source geometry for the destinations, and the shared FS-325 and FS-506 of the resampling and the
+  physical-voxel change). Built from §67's text as it stands, with §63's paths shared (`ltaxf.rs`).
+- **How we know:** *validated* (the four groups and every earlier one, both modes, 2026-11-25, relay 23; the
+  defect tests on `vrules26`'s own lines: FS-954, FS-956, FS-957 in both of its outcomes, FS-504).
+
+## Part 11b: writing a transform array, a volume moved by one, the helpers, rotations and voxel lists (§62 to §66)
+
+- **What:** `vltawr` (180 calls), `vltamisc` (270, `DevolveXFMWithSubjectsDir`'s 60 among them) and `vrot`
+  (240) are identical with `reproduce` in every line; `vltaxf` (200) but FreeSurfer's crashes (FS-323's indices
+  far outside the destination's tables, FS-52's and FS-53's destinations of other extents and frames) and one
+  memory line; `vlst` (322) but FS-890's sorts and copies past a list's arrays and FS-888's border count past
+  new arrays; `vrules25` (145, two in its batch without the guard runs) but FS-504's crashes (the writers, the
+  point weights and the coronal change given no transform), FS-890's lines and FS-889's two negative skips
+  after the alarm. `fix`: every other line identical or corrected by a noted defect (FS-888, FS-891, GLIBC-07's
+  correctly rounded `atan2f`, `cos`, `sin`, `exp`, FS-167, and the shared FS-01, FS-12, FS-52, FS-53, FS-325,
+  FS-506, FS-507).
+- Readings the probe decided, where the spec's text says otherwise or nothing:
+  - `LTAchangeType` (§54, which §62's FSL writer and §63's physical-voxel move call) refuses only a geometry
+    of `valid` 0: `vltaxf`'s physical-voxel arrays with a destination geometry of `valid` 2 change and are
+    resampled. Every earlier group that changes a type is unchanged with that reading.
+  - `VLSTcreate` prints its allocation line (`DIAG_SHOW` and `DIAG_VERBOSE`) whether or not it makes new
+    arrays (a given list large enough keeps its arrays and still prints the line).
+  - `DevolveXFMWithSubjectsDir`'s original volume read as an MGH header alone (fs.io §43): an `.mgz` that is
+    not gzip is read as it is (zlib's transparent mode); its 8 bytes `not gzip` give the version and the
+    width, and each later `int` of the header keeps the width's bytes (fs.io §100's rule for a number cut
+    after another, FS-167), so the frame count is the width, 1,736,075,632, and FreeSurfer ends with
+    `MRIalloc: could not allocate 1736075632 frame` (status 254). The candidate ends with that error for a
+    frame count above 2^24, a bound of its own (fs.mri's allocation names only a negative count); by default
+    the cut header's missing bytes are zeros, FS-167 noted.
+- The writers and `DevolveXFMWithSubjectsDir` write and read through two small interfaces
+  (`TransformOutputs`, `TransformInputs`' folder and open tests), the file system by default; the golden cases
+  give them in memory.
+- **How we know:** *validated* (the six groups and every earlier one, both modes, 2026-11-25, relay 23; the
+  defect tests on `vrules25`'s own lines: FS-504, FS-167, FS-888, FS-889, FS-890, FS-891).
+
 ## Part 11a: filling a coarser grid, bright voxels, voxel topology, binary volumes (§59 to §61), with §64's and §65's functions of `mri_cc`
 
 - **What:** `vfill` (140 calls), `vbright` (100), `vtopo` (380), `vbin` (340), `vdem` (355), `vcc` (200) and
@@ -421,8 +472,9 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
   - `DEMorphBinVol`'s thresholded and matched morphs copy a volume of several frames with `copyFrame`,
     in its working type `mm_mritype` (bytes for -1): `vdem`'s copies into ints and floats keep the values
     (a NaN passes thresholds of 99.5 and 60 into the binarized volume) where a copy into bytes would not.
-    FS-808 (bytes by default) is the working type's default; the candidate's default copies in the input's
-    type and notes FS-808 when the working type differs.
+    FS-808 (bytes by default) is the working type's default; as §60 now states (relay 23), a chosen
+    `mm_mritype` is the copy's type in both modes without a notice, and only the default -1 with an input not
+    of bytes is FS-808 (`reproduce` bytes, by default the input's own type).
 - **How we know:** *validated* (the seven groups and every earlier one, both modes, 2026-11-24, relay 22,
   log `oracles/logs/fs-cleanroom-2-relay22-chain-a.log`: 73 groups, 22,238 calls, none unexplained in either
   mode; the defect tests in `tests/defects_volume.rs`: FS-802 to FS-808, FS-1233, FS-889 and FS-890 on
@@ -680,10 +732,12 @@ writes through `MRIsetVoxVal`); `MRIextractInto` refuses a tensor source. 6 line
   the transform files in memory, several in one process; part 5's labels, segmentation functions
   and the statistics cache's text and reading in memory; part 6a's 11 commands; part 6b's and 6c's
   13, the diagnostic bits' prints included; part 7a's 11, fs.bspline's 10 and the cubic B-spline
-  paths; part 7b's 16 commands and §54's changes of type; part 8's 32 commands but `tiv`, which reads files and is in the defect tests; §54's other operations, `lta54`, over pools of three geometries with mostly invertible matrices; §55 to §57's 18 commands, `segs57`, on volumes of labels with ordinary geometries; part 9's 16 commands, `part9`, with §55's upsampling and §56's shift-map resampling; part 10a's 9 commands, `part10`, with `NO_AVERAGE305` and the diagnostic bits; part 10b's 34 commands, `part10b` (conforming's matrix and template only: `MRIconform`'s 256^3 result is beyond rule 10's golden size, `vconf` compares it); part 10c's 9 commands, `part10c`, with given histograms, regions outside, NaN and infinite floats and `MRIhistoSegment`'s diagnostic bits; part 11a's 19 commands, `part11a`; 72 SHA-256 over 36 groups), identical in debug and release builds on x86-64 and under the
-  AArch64 NaN emulation of both (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`).
-- **How we know:** *measured* (2026-11-23 and 24, relays 10 to 22; relay 22 ran every test of the
-  crate, 231, in the four configurations).
+  paths; part 7b's 16 commands and §54's changes of type; part 8's 32 commands but `tiv`, which reads files and is in the defect tests; §54's other operations, `lta54`, over pools of three geometries with mostly invertible matrices; §55 to §57's 18 commands, `segs57`, on volumes of labels with ordinary geometries; part 9's 16 commands, `part9`, with §55's upsampling and §56's shift-map resampling; part 10a's 9 commands, `part10`, with `NO_AVERAGE305` and the diagnostic bits; part 10b's 34 commands, `part10b` (conforming's matrix and template only: `MRIconform`'s 256^3 result is beyond rule 10's golden size, `vconf` compares it); part 10c's 9 commands, `part10c`, with given histograms, regions outside, NaN and infinite floats and `MRIhistoSegment`'s diagnostic bits; part 11a's 19 commands, `part11a`; part 11b's 17 commands without files, `part11b`, and its writers and
+  `DevolveXFMWithSubjectsDir` in memory, `part11b-writers`; part 11c's 4 commands, `part11c`; 78 SHA-256
+  over 39 groups), identical in debug and release builds on x86-64 and under the AArch64 NaN emulation of
+  both (the orchestrator's prebuilt library).
+- **How we know:** *measured* (2026-11-23 to 25, relays 10 to 23; relay 23 ran every test of the
+  crate, 238, in the four configurations).
 
 ## NaN choices made in code, and NaN test inputs made by their bits (relay 19)
 

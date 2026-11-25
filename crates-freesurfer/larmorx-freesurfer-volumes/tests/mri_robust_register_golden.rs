@@ -26,10 +26,12 @@ use sha2::{Digest, Sha256};
 /// 16^3 images added; again (relay 48, with that preload): 11 cases, the test mode (`--test 4`,
 /// `--test 5` on a float image, `--test 30`, `--test 0` on a 16^3 image) added; again (relay 49,
 /// with that preload): 13 cases, the debug output (a robust registration with `--satit` and a
-/// half-way image, `--cost MI`) added.
-const OFFICIAL_SHA256: &str = "bf052cf0b9941520f25c04ef846ecdac5d5fa00bcea38049012b2c9f2e6fe2ee";
+/// half-way image, `--cost MI`) added; again (relay 52, from the clean commit e77cb321, with the
+/// decided `cabs`, `csqrt`, `acos` and `clog` preloaded: the same value as with `cabs` and `csqrt`
+/// alone): the registrations' images 16^3, the test mode's 32^3 byte image drawn after them.
+const OFFICIAL_SHA256: &str = "7d92cb63b3f2c861b35eb3716a97968c00df9baa3453c0643d1f45c215e7ea3e";
 /// The port's default on Linux x64 (FS-1078's pattern as voxel values, FS-1076's error).
-const FIX_SHA256: &str = "8004a0c633cee42993b1af9a073891917721148916c692dce30eba0e6ff285d2";
+const FIX_SHA256: &str = "fb1a7c0ecfc70a70837198a58343391dcd0ea7490d501cedc167063fd28a3f77";
 
 /// The lines' outputs run side by side (each case in its own folder, with its own state), hashed
 /// in order.

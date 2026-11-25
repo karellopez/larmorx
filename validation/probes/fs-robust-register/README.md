@@ -82,6 +82,12 @@ plan is in `specs/mri_robust_register.md` §7.
   notice. Its hash is in `tests/fs_robreg_debug_official.rs`; seed 1 x 120 with `--preload` (the
   prelude's `--satit --debug` compared now): 112 identical, 0 different, 8 not compared, none not
   ported.
+- Relay 52: the golden cases' registrations on 16^3 images (the test mode keeps a 32^3 byte image;
+  `--satit` prints its small-image warning there), run side by side by the test: a debug build's
+  test about 2 s here (50 s before). `check.py --golden --preload` from the clean commit e77cb321:
+  13 identical, 0 different, the same `OFFICIAL_SHA256` (`7d92cb63...`) with the decided `cabs` and
+  `csqrt` alone (`fs-complex-decided`) as with the template's preload (`fs-template-decided`,
+  `acos` and `clog` too). Log `oracles/logs/fs-found-c-r52-golden-record.log`.
 - `timeline.py` (relay 49): every line of a run's standard output with the seconds since the start
   and since the line before, the port's program or (`--official`, `--preload`) FreeSurfer's: where
   the time goes (the Powell costs' speed: `docs/findings/freesurfer-robust-register.md` §10).

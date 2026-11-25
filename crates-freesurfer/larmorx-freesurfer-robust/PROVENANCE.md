@@ -102,6 +102,12 @@ case, and the cost function's lines written among Powell's in their order (one s
 `log2` (`computeMI`, `ECC`, `NMI`) and `exp` (`smooth`) through `larmorx_core::math::Libm`: glibc
 2.35's bits with `reproduce` (`log2_glibc`, relay 47), correctly rounded by default; `sqrt(8 *
 log(2))` is the constant GCC folds.
+Relay 52: `smooth`'s two passes compute each of the source's sums (the taps inside the histogram,
+`k` in the source's order) by spreading every non-zero bin's terms over the sums it enters, zero
+bins skipped (with a finite filter their terms are zeros, which leave a sum unchanged), in plain
+arithmetic, a sum that ends as a NaN summed again with `add64`/`mul64`; `computeRCsums` and
+`computeMI` on row slices. The same bits (`smooth_matches_the_source_bit_for_bit` against the
+source's form, NaNs from their bits), about 7 times faster in a debug build.
 
 Relay 48 of track C (queue 3.2-13): `src/testmode.rs` from `mri_robust_register/Registration.cpp`
 (`testRobust` 1315-1700: the tests 0 to 7, 9 and 30 and the unknown test, then the robust

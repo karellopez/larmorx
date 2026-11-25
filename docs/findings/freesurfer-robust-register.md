@@ -389,3 +389,12 @@ took <s> seconds.`) and the target, with the mask passed in (no `MRImask` then).
   34 ns a voxel. What is left (`timeline.py`, LS): the 128^3 level's evaluations (FreeSurfer about 16 ns a
   voxel there, its images in the cache), the pyramid (fs.filter's blur and fs.volume's B-spline halving:
   2.1 s each against 1.0 s) and the reading and reslicing (3.9 s against 2.3 s).
+- Relay 52 (the golden cases' speed in a debug build, bit for bit): `JointHisto::smooth` (two
+  passes of a 19-tap Gaussian over the 256 x 256 histogram, about 2.5 million products an
+  evaluation) spreads each non-zero bin's terms over the sums it enters, in the source's order of
+  `k`, zero bins skipped, plain arithmetic with a NaN sum redone under x86-64's NaN rules (the unit
+  test `smooth_matches_the_source_bit_for_bit` against the source's form). A 16^3 `--cost MI` case
+  in a debug build: 7.3 s before, 1.2 s after (143 evaluations: the smoothing 29 ms -> 3.9 ms each).
+  On a real head (`real.py --heads ds000228-sub-pixar008 --extra '--cost MI --powelltol 0.1'
+  --preload`, one thread): 42.9 s against relay 49's 46.0 s, every byte identical with `reproduce`
+  (log `oracles/logs/fs-found-c-r52-mi-real.log`).

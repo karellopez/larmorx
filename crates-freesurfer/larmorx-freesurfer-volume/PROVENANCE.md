@@ -259,6 +259,7 @@ here); `include/macros.h`'s `MAX`; the official build's operand orders from the 
 - `src/ltaconv.rs` (3.1-40; relay 35): `utils/transform.cpp` `LTAvoxelToRasXform` (1898-1928), `LTArasToVoxelXform`
   (1930-1944), `LTAsetVolGeom` (4280-4289), `LTAcompose` (4844-4857); `utils/mri.cpp` `MRIcopyVolGeomFromMRI`
   (16279-16301, through fs.mri). Changes: FS-954, FS-956, FS-957 (rule A), FS-955 kept (rule C), FS-504 (errors).
+  Relay 52 of track C (3.2-17, `mri_coreg`): `LTAcreate` (`utils/transform.cpp` 4936-4949).
 - `src/bspline.rs` (3.2-01, fs.bspline; relay 39 of track C): FS-962 (rule A: the upsampling's copy of the source
   over expanded lines skipped), FS-963 (rule D, pending: both modes FreeSurfer's voxel sizes), FS-964 (memory:
   an error in both modes); the lines of each pass computed in order (FreeSurfer's OpenMP lines are independent);

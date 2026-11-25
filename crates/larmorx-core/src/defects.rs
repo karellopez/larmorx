@@ -3543,6 +3543,36 @@ defects! {
         "the matrix exponential of mri_robust_template's affine mean space (--affine without --fixtp) computes with numbers it reads from memory it does not own (uninitialized memory in the official build): its result is NaN or arbitrary, and so is the mean space (memory contents); the numbers the method defines in both modes, noted";
     FS_1312 = "FS-1312", "FreeSurfer", true,
         "the matrix logarithm of mri_robust_template's affine mean space ends the program ('Result too imaginary to ignore!') when the imaginary part of its complex intermediate result passes 10 n 2^-52 times the result's one-norm, a bound below the rounding of its own complex arithmetic: about one ordinary near-identity transform in twenty is refused; by default refused only above sqrt(2^-52) times the norm";
+    FS_1313 = "FS-1313", "FreeSurfer", true,
+        "mri_coreg with more than 10 --sep options writes past the 10 spatial scales it keeps (memory corruption); a clear error in both modes";
+    FS_1314 = "FS-1314", "FreeSurfer", true,
+        "mri_coreg --threads (or --nthreads) with an argument that is no number sets the thread count from a value never written (memory contents); the count is left as it was, noted";
+    FS_1315 = "FS-1315", "FreeSurfer", true,
+        "mri_coreg --s crashes when it cannot form the subject's file names: no FreeSurfer environment (FREESURFER_HOME or its colour table missing), or a name of 3,000 bytes or more; a clear error by default";
+    FS_1316 = "FS-1316", "FreeSurfer", true,
+        "mri_coreg's --par2mat parameters and --rms radius that are no number: the program goes on with values never written (memory contents); taken as 0, noted";
+    FS_1317 = "FS-1317", "FreeSurfer", true,
+        "mri_coreg --rms with two or three arguments reads the missing registration names past the command line and crashes, as it does when its output file does not open or a registration holds no matrix; a clear error by default";
+    FS_1318 = "FS-1318", "FreeSurfer", true,
+        "mri_coreg --lrrev of a transform whose source volume has no left-right axis (an orientation without L or R) writes outside its vector (memory corruption); a clear error in both modes";
+    FS_1319 = "FS-1319", "FreeSurfer", true,
+        "mri_coreg's brute-force search never ends when its step does not advance the parameter (--bf-lim 0, a negative --bf-nsamp, a step below the parameter's precision); a clear error in both modes";
+    FS_1320 = "FS-1320", "FreeSurfer", true,
+        "mri_coreg's saturation percentile reads past its sorted values when the percentile's place rounds to the last value or beyond (--sat 100, or the default 99.99 on a volume of fewer than 5,000 voxels: memory contents); the last value by default, 0 with reproduce, noted";
+    FS_1321 = "FS-1321", "FreeSurfer", true,
+        "mri_coreg samples outside a volume's voxels where a mapped coordinate is not a number (parameters or matrices that are NaN); a clear error in both modes";
+    FS_1322 = "FS-1322", "FreeSurfer", true,
+        "mri_coreg --dof above 12 (with the default parameter schema) reads and writes past its 12 parameters (memory corruption: a result that depends on memory); a clear error in both modes";
+    FS_1323 = "FS-1323", "FreeSurfer", true,
+        "mri_coreg --sep 0 divides by zero (a crash) and a negative --sep never ends; a clear error in both modes";
+    FS_1324 = "FS-1324", "FreeSurfer", true,
+        "mri_coreg's --init-cost-only, --params and --final-cost files that do not open: the program writes through no file and crashes; a clear error by default";
+    FS_1325 = "FS-1325", "FreeSurfer", true,
+        "mri_coreg with a singular final voxel-to-voxel matrix writes a registration without a matrix, and --conf-ref goes on with no volume when the reference does not conform; a clear error in both modes";
+    FS_1326 = "FS-1326", "FreeSurfer", true,
+        "mri_coreg --landmarks with a pair file whose first line does not hold every number uses values never written (memory contents); taken as 0, noted";
+    FS_1327 = "FS-1327", "FreeSurfer", true,
+        "mri_coreg --landmarks with points whose least-squares system is singular (fewer than four points in general position, three for --landmarks-2d) goes on with no matrix: it crashes with RAS coordinates (the output LTA left empty) and ends with an error with VOX and TKR ones; a clear error by default";
 }
 
 /// The register entry with ID `id`.

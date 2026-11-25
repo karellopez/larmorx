@@ -4,7 +4,8 @@
 //! A linear transform array converted between coordinates and composed with matrices
 //! (`utils/transform.cpp`, for track A's `TransformVox2Ras`, `TransformRas2Vox` and
 //! `TransformCompose`): `LTAvoxelToRasXform` (1898), `LTArasToVoxelXform` (1930) with
-//! `LTAsetVolGeom` (4280), and `LTAcompose` (4844).
+//! `LTAsetVolGeom` (4280), and `LTAcompose` (4844); and for `mri_coreg` (relay 52 of track C)
+//! `LTAcreate` (4936).
 //!
 //! The products are FreeSurfer's `MatrixMultiply` (`float`), the inverses its `MatrixInverse`.
 //!
@@ -24,9 +25,11 @@ use std::io::Write;
 use larmorx_core::defects::{FS_954, FS_956, FS_957};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, Fatal, NO_ERROR};
-use larmorx_freesurfer_core::matrix::{Matrix, matrix_multiply};
+use larmorx_freesurfer_core::matrix::{Matrix, matrix_copy, matrix_multiply};
 use larmorx_freesurfer_core::ret::Ret;
-use larmorx_freesurfer_mri::lta::{LINEAR_RAS_TO_RAS, LINEAR_VOX_TO_VOX, Lta, lta_alloc};
+use larmorx_freesurfer_mri::lta::{
+    LINEAR_RAS_TO_RAS, LINEAR_VOX_TO_VOX, Lta, REGISTER_DAT, lta_alloc,
+};
 use larmorx_freesurfer_mri::mri::{Mri, mri_copy_vol_geom_from_mri};
 
 use crate::ltaops::outside;
@@ -90,6 +93,33 @@ pub fn lta_set_vol_geom(lta: &mut Lta, mri_src: &Mri, mri_dst: &Mri) -> i32 {
         mri_copy_vol_geom_from_mri(mri_dst, &mut lt.dst);
     }
     NO_ERROR
+}
+
+/// `LTAcreate(src, dst, T, type)`: an array of one transform (`LTAalloc(1, NULL)`), the volumes'
+/// geometries ([`lta_set_vol_geom`]), a copy of `t` as its matrix, `ltype` as the transform's and
+/// the array's type; for `REGISTER_DAT` FreeSurfer's reminder `  ... using LTAcreate() with
+/// REGISTER_DAT, make sure matrix points in the right direction` on standard output.
+pub fn lta_create(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    src: &Mri,
+    dst: &Mri,
+    t: &Matrix,
+    ltype: i32,
+) -> Result<Lta, Fatal> {
+    let mut lta = lta_alloc(g, out, err, 1, None)?;
+    lta_set_vol_geom(&mut lta, src, dst);
+    lta.xforms[0].m_l = matrix_copy(g, out, err, Some(t), None)?.into_new();
+    lta.xforms[0].ltype = ltype;
+    lta.ltype = ltype;
+    if ltype == REGISTER_DAT {
+        let _ = writeln!(
+            out,
+            "  ... using LTAcreate() with REGISTER_DAT, make sure matrix points in the right direction"
+        );
+    }
+    Ok(lta)
 }
 
 /// `LTArasToVoxelXform(lta, mri_src, mri_dst)`: nothing for an array of `LINEAR_VOX_TO_VOX`;

@@ -30,6 +30,7 @@ pub mod mri_binarize;
 pub mod mri_cc;
 pub mod mri_concat;
 pub mod mri_convert;
+pub mod mri_coreg;
 pub mod mri_edit_wm_with_aseg;
 pub mod mri_fill;
 pub mod mri_info;
@@ -87,6 +88,10 @@ pub const PROGRAMS: &[Program] = &[
     Program {
         name: mri_convert::main::NAME,
         run: mri_convert::main::run,
+    },
+    Program {
+        name: mri_coreg::main::NAME,
+        run: mri_coreg::main::run,
     },
     Program {
         name: mri_edit_wm_with_aseg::main::NAME,

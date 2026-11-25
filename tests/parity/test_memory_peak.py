@@ -29,7 +29,7 @@ recording, relay 54), ``mri_concat`` (``MRI_CONCAT_CASES``, 2026-11-23), ``mri_l
 ``mri_segment`` (``MRI_SEGMENT_CASES``, 2026-11-24), ``mri_edit_wm_with_aseg``
 (``MRI_EDIT_WM_WITH_ASEG_CASES``, 2026-11-24), the tcsh scripts ``seg2cc`` and ``mergeseg``
 (``SCRIPT_CASES``, 2026-11-24), ``mri_pretess`` (``MRI_PRETESS_CASES``, 2026-11-24) and
-``mri_fill`` (``MRI_FILL_CASES``, 2026-11-25).
+``mri_fill`` (``MRI_FILL_CASES``, 2026-11-25), ``mri_coreg`` (``MRI_COREG_CASES``, 2026-11-25).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -4053,3 +4053,102 @@ def test_mri_fill_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, r
         )
         c = fsfiles.compare(o_dir / out, r_dir / out, fsfiles.Context(any_directory=True), name=out)
         assert c.same, f"mri_fill {name} ({mode}): {c.verdict} {c.detail}"
+
+
+#: ``mri_coreg``'s calls (track C relay 52): fMRIPrep's ``MRICoreg`` on ds000228's BOLD reference
+#: onto the FreeSurfer reference run's subject (its brain mask the reference, its ``aparc+aseg``
+#: the reference's mask).
+MRI_COREG_CASES = [
+    (
+        "fmriprep",
+        [
+            "--s",
+            "sub-pixar008",
+            "--sd",
+            "{sd}",
+            "--mov",
+            "{bold}",
+            "--lta",
+            "registration.lta",
+            "--dof",
+            "6",
+            "--sep",
+            "4",
+            "--ftol",
+            "1.000000e-04",
+            "--linmintol",
+            "1.000000e-02",
+        ],
+    ),
+]
+
+
+@pytest.mark.parametrize(("name", "args"), MRI_COREG_CASES)
+def test_mri_coreg_replica_needs_no_more_memory_than_freesurfer(tmp_path, name, args):
+    from larmorx_validation.freesurfer_unit import FS_HOME, freesurfer_env
+    from larmorx_validation.oracle_cache.store import workspace
+
+    lx = _freesurfer_replica()
+    if lx is None:
+        pytest.skip("the larmorx-freesurfer program is not built (crates-freesurfer)")
+    ws = workspace()
+    exe = ws / FS_HOME / "bin" / "mri_coreg" if ws else None
+    sd = ws / "oracles" / "freesurfer-8.2.0" / "runs" / "ds000228-sub-pixar008-v8" / "subjects"
+    bold = (
+        ws / "oracles" / "fmriprep-25.2.6" / "ds000228-sub-pixar008-noreconall" / "out"
+        / "sub-pixar008" / "func" / "sub-pixar008_task-pixar_desc-coreg_boldref.nii.gz"
+        if ws
+        else None
+    )  # fmt: skip
+    if exe is None or not exe.is_file() or bold is None or not bold.is_file():
+        pytest.skip("FreeSurfer 8.2.0 or the ds000228 recordings were not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    words = [a.format(sd=sd, bold=bold) for a in args]
+    env = {
+        "PATH": f"{exe.parent}:/usr/bin:/bin",
+        "LC_ALL": "C",
+        "LANG": "C",
+        "OMP_NUM_THREADS": "1",
+        "USER": "memory",
+        "FS_DISABLE_LANG": "1",
+        "FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING": "Thu Jan  1 00:00:00 1970",
+        **freesurfer_env(),
+    }
+
+    def fresh(d: Path):
+        def reset() -> None:
+            if d.exists():
+                shutil.rmtree(d)
+            d.mkdir()
+
+        reset()
+        return reset
+
+    o_dir = tmp_path / "freesurfer"
+    code, fs_mib = _original_peak(
+        ["mri_coreg", *words],
+        env,
+        "freesurfer",
+        fresh(o_dir),
+        o_dir,
+        (
+            r"OptTimeSec +[0-9.]+ sec",
+            r"OptTimeMin +[0-9.]+ min",
+            r"mri_coreg RunTimeSec +[0-9.]+ sec",
+        ),
+        "freesurfer",
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        fresh(r_dir)
+        cmd = [str(lx), "--upstream-defects", mode, "freesurfer", "mri_coreg", *words]
+        code, mib = _peak(cmd, env, r_dir)
+        assert code == 0
+        print(f"mri_coreg {name} ({mode}): larmorx {mib:.1f} MiB, FreeSurfer {fs_mib:.1f}")
+        assert mib <= allowance(fs_mib), (
+            f"mri_coreg {name} ({mode}): larmorx {mib:.0f} MiB, FreeSurfer {fs_mib:.0f} MiB"
+        )
+        f = "registration.lta"
+        assert (r_dir / f).read_bytes() == (o_dir / f).read_bytes(), f"{name} ({mode}) {f}"

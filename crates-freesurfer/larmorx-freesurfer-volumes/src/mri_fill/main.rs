@@ -1145,7 +1145,7 @@ fn talairach_header(g: &mut Globals, r: &mut Run, o: &mut Options, im: &Mri) -> 
         matrix_print(
             g,
             Some(&mut buf as &mut dyn Write),
-            &mut std::io::sink(),
+            r.out,
             r.err,
             Some(m_l),
             5,

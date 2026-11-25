@@ -242,13 +242,10 @@ pub fn matrix_print(
     mat: Option<&Matrix>,
     precision_real: i32,
 ) -> i32 {
-    let fp: &mut dyn Write = match fp {
-        Some(fp) => fp,
-        None => {
-            log::error_printf(g, err, ERROR_BADPARM, "MatrixPrint: fp = NULL!");
-            out
-        }
-    };
+    let null = fp.is_none();
+    if null {
+        log::error_printf(g, err, ERROR_BADPARM, "MatrixPrint: fp = NULL!");
+    }
     let Some(mat) = mat else {
         log::error_printf(g, err, ERROR_BADPARM, "MatrixPrint: mat = NULL!");
         return ERROR_BADPARM;
@@ -260,9 +257,16 @@ pub fn matrix_print(
         precision_real
     };
     let spec = format!("% 2.{p}f");
-    let r = print_body(g, fp, err, mat, &spec, ("% 2.3f", "% 2.3f"), b";\n");
-    // fflush(stdout), not fp
-    let _ = fp.flush();
+    let r = match fp {
+        Some(fp) => {
+            let r = print_body(g, fp, err, mat, &spec, ("% 2.3f", "% 2.3f"), b";\n");
+            let _ = fp.flush();
+            r
+        }
+        None => print_body(g, out, err, mat, &spec, ("% 2.3f", "% 2.3f"), b";\n"),
+    };
+    // `fflush(stdout)` (relay 59 of track D: a crash after it keeps what standard output held)
+    let _ = out.flush();
     r
 }
 

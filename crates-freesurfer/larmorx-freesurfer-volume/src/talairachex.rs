@@ -417,7 +417,7 @@ pub fn mri_talairach_voxel_to_voxel_ex(
 }
 
 /// `MatrixPrint(stderr, m)` (5 decimals; `NULL` gives its error).
-fn print_on(g: &mut Globals, err: &mut dyn Write, m: Option<&Matrix>) {
+fn print_on(g: &mut Globals, out: &mut dyn Write, err: &mut dyn Write, m: Option<&Matrix>) {
     let mut buf = Vec::new();
     matrix_print(
         g,
@@ -428,6 +428,11 @@ fn print_on(g: &mut Globals, err: &mut dyn Write, m: Option<&Matrix>) {
         5,
     );
     let _ = err.write_all(&buf);
+    // MatrixPrint's `fflush(stdout)` (relay 59 of track D: a crash after it keeps what standard
+    // output held); not after `NULL`'s error
+    if m.is_some() {
+        let _ = out.flush();
+    }
 }
 
 /// The resampling of `MRItoTalairachExInterp` and `MRItoTalairachEx`: the matrix
@@ -448,7 +453,7 @@ fn to_talairach(
 ) -> Result<Ret<Mri>, Fatal> {
     let m = mtal_voxel_from_voxel(g, out, err, env, src, lta)?;
     let _ = writeln!(err, "voxel to talairach voxel transform");
-    print_on(g, err, m.as_ref());
+    print_on(g, out, err, m.as_ref());
     let mut fresh = None;
     let given = tal.is_some();
     let t: &mut Mri = match tal {
@@ -530,7 +535,7 @@ pub fn mri_from_talairach_ex(
     };
     let m = mvoxel_from_tal_voxel(g, out, err, env, dst, lta)?;
     let _ = writeln!(err, "talairach voxel to voxel transform");
-    print_on(g, err, m.as_ref());
+    print_on(g, out, err, m.as_ref());
     mri_linear_transform(g, out, err, tal, Some(dst), m.as_ref())?;
     Ok(Ret::Given)
 }

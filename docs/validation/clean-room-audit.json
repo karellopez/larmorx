@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-25-freesurfer-batch-122",
+ "dossier": "2026-11-25-freesurfer-batch-123",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 559703,
-  "agents": 594,
+  "accesses": 561053,
+  "agents": 596,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 1031,
-  "archived_files": 1031,
+  "archive_checksums_matched": 1035,
+  "archived_files": 1035,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -710,32 +710,36 @@
    "2026-11-25-session-transcripts-freesurfer-batch-122": {
     "files": 6,
     "sha256": "d2314b049701aaf121d7d6d176115570581430e29e3efa2e5ee2bbae4b783a71"
+   },
+   "2026-11-25-session-transcripts-freesurfer-batch-123": {
+    "files": 7,
+    "sha256": "332156c071c23822a62bb171838611d1f3dcd5b9ad091de5336ca96eb8961074"
    }
   },
-  "commits_printed": 5862,
-  "distinct_transcripts": 598,
+  "commits_printed": 5879,
+  "distinct_transcripts": 600,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 489,
+   "agents_without_worktree": 491,
    "bad_lines": 0,
    "calls_without_result": 159,
    "compaction_parent_missing": 9,
    "compactions": 93,
-   "refused_calls": 1760,
+   "refused_calls": 1762,
    "refused_calls_restricted_accesses": 743,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 10398
+   "unresolved_paths": 10402
   },
-  "last_record": "2026-11-24 23:01 UTC",
-  "live_files": 598,
-  "live_files_also_archived": 598,
+  "last_record": "2026-11-25 01:38 UTC",
+  "live_files": 600,
+  "live_files_also_archived": 599,
   "sessions": 4,
-  "tool_calls": 156910,
+  "tool_calls": 157328,
   "tool_calls_by_tool": [
    [
     "Agent",
-    596
+    598
    ],
    [
     "Artifact",
@@ -747,7 +751,7 @@
    ],
    [
     "Bash",
-    138182
+    138580
    ],
    [
     "CronCreate",
@@ -759,7 +763,7 @@
    ],
    [
     "Edit",
-    5364
+    5372
    ],
    [
     "EnterWorktree",
@@ -771,11 +775,11 @@
    ],
    [
     "Read",
-    3423
+    3428
    ],
    [
     "ReadNotifications",
-    28
+    30
    ],
    [
     "SendMessage",
@@ -791,7 +795,7 @@
    ],
    [
     "SubagentHandback",
-    625
+    627
    ],
    [
     "TaskOutput",
@@ -815,12 +819,12 @@
    ],
    [
     "Write",
-    7474
+    7475
    ]
   ],
-  "transcript_bytes": 41154443754,
-  "transcript_files": 1629,
-  "unique_paths": 101274
+  "transcript_bytes": 41438272599,
+  "transcript_files": 1635,
+  "unique_paths": 101454
  },
  "levels": [
   [
@@ -901,7 +905,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "7db59797"
+  "verdicts_repository": "d2e9d76e"
  },
  "overview": {
   "agents_by_role": [
@@ -927,11 +931,11 @@
    ],
    [
     "replica author",
-    171
+    172
    ],
    [
     "spec writer",
-    136
+    137
    ]
   ],
   "attributed_by": [

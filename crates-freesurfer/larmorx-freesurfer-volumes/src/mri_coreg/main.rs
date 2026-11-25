@@ -37,6 +37,7 @@ use std::path::Path;
 use larmorx_core::cfmt;
 use larmorx_core::defects::{FS_1315, FS_1322, FS_1323, FS_1324, FS_1325};
 use larmorx_core::math::Libm;
+use larmorx_freesurfer_core::cname::STRLEN;
 use larmorx_freesurfer_core::diag::diag_init;
 use larmorx_freesurfer_core::fsenv::fsenv_getenv;
 use larmorx_freesurfer_core::globals::Globals;
@@ -49,7 +50,6 @@ use larmorx_freesurfer_core::version::{argv2cmdline, handle_version_option, ver_
 use larmorx_freesurfer_io::colortab::ctab_read_ascii;
 use larmorx_freesurfer_io::mriio::mri_write;
 use larmorx_freesurfer_mri::lta::{LINEAR_RAS_TO_RAS, REGISTER_DAT};
-use larmorx_freesurfer_core::cname::STRLEN;
 use larmorx_freesurfer_mri::mri::{MGZ_INTENT_UNKNOWN, Mri};
 use larmorx_freesurfer_mri::vol_geom::xfm_crs2xyz;
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
@@ -57,8 +57,8 @@ use larmorx_freesurfer_volume::conform::mri_conform;
 use larmorx_freesurfer_volume::ltaconv::lta_create;
 use larmorx_freesurfer_volume::mriset::mri_compute_centroid;
 use larmorx_freesurfer_volume::resample::mri_resample;
-use larmorx_freesurfer_volume::sample::SAMPLE_NEAREST;
 use larmorx_freesurfer_volume::rotmat::tranform_affine_params2_matrix;
+use larmorx_freesurfer_volume::sample::SAMPLE_NEAREST;
 
 use super::coreg::{
     Coreg, UniformField, coreg_fwhm, mri_get_percentile, mri_rescale_to_uchar, mri_to_uchar_vect,
@@ -177,7 +177,9 @@ fn write_unchecked(
             g,
             r,
             &FS_1324,
-            &format!("{option} {name}: the file does not open for writing (FreeSurfer writes through a NULL file and crashes)"),
+            &format!(
+                "{option} {name}: the file does not open for writing (FreeSurfer writes through a NULL file and crashes)"
+            ),
         ));
     }
     Ok(())
@@ -291,10 +293,17 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
             g,
             r,
             &FS_1322,
-            &format!("--dof {}: more than 12 parameters (FreeSurfer reads and writes past its 12)", c.dof),
+            &format!(
+                "--dof {}: more than 12 parameters (FreeSurfer reads and writes past its 12)",
+                c.dof
+            ),
         ));
     }
-    if let Some(&bad) = c.seplist.iter().find(|&&s| s <= 0) {
+    // FS-1323: a separation of 0 or less; `reproduce` runs FreeSurfer's way (its division by 0
+    // at the first histogram of that separation; a negative one where no column is sampled)
+    if !g.notices.reproduce()
+        && let Some(&bad) = c.seplist.iter().find(|&&s| s <= 0)
+    {
         g.notices.add(
             &FS_1323,
             format!("mri_coreg --sep {bad}: a separation of 0 or less (FreeSurfer divides by 0 or never ends)"),
@@ -322,7 +331,12 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
         ref_vol = match conform_no_scale(g, r, &ref_vol)? {
             Some(m) => m,
             None => {
-                return Err(crash(g, r, &FS_1325, "--conf-ref: the reference does not conform (FreeSurfer goes on with no volume and crashes)"));
+                return Err(crash(
+                    g,
+                    r,
+                    &FS_1325,
+                    "--conf-ref: the reference does not conform (FreeSurfer goes on with no volume and crashes)",
+                ));
             }
         };
     }
@@ -370,21 +384,25 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     }
 
     if c.cras0 != 0 || c.align_centroids != 0 {
-        let centre = |g: &mut Globals, r: &mut Run, v: &Mri, align: bool| -> Result<[f64; 3], Fatal> {
-            if align {
-                let (_, x) = mri_compute_centroid(g, r.err, v)?;
-                Ok(x)
-            } else {
-                Ok([
-                    f64::from(v.vg.width - 1) / 2.0,
-                    f64::from(v.vg.height - 1) / 2.0,
-                    f64::from(v.vg.depth - 1) / 2.0,
-                ])
-            }
-        };
+        let centre =
+            |g: &mut Globals, r: &mut Run, v: &Mri, align: bool| -> Result<[f64; 3], Fatal> {
+                if align {
+                    let (_, x) = mri_compute_centroid(g, r.err, v)?;
+                    Ok(x)
+                } else {
+                    Ok([
+                        f64::from(v.vg.width - 1) / 2.0,
+                        f64::from(v.vg.height - 1) / 2.0,
+                        f64::from(v.vg.depth - 1) / 2.0,
+                    ])
+                }
+            };
         let align = c.align_centroids != 0;
         if align {
-            let _ = writeln!(r.out, "Setting cras translation parameters to align centroids");
+            let _ = writeln!(
+                r.out,
+                "Setting cras translation parameters to align centroids"
+            );
         } else {
             let _ = writeln!(
                 r.out,
@@ -509,10 +527,17 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     if co.do_coord_dither != 0 {
         let _ = writeln!(r.out, "Creating random numbers for coordinate dithering");
         let mut crfs = UniformField::new(g, co.seed, 0.0, 1.0);
-        let (w, h, d) = (co.ref_vol.vg.width, co.ref_vol.vg.height, co.ref_vol.vg.depth);
+        let (w, h, d) = (
+            co.ref_vol.vg.width,
+            co.ref_vol.vg.height,
+            co.ref_vol.vg.depth,
+        );
         co.cdither = rf_synth_dither(&mut crfs, w, h, d, 3);
     } else {
-        let _ = writeln!(r.out, "NOT Creating random numbers for coordinate dithering");
+        let _ = writeln!(
+            r.out,
+            "NOT Creating random numbers for coordinate dithering"
+        );
     }
     if co.do_intensity_dither != 0 {
         let _ = writeln!(r.out, "Performing intensity dithering");
@@ -543,7 +568,17 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     if let Some(name) = c.movoutfile.clone() {
         let _ = writeln!(r.out, "Saving mov to {name}");
         let env = r.env.clone();
-        mri_write(g, r.out, r.err, &env, r.dir, &mut co.mov, &name, None, MGZ_INTENT_UNKNOWN)?;
+        mri_write(
+            g,
+            r.out,
+            r.err,
+            &env,
+            r.dir,
+            &mut co.mov,
+            &name,
+            None,
+            MGZ_INTENT_UNKNOWN,
+        )?;
     }
     if let Some(name) = c.logcost.clone() {
         let path = match r.dir {
@@ -587,7 +622,11 @@ pub fn main(g: &mut Globals, r: &mut Run, args: &[String]) -> Result<(), Fatal> 
     }
     for n in 0..co.seplist.len() {
         co.sep = co.seplist[n];
-        let _ = writeln!(r.out, "sep = {} -----------------------------------", co.sep);
+        let _ = writeln!(
+            r.out,
+            "sep = {} -----------------------------------",
+            co.sep
+        );
         if n == 0 && c.do_bf != 0 {
             co.opt_brute_force(g, r, c.bf_lim, 1, c.bf_nsamp)?;
         }
@@ -696,7 +735,11 @@ fn coreg_print(r: &mut Run, co: &Coreg, nthreads: usize) {
     let _ = writeln!(r.out, "DoIntensityDither {}", co.do_intensity_dither);
     let _ = writeln!(r.out, "nitersmax {}", co.nitersmax);
     let _ = writeln!(r.out, "ftol {}", cfmt::pad(&cfmt::e(co.ftol, 3), 5));
-    let _ = writeln!(r.out, "linmintol {}", cfmt::pad(&cfmt::e(co.linmintol, 3), 5));
+    let _ = writeln!(
+        r.out,
+        "linmintol {}",
+        cfmt::pad(&cfmt::e(co.linmintol, 3), 5)
+    );
     let _ = writeln!(r.out, "SatPct {}", cfmt::f(co.sat_pct, 6));
     let _ = writeln!(
         r.out,

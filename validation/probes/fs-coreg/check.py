@@ -74,6 +74,8 @@ SKIP = (
     *(f"FS-{k}" for k in range(302, 311)),
 )
 NOT_PORTED = "is not ported yet"
+#: the prelude's command-line and stand-alone cases (`fs_coreg_official.rs`' debug build)
+DEBUG_CASES = 49
 #: the times (both sides): Powell's, the whole run's (the head, the tail kept)
 TIMES = (
     (re.compile(r"OptTimeSec +[0-9.]+ sec"), "OptTimeSec <T> sec"),
@@ -85,8 +87,19 @@ EXAMPLE = REPO / "crates-freesurfer" / "target" / "release" / "examples" / "fs_c
 #: a timeout for one official run (the brute force on these volumes takes seconds)
 TIMEOUT = 120
 #: the port's notices of a case where the official program never ends (FS-1319: the brute force's
-#: step does not advance; FS-1323: a negative separation): the official program is not run
+#: step does not advance; FS-1323: a negative separation that samples, unless the port's
+#: reproduce ends as FreeSurfer's division by 0 does, CRASH 8): the official program is not run
 NEVER_ENDS = ("FS-1319", "FS-1323")
+
+
+def never_ends(line: str, ids: list[str]) -> bool:
+    return any(x in NEVER_ENDS for x in ids) and not line.startswith("CRASH 8")
+
+
+def skipped(line: str, ids: list[str]) -> bool:
+    """FreeSurfer's result is undefined, or the case is not run (FS-1323's division by 0, which
+    the port reproduces, is compared)."""
+    return any(x in SKIP and not (x == "FS-1323" and line.startswith("CRASH 8")) for x in ids)
 
 
 def escape(b: bytes) -> str:
@@ -112,6 +125,11 @@ def collect(d: Path, prefix: str = "") -> list[tuple[str, bytes | None]]:
     return out
 
 
+#: a case folder of an earlier run of this probe: the oracle cache serves an entry's output files
+#: as that run wrote them (an LTA names its volumes by the folder's absolute path)
+OTHER_CASE = re.compile(rb"/[^ \n]*/oracles/inputs/fs-coreg/cases-[^/ \n]*\.d/case-\d+")
+
+
 def written(d: Path, inputs: list[str]) -> str:
     out = []
     for n, b in collect(d):
@@ -120,7 +138,7 @@ def written(d: Path, inputs: list[str]) -> str:
         if b is None:
             out.append(f"D {n}")
             continue
-        b = b.replace(str(d).encode(), b"<DIR>")
+        b = OTHER_CASE.sub(b"<DIR>", b.replace(str(d).encode(), b"<DIR>"))
         if n.endswith((".lta", ".xfm", ".dat", ".txt")):
             out.append(f"F {n} {escape(b)}")
         else:
@@ -221,9 +239,18 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--json", type=Path)
     ap.add_argument("--show", type=int, default=5, help="differing cases to print")
-    ap.add_argument("--golden", action="store_true", help="the golden cases: their official SHA-256")
+    ap.add_argument(
+        "--golden", action="store_true", help="the golden cases: their official SHA-256"
+    )
     ap.add_argument("--only", type=str, default="", help="comma-separated case numbers")
     ap.add_argument("--dump", type=Path, help="every case's official, reproduce and fix lines")
+    ap.add_argument(
+        "--debug-cases",
+        type=int,
+        default=DEBUG_CASES,
+        help="the recorded test's debug build compares the first K cases (the command line and the "
+        "stand-alone options) and hashes the rest as SLOW: official_sha256_skip_debug",
+    )
     a = ap.parse_args(argv)
     devnull = os.open(os.devnull, os.O_RDONLY)
     os.dup2(devnull, 0)
@@ -253,6 +280,7 @@ def main(argv: list[str] | None = None) -> int:
         tag += "-only"
     cases_path = inputs / f"cases-{tag}.txt"
     cases_path.write_text("\n".join(cases) + "\n", encoding="utf-8")
+
     def port_lines(mode: str) -> list[tuple[str, list[str]]]:
         penv = dict(env, PROBE_JOBS=str(a.jobs))
         out = subprocess.run(
@@ -269,7 +297,7 @@ def main(argv: list[str] | None = None) -> int:
     root = inputs / f"cases-{tag}.d"
     official = [
         "NOT RUN (the official program never ends)"
-        if any(x in NEVER_ENDS for x in rep[k][1])
+        if never_ends(*rep[k])
         else official_line(exe, c, root, k)
         for k, c in enumerate(cases)
     ]
@@ -295,7 +323,7 @@ def main(argv: list[str] | None = None) -> int:
         if NOT_PORTED in r:
             counts["not_ported"] += 1
             continue
-        if any(x in SKIP for x in ids):
+        if skipped(r, ids):
             counts["skipped"] += 1
             counts["skipped_but_identical"] += c == r
             continue
@@ -311,16 +339,33 @@ def main(argv: list[str] | None = None) -> int:
                 fix_bad.append(k)
     h = hashlib.sha256()
     for k, (c, (r, ids)) in enumerate(zip(official, rep, strict=True)):
-        h.update(("SKIP" if any(x in SKIP for x in ids) or NOT_PORTED in r else c).encode())
+        h.update(("SKIP" if skipped(r, ids) or NOT_PORTED in r else c).encode())
         h.update(b"\n")
+    hd = hashlib.sha256()
+    for k, (c, (r, ids)) in enumerate(zip(official, rep, strict=True)):
+        if k >= a.debug_cases:
+            hd.update(b"SLOW\n")
+            continue
+        hd.update(("SKIP" if skipped(r, ids) or NOT_PORTED in r else c).encode())
+        hd.update(b"\n")
     summary = {
         "seed": a.seed,
         "family": "golden" if a.golden else "seeded",
         "cases": len(cases),
-        **{k: counts.get(k, 0) for k in ("reproduce_equal", "reproduce_differ", "skipped",
-                                          "skipped_but_identical", "not_ported", "fix_differ",
-                                          "fix_differ_without_notice")},  # fmt: skip
+        **{
+            k: counts.get(k, 0)
+            for k in (
+                "reproduce_equal",
+                "reproduce_differ",
+                "skipped",
+                "skipped_but_identical",
+                "not_ported",
+                "fix_differ",
+                "fix_differ_without_notice",
+            )
+        },  # fmt: skip
         "official_sha256_skip": h.hexdigest(),
+        "official_sha256_skip_debug": hd.hexdigest(),
         "first_differ": differ[:20],
         "fix_differ_without_notice_cases": fix_bad[:20],
     }
@@ -328,7 +373,9 @@ def main(argv: list[str] | None = None) -> int:
     for k in differ[: a.show]:
         print(f"--- case {k}: {cases[k][:200]}")
         c, r = official[k], rep[k][0]
-        j = next((i for i, (x, y) in enumerate(zip(c, r, strict=False)) if x != y), min(len(c), len(r)))
+        j = next(
+            (i for i, (x, y) in enumerate(zip(c, r, strict=False)) if x != y), min(len(c), len(r))
+        )
         print(f"    official:  ...{c[max(0, j - 200) : j + 300]}")
         print(f"    reproduce: ...{r[max(0, j - 200) : j + 300]}")
     if a.json:

@@ -46,8 +46,10 @@ fn main() {
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(4);
             let next = std::sync::atomic::AtomicUsize::new(0);
-            let outs: Vec<std::sync::Mutex<String>> =
-                lines.iter().map(|_| std::sync::Mutex::new(String::new())).collect();
+            let outs: Vec<std::sync::Mutex<String>> = lines
+                .iter()
+                .map(|_| std::sync::Mutex::new(String::new()))
+                .collect();
             std::thread::scope(|sc| {
                 for _ in 0..jobs.max(1) {
                     sc.spawn(|| {
@@ -67,7 +69,9 @@ fn main() {
             }
         }
         _ => {
-            eprintln!("usage: fs_coreg_probe cases <seed> <n> | golden-cases | run <cases> fix|reproduce");
+            eprintln!(
+                "usage: fs_coreg_probe cases <seed> <n> | golden-cases | run <cases> fix|reproduce"
+            );
             std::process::exit(2);
         }
     }

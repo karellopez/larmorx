@@ -31,8 +31,8 @@ use larmorx_core::cfmt;
 use larmorx_core::defects::{FS_1316, FS_1317, FS_1318};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
-use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc, matrix_copy};
 use larmorx_freesurfer_core::matrix::matrix_multiply;
+use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc, matrix_copy};
 use larmorx_freesurfer_core::matrix_ops::matrix_inverse;
 use larmorx_freesurfer_gca::transform::GcaLtaIo;
 use larmorx_freesurfer_io::mriio::mri_read_volume;
@@ -130,7 +130,10 @@ pub fn mat2par(g: &mut Globals, r: &mut Run, name: &str, ras: bool) -> Result<Fa
     let had = first_matrix(&lta).is_some();
     extract(g, r, &lta, &mut p)?;
     if !had {
-        fs_1316(g, "--mat2par: the transform has no matrix (FreeSurfer prints numbers it never wrote)");
+        fs_1316(
+            g,
+            "--mat2par: the transform has no matrix (FreeSurfer prints numbers it never wrote)",
+        );
     }
     print_params(r.out, &p);
     let _ = writeln!(r.out);
@@ -149,16 +152,12 @@ pub fn mat2rot(g: &mut Globals, r: &mut Run, name: &str, out_name: &str) -> Resu
 
 /// FS-1316's notice: a value FreeSurfer reads from a variable it never wrote, 0 here.
 fn fs_1316(g: &mut Globals, what: &str) {
-    g.notices.add(&FS_1316, format!("mri_coreg {what}: taken as 0"));
+    g.notices
+        .add(&FS_1316, format!("mri_coreg {what}: taken as 0"));
 }
 
 /// `--par2mat p1 .. p12 src trg reg.lta` (`a` holds the 15 arguments).
-pub fn par2mat(
-    g: &mut Globals,
-    r: &mut Run,
-    c: &CmdArgs,
-    a: &[String],
-) -> Result<Fatal, Fatal> {
+pub fn par2mat(g: &mut Globals, r: &mut Run, c: &CmdArgs, a: &[String]) -> Result<Fatal, Fatal> {
     let mut par = [0.0f64; 12];
     for (k, p) in par.iter_mut().enumerate() {
         match scan_lf(g, &a[k]) {
@@ -193,7 +192,12 @@ pub fn par2mat(
 
 /// FS-1317 and FS-1318: a crash of FreeSurfer's (`reproduce`: status 139, after the defined
 /// output), a clear error by default (status 1).
-pub fn crash(g: &mut Globals, r: &mut Run, id: &'static larmorx_core::defects::Defect, what: &str) -> Fatal {
+pub fn crash(
+    g: &mut Globals,
+    r: &mut Run,
+    id: &'static larmorx_core::defects::Defect,
+    what: &str,
+) -> Fatal {
     g.notices.add(id, format!("mri_coreg {what}"));
     if g.notices.reproduce() {
         return Fatal::Exit(139);
@@ -293,7 +297,10 @@ pub fn rms(g: &mut Globals, r: &mut Run, a: &[String]) -> Result<Fatal, Fatal> {
         None => {
             fs_1316(
                 g,
-                &format!("--rms: the radius '{}' is no number (FreeSurfer uses the variable it never wrote)", a[0]),
+                &format!(
+                    "--rms: the radius '{}' is no number (FreeSurfer uses the variable it never wrote)",
+                    a[0]
+                ),
             );
             0.0
         }
@@ -304,21 +311,36 @@ pub fn rms(g: &mut Globals, r: &mut Run, a: &[String]) -> Result<Fatal, Fatal> {
     }
     let file = a[1].clone();
     let Some(name1) = a.get(2).cloned() else {
-        return Ok(crash(g, r, &FS_1317, "--rms: no first registration (FreeSurfer reads its name past the command line and crashes)"));
+        return Ok(crash(
+            g,
+            r,
+            &FS_1317,
+            "--rms: no first registration (FreeSurfer reads its name past the command line and crashes)",
+        ));
     };
     let Some(mut lta1) = read_lta(g, r, &name1)? else {
         return Ok(Fatal::Exit(1));
     };
     change_type(g, r, &mut lta1, REGISTER_DAT)?;
     let Some(name2) = a.get(3).cloned() else {
-        return Ok(crash(g, r, &FS_1317, "--rms: no second registration (FreeSurfer reads its name past the command line and crashes)"));
+        return Ok(crash(
+            g,
+            r,
+            &FS_1317,
+            "--rms: no second registration (FreeSurfer reads its name past the command line and crashes)",
+        ));
     };
     let Some(mut lta2) = read_lta(g, r, &name2)? else {
         return Ok(Fatal::Exit(1));
     };
     change_type(g, r, &mut lta2, REGISTER_DAT)?;
     let (Some(m1), Some(m2)) = (first_matrix(&lta1).cloned(), first_matrix(&lta2).cloned()) else {
-        return Ok(crash(g, r, &FS_1317, "--rms: a registration without a matrix (FreeSurfer reads through it and crashes)"));
+        return Ok(crash(
+            g,
+            r,
+            &FS_1317,
+            "--rms: a registration without a matrix (FreeSurfer reads through it and crashes)",
+        ));
     };
     let v = rms_reg_diff_mj(g, r.out, r.err, &m1, &m2, rad)?;
     let line = format!("{}\n", cfmt::pad(&cfmt::f(v, 10), 20));
@@ -332,7 +354,9 @@ pub fn rms(g: &mut Globals, r: &mut Run, a: &[String]) -> Result<Fatal, Fatal> {
                 g,
                 r,
                 &FS_1317,
-                &format!("--rms: {file} does not open for writing (FreeSurfer writes through a NULL file and crashes)"),
+                &format!(
+                    "--rms: {file} does not open for writing (FreeSurfer writes through a NULL file and crashes)"
+                ),
             ));
         }
     }

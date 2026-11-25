@@ -133,15 +133,24 @@ impl Pair {
 
     /// `(dims, size, mdc, c, name)` of an image.
     #[allow(clippy::type_complexity)]
-    pub fn geom(i: &Img, name: &'static str) -> ([i32; 3], [f32; 3], [f32; 9], [f32; 3], &'static str) {
+    pub fn geom(
+        i: &Img,
+        name: &'static str,
+    ) -> ([i32; 3], [f32; 3], [f32; 9], [f32; 3], &'static str) {
         (i.dims, i.size, i.mdc, i.c, name)
     }
 
     /// The files: `mov.mgz`, `ref.mgz`.
     pub fn files(&self, g: &mut Gen) -> Vec<(String, Vec<u8>)> {
         vec![
-            ("mov.mgz".to_owned(), write_as(&mut image(g, &self.mov), "mov.mgz")),
-            ("ref.mgz".to_owned(), write_as(&mut image(g, &self.refv), "ref.mgz")),
+            (
+                "mov.mgz".to_owned(),
+                write_as(&mut image(g, &self.mov), "mov.mgz"),
+            ),
+            (
+                "ref.mgz".to_owned(),
+                write_as(&mut image(g, &self.refv), "ref.mgz"),
+            ),
         ]
     }
 }
@@ -153,7 +162,12 @@ pub fn init_lta(p: &Pair, ltype: i32) -> Vec<u8> {
     let m = [
         c, -sn, 0.0, 1.5, sn, c, 0.0, -0.75, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.0, 1.0,
     ];
-    lta_text(&m, ltype, Pair::geom(&p.mov, "mov.mgz"), Pair::geom(&p.refv, "ref.mgz"))
+    lta_text(
+        &m,
+        ltype,
+        Pair::geom(&p.mov, "mov.mgz"),
+        Pair::geom(&p.refv, "ref.mgz"),
+    )
 }
 
 /// A segmentation of the reference's pattern (aparc+aseg-like: 0 outside, 2, 3, 41, 42 inside).
@@ -168,8 +182,10 @@ fn seg_bytes(g: &mut Gen, refv: &Img, name: &str) -> Vec<u8> {
     for z in 0..m.dims[2] {
         for y in 0..m.dims[1] {
             for x in 0..m.dims[0] {
-                let val = larmorx_freesurfer_mri::voxel::mri_get_vox_val(&mut gg, &mut e, &v, x, y, z, 0, 0)
-                    .expect("a voxel");
+                let val = larmorx_freesurfer_mri::voxel::mri_get_vox_val(
+                    &mut gg, &mut e, &v, x, y, z, 0, 0,
+                )
+                .expect("a voxel");
                 if val > 0.0 {
                     let lab = match (x < m.dims[0] / 2, z % 3 == 0) {
                         (true, true) => 2.0,
@@ -177,8 +193,10 @@ fn seg_bytes(g: &mut Gen, refv: &Img, name: &str) -> Vec<u8> {
                         (false, true) => 41.0,
                         (false, false) => 42.0,
                     };
-                    larmorx_freesurfer_mri::voxel::mri_set_vox_val(&mut gg, &mut e, &mut v, x, y, z, 0, lab, 0)
-                        .expect("a voxel");
+                    larmorx_freesurfer_mri::voxel::mri_set_vox_val(
+                        &mut gg, &mut e, &mut v, x, y, z, 0, lab, 0,
+                    )
+                    .expect("a voxel");
                 }
             }
         }
@@ -230,10 +248,32 @@ pub fn prelude() -> Vec<String> {
         s(&["--mov", "mov.mgz", "--reg", "reg.lta"]),
         s(&["--mov", "mov.mgz", "--ref", "ref.mgz"]),
         with(&["--checkopts"]),
-        with(&["--checkopts", "--nocheckopts", "--no-bf", "--nitersmax", "1", "--sep", "4"]),
+        with(&[
+            "--checkopts",
+            "--nocheckopts",
+            "--no-bf",
+            "--nitersmax",
+            "1",
+            "--sep",
+            "4",
+        ]),
         with(&["--debug", "--checkopts"]),
-        s(&["--mov", "nofile.mgz", "--ref", "ref.mgz", "--reg", "reg.lta"]),
-        s(&["--mov", "mov.mgz", "--ref", "nofile.mgz", "--reg", "reg.lta"]),
+        s(&[
+            "--mov",
+            "nofile.mgz",
+            "--ref",
+            "ref.mgz",
+            "--reg",
+            "reg.lta",
+        ]),
+        s(&[
+            "--mov",
+            "mov.mgz",
+            "--ref",
+            "nofile.mgz",
+            "--reg",
+            "reg.lta",
+        ]),
         with(&["--NO-BF", "--Sep", "4", "--NITERSMAX", "1"]),
         with(&["--No-Dither", "--checkopts"]),
     ] {
@@ -250,10 +290,80 @@ pub fn prelude() -> Vec<String> {
         s(&["--mat2par", "nofile.lta"]),
         s(&["--mat2rot", "a.lta", "rot.lta"]),
         s(&["--mat2rot", "v.lta", "rot.lta"]),
-        s(&["--par2mat", "1", "-2", "3", "4", "5", "6", "1", "1.1", "0.9", "0", "0.1", "0", "mov.mgz", "ref.mgz", "p.lta"]),
-        s(&["--s", "bert", "--par2mat", "0", "0", "0", "10", "0", "0", "1", "1", "1", "0", "0", "0", "mov.mgz", "ref.mgz", "p.lta"]),
-        s(&["--par2mat", "1", "x", "3", "4", "5", "6", "1", "1", "1", "0", "0", "0", "mov.mgz", "ref.mgz", "p.lta"]),
-        s(&["--par2mat", "1", "2", "3", "4", "5", "6", "1", "1", "1", "0", "0", "0", "nofile.mgz", "ref.mgz", "p.lta"]),
+        s(&[
+            "--par2mat",
+            "1",
+            "-2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "1",
+            "1.1",
+            "0.9",
+            "0",
+            "0.1",
+            "0",
+            "mov.mgz",
+            "ref.mgz",
+            "p.lta",
+        ]),
+        s(&[
+            "--s",
+            "bert",
+            "--par2mat",
+            "0",
+            "0",
+            "0",
+            "10",
+            "0",
+            "0",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0",
+            "mov.mgz",
+            "ref.mgz",
+            "p.lta",
+        ]),
+        s(&[
+            "--par2mat",
+            "1",
+            "x",
+            "3",
+            "4",
+            "5",
+            "6",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0",
+            "mov.mgz",
+            "ref.mgz",
+            "p.lta",
+        ]),
+        s(&[
+            "--par2mat",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0",
+            "nofile.mgz",
+            "ref.mgz",
+            "p.lta",
+        ]),
         s(&["--lrrev", "a.lta", "lr.lta"]),
         s(&["--lrrev", "v.lta", "lr.lta"]),
         s(&["--rms", "50", "rms.txt", "a.lta", "v.lta"]),
@@ -264,11 +374,76 @@ pub fn prelude() -> Vec<String> {
         s(&["--rms", "50", "rms.txt", "a.lta", "nofile.lta"]),
         s(&["--landmarks", "a", "b", "c", "d", "e", "f"]),
         s(&["--init-reg", "nofile.lta"]),
-        s(&["--mov", "mov.mgz", "--ref", "ref.mgz", "--reg", "reg.lta", "--init-reg-save-only", "i.lta"]),
-        s(&["--mov", "mov.mgz", "--ref", "ref.mgz", "--reg", "reg.lta", "--init-reg", "a.lta", "--init-reg-save-only", "i.lta"]),
-        s(&["--mov", "mov.mgz", "--ref", "ref.mgz", "--reg", "reg.lta", "--trans", "1", "2", "3", "--rot", "4", "5", "6", "--scale", "1.1", "1", "0.9", "--shear", "0.1", "0", "0", "--init-reg-save-only", "i.lta"]),
-        s(&["--mov", "mov.mgz", "--ref", "ref.mgz", "--reg", "reg.lta", "--centroid", "--init-reg-save-only", "i.lta"]),
-        s(&["--mov", "mov.mgz", "--ref", "ref.mgz", "--reg", "reg.lta", "--no-cras0", "--init-reg-save-only", "i.lta"]),
+        s(&[
+            "--mov",
+            "mov.mgz",
+            "--ref",
+            "ref.mgz",
+            "--reg",
+            "reg.lta",
+            "--init-reg-save-only",
+            "i.lta",
+        ]),
+        s(&[
+            "--mov",
+            "mov.mgz",
+            "--ref",
+            "ref.mgz",
+            "--reg",
+            "reg.lta",
+            "--init-reg",
+            "a.lta",
+            "--init-reg-save-only",
+            "i.lta",
+        ]),
+        s(&[
+            "--mov",
+            "mov.mgz",
+            "--ref",
+            "ref.mgz",
+            "--reg",
+            "reg.lta",
+            "--trans",
+            "1",
+            "2",
+            "3",
+            "--rot",
+            "4",
+            "5",
+            "6",
+            "--scale",
+            "1.1",
+            "1",
+            "0.9",
+            "--shear",
+            "0.1",
+            "0",
+            "0",
+            "--init-reg-save-only",
+            "i.lta",
+        ]),
+        s(&[
+            "--mov",
+            "mov.mgz",
+            "--ref",
+            "ref.mgz",
+            "--reg",
+            "reg.lta",
+            "--centroid",
+            "--init-reg-save-only",
+            "i.lta",
+        ]),
+        s(&[
+            "--mov",
+            "mov.mgz",
+            "--ref",
+            "ref.mgz",
+            "--reg",
+            "reg.lta",
+            "--no-cras0",
+            "--init-reg-save-only",
+            "i.lta",
+        ]),
     ] {
         cases.push(line(&[], &lfiles, &[], &a));
     }
@@ -283,8 +458,14 @@ pub fn prelude() -> Vec<String> {
     };
     let mut rfiles = lfiles.clone();
     rfiles.push(("seg.mgz".to_owned(), seg_bytes(&mut g, &p.refv, "seg.mgz")));
-    rfiles.push(("mmask.mgz".to_owned(), mask_bytes_of(&mut g, &p.mov, MRI_UCHAR, "mmask.mgz")));
-    rfiles.push(("dith.mgz".to_owned(), mask_bytes_of(&mut g, &p.mov, MRI_FLOAT, "dith.mgz")));
+    rfiles.push((
+        "mmask.mgz".to_owned(),
+        mask_bytes_of(&mut g, &p.mov, MRI_UCHAR, "mmask.mgz"),
+    ));
+    rfiles.push((
+        "dith.mgz".to_owned(),
+        mask_bytes_of(&mut g, &p.mov, MRI_FLOAT, "dith.mgz"),
+    ));
     for a in [
         with(&[]),
         q(&[]),
@@ -332,7 +513,10 @@ pub fn prelude() -> Vec<String> {
         q(&["--sep", "0"]),
         q(&["--sep", "-2"]),
         q(&["--dof", "13"]),
-        q(&["--sep", "4", "--sep", "4", "--sep", "4", "--sep", "4", "--sep", "4", "--sep", "4", "--sep", "4", "--sep", "4", "--sep", "4", "--sep", "4"]),
+        q(&[
+            "--sep", "4", "--sep", "4", "--sep", "4", "--sep", "4", "--sep", "4", "--sep", "4",
+            "--sep", "4", "--sep", "4", "--sep", "4", "--sep", "4",
+        ]),
         q(&["--params", "nodir/par.txt"]),
         q(&["--log-cost", "nodir/log.txt"]),
         q(&["--rusage", "ru.txt"]),
@@ -344,7 +528,10 @@ pub fn prelude() -> Vec<String> {
     let subj = vec![
         ("mov.mgz".to_owned(), files[0].1.clone()),
         ("bert/mri/brainmask.mgz".to_owned(), files[1].1.clone()),
-        ("bert/mri/aparc+aseg.mgz".to_owned(), seg_bytes(&mut g, &p.refv, "aparc+aseg.mgz")),
+        (
+            "bert/mri/aparc+aseg.mgz".to_owned(),
+            seg_bytes(&mut g, &p.refv, "aparc+aseg.mgz"),
+        ),
     ];
     let sq = |extra: &[&str]| -> Vec<String> {
         let mut a = s(&["--mov", "mov.mgz", "--reg", "reg.lta"]);
@@ -352,14 +539,49 @@ pub fn prelude() -> Vec<String> {
         a.extend(extra.iter().map(|x| (*x).to_owned()));
         a
     };
-    cases.push(line(&["SUBJECTS_DIR=@DIR@"], &subj, &[], &sq(&["--s", "bert"])));
-    cases.push(line(&[], &subj, &[], &sq(&["--sd", "@DIR@", "--s", "bert"])));
-    cases.push(line(&["SUBJECTS_DIR=@DIR@"], &subj, &[], &sq(&["--s", "bert", "--no-ref-mask"])));
-    cases.push(line(&["SUBJECTS_DIR=@DIR@"], &subj, &[], &sq(&["--s", "bert", "--ref", "bert/mri/brainmask.mgz"])));
-    cases.push(line(&["SUBJECTS_DIR=@DIR@"], &subj, &[], &sq(&["--s", "nobody"])));
+    cases.push(line(
+        &["SUBJECTS_DIR=@DIR@"],
+        &subj,
+        &[],
+        &sq(&["--s", "bert"]),
+    ));
+    cases.push(line(
+        &[],
+        &subj,
+        &[],
+        &sq(&["--sd", "@DIR@", "--s", "bert"]),
+    ));
+    cases.push(line(
+        &["SUBJECTS_DIR=@DIR@"],
+        &subj,
+        &[],
+        &sq(&["--s", "bert", "--no-ref-mask"]),
+    ));
+    cases.push(line(
+        &["SUBJECTS_DIR=@DIR@"],
+        &subj,
+        &[],
+        &sq(&["--s", "bert", "--ref", "bert/mri/brainmask.mgz"]),
+    ));
+    cases.push(line(
+        &["SUBJECTS_DIR=@DIR@"],
+        &subj,
+        &[],
+        &sq(&["--s", "nobody"]),
+    ));
     cases.push(line(&[], &subj, &[], &sq(&["--s", "bert"])));
-    cases.push(line(&["FREESURFER_HOME=@DIR@/nowhere", "SUBJECTS_DIR=@DIR@"], &subj, &[], &sq(&["--s", "bert"])));
-    cases.push(line(&["FREESURFER_HOME=@DIR@/nowhere"], &files, &[], &q(&[])));
+    cases.push(line(
+        &["FREESURFER_HOME=@DIR@/nowhere", "SUBJECTS_DIR=@DIR@"],
+        &subj,
+        &[],
+        &sq(&["--s", "bert"]),
+    ));
+    cases.push(line(
+        &["FREESURFER_HOME=@DIR@/nowhere"],
+        &files,
+        &[],
+        &q(&[]),
+    ));
     cases
 }
 
@@ -370,15 +592,27 @@ fn seeded(g: &mut Gen) -> String {
     p.refv.ty = g.pick(&[MRI_UCHAR, MRI_SHORT, MRI_FLOAT]);
     p.mov.mdc = g.pick(&[LIA, RAS, LPI]);
     p.refv.mdc = g.pick(&[LIA, RAS]);
-    p.mov.shift = [g.int(-6, 6) as i32, g.int(-6, 6) as i32, g.int(-4, 4) as i32];
+    p.mov.shift = [
+        g.int(-6, 6) as i32,
+        g.int(-6, 6) as i32,
+        g.int(-4, 4) as i32,
+    ];
     p.mov.shear = g.int(-2, 2) as i32;
     p.mov.gain = g.int(10, 30) as i32;
     p.mov.white = g.chance(8);
     if g.chance(4) {
-        p.mov.dims = [g.int(16, 24) as i32, g.int(16, 24) as i32, g.int(10, 16) as i32];
+        p.mov.dims = [
+            g.int(16, 24) as i32,
+            g.int(16, 24) as i32,
+            g.int(10, 16) as i32,
+        ];
     }
     if g.chance(5) {
-        p.refv.dims = [g.int(24, 32) as i32, g.int(24, 32) as i32, g.int(24, 32) as i32];
+        p.refv.dims = [
+            g.int(24, 32) as i32,
+            g.int(24, 32) as i32,
+            g.int(24, 32) as i32,
+        ];
     }
     let files = p.files(g);
     let mut a = s(&["--mov", "mov.mgz", "--ref", "ref.mgz", "--reg", "reg.lta"]);
@@ -407,7 +641,10 @@ fn seeded(g: &mut Gen) -> String {
         opt(&mut a, &["--ftol", "1e-4", "--linmintol", "1e-2"]);
     }
     if g.chance(5) {
-        opt(&mut a, &[g.pick(&["--no-dither", "--no-coord-dither", "--no-intensity-dither"])]);
+        opt(
+            &mut a,
+            &[g.pick(&["--no-dither", "--no-coord-dither", "--no-intensity-dither"])],
+        );
     }
     if g.chance(6) {
         opt(&mut a, &["--no-smooth"]);
@@ -428,7 +665,17 @@ fn seeded(g: &mut Gen) -> String {
         opt(&mut a, &["--sat", g.pick(&["95", "99.9"])]);
     }
     if g.chance(5) {
-        opt(&mut a, &["--regdat", "reg.dat", "--params", "p.txt", "--final-cost", "c.txt"]);
+        opt(
+            &mut a,
+            &[
+                "--regdat",
+                "reg.dat",
+                "--params",
+                "p.txt",
+                "--final-cost",
+                "c.txt",
+            ],
+        );
     }
     line(&[], &files, &[], &a)
 }
@@ -459,9 +706,70 @@ pub fn golden_cases() -> Vec<String> {
         a
     };
     vec![
-        line(&[], &files, &[], &with(&["--dof", "6", "--sep", "4", "--ftol", "1e-4", "--linmintol", "1e-2", "--bf-lim", "4", "--bf-nsamp", "4", "--nitersmax", "2", "--ref-mask", "seg.mgz"])),
-        line(&[], &files, &[], &with(&["--dof", "12", "--no-bf", "--nitersmax", "1", "--sep", "4", "--regdat", "reg.dat", "--params", "p.txt", "--final-cost", "c.txt", "--log-cost", "log.txt", "--movout", "mo.mgz", "--init-reg", "a.lta"])),
-        line(&[], &files, &[], &with(&["--xytrans+zrot", "--no-bf", "--nitersmax", "1", "--sep", "4", "--centroid", "--ras2ras"])),
+        line(
+            &[],
+            &files,
+            &[],
+            &with(&[
+                "--dof",
+                "6",
+                "--sep",
+                "4",
+                "--ftol",
+                "1e-4",
+                "--linmintol",
+                "1e-2",
+                "--bf-lim",
+                "4",
+                "--bf-nsamp",
+                "4",
+                "--nitersmax",
+                "2",
+                "--ref-mask",
+                "seg.mgz",
+            ]),
+        ),
+        line(
+            &[],
+            &files,
+            &[],
+            &with(&[
+                "--dof",
+                "12",
+                "--no-bf",
+                "--nitersmax",
+                "1",
+                "--sep",
+                "4",
+                "--regdat",
+                "reg.dat",
+                "--params",
+                "p.txt",
+                "--final-cost",
+                "c.txt",
+                "--log-cost",
+                "log.txt",
+                "--movout",
+                "mo.mgz",
+                "--init-reg",
+                "a.lta",
+            ]),
+        ),
+        line(
+            &[],
+            &files,
+            &[],
+            &with(&[
+                "--xytrans+zrot",
+                "--no-bf",
+                "--nitersmax",
+                "1",
+                "--sep",
+                "4",
+                "--centroid",
+                "--ras2ras",
+            ]),
+        ),
         line(&[], &files, &[], &s(&["--mat2par", "a.lta"])),
         line(&[], &files, &[], &s(&["--lrrev", "a.lta", "lr.lta"])),
     ]
@@ -469,7 +777,9 @@ pub fn golden_cases() -> Vec<String> {
 
 /// Text files listed with their bytes.
 fn is_text(name: &str) -> bool {
-    [".lta", ".xfm", ".dat", ".txt"].iter().any(|e| name.ends_with(e))
+    [".lta", ".xfm", ".dat", ".txt"]
+        .iter()
+        .any(|e| name.ends_with(e))
 }
 
 /// The lines that name the machine and the user, masked: `<key> <M>`.
@@ -519,7 +829,10 @@ pub fn written(dir: &Path, inputs: &[String]) -> String {
     let d = dir.to_string_lossy().into_owned();
     let mut out = Vec::new();
     for (n, b) in collect_all(dir, "") {
-        if inputs.iter().any(|i| n == *i || i.starts_with(&format!("{n}/"))) {
+        if inputs
+            .iter()
+            .any(|i| n == *i || i.starts_with(&format!("{n}/")))
+        {
             continue;
         }
         match b {
@@ -638,7 +951,15 @@ pub fn run_line_in(line: &str, mode: UpstreamDefects, dir: &Path) -> (String, Ve
         .and_then(|v| v.to_str())
         .and_then(|v| v.parse().ok())
         .unwrap_or(0);
-    let status = run_with(&mut g, &args, environment, Some(dir), threads, &mut out, &mut err);
+    let status = run_with(
+        &mut g,
+        &args,
+        environment,
+        Some(dir),
+        threads,
+        &mut out,
+        &mut err,
+    );
     let d = dir.to_string_lossy().into_owned();
     let mask = |b: &[u8]| {
         mask_machine(&mask_time(

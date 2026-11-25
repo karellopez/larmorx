@@ -34,7 +34,7 @@ use std::fs::File;
 use std::io::Write;
 
 use larmorx_core::cfmt;
-use larmorx_core::defects::{FS_1319, FS_1320, FS_1321};
+use larmorx_core::defects::{FS_1319, FS_1320, FS_1321, FS_1323};
 use larmorx_core::glibc_qsort::qsort;
 use larmorx_core::math::Libm;
 use larmorx_core::ranlux::Ranlux;
@@ -192,7 +192,8 @@ fn coreg_samp(f: &[u8], c: f64, r: f64, s: f64, ncols: i32, nrows: i32) -> Optio
     let spd = 1.0 - smd;
     let idx = |c: f64, r: f64, s: f64| -> Option<usize> {
         let (c, r, s) = (to_int_x86(c), to_int_x86(r), to_int_x86(s));
-        let i = i64::from(c) + i64::from(r) * i64::from(ncols)
+        let i = i64::from(c)
+            + i64::from(r) * i64::from(ncols)
             + i64::from(s) * i64::from(nrows) * i64::from(ncols);
         usize::try_from(i).ok().filter(|&i| i < f.len())
     };
@@ -208,9 +209,47 @@ fn coreg_samp(f: &[u8], c: f64, r: f64, s: f64, ncols: i32, nrows: i32) -> Optio
     Some(val)
 }
 
-/// One chunk's histogram and hits, or the coordinates of a sample FreeSurfer reads outside its
-/// vector at.
-type ChunkResult = Result<(Vec<f64>, i64), (f64, f64, f64)>;
+/// One chunk's histogram (its non-zero bins, `(bin, value)` in the order of the bins' first
+/// weight) and hits, or the coordinates of a sample FreeSurfer reads outside its vector at.
+type ChunkResult = Result<(Vec<(usize, f64)>, i64), (f64, f64, f64)>;
+
+/// A chunk's histogram: the bins' values and the bins touched (reused from chunk to chunk; the
+/// touched bins cleared after each).
+struct Scratch {
+    h: Vec<f64>,
+    seen: Vec<bool>,
+    touched: Vec<usize>,
+}
+
+impl Scratch {
+    fn new() -> Scratch {
+        Scratch {
+            h: vec![0.0; NB * NB],
+            seen: vec![false; NB * NB],
+            touched: Vec::new(),
+        }
+    }
+
+    #[inline]
+    fn add(&mut self, k: usize, w: f64) {
+        if !self.seen[k] {
+            self.seen[k] = true;
+            self.touched.push(k);
+        }
+        self.h[k] += w;
+    }
+
+    /// The touched bins and their values, the scratch cleared.
+    fn take(&mut self) -> Vec<(usize, f64)> {
+        let out = self.touched.iter().map(|&k| (k, self.h[k])).collect();
+        for &k in &self.touched {
+            self.h[k] = 0.0;
+            self.seen[k] = false;
+        }
+        self.touched.clear();
+        out
+    }
+}
 
 impl Coreg {
     /// The coordinate dither's value at `(c, r, s)`, frame `f` (`MRIgetVoxVal(cdither, ...)`).
@@ -225,8 +264,7 @@ impl Coreg {
     }
 
     /// One chunk of `COREGhist`'s loop: the reference's columns `[begin, end)` every `sep`.
-    fn hist_chunk(&self, v2v: &[f64; 16], begin: i32, end: i32) -> ChunkResult {
-        let mut h = vec![0.0f64; NB * NB];
+    fn hist_chunk(&self, sc: &mut Scratch, v2v: &[f64; 16], begin: i32, end: i32) -> ChunkResult {
         let mut nhits = 0i64;
         let (rw, rh, rd) = (
             self.ref_vol.vg.width,
@@ -243,7 +281,8 @@ impl Coreg {
             while rref < rh {
                 let mut sref = 0;
                 while sref < rd {
-                    let (mut dc, mut dr, mut ds) = (f64::from(cref), f64::from(rref), f64::from(sref));
+                    let (mut dc, mut dr, mut ds) =
+                        (f64::from(cref), f64::from(rref), f64::from(sref));
                     if self.do_coord_dither != 0 {
                         dc += f64::from(fsep * self.dither(cref, rref, sref, 0));
                         dr += f64::from(fsep * self.dither(cref, rref, sref, 1));
@@ -286,9 +325,9 @@ impl Coreg {
                     let ivg = to_int_x86((vg + 0.5).floor());
                     let k = (i64::from(ivf) + i64::from(ivg) * NB as i64) as usize;
                     let frac = vf - f64::from(ivf);
-                    h[k] += 1.0 - frac;
+                    sc.add(k, 1.0 - frac);
                     if ivf < 255 {
-                        h[k + 1] += frac;
+                        sc.add(k + 1, frac);
                     }
                     sref += sep;
                 }
@@ -296,7 +335,7 @@ impl Coreg {
             }
             cref += sep;
         }
-        Ok((h, nhits))
+        Ok((sc.take(), nhits))
     }
 
     /// `COREGhist(coreg)`: the joint histogram into `h0`, the hits and their percentage.
@@ -310,6 +349,14 @@ impl Coreg {
         }
         let width = self.ref_vol.vg.width;
         let sep = self.sep;
+        if sep == 0 {
+            // FreeSurfer's integer division by 0 (SIGFPE): only `reproduce` reaches it
+            g.notices.add(
+                &FS_1323,
+                "mri_coreg --sep 0: FreeSurfer divides by 0 at the separation's first histogram (SIGFPE)",
+            );
+            return Err(Fatal::Exit(136));
+        }
         let niters = (width + sep - 1) / sep;
         let chunk_size = (niters + NCHUNKS as i32 - 1) / NCHUNKS as i32;
         let ranges: Vec<(i32, i32)> = (0..NCHUNKS as i32)
@@ -319,19 +366,38 @@ impl Coreg {
                 (b, e)
             })
             .collect();
+        if sep < 0 && ranges.iter().any(|&(b, e)| b < e) {
+            // a negative step from below the end: FreeSurfer's loop never ends (it reads outside
+            // the volume until it crashes); only `reproduce` reaches it
+            g.notices.add(
+                &FS_1323,
+                format!("mri_coreg --sep {sep}: FreeSurfer's sampling loop never ends"),
+            );
+            let _ = writeln!(
+                r.err,
+                "{}: --sep {sep}: FreeSurfer's sampling loop never ends here",
+                super::main::NAME
+            );
+            return Err(Fatal::Exit(1));
+        }
         let nthreads = self.threads.clamp(1, NCHUNKS);
         let this = &*self;
         let results: Vec<ChunkResult> = if nthreads == 1 {
-            ranges.iter().map(|&(b, e)| this.hist_chunk(&v2v, b, e)).collect()
+            let mut sc = Scratch::new();
+            ranges
+                .iter()
+                .map(|&(b, e)| this.hist_chunk(&mut sc, &v2v, b, e))
+                .collect()
         } else {
-            std::thread::scope(|sc| {
+            std::thread::scope(|scope| {
                 let per = NCHUNKS.div_ceil(nthreads);
                 let hs: Vec<_> = ranges
                     .chunks(per)
                     .map(|part| {
-                        sc.spawn(move || {
+                        scope.spawn(move || {
+                            let mut sc = Scratch::new();
                             part.iter()
-                                .map(|&(b, e)| this.hist_chunk(&v2v, b, e))
+                                .map(|&(b, e)| this.hist_chunk(&mut sc, &v2v, b, e))
                                 .collect::<Vec<_>>()
                         })
                     })
@@ -341,13 +407,17 @@ impl Coreg {
                     .collect()
             })
         };
-        let mut chunks = Vec::with_capacity(NCHUNKS);
+        // the chunks collected in their order (`H01d[k] = sum_n HH[n][k]`, each sum from 0: a
+        // chunk that left a bin at 0 adds nothing to it), then `H0[r][c] = H01d[c * 256 + r]`
+        let mut h01d = vec![0.0f64; NB * NB];
         let mut nhits = 0i64;
         for res in results {
             match res {
-                Ok((h, n)) => {
+                Ok((bins, n)) => {
                     nhits += n;
-                    chunks.push(h);
+                    for (k, v) in bins {
+                        h01d[k] += v;
+                    }
                 }
                 Err((c, rr, s)) => {
                     return Err(super::standalone::crash(
@@ -364,15 +434,9 @@ impl Coreg {
                 }
             }
         }
-        // the chunks collected (`H01d[k] = sum_n HH[n][k]`), then `H0[r][c] = H01d[c * 256 + r]`
         for c in 0..NB {
             for rr in 0..NB {
-                let k = c * NB + rr;
-                let mut v = 0.0f64;
-                for h in &chunks {
-                    v += h[k];
-                }
-                self.h0[rr * NB + c] = v;
+                self.h0[rr * NB + c] = h01d[c * NB + rr];
             }
         }
         self.nhits = nhits as i32;
@@ -494,34 +558,34 @@ impl Coreg {
         let cols1 = NB + g2.len() - 1;
         let mut h1 = vec![0.0f64; NB * cols1];
         for rr in 0..NB {
-            conv1d(&self.h0[rr * NB..(rr + 1) * NB], &g2, &mut h1[rr * cols1..(rr + 1) * cols1]);
+            conv1d(
+                &self.h0[rr * NB..(rr + 1) * NB],
+                &g2,
+                &mut h1[rr * cols1..(rr + 1) * cols1],
+            );
         }
+        // the smoothed histogram column by column (`hc[c * rows + r]`: the passes below run
+        // over the columns, the rows inside)
         let rows = NB + g1.len() - 1;
-        let mut hh = vec![0.0f64; rows * cols1];
+        let mut hc = vec![0.0f64; rows * cols1];
         let mut col = vec![0.0f64; NB];
-        let mut vc = vec![0.0f64; rows];
         for c in 0..cols1 {
-            for rr in 0..NB {
-                col[rr] = h1[rr * cols1 + c];
+            for (rr, v) in col.iter_mut().enumerate() {
+                *v = h1[rr * cols1 + c];
             }
-            conv1d(&col, &g1, &mut vc);
-            for rr in 0..rows {
-                hh[rr * cols1 + c] = vc[rr];
-            }
+            conv1d(&col, &g1, &mut hc[c * rows..(c + 1) * rows]);
         }
-        for v in &mut hh {
+        for v in &mut hc {
             *v += FLT_EPSILON;
         }
         let mut sum = 0.0f64;
-        for c in 0..cols1 {
-            for rr in 0..rows {
-                sum += hh[rr * cols1 + c];
-            }
+        for v in &hc {
+            sum += *v;
         }
-        for v in &mut hh {
+        for v in &mut hc {
             *v /= sum;
         }
-        self.cost = nmi_cost(&self.libm, &hh, cols1, rows);
+        self.cost = nmi_cost(&self.libm, &hc, cols1, rows);
         if let Some(fp) = self.fplogcost.as_mut() {
             let mut line = format!("{} {}  ", pad(self.sep, 2), pad(self.n_cost_evaluations, 4));
             for v in &self.params[..self.nparams.clamp(0, 12) as usize] {
@@ -544,7 +608,14 @@ impl Coreg {
             Some(v) => v,
             None => Matrix::real(4, 4),
         };
-        matrix_multiply_d(g, r.out, r.err, ras2vox_dst.as_ref(), self.m.as_ref(), Some(&mut v))?;
+        matrix_multiply_d(
+            g,
+            r.out,
+            r.err,
+            ras2vox_dst.as_ref(),
+            self.m.as_ref(),
+            Some(&mut v),
+        )?;
         let v1 = v.clone();
         matrix_multiply_d(g, r.out, r.err, Some(&v1), Some(&src), Some(&mut v))?;
         Ok(v)
@@ -581,7 +652,11 @@ impl Coreg {
             }
         }
         if newmin {
-            let mut line = format!("#@# {} {}  ", pad(self.sep, 2), pad(self.n_cost_evaluations, 4));
+            let mut line = format!(
+                "#@# {} {}  ",
+                pad(self.sep, 2),
+                pad(self.n_cost_evaluations, 4)
+            );
             for v in &self.ppmin[..n] {
                 line.push_str(&format!("{} ", cfmt::pad(&cfmt::f(f64::from(*v), 5), 7)));
             }
@@ -623,7 +698,8 @@ impl Coreg {
         let buf_err = RefCell::new((Vec::new(), Vec::new()));
         let mut failed: Option<Fatal> = None;
         let (mut niters, mut fret) = (self.niters, self.fret);
-        let (ftol, linmintol, nitersmax) = (self.ftol as f32, self.linmintol as f32, self.nitersmax);
+        let (ftol, linmintol, nitersmax) =
+            (self.ftol as f32, self.linmintol as f32, self.nitersmax);
         {
             let env = r.env.clone();
             let (dir, threads) = (r.dir, r.threads);
@@ -677,7 +753,11 @@ impl Coreg {
         let secs = start.elapsed().as_secs_f64();
         let _ = writeln!(r.out, "Powell done niters total = {}", self.niters);
         let _ = writeln!(r.out, "OptTimeSec {} sec", cfmt::pad(&cfmt::f(secs, 1), 4));
-        let _ = writeln!(r.out, "OptTimeMin {} min", cfmt::pad(&cfmt::f(secs / 60.0, 2), 5));
+        let _ = writeln!(
+            r.out,
+            "OptTimeMin {} min",
+            cfmt::pad(&cfmt::f(secs / 60.0, 2), 5)
+        );
         let _ = writeln!(r.out, "nEvals {}", self.n_cost_evaluations);
         let _ = r.out.flush();
         let _ = write!(r.out, "Final optimized parameters ");
@@ -692,7 +772,11 @@ impl Coreg {
         }
         let _ = writeln!(r.out);
         self.cost(g, r)?;
-        let _ = write!(r.out, "Final cost {}\n ", cfmt::pad(&cfmt::f(self.cost, 15), 20));
+        let _ = write!(
+            r.out,
+            "Final cost {}\n ",
+            cfmt::pad(&cfmt::f(self.cost, 15), 20)
+        );
         let _ = write!(r.out, "\n\n---------------------------------\n");
         Ok(())
     }
@@ -752,7 +836,8 @@ impl Coreg {
                         popt = p;
                     }
                     if self.debug != 0 {
-                        let mut line = format!("{} {} {}", pad(iter, 2), pad(nthp as i32, 2), pad(nth1d, 3));
+                        let mut line =
+                            format!("{} {} {}", pad(iter, 2), pad(nthp as i32, 2), pad(nth1d, 3));
                         for v in &self.params[..nshow] {
                             line.push_str(&format!("  {} ", cfmt::pad(&cfmt::f(*v, 5), 9)));
                         }
@@ -875,27 +960,35 @@ fn conv1d(v1: &[f64], v2: &[f64], vc: &mut [f64]) {
 }
 
 /// `NMICost(H, cols, rows)`: `-(sum_r s1 log2 s1 + sum_c s2 log2 s2) / (sum H log2 H +
-/// FLT_EPSILON)`, `s1` the row sums and `s2` the column sums; `H`'s sum column by column.
-fn nmi_cost(libm: &Libm, h: &[f64], cols: usize, rows: usize) -> f64 {
-    let at = |r: usize, c: usize| h[r * cols + c];
+/// FLT_EPSILON)`, `s1` the row sums and `s2` the column sums (each from 0 in the index order);
+/// `H`'s sum column by column. `hc` holds `H` column by column (`hc[c * rows + r]`).
+fn nmi_cost(libm: &Libm, hc: &[f64], cols: usize, rows: usize) -> f64 {
     let mut s1 = vec![0.0f64; rows];
-    for (r, s) in s1.iter_mut().enumerate() {
-        for c in 0..cols {
-            *s += at(r, c);
+    for c in 0..cols {
+        for (s, v) in s1.iter_mut().zip(&hc[c * rows..(c + 1) * rows]) {
+            *s += *v;
         }
     }
     let mut s2 = vec![0.0f64; cols];
     for (c, s) in s2.iter_mut().enumerate() {
-        for r in 0..rows {
-            *s += at(r, c);
+        for v in &hc[c * rows..(c + 1) * rows] {
+            *s += *v;
         }
     }
+    // `log2` of the bins in order; the bins of no sample all hold the same value, whose
+    // logarithm is taken once (the same call on the same number: the same bits)
     let mut den = 0.0f64;
-    for c in 0..cols {
-        for r in 0..rows {
-            let v = at(r, c);
-            den += v * libm.log2(v);
-        }
+    let mut last: Option<(u64, f64)> = None;
+    for &v in hc {
+        let l = match last {
+            Some((b, l)) if b == v.to_bits() => l,
+            _ => {
+                let l = libm.log2(v);
+                last = Some((v.to_bits(), l));
+                l
+            }
+        };
+        den += v * l;
     }
     let mut s1sum = 0.0f64;
     for v in &s1 {
@@ -973,7 +1066,15 @@ pub fn mri_rescale_to_uchar(
     mri: &Mri,
     sat: f64,
 ) -> Result<Mri, Fatal> {
-    let mut uc = mri_alloc(g, r.out, r.err, mri.vg.width, mri.vg.height, mri.vg.depth, MRI_FLOAT)?;
+    let mut uc = mri_alloc(
+        g,
+        r.out,
+        r.err,
+        mri.vg.width,
+        mri.vg.height,
+        mri.vg.depth,
+        MRI_FLOAT,
+    )?;
     mri_copy_header(g, r.out, r.err, mri, Some(&mut uc))?;
     let (mut max, mut min) = (-10e10f64, 10e10f64);
     for c in 0..mri.vg.width {

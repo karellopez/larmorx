@@ -39,6 +39,17 @@ pub trait TransformInputs {
             Err(e) => Err(e.raw_os_error().unwrap_or(ENOENT)),
         }
     }
+
+    /// Whether `name` is a folder (`stat` and `S_ISDIR`; §63's subject and slice folders).
+    fn is_dir(&mut self, name: &[u8]) -> bool {
+        std::fs::metadata(crate::files::path_of(name)).is_ok_and(|m| m.is_dir())
+    }
+
+    /// Whether `name` opens for reading (`fopen(name, "r")`; §63's original volumes and
+    /// transforms).
+    fn opens(&mut self, name: &[u8]) -> bool {
+        std::fs::File::open(crate::files::path_of(name)).is_ok()
+    }
 }
 
 /// The file system, read through [`TransformInputs`]' defaults.

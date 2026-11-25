@@ -197,7 +197,7 @@ impl Process {
         if self.mode().reproduce() { glibc } else { cr }
     }
 
-    fn note_glibc07(&mut self, name: &str) {
+    pub(crate) fn note_glibc07(&mut self, name: &str) {
         if self.mode().reproduce() {
             self.note(
                 &GLIBC_07,

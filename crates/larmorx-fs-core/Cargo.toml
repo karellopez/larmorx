@@ -8,6 +8,8 @@ repository.workspace = true
 
 [dependencies]
 larmorx-core.workspace = true
+# an .mgz's header read through zlib's gzip format (DevolveXFM's original volume, spec §63)
+flate2.workspace = true
 # the reproducible sums' pieces on several threads (§19)
 rayon.workspace = true
 

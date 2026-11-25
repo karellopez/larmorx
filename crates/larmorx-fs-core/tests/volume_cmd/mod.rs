@@ -20,6 +20,7 @@ mod part10;
 mod part10b;
 mod part10c;
 mod part11a;
+mod part11b;
 mod part7b;
 mod part8;
 mod part9;
@@ -1345,6 +1346,7 @@ fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
                 && !part10b::call(p, l, &c)?
                 && !part10c::call(p, l, &c)?
                 && !part11a::call(p, l, &c)?
+                && !part11b::call(p, l, &c)?
             {
                 args::bad("unknown command")
             }

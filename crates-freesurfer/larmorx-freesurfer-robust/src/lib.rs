@@ -16,6 +16,7 @@ pub mod costs;
 pub mod debug;
 pub mod entropy;
 pub mod jointhisto;
+pub mod matrixlog;
 pub mod mymatrix;
 pub mod mymri;
 pub mod powell;

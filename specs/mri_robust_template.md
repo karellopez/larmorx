@@ -1,11 +1,9 @@
 # `mri_robust_template` (FreeSurfer 8.2.0): behaviour spec
 
-Status: queue item 3.2-14 (part 1 of `mri_robust_template`, track C relay 50): the command line, the
-loading of the inputs, the registrations to the initial target, the rigid mean space, the global
-iterations, the averages and every output, the exit statuses, the defects with their switches and the
-validation plan (§8). Not yet: the affine mean space (`--affine` without `--fixtp`: the matrices'
-geometric mean, §4.4), which ends with a message (`... is not ported yet`, status 1) until queue item
-3.2-15. Written by the replica's author as the spec writer: behaviour, conventions and messages, for
+Status: queue items 3.2-14 and 3.2-15 (track C relays 50 and 51): the command line, the loading of
+the inputs, the registrations to the initial target, the rigid and the affine mean space (§4.4), the
+global iterations, the averages and every output, the exit statuses, the defects with their switches
+and the validation plan (§9): the whole program. Written by the replica's author as the spec writer: behaviour, conventions and messages, for
 the clean room (`larmorx-fs-volumes`), which works from this file, `specs/mri_robust_register.md` (the
 pairwise registration's messages and the library it shares), the library modules' specs
 (`specs/freesurfer-robust.md` for the registration, `freesurfer-volume.md` for the transforms and the
@@ -212,8 +210,78 @@ RAS transforms for a radius of 100 mm), ` - mapping tp <i> to template (cubic bs
 distances, `Maxchange: <m>`; `Computing new template <k>`; at the end ` DONE : computeTemplate `.
 
 ### 4.4 The affine mean space
-`--affine` without `--fixtp` averages the linear maps by their geometric mean (the matrix logarithm and
-exponential): not ported yet (queue 3.2-15).
+`--affine` without `--fixtp`: §4.2's step 6 with the linear maps (each other input's RAS transform
+inverted, its upper 3 x 3 block; the target's the identity) averaged by their **geometric mean**
+`exp((1/n) sum_i log(L_i))` (`n` the number of inputs, the logarithms summed in input order, then
+each element times `1/n`) instead of the mean rotation; no rotation check and no polar decomposition
+afterwards (the mean transform times each input's RAS transform is kept as it is). The matrix
+logarithm and exponential are those of MATLAB's `logm` and `expm` (Higham's methods), in double
+precision with C++'s complex arithmetic (a complex product and quotient as C99 computes them, Annex
+G's recoveries included; `abs`, `sqrt` and `log` of a complex number the project's decided `cabs`,
+`csqrt` and `clog`: `larmorx_core::cplx`; the complex Frobenius norm's squares `abs(z)^2`):
+
+1. **Logarithm of a 3 x 3 real `A`.** The complex Schur form `A = U T U^H` (`specs/freesurfer-robust.md`'s
+   `SchurComplex`: reference LAPACK 3.10.0's `ZGEES`). For each diagonal element of `T` with real part
+   at most 0 and imaginary part below `1e-9` in magnitude, on standard error `MatrixLog Error: `, `
+   Principal matrix logarithm is not defined for A with `, `          nonpositive real eigenvalues. `
+   (FS-1099: by default then status 1; `reproduce` goes on). The diagonal elements grouped: each new
+   element starts a group, two elements of different groups within `0.1` (the absolute value of their
+   difference) merge their groups (the larger group number into the smaller, the numbers above it
+   lowered); the groups ordered by the mean of their elements' positions (ties by group number), and
+   the Schur form reordered so each group's elements are consecutive (LAPACK's `ZTRSEN` with `JOB =
+   'N'`, `COMPQ = 'V'`, called for each group from the last in the order to the first whose elements
+   are not already at the front, each time selecting that group's current positions). Then `F`, upper
+   triangular: each diagonal block (a group) by (2); above the diagonal, for each block column from
+   the left and each block row from the one above it up: between two single elements `F(i, j) =
+   (T(i, j) (F(i, i) - F(j, j)) + sum_k F(i, k) T(k, j) - sum_k T(i, k) F(k, j)) / (T(i, i) - T(j,
+   j))` (`k` strictly between `i` and `j`, both sums from 0 in `k` order); otherwise the block solves
+   `T_ii X + X N = F_ii T_ij - T_ij F_jj + F_ik T_kj - T_ik F_kj` (`N = -T_jj`, each element
+   negated; `k` the blocks between; the right-hand side's products and sums in that order) column by
+   column: column `c` from `(T_ii + N(c, c) I) x = rhs(:, c) - X(:, 0:c) N(0:c, c)` (the matrix-vector
+   product's sums from 0 in column order), each system by (4); FS-1100: FreeSurfer leaves the last
+   solved column out of that product (`X(:, 0:c-1) N(0:c-1, c)`), `reproduce` does as it does. Then `U F U^H`. If the one-norm of its imaginary part
+   passes `10 n 2^-52` times its own one-norm: on standard error ` MatrixLog Error: `, `  Result too
+   imaginary to ignore! ( <x> )` (`%g`), then at precision 16 ` A = ` and `A` (each element and a
+   blank, each row a newline) and an empty line, ` T = ` and `T` (complex elements `(re,im)`), ` U = `
+   and `U` likewise, ` fro( real(U * T * U^*) - A) = <x>` and two newlines, ` log(A) = ` and the complex
+   result, ` fro( exp(real(log(A))) - A)  = <x>` and two newlines, status 1 (FS-1312: by default only
+   above `sqrt(2^-52)` times the norm). The result is the real part.
+2. **Logarithm of a triangular block.** A single element: its complex `log`. Otherwise inverse scaling
+   and squaring: while the Frobenius norm of `T - I` is above `0.25`, the upper triangular square root
+   (column by column, the diagonal `sqrt(T(j, j))`, then from row `j - 1` up `R(i, j) = (T(i, j) - sum_k
+   R(i, k) R(k, j)) / (R(i, i) + R(j, j))`) replaces `T`; the 99th root still above ends with
+   `MatrixLog_isst:tooManyIterations Too many square roots.` on standard error, status 1. Then `2^s`
+   times (3) of `T - I` (`s` the number of roots).
+3. **`log(I + X)`**: the [8/8] Pade approximant in partial fractions, `sum_j w_j X (I + x_j X)^-1` over
+   the 8-point Gauss-Legendre nodes `x_j` and weights `w_j` mapped to `[0, 1]` (`(x + 1) / 2`, `w /
+   2`; the nodes and weights by Golub and Welsch: the eigenvalues, ascending, of the symmetric
+   tridiagonal matrix with `i / sqrt(4 i^2 - 1)` beside its diagonal and `2 v(0)^2` of each
+   eigenvector, VNL's symmetric eigensystem); each term solved as `(I + x_j X^T) Y = X^T` by (4), the
+   terms summed in order, the sum transposed.
+4. **The complex solves** are VNL's `vnl_svd<std::complex<double>>`: LINPACK's `zsvdc` (VNL's f2c
+   translation; `job = 21`), the singular values' absolute values, then for a matrix right-hand side
+   `V (diag(1/w) (U^H B))` (`1/w` C++'s complex quotient `(1, 0) / (w, 0)`, the row times it; 0 rows
+   kept for `w = 0`), for a vector `V (U^H y ./ w)`.
+5. **Exponential** (`expm`, Higham 2005): `m` the one-norm of the matrix; up to `5.371920351148152` the
+   Pade approximant of the first degree 3, 5, 7, 9 or 13 whose `theta` (`1.495585217958292e-2`,
+   `2.539398330063230e-1`, `9.504178996162932e-1`, `2.097847961257068`, `5.371920351148152`) it does
+   not pass; otherwise `s` the exponent of `m / theta13` (`frexp`, one less when the fraction is
+   exactly 1/2), the degree-13 approximant of the matrix times `2^-s`, squared `s` times. The
+   approximant of degree 3 to 9: the powers `I, A^2, A^4, ...` (each the previous times `A^2`), `U = A
+   sum_{j odd, from the degree down} c_j A^(j-1)`, `V = sum_{j even, from the degree minus 1 down} c_j
+   A^j` (each running sum from zeros, each term `c_j` times the power element by element); of degree
+   13 Higham's grouping `U = A (A6 (c13 A6 + c11 A4 + c9 A2) + c7 A6 + c5 A4 + c3 A2 + c1 I)`, `V = A6
+   (c12 A6 + c10 A4 + c8 A2) + c6 A6 + c4 A4 + c2 A2 + c0 I` (left to right); then `(V - U)^-1 (U + V)`
+   by VNL's double `vnl_svd` solve (`-U + V`, `U + V`; its warning when LINPACK does not converge). The
+   coefficients are the numerators of the `[m/m]` Pade approximants of `exp` (3: 120, 60, 12, 1; 5:
+   30240, 15120, 3360, 420, 30, 1; 7: 17297280, 8648640, 1995840, 277200, 25200, 1512, 56, 1; 9:
+   17643225600, 8821612800, 2075673600, 302702400, 30270240, 2162160, 110880, 3960, 90, 1; 13:
+   64764752532480000, 32382376266240000, 7771770303897600, 1187353796428800, 129060195264000,
+   10559470521600, 670442572800, 33522128640, 1323241920, 40840800, 960960, 16380, 182, 1). FS-1311:
+   FreeSurfer's official build computes with numbers from memory it does not own instead (NaN or
+   arbitrary results): both modes use these, with the notice.
+6. With `--debug` the mean matrix is printed as for the rigid mean (`meanr`, its determinant and its
+   decomposition into `Rot`, `Shear`, `Scale`).
 
 ### 4.5 The template
 `mapping movs and creating initial template...` (` allow intensity scaling` with `--iscale`); each input
@@ -278,13 +346,24 @@ FS-1087, FS-1088, FS-1089 (`--ixforms`: an unread file, a morph, too few for a 4
 past the inputs: an error), FS-1093 (no transforms: an error), FS-1094 (weights with `--leastsquares`:
 none kept), FS-1095 (`--average 3` above 2,048 voxels: an error), FS-1096 (a failed write: status 1
 by default), FS-1097 (a 4-D input's random target: frame 1, kept), FS-1098 (the debug folder: the
-template's folder by default). Each text is in `larmorx_core::defects`.
+template's folder by default), FS-1099 (a nonpositive real eigenvalue in the affine mean space: status 1
+by default), FS-1100 (the logarithm's coupling equations: correct by default), FS-1311 (the
+exponential's numbers from memory FreeSurfer does not own: the method's in both modes, noted),
+FS-1312 (the logarithm's imaginary bound: `sqrt(2^-52)` by default). Each text is in
+`larmorx_core::defects`.
 
 ## 9. Validation plan (for the clean room)
 - The probe `validation/probes/fs-robust-template/` runs the replica (closed); the clean room checks
   against the official program as a black box with the same kinds of cases: the command line's paths
   and failures, two to four small head-like images of every type, extent and orientation, 4-D inputs,
   masks, initial transforms and intensity scales, every option and output; the official program at one
-  thread with the decided `cabs` and `csqrt` preloaded (the user's D4: the matrix square roots).
+  thread with the decided `cabs` and `csqrt` preloaded (the user's D4: the matrix square roots), the
+  correctly rounded `acos` and the decided `clog` (§4.4).
+- The affine mean space (§4.4): its own cases (`--affine` without `--fixtp`, inputs with rotated and
+  scaled headers: single and separate eigenvalue groups); the official program's results there are
+  memory contents (FS-1311), so the reference is the official sources rebuilt with the exponential's
+  coefficients defined (the probe's `rebuild.sh`, first checked to give the official program's
+  outputs on the other cases). The matrix functions alone (logarithm, exponential, geometric mean) are
+  compared with the official code case by case (fs-robust's probe, `--family logm`).
 - fMRIPrep's recorded calls (ds004173's three T1w, ds005454's two) and recon-all's motion correction on
   them, and sMRIPrep's longitudinal call, byte for byte.

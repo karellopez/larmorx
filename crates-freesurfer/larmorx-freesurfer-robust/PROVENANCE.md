@@ -116,6 +116,25 @@ Not yet: the `debug > 0` paths (with `mri_robust_register`, 3.2-13); not reached
 `flipInputs`, `init_scaling`, `setSource`,
 `setTarget`, `RegRobust::estimateIScale`; the functions only one program reaches (their items).
 
+- `src/matrixlog.rs` (queue item 3.2-15, track C relay 51, 2026-11-24): `mri_robust_register/MyMatrix.cpp`
+  `PadeApproximantOfDegree` (286-354), `getPadeCoefficients` (356-406), `expmchk` (408-452),
+  `MatrixExp` (454-507), `MatrixLog` (509-700), `OrdSchurComplexLogical` (702-775), `OrdSchurComplex`
+  (777-870), `getSubMatrix`, `setSubMatrix` (872-906), `MatrixLog_isst` (908-988), `MatrixLog_pf`
+  (990-1017), `gauss_legendre` (1019-1053), `blocking` (1055-1122), `swapping` (1124-1195), `cumsum0`
+  (1197-1219), `sylv_tri` (1221-1266) and `GeometricMean` of `vnl_matrix_fixed<double, 3, 3>`s
+  (1905-1915), FreeSurfer 8.2.0; `mymatrix.rs`'s `svd_solve` (`vnl_svd<double>::solve` of a matrix,
+  ITK 4.13.2's `vnl_svd.hxx`). On larmorx-core's `vnl_svd_complex` (LINPACK's `zsvdc`), `lapack_ztrsen`
+  (`ZTRSEN`), `vnl_eigen::symmetric_eigensystem` and the decided `clog`. Changes: FS-1099 (rule B: a
+  nonpositive real eigenvalue ends the program by default after FreeSurfer's message), FS-1100 (rule A:
+  `sylv_tri` with the whole sum by default), FS-1311 (memory contents: `getPadeCoefficients`' arrays
+  are read after their lifetime in the official build, whose stores are removed; the coefficients
+  the arrays hold in both modes, noted), FS-1312 (rule A: the imaginary part refused only above
+  `sqrt(2^-52)` times the norm by default); `log` of a `1 x 1` matrix glibc's with `reproduce`, the
+  correctly rounded one by default; libf2c's division by zero in `zsvdc` (unreachable from finite
+  inputs) ends with status 134 after its message.
+- `larmorx-freesurfer-volumes`'s `mri_robust_template/multireg.rs` calls it for the affine mean space
+  (`MultiRegistration.cpp` 1541-1545: `MyMatrix::GeometricMean(mras3)`).
+
 ## Changes from the originals
 
 - **FS-966** (`costs::orientation`): no eigenvalue above another: the eigensystem's own column order by

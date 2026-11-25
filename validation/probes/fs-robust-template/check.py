@@ -13,7 +13,7 @@ the command line's own paths and failures), runs the official ``mri_robust_templ
 ``--upstream-defects`` ``reproduce`` and ``fix``, and compares the lines (exit status, standard
 output, standard error, every file written; the line of the time taken masked): ``reproduce``
 must give FreeSurfer's on every case but those where FreeSurfer's result is undefined (``SKIP``)
-and those the port does not run yet (``is not ported yet``: the affine mean space), which are
+and those the port does not run yet (``is not ported yet``), which are
 counted, not compared; ``fix`` may differ only where a defect it corrects changed the result (its
 notices). Prints the counts and the hash the port's recorded test checks
 (``tests/fs_robtmpl_official.rs``).
@@ -218,6 +218,25 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--only", type=str, default="", help="comma-separated case numbers")
     ap.add_argument(
+        "--family",
+        choices=("seeded", "affine"),
+        default="seeded",
+        help="the seeded cases (the prelude, then random ones) or the affine mean space's (3.2-15: "
+        "--affine without --fixtp)",
+    )
+    ap.add_argument(
+        "--exe",
+        type=Path,
+        help="the program to compare with instead of the official binary (rebuild.sh's rebuild, "
+        "checked against the official binary first)",
+    )
+    ap.add_argument(
+        "--pade",
+        type=Path,
+        help="rebuild.sh's pade/mri_robust_template: the reference of the cases whose port notes "
+        "FS-1311 (the official matrix exponential reads uninitialized stack memory)",
+    )
+    ap.add_argument(
         "--preload",
         type=Path,
         help="a library for the official program's LD_PRELOAD (fs-robust-register's "
@@ -240,7 +259,7 @@ def main(argv: list[str] | None = None) -> int:
     ws = workspace()
     if ws is None:
         raise SystemExit("no workspace with oracles/")
-    exe = ws / FS_HOME / "bin" / "mri_robust_template"
+    exe = a.exe.resolve() if a.exe else ws / FS_HOME / "bin" / "mri_robust_template"
     if not exe.is_file():
         raise SystemExit(f"no {exe}")
     env = {k: v for k, v in os.environ.items() if k != "FSLDIR"}
@@ -255,8 +274,13 @@ def main(argv: list[str] | None = None) -> int:
     global PRELOAD
     PRELOAD = str(a.preload.resolve()) if a.preload else ""
     tag = ("golden" if a.golden else f"{a.seed}-{a.n}") + ("-preload" if a.preload else "")
+    if a.family == "affine":
+        tag = "affine-" + tag
+    if a.exe:
+        tag += "-exe"
     cases_path = inputs / f"cases-{tag}.txt"
-    gen = ["golden-cases"] if a.golden else ["cases", str(a.seed), str(a.n)]
+    sub = "cases-affine" if a.family == "affine" else "cases"
+    gen = ["golden-cases"] if a.golden else [sub, str(a.seed), str(a.n)]
     text = subprocess.run([EXAMPLE, *gen], check=True, capture_output=True, text=True).stdout
     cases = text.splitlines()
     if a.only:
@@ -268,11 +292,6 @@ def main(argv: list[str] | None = None) -> int:
     root = inputs / f"cases-{tag}.d"
     official = [official_line(exe, c, root, k) for k, c in enumerate(cases)]
     shutil.rmtree(root)
-    if a.golden:
-        h = hashlib.sha256()
-        for c in official:
-            h.update(c.encode() + b"\n")
-        print(f"golden OFFICIAL_SHA256 {h.hexdigest()} ({len(official)} cases)")
 
     def port_lines(mode: str) -> list[tuple[str, list[str]]]:
         out = subprocess.run(
@@ -285,6 +304,23 @@ def main(argv: list[str] | None = None) -> int:
         return rows
 
     rep, fix = port_lines("reproduce"), port_lines("fix")
+    # FS-1311: the official matrix exponential's Pade coefficients are uninitialized stack memory;
+    # those cases are compared with the rebuild whose coefficients are defined (--pade)
+    pade_cases = pade_unpatched_same = 0
+    if a.pade:
+        proot = inputs / f"cases-{tag}-pade.d"
+        for k, (_r, ids) in enumerate(rep):
+            if "FS-1311" in ids:
+                pl = official_line(a.pade.resolve(), cases[k], proot, k)
+                pade_cases += 1
+                pade_unpatched_same += pl == official[k]
+                official[k] = pl
+        shutil.rmtree(proot, ignore_errors=True)
+    if a.golden:
+        h = hashlib.sha256()
+        for c in official:
+            h.update(c.encode() + b"\n")
+        print(f"golden OFFICIAL_SHA256 {h.hexdigest()} ({len(official)} cases)")
     if not len(official) == len(rep) == len(fix) == len(cases):
         raise SystemExit(
             f"line counts differ: official {len(official)}, reproduce {len(rep)}, fix {len(fix)}"
@@ -339,7 +375,7 @@ def main(argv: list[str] | None = None) -> int:
                     first.append({"case": k, "official": c[:1500], "fix": f[:1500]})
     summary = {
         "seed": a.seed,
-        "family": "golden" if a.golden else "seeded",
+        "family": "golden" if a.golden else a.family,
         "preload": bool(a.preload),
         "cases": len(cases),
         "reproduce_equal": equal,
@@ -352,6 +388,8 @@ def main(argv: list[str] | None = None) -> int:
         "fix_differ_without_notice": fix_unexplained,
         "fix_notices": dict(fix_ids),
         "official_sha256_skip": hashed.hexdigest(),
+        "pade_reference_cases": pade_cases,
+        "pade_unpatched_identical": pade_unpatched_same,
         "official_sha256_skip_debug": hashed_debug.hexdigest(),
         "first_differ": first,
     }

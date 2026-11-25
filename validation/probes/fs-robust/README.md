@@ -99,3 +99,29 @@ comparable; seed 13, 1,000: 931 identical, 69 not comparable (FS-1063, FS-1069, 
 differs only with notices. Seed 1's first 40: hash `5485548405ae9d5c608171b3bf6567e796903b3bf43f6614f114d2f8d9e5ecf3`
 (4 `SKIP`), the test's `reproduce_gives_the_official_registrations`. The probe built before relay 43 is in
 `<workspace>/archive/2026-11-22-fsrobust-probe-before-r43/`.
+
+Commands of 3.2-15 (relay 51, `mri_robust_template`'s affine mean space), in a seeded stream of their
+own (`check.py --family logm`; the example's `cases-logm <seed> <n>`): `logm`
+(`MyMatrix::MatrixLog`: the complex Schur form, its blocking and reordering by LAPACK's `ZTRSEN`, the
+inverse scaling and squaring, the block Parlett recurrence and `sylv_tri`), `expm`
+(`MyMatrix::MatrixExp`) and `geomean` (`MyMatrix::GeometricMean` of 3 x 3 matrices), on transforms'
+linear parts (small, large and half-turn rotations, isotropic and anisotropic scalings, shears),
+diagonal and triangular matrices, Jordan blocks, nonpositive and zero eigenvalues, other sizes, tiny
+and huge scales and special entries. `clog` (`std::log` of `std::complex<double>`) is linked with
+`--wrap` to `clogrt.c`'s, the decided complex logarithm (CORE-MATH's correctly rounded `atan2`,
+`log1p`, `log` and `hypot`; the same function as `larmorx_core::cplx::clog`). FreeSurfer's
+`getPadeCoefficients` returns its numbers from arrays whose lifetime has ended, and the official build
+reads uninitialized stack memory there (FS-1311): `build.sh` also builds `fsrobust-pade`, the same
+probe with a copy of `MyMatrix.cpp` whose five arrays are `static` (the tag is never edited), and
+`check.py` compares the cases where the port notes FS-1311 with it (`pade_reference_cases`; the
+unpatched official line counted apart, `pade_unpatched_identical`). The port's `SVDNAN` lines (the
+exponential's double SVD of a matrix with an infinite or NaN number) are hashed as `NANBITS`.
+
+```bash
+bash validation/probes/fs-robust/build.sh <workspace>
+scripts/orchestration/boxed.sh 20 python -P validation/probes/fs-robust/check.py --family logm --seed 1 --n 600 --jobs 10
+```
+
+Measured 2026-11-24 (track C, relay 51), `--family logm`: see `docs/findings/freesurfer-robust-template.md`
+§6 (seed 1 x 600: 598 identical, 0 different, 2 `NOTPORTED`: `ZLAQR0`, FS-969; the hash of
+`tests/fs_robust_official.rs`'s `reproduce_gives_the_official_logarithms`).

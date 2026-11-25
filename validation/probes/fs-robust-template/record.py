@@ -25,13 +25,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 NAME = "freesurfer-mri-robust-template"
-NOT_PORTED_YET = (
-    "the affine mean space (`--affine` without `--fixtp`: the matrices' geometric mean, "
-    "`MyMatrix::GeometricMean`'s matrix logarithm and exponential; queue 3.2-15)"
-)
 PRELOAD = (
-    "the official program with the decided `acos`, `cabs` and `csqrt` preloaded (`decided.sh`: "
-    "the project's decision for glibc's `acos` and the user's D4 for `hypot`)"
+    "the official program with the decided `acos`, `cabs`, `csqrt` and `clog` preloaded "
+    "(`decided.sh`: the project's decision for glibc's `acos`, the user's D4 for `hypot` and the "
+    "decided complex logarithm of relay 51)"
 )
 RECIPES = {
     "fmriprep": "fMRIPrep's call (`--satit --fixtp --inittp 1 --iscale --noit --subsample 200 --lta`)",
@@ -57,13 +54,44 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--memory", type=Path, required=True)
     ap.add_argument("--golden", required=True)
     ap.add_argument("--golden-fix", required=True)
+    ap.add_argument(
+        "--rebuild",
+        type=Path,
+        nargs=2,
+        help="check.py's summaries of the same cases against the official binary and against "
+        "rebuild.sh's plain rebuild (their hashes must agree)",
+    )
+    ap.add_argument(
+        "--unit",
+        type=Path,
+        nargs="*",
+        default=[],
+        help="fs-robust check.py --family logm summaries",
+    )
     a = ap.parse_args(argv)
     probes = []
     for p in a.probe:
         d = json.loads(p.read_text(encoding="utf-8"))
-        probes.append({k: d[k] for k in ("seed", "family", "preload", "cases", "reproduce_equal",
-                       "reproduce_differ", "skipped", "not_ported", "fix_differ",
-                       "fix_differ_without_notice", "official_sha256_skip")})  # fmt: skip
+        probes.append({k: d.get(k, 0) for k in ("seed", "family", "preload", "cases",
+                       "reproduce_equal", "reproduce_differ", "skipped", "not_ported", "fix_differ",
+                       "fix_differ_without_notice", "official_sha256_skip",
+                       "pade_reference_cases")})  # fmt: skip
+    rebuild = None
+    if a.rebuild:
+        o, r = (json.loads(x.read_text(encoding="utf-8")) for x in a.rebuild)
+        rebuild = {
+            "cases": o["cases"],
+            "seed": o["seed"],
+            "official_sha256_skip": o["official_sha256_skip"],
+            "rebuild_sha256_skip": r["official_sha256_skip"],
+            "identical": o["official_sha256_skip"] == r["official_sha256_skip"],
+        }
+    unit = []
+    for p in a.unit:
+        d = json.loads(p.read_text(encoding="utf-8"))
+        unit.append({k: d.get(k) for k in ("family", "seed", "cases", "reproduce_equal",
+                     "reproduce_differ", "not_ported", "fix_differ_without_notice",
+                     "pade_reference_cases", "official_sha256_skip")})  # fmt: skip
     real = json.loads(a.real.read_text(encoding="utf-8"))
     rows = [
         {
@@ -89,12 +117,13 @@ def main(argv: list[str] | None = None) -> int:
         "tool": "mri_robust_template",
         "upstream": "FreeSurfer 8.2.0",
         "status": "experimental",
-        "queue": "3.2-14 (part 1 of mri_robust_template)",
+        "queue": "3.2-14 and 3.2-15 (mri_robust_template, the whole program)",
         "commit": commit(),
         "date": datetime.date.today().isoformat(),
         "platform": f"{platform.system()} {platform.machine()}",
-        "not_ported_yet": NOT_PORTED_YET,
         "probe": probes,
+        "rebuild": rebuild,
+        "unit": unit,
         "real": rows,
         "golden": {"reproduce": a.golden, "fix": a.golden_fix},
         "memory": memory,
@@ -113,8 +142,8 @@ def main(argv: list[str] | None = None) -> int:
         "# Validation: FreeSurfer's `mri_robust_template` (replica)",
         "",
         f"Status `experimental`. Generated {rec['date']} on {rec['platform']} from commit "
-        f"`{rec['commit']}` with `validation/probes/fs-robust-template/record.py` (queue item 3.2-14, "
-        "part 1 of the program).",
+        f"`{rec['commit']}` with `validation/probes/fs-robust-template/record.py` (queue items 3.2-14 "
+        "and 3.2-15: the whole program).",
         "",
         "- **Replica:** crates-freesurfer/larmorx-freesurfer-volumes (src/mri_robust_template/) on "
         "larmorx-freesurfer-robust (fs.robust), the larmorx-freesurfer program (`larmorx-freesurfer "
@@ -125,7 +154,11 @@ def main(argv: list[str] | None = None) -> int:
         "- **Recorded steps:** recon-all runs the program only as `mri_robust_template -all-info` "
         "on the recorded heads (one T1w each); fMRIPrep's `StructuralReference` ran it in the "
         "fMRIPrep oracle runs of ds004173 (three T1w) and ds005454 (two), compared below.",
-        f"- **Not ported yet:** {NOT_PORTED_YET}: it ends with `... is not ported yet`, status 1.",
+        "- **The affine mean space** (`--affine` without `--fixtp`): FreeSurfer's official build "
+        "computes its matrix exponential with numbers from memory it does not own (FS-1311), so its "
+        "results there are NaN or arbitrary; the reference for those cases is the official sources "
+        "rebuilt with those numbers defined (`rebuild.sh`), the plain rebuild first checked to give "
+        "the official binary's outputs.",
         "",
         "## fMRIPrep's recorded inputs",
         "",
@@ -165,22 +198,55 @@ def main(argv: list[str] | None = None) -> int:
         "",
     ]
     for p in probes:
-        md.append(
-            f"- seed {p['seed']}: {p['cases']} cases; `reproduce` {p['reproduce_equal']} identical, "
-            f"{p['reproduce_differ']} different, {p['skipped']} undefined, {p['not_ported']} not "
-            f"ported; `fix` {p['fix_differ'] - p['fix_differ_without_notice']} different with a "
-            f"notice, {p['fix_differ_without_notice']} without."
+        fam = "" if p["family"] == "seeded" else f" ({p['family']}: `--affine` without `--fixtp`)"
+        pade = (
+            f", {p['pade_reference_cases']} of them against the rebuild with the exponential's "
+            "numbers defined"
+            if p["pade_reference_cases"]
+            else ""
         )
+        md.append(
+            f"- seed {p['seed']}{fam}: {p['cases']} cases; `reproduce` {p['reproduce_equal']} "
+            f"identical{pade}, {p['reproduce_differ']} different, {p['skipped']} undefined, "
+            f"{p['not_ported']} not ported; `fix` {p['fix_differ'] - p['fix_differ_without_notice']} "
+            f"different with a notice, {p['fix_differ_without_notice']} without."
+        )
+    if rebuild:
+        md += [
+            "",
+            f"The rebuild (`rebuild.sh`) against the official binary on seed {rebuild['seed']}'s "
+            f"{rebuild['cases']} cases: the hashes of their lines "
+            + ("agree" if rebuild["identical"] else "DIFFER")
+            + f" (`{rebuild['official_sha256_skip'][:16]}...`).",
+        ]
+    if unit:
+        md += [
+            "",
+            "The matrix functions alone (`validation/probes/fs-robust/check.py --family logm`: "
+            "`MyMatrix::MatrixLog`, `MatrixExp`, `GeometricMean` on transforms' linear parts and "
+            "structured and special matrices, the official code compiled as the official programs are, "
+            "the exponential's cases against `fsrobust-pade`):",
+            "",
+        ]
+        for u in unit:
+            md.append(
+                f"- seed {u['seed']}: {u['cases']} cases; `reproduce` {u['reproduce_equal']} identical "
+                f"({u['pade_reference_cases']} against `fsrobust-pade`), "
+                f"{sum(u['reproduce_differ'].values())} different, "
+                f"{sum(u['not_ported'].values())} not ported (LAPACK's `ZLAQR0`, FS-969); `fix` "
+                f"{sum(u['fix_differ_without_notice'].values())} different without a notice."
+            )
     md += [
         "",
         "## Golden cases",
         "",
-        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_robust_template_golden.rs`: 6 cases "
-        "on 32^3 images made with integer arithmetic (fMRIPrep's call on three inputs, recon-all's "
+        "`crates-freesurfer/larmorx-freesurfer-volumes/tests/mri_robust_template_golden.rs`: 7 cases "
+        "on 16^3 images made with integer arithmetic (fMRIPrep's call on three inputs, recon-all's "
         "on two, the rigid mean space of two, one global iteration of three with weights, an input "
-        "with NaN voxels built from their bits, a 4-D input's one `--mapmov` image), on every "
-        f"platform: `reproduce` `{a.golden}` (the official program's value on the same inputs, "
-        f"`check.py --golden --preload`), `fix` `{a.golden_fix}`.",
+        "with NaN voxels built from their bits, a 4-D input's one `--mapmov` image, the affine mean "
+        "space of three with rotated headers), on every platform: `reproduce` "
+        f"`{a.golden}` (the official program's value on the same inputs, `check.py --golden "
+        f"--preload --pade`: the affine case's from the rebuild), `fix` `{a.golden_fix}`.",
         "",
         "## Memory",
         "",
@@ -196,7 +262,8 @@ def main(argv: list[str] | None = None) -> int:
     md += [
         "",
         "Findings: `docs/findings/freesurfer-robust-template.md` (closed to clean rooms); the spec: "
-        "`specs/mri_robust_template.md`; defects FS-1080 to FS-1098 (`docs/findings/upstream-defects.md`).",
+        "`specs/mri_robust_template.md`; defects FS-1080 to FS-1100, FS-1311, FS-1312 "
+        "(`docs/findings/upstream-defects.md`).",
         "",
     ]
     (REPO / "docs" / "validation" / f"{NAME}.md").write_text("\n".join(md), encoding="utf-8")

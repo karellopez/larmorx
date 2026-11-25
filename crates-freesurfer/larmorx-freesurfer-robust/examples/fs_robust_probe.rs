@@ -7,6 +7,7 @@
 //!     fs_robust_probe cases-sqrtm <seed> <n>      the matrix square root's case file
 //!     fs_robust_probe cases-regstep <seed> <n>    the registration step's case file
 //!     fs_robust_probe cases-reg <seed> <n>        the registration's case file
+//!     fs_robust_probe cases-logm <seed> <n>       the matrix logarithm's and exponential's
 //!     fs_robust_probe run <cases> fix|reproduce   one line per case: the output, a tab, the
 //!                                              defects the port noted (comma-separated)
 
@@ -39,6 +40,13 @@ fn main() {
                 println!("{line}");
             }
         }
+        Some("cases-logm") if args.len() == 4 => {
+            let seed: u64 = args[2].parse().expect("seed");
+            let n: usize = args[3].parse().expect("n");
+            for line in cases::generate_logm(seed, n) {
+                println!("{line}");
+            }
+        }
         Some("cases-reg") if args.len() == 4 => {
             let seed: u64 = args[2].parse().expect("seed");
             let n: usize = args[3].parse().expect("n");
@@ -60,7 +68,7 @@ fn main() {
         }
         _ => {
             eprintln!(
-                "usage: fs_robust_probe cases <seed> <n> | cases-sqrtm <seed> <n> | cases-regstep <seed> <n> | cases-reg <seed> <n> | run <cases> fix|reproduce"
+                "usage: fs_robust_probe cases <seed> <n> | cases-sqrtm <seed> <n> | cases-regstep <seed> <n> | cases-reg <seed> <n> | cases-logm <seed> <n> | run <cases> fix|reproduce"
             );
             std::process::exit(2);
         }

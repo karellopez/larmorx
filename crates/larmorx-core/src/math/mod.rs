@@ -32,6 +32,7 @@ mod log10;
 mod log10_glibc;
 mod log10f;
 mod log10f_glibc;
+mod log1p;
 mod log2;
 mod log2_glibc;
 mod log_glibc;
@@ -294,6 +295,11 @@ dispatch!(
     log10
 );
 dispatch!(
+    /// `log(1 + x)`, correctly rounded (CORE-MATH's `cr_log1p`). The decided complex logarithm
+    /// [`crate::cplx::clog`] takes the real part of an argument near the unit circle from it.
+    log1p
+);
+dispatch!(
     /// The base-2 logarithm of `x`, correctly rounded (CORE-MATH's `cr_log2`). glibc's `log2` is
     /// not correctly rounded ([`log2_glibc`] has its bits, for `reproduce`).
     log2
@@ -432,6 +438,7 @@ mod fma {
     fma_copy!(log);
     fma_copy!(log10);
     fma_copy!(log2);
+    fma_copy!(log1p);
     fma_copy!(sin);
     fma_copy!(asin);
     fma_copy!(acos);

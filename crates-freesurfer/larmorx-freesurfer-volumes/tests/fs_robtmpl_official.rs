@@ -5,7 +5,8 @@
 //! of the official program's lines (exit status, standard output and error, every file written; the
 //! case's folder as `<DIR>`, the time taken and `-all-info`'s run-time fields masked) for the probe's
 //! cases of seed 1, recorded by `validation/probes/fs-robust-template/check.py --seed 1 --n <N>
-//! --preload <decided.sh's library>` on Linux x64 (the decided `acos`, `cabs` and `csqrt`), against
+//! --preload <decided.sh's library> --pade <rebuild.sh's>` on Linux x64 (the decided `acos`, `cabs`,
+//! `csqrt` and `clog`), against
 //! the port's lines with `reproduce` (cases whose result in FreeSurfer is undefined, `check.py`'s
 //! `SKIP`, hashed as `SKIP`; the paths the port does not run yet, `NOTPORTED`).
 
@@ -15,17 +16,17 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-24 (track C relay 50) from the official program with the decided functions
-/// preloaded: 150 cases, 143 lines identical, 6 hashed as `SKIP`, 1 `NOTPORTED` (the affine mean
-/// space, queue 3.2-15).
+/// Recorded 2026-11-24 (track C relay 51) from the official program with the decided functions
+/// preloaded (`--pade`: the affine mean space's case from the official sources with the matrix
+/// exponential's numbers defined, FS-1311): 150 cases, 144 lines identical, 6 hashed as `SKIP`.
 const N: usize = 150;
-const OFFICIAL_SHA256: &str = "89a59be5b08c80546d919c3a10eae5532f9ab8dc6513a9bc7fb587495acd4473";
+const OFFICIAL_SHA256: &str = "08addb5daf59426a3bd3943d898466e7afd54a8bcbaf71899f525574563f67c4";
 const SKIPPED: usize = 6;
-const NOT_PORTED: usize = 1;
+const NOT_PORTED: usize = 0;
 /// In a debug build (CI's) only the first `DEBUG_CASES` cases run (the command line's own paths and
 /// failures: no registration, which takes seconds each in a debug build), the rest hashed as `SLOW`
 /// (`check.py`'s `official_sha256_skip_debug`, `--debug-cases 45`); the golden cases
-/// (`mri_robust_template_golden.rs`) hold six templates on every platform.
+/// (`mri_robust_template_golden.rs`) hold seven templates on every platform.
 const DEBUG_CASES: usize = 45;
 const OFFICIAL_SHA256_DEBUG: &str =
     "a162a70211463e072523c90bfcd8ac1319c82abc650712fa2abe83de9f9ad3f2";

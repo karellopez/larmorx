@@ -723,6 +723,258 @@ pub fn generate_sqrtm(seed: u64, n: usize) -> Vec<String> {
 }
 
 // ------------------------------------------------------------------------------------------
+// The matrix logarithm's and exponential's cases (3.2-15, relay 51: `logm`, `expm`, `geomean`), a
+// stream of their own
+
+/// The logarithm's commands, cycled.
+pub const LOGM: [&str; 3] = ["logm", "expm", "geomean"];
+
+/// A rotation from the unit quaternion `(1, w v)` normalised (`v` a random direction, `w` sets
+/// the angle: about `2 w` radians for a small `w`; square roots only).
+fn rot_w(g: &mut Gen, w: f64) -> [[f64; 3]; 3] {
+    let v: [f64; 3] = std::array::from_fn(|_| g.unit() - 0.5);
+    let nv = v.iter().map(|x| x * x).sum::<f64>().sqrt().max(1e-12);
+    let q = [1.0, w * v[0] / nv, w * v[1] / nv, w * v[2] / nv];
+    let n = q.iter().map(|x| x * x).sum::<f64>().sqrt();
+    let [a, b, c, d] = q.map(|x| x / n);
+    [
+        [
+            a * a + b * b - c * c - d * d,
+            2.0 * (b * c - a * d),
+            2.0 * (b * d + a * c),
+        ],
+        [
+            2.0 * (b * c + a * d),
+            a * a - b * b + c * c - d * d,
+            2.0 * (c * d - a * b),
+        ],
+        [
+            2.0 * (b * d - a * c),
+            2.0 * (c * d + a * b),
+            a * a - b * b - c * c + d * d,
+        ],
+    ]
+}
+
+fn mul33(a: &[[f64; 3]; 3], b: &[[f64; 3]; 3]) -> [[f64; 3]; 3] {
+    std::array::from_fn(|i| std::array::from_fn(|j| (0..3).map(|k| a[i][k] * b[k][j]).sum()))
+}
+
+/// A 3 x 3 linear part of a transform: a rotation (small, large, or near a half turn) times a
+/// scale (isotropic, anisotropic with one axis set apart: two groups of eigenvalues) and a shear.
+fn lin3(g: &mut Gen) -> [[f64; 3]; 3] {
+    let w = g.pick(&[0.0, 0.001, 0.01, 0.03, 0.05, 0.1, 0.3, 0.7, 2.0, 30.0]);
+    let r = rot_w(g, w);
+    let mut s = [[0.0; 3]; 3];
+    match g.below(4) {
+        0 => {
+            for (i, row) in s.iter_mut().enumerate() {
+                row[i] = 1.0;
+            }
+        }
+        1 => {
+            let f = 1.0 + (g.unit() - 0.5) * 0.2;
+            for (i, row) in s.iter_mut().enumerate() {
+                row[i] = f;
+            }
+        }
+        2 => {
+            // one axis apart by more than 0.1: a pair beside a single eigenvalue
+            let k = g.below(3) as usize;
+            for (i, row) in s.iter_mut().enumerate() {
+                row[i] = if i == k {
+                    g.pick(&[1.3, 0.8, 1.6, 0.6])
+                } else {
+                    1.0 + (g.unit() - 0.5) * 0.02
+                };
+            }
+        }
+        _ => {
+            for (i, row) in s.iter_mut().enumerate() {
+                row[i] = 1.0 + (g.unit() - 0.5) * 0.4;
+            }
+        }
+    }
+    if g.chance(3) {
+        let (i, j) = (g.below(3) as usize, g.below(3) as usize);
+        if i != j {
+            s[i][j] = (g.unit() - 0.5) * 0.3;
+        }
+    }
+    if g.chance(2) {
+        mul33(&r, &s)
+    } else {
+        mul33(&s, &r)
+    }
+}
+
+/// A square matrix for the logarithm: [`lin3`]'s mostly, and the structures its paths turn on
+/// (diagonal with separate or equal values, Jordan blocks, a negative or zero eigenvalue, a
+/// half-turn rotation, other sizes, tiny and huge scales, special entries).
+fn log_matrix(g: &mut Gen) -> (usize, Vec<f64>) {
+    let kind = g.below(16);
+    let (n, mut m): (usize, Vec<f64>) = match kind {
+        0..=6 => (3, lin3(g).iter().flatten().copied().collect()),
+        7 => {
+            let n = g.pick(&[2usize, 3, 4]);
+            let mut m = vec![0.0; n * n];
+            for i in 0..n {
+                m[i * n + i] = g.pick(&[1.0, 1.05, 2.0, 0.5, 0.95, 1.2, 3.0]);
+                for j in i + 1..n {
+                    if g.chance(2) {
+                        m[i * n + j] = (g.unit() - 0.5) * 0.5;
+                    }
+                }
+            }
+            (n, m)
+        }
+        8 => {
+            // a Jordan block (one eigenvalue, defective)
+            let n = g.pick(&[2usize, 3]);
+            let l = g.pick(&[1.0, 1.1, 0.7]);
+            let mut m = vec![0.0; n * n];
+            for i in 0..n {
+                m[i * n + i] = l;
+                if i + 1 < n {
+                    m[i * n + i + 1] = g.pick(&[1.0, 0.1, 1e-8]);
+                }
+            }
+            (n, m)
+        }
+        9 => {
+            // a negative or zero eigenvalue (FS-1099), a half turn
+            let mut m: Vec<f64> = lin3(g).iter().flatten().copied().collect();
+            match g.below(3) {
+                0 => {
+                    for v in m.iter_mut().take(3) {
+                        *v = -*v;
+                    }
+                }
+                1 => {
+                    for k in 0..3 {
+                        m[3 + k] = m[k];
+                    }
+                }
+                _ => {
+                    m = vec![-1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0];
+                    m[1] = g.pick(&[0.0, 1e-3, 0.1]);
+                }
+            }
+            (3, m)
+        }
+        10 => {
+            // another size: a perturbed identity, or a 4 x 4 transform
+            let n = g.pick(&[1usize, 2, 4, 5]);
+            if n == 4 && g.chance(2) {
+                return (4, m44(g).iter().flatten().copied().collect());
+            }
+            let mut m = vec![0.0; n * n];
+            for (k, v) in m.iter_mut().enumerate() {
+                *v = (g.unit() - 0.5) * 0.3 + if k % (n + 1) == 0 { 1.0 } else { 0.0 };
+            }
+            (n, m)
+        }
+        11 => {
+            let f = g.pick(&[1e-3, 1e3, 1e-150, 1e150, 4.0, 0.25]);
+            let m: Vec<f64> = lin3(g).iter().flatten().map(|&x| x * f).collect();
+            (3, m)
+        }
+        12 => {
+            // the identity, a multiple of it
+            let v = g.pick(&[1.0, 2.0, 0.5]);
+            let mut m = vec![0.0; 9];
+            for i in 0..3 {
+                m[i * 3 + i] = v;
+            }
+            (3, m)
+        }
+        13 => (3, (0..9).map(|_| d64(g)).collect()),
+        _ => (3, rot3(g).iter().flatten().copied().collect()),
+    };
+    if g.chance(40) && n > 0 {
+        let k = g.below((n * n) as u64) as usize;
+        m[k] = f64::from_bits(g.pick(&SPECIAL64));
+    }
+    (n, m)
+}
+
+/// A square matrix for the exponential: a logarithm-like small matrix scaled to each of the
+/// Pade degrees' ranges and to the scaling and squaring, and other sizes and special entries.
+fn exp_matrix(g: &mut Gen) -> (usize, Vec<f64>) {
+    let n = g.pick(&[3usize, 3, 3, 2, 4, 1, 5]);
+    let mut m: Vec<f64> = (0..n * n).map(|_| g.unit() - 0.5).collect();
+    if g.chance(3) && n == 3 {
+        // skew-symmetric (a rotation's logarithm) plus a small symmetric part
+        for i in 0..3 {
+            m[i * 3 + i] = (g.unit() - 0.5) * 0.1;
+            for j in i + 1..3 {
+                let a = m[i * 3 + j];
+                m[j * 3 + i] = -a + (g.unit() - 0.5) * 0.05;
+            }
+        }
+    }
+    let f = g.pick(&[
+        0.0, 1e-3, 0.01, 0.05, 0.2, 0.5, 1.0, 2.0, 3.0, 5.0, 8.0, 20.0, 100.0, 1000.0,
+    ]);
+    for v in m.iter_mut() {
+        *v *= f;
+    }
+    if g.chance(40) {
+        let k = g.below((n * n) as u64) as usize;
+        m[k] = f64::from_bits(g.pick(&SPECIAL64));
+    }
+    (n, m)
+}
+
+fn push_vm(t: &mut Vec<String>, n: usize, v: &[f64]) {
+    t.push(n.to_string());
+    t.push(n.to_string());
+    t.extend(v.iter().map(|&x| dx(x)));
+}
+
+/// The logarithm's cases of `seed`.
+pub fn generate_logm(seed: u64, n: usize) -> Vec<String> {
+    let mut g = Gen::new(seed ^ 0x4c4f_474d);
+    (0..n)
+        .map(|k| {
+            let cmd = LOGM[k % 3];
+            let mut t = vec![cmd.to_owned()];
+            match cmd {
+                "logm" => {
+                    let (m, v) = log_matrix(&mut g);
+                    push_vm(&mut t, m, &v);
+                }
+                "expm" => {
+                    let (m, v) = exp_matrix(&mut g);
+                    push_vm(&mut t, m, &v);
+                }
+                _ => {
+                    // the template's mean space: the identity first, then the others' linear parts
+                    let k = g.int(1, 4) as usize;
+                    t.push(k.to_string());
+                    for i in 0..k {
+                        let v: Vec<f64> = if i == 0 && !g.chance(4) {
+                            vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+                        } else if g.chance(20) {
+                            log_matrix(&mut g)
+                                .1
+                                .into_iter()
+                                .chain(std::iter::repeat(0.0))
+                                .take(9)
+                                .collect()
+                        } else {
+                            lin3(&mut g).iter().flatten().copied().collect()
+                        };
+                        push_vm(&mut t, 3, &v);
+                    }
+                }
+            }
+            t.join(" ")
+        })
+        .collect()
+}
+
+// ------------------------------------------------------------------------------------------
 // The registration step's cases (3.2-03 part 1: `rgauss`, `regress`, `trans`, `quat`, `rstep`),
 // a stream of their own
 
@@ -1868,6 +2120,43 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let m = get_vm(t);
             let r = mx::matrix_sqrt(&mut cx.g, &mut cx.a, &mut cx.b, &m)?;
             o.vm(&r);
+        }
+        "logm" => {
+            let m = get_vm(t);
+            let r = larmorx_freesurfer_robust::matrixlog::matrix_log(
+                &mut cx.g, &mut cx.a, &mut cx.b, &m, 100,
+            )?;
+            o.vm(&r);
+        }
+        "expm" => {
+            let m = get_vm(t);
+            // the approximant's double SVD of a matrix with an infinite or NaN number: its NaN
+            // bits are an open item (SVDNAN)
+            cx.svdnan |= m.data.iter().any(|x| !x.is_finite());
+            let r = larmorx_freesurfer_robust::matrixlog::matrix_exp(&mut cx.g, &mut cx.b, &m)?;
+            cx.svdnan |= r.data.iter().any(|x| x.is_nan());
+            o.vm(&r);
+        }
+        "geomean" => {
+            let k = t.i() as usize;
+            let vm: Vec<[[f64; 3]; 3]> = (0..k)
+                .map(|_| {
+                    let m = get_vm(t);
+                    cx.svdnan |= m.data.iter().any(|x| !x.is_finite());
+                    std::array::from_fn(|i| std::array::from_fn(|j| m.at(i, j)))
+                })
+                .collect();
+            let r = larmorx_freesurfer_robust::matrixlog::geometric_mean3(
+                &mut cx.g, &mut cx.a, &mut cx.b, &vm,
+            )?;
+            let m = VnlMatrix {
+                rows: 3,
+                cols: 3,
+                data: r.iter().flatten().copied().collect(),
+            };
+            // a NaN logarithm (a zero eigenvalue under `reproduce`) reaches the exponential's SVD
+            cx.svdnan |= m.data.iter().any(|x| x.is_nan());
+            o.vm(&m);
         }
         "rgauss" => {
             if t.i() != 0 {

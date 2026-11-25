@@ -2,50 +2,129 @@
  "tool": "mri_robust_template",
  "upstream": "FreeSurfer 8.2.0",
  "status": "experimental",
- "queue": "3.2-14 (part 1 of mri_robust_template)",
- "commit": "e9b605fd5bac",
- "date": "2026-11-24",
+ "queue": "3.2-14 and 3.2-15 (mri_robust_template, the whole program)",
+ "commit": "8c86afa7c39a",
+ "date": "2026-11-25",
  "platform": "Linux x86_64",
- "not_ported_yet": "the affine mean space (`--affine` without `--fixtp`: the matrices' geometric mean, `MyMatrix::GeometricMean`'s matrix logarithm and exponential; queue 3.2-15)",
  "probe": [
   {
    "seed": 1,
    "family": "seeded",
    "preload": true,
    "cases": 300,
-   "reproduce_equal": 293,
+   "reproduce_equal": 294,
    "reproduce_differ": 0,
    "skipped": 6,
-   "not_ported": 1,
-   "fix_differ": 67,
+   "not_ported": 0,
+   "fix_differ": 68,
    "fix_differ_without_notice": 0,
-   "official_sha256_skip": "0ea79baa5981e2c16482362b237e688bf910be6cdefaa61a0024607e6e922d8a"
+   "official_sha256_skip": "61fb3708564b328ab3320411cac1505d33db375c017031494f23bdab8ce1f97a",
+   "pade_reference_cases": 1
   },
   {
    "seed": 7,
    "family": "seeded",
    "preload": true,
    "cases": 300,
-   "reproduce_equal": 291,
+   "reproduce_equal": 292,
    "reproduce_differ": 0,
    "skipped": 8,
-   "not_ported": 1,
-   "fix_differ": 76,
+   "not_ported": 0,
+   "fix_differ": 77,
    "fix_differ_without_notice": 0,
-   "official_sha256_skip": "c9e02afc803fcb6a06de0115ab67cde094b13dcf948e55494ee65ef07fc69867"
+   "official_sha256_skip": "927d40446ebf5617820a55e9cae915dbd5bb72af06d98716735830b53bdb5f12",
+   "pade_reference_cases": 1
   },
   {
    "seed": 13,
    "family": "seeded",
    "preload": true,
    "cases": 300,
-   "reproduce_equal": 292,
+   "reproduce_equal": 293,
    "reproduce_differ": 0,
    "skipped": 7,
-   "not_ported": 1,
-   "fix_differ": 73,
+   "not_ported": 0,
+   "fix_differ": 74,
    "fix_differ_without_notice": 0,
-   "official_sha256_skip": "d3b599f66d40115303b9d95ed1c01cb42eef2620aaaf454580dc082cf5eef05c"
+   "official_sha256_skip": "9bcb5c6d0dbd7a1de8755c390e2b9783d6394435e92d055bdf9232a448ac5228",
+   "pade_reference_cases": 1
+  },
+  {
+   "seed": 1,
+   "family": "affine",
+   "preload": true,
+   "cases": 150,
+   "reproduce_equal": 150,
+   "reproduce_differ": 0,
+   "skipped": 0,
+   "not_ported": 0,
+   "fix_differ": 26,
+   "fix_differ_without_notice": 0,
+   "official_sha256_skip": "c359877618b761355f7af45348c35f6c5d46f0b20b3a13ca8b85b59a3568bb71",
+   "pade_reference_cases": 150
+  },
+  {
+   "seed": 7,
+   "family": "affine",
+   "preload": true,
+   "cases": 150,
+   "reproduce_equal": 150,
+   "reproduce_differ": 0,
+   "skipped": 0,
+   "not_ported": 0,
+   "fix_differ": 23,
+   "fix_differ_without_notice": 0,
+   "official_sha256_skip": "478e9b7a38f7d36f8988ad2daf008d41fa6716178f58ece3f05b2493f25be6a1",
+   "pade_reference_cases": 150
+  }
+ ],
+ "rebuild": {
+  "cases": 300,
+  "seed": 1,
+  "official_sha256_skip": "61fb3708564b328ab3320411cac1505d33db375c017031494f23bdab8ce1f97a",
+  "rebuild_sha256_skip": "61fb3708564b328ab3320411cac1505d33db375c017031494f23bdab8ce1f97a",
+  "identical": true
+ },
+ "unit": [
+  {
+   "family": "logm",
+   "seed": 1,
+   "cases": 600,
+   "reproduce_equal": 598,
+   "reproduce_differ": {},
+   "not_ported": {
+    "logm": 2
+   },
+   "fix_differ_without_notice": {},
+   "pade_reference_cases": 436,
+   "official_sha256_skip": "570ad980b91284dae6b5bea960bd0572357a3a06af78655bc8863b53f7b43bda"
+  },
+  {
+   "family": "logm",
+   "seed": 7,
+   "cases": 3000,
+   "reproduce_equal": 2992,
+   "reproduce_differ": {},
+   "not_ported": {
+    "logm": 8
+   },
+   "fix_differ_without_notice": {},
+   "pade_reference_cases": 2190,
+   "official_sha256_skip": "2f220d893346ce33f2f8c39ce7182c0a55fc90bace3e4f6c3bef020a70608e89"
+  },
+  {
+   "family": "logm",
+   "seed": 13,
+   "cases": 6000,
+   "reproduce_equal": 5977,
+   "reproduce_differ": {},
+   "not_ported": {
+    "logm": 21,
+    "geomean": 2
+   },
+   "fix_differ_without_notice": {},
+   "pade_reference_cases": 4335,
+   "official_sha256_skip": "f36cdd6ce2fe8579a3248403cf28e9009c25d805db546a8d592b0c735076febe"
   }
  ],
  "real": [
@@ -65,14 +144,14 @@
     "files": true
    },
    "seconds": {
-    "official": 75.8,
-    "reproduce": 129.2,
-    "fix": 128.0
+    "official": 73.2,
+    "reproduce": 123.3,
+    "fix": 123.0
    },
    "peak_mib": {
-    "official": 1879.09375,
-    "reproduce": 1658.4,
-    "fix": 1660.0
+    "official": 1880.5234375,
+    "reproduce": 1661.2,
+    "fix": 1661.4
    }
   },
   {
@@ -91,14 +170,14 @@
     "files": true
    },
    "seconds": {
-    "official": 75.9,
-    "reproduce": 128.9,
-    "fix": 128.5
+    "official": 73.2,
+    "reproduce": 124.1,
+    "fix": 123.5
    },
    "peak_mib": {
-    "official": 1879.671875,
-    "reproduce": 1661.2,
-    "fix": 1660.0
+    "official": 1880.38671875,
+    "reproduce": 1661.4,
+    "fix": 1661.8
    }
   },
   {
@@ -117,14 +196,14 @@
     "files": true
    },
    "seconds": {
-    "official": 269.7,
-    "reproduce": 472.1,
-    "fix": 451.8
+    "official": 259.5,
+    "reproduce": 444.8,
+    "fix": 439.0
    },
    "peak_mib": {
-    "official": 1996.2421875,
-    "reproduce": 1772.7,
-    "fix": 1774.2
+    "official": 1997.11328125,
+    "reproduce": 1773.8,
+    "fix": 1773.1
    }
   },
   {
@@ -143,14 +222,14 @@
     "files": true
    },
    "seconds": {
-    "official": 53.6,
-    "reproduce": 103.5,
-    "fix": 104.0
+    "official": 50.9,
+    "reproduce": 97.0,
+    "fix": 95.9
    },
    "peak_mib": {
-    "official": 1396.91015625,
-    "reproduce": 1375.8,
-    "fix": 1376.1
+    "official": 1397.93359375,
+    "reproduce": 1388.9,
+    "fix": 1388.4
    }
   },
   {
@@ -169,14 +248,14 @@
     "files": true
    },
    "seconds": {
-    "official": 55.7,
-    "reproduce": 103.2,
-    "fix": 103.7
+    "official": 51.6,
+    "reproduce": 96.2,
+    "fix": 96.0
    },
    "peak_mib": {
-    "official": 1396.0859375,
-    "reproduce": 1376.3,
-    "fix": 1376.3
+    "official": 1397.921875,
+    "reproduce": 1377.9,
+    "fix": 1377.7
    }
   },
   {
@@ -195,32 +274,32 @@
     "files": true
    },
    "seconds": {
-    "official": 56.0,
-    "reproduce": 103.7,
-    "fix": 97.4
+    "official": 53.3,
+    "reproduce": 97.0,
+    "fix": 97.0
    },
    "peak_mib": {
-    "official": 1396.45703125,
-    "reproduce": 1375.9,
-    "fix": 1377.0
+    "official": 1397.59375,
+    "reproduce": 1378.5,
+    "fix": 1378.1
    }
   }
  ],
  "golden": {
-  "reproduce": "5ee82ce663af88dc34df36c4cea69e551aae036f8637e7f6b172daf61873fda0",
-  "fix": "cfe17db9203387f230880cae98bea9fc4a96dd152d09e2de96ff91c46dc14665"
+  "reproduce": "654cb4a5986915fcd80c50cf69bf3aa7d0398d489205dbd84444ba5aafb0332d",
+  "fix": "53f7bac3ae742382542327bbfa018bbe0ce7c935b5f5c131a11bed066b9c7cd1"
  },
  "memory": [
   {
    "case": "fmriprep",
    "mode": "reproduce",
-   "larmorx_mib": 1378.8,
+   "larmorx_mib": 1389.1,
    "freesurfer_mib": 1397.0
   },
   {
    "case": "fmriprep",
    "mode": "fix",
-   "larmorx_mib": 1378.3,
+   "larmorx_mib": 1388.7,
    "freesurfer_mib": 1397.0
   }
  ]

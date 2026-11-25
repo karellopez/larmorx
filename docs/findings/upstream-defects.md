@@ -524,6 +524,10 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FS-1096 | FreeSurfer 8.2.0 `mri_robust_template`, an output that cannot be written (the template, a transform, an intensity file, a mapped input, weights) | the program prints the writer's message and ends with status 0 | c (exit status; rule A) | a pipeline sees success without the file | status 1 after the program's messages by default; `reproduce` 0, named | – |
 | FS-1097 | FreeSurfer 8.2.0 `mri_robust_template` with one 4-D input and no `--inittp` | the random initial target is drawn among the command line's one name: always frame 1 | c (results; rule C: the initial target is arbitrary by design, frame 1 as good as any) | none | kept in both modes, named | – |
 | FS-1098 | FreeSurfer 8.2.0 `mri_robust_template --debug` with a `--template` in a folder | the debug files go to the template's folder name cut two bytes short (`out/t.mgz`: into the working folder with the prefix `ou`) | c (results; rule A) | none (no debug output in fMRIPrep or recon-all) | the template's folder by default; `reproduce` FreeSurfer's, named | – |
+| FS-1099 | FreeSurfer 8.2.0 `mri_robust_template --affine` without `--fixtp`, a transform with an eigenvalue on the nonpositive real axis (a reflection, a zero eigenvalue) | prints that the principal matrix logarithm is not defined, then goes on to a logarithm that is not the principal one, which nearly always ends in 'Result too imaginary to ignore!' (status 1) | c (results; rule B) | none (fMRIPrep and recon-all pass `--fixtp`) | the message and status 1 by default; `reproduce` goes on, named | – |
+| FS-1100 | FreeSurfer 8.2.0 `mri_robust_template --affine` without `--fixtp`, a transform whose eigenvalues fall into separate groups (more than 0.1 apart), one of them holding two or more | a term is left out of the equations that connect the groups: the matrix logarithm, and the mean space, are wrong (FreeSurfer then usually ends with 'Result too imaginary to ignore!') | c (results; rule A) | none | computed correctly by default; `reproduce` FreeSurfer's, named | – |
+| FS-1311 | FreeSurfer 8.2.0 `mri_robust_template --affine` without `--fixtp` | the matrix exponential of the mean space computes with numbers read from memory it does not own (uninitialized memory in the official build): the mean space is NaN or arbitrary on every such call | a (memory contents) | none | the numbers the method defines (Higham's Pade coefficients) in both modes, named | the memory contents not reproduced |
+| FS-1312 | FreeSurfer 8.2.0 `mri_robust_template --affine` without `--fixtp` | the matrix logarithm ends the program ('Result too imaginary to ignore!', status 1) when the imaginary part of its intermediate result passes 10 n 2^-52 times the result's one-norm, a bound below the rounding of its own complex arithmetic: about one ordinary near-identity transform in twenty is refused | c (exit status; rule A) | none | refused only above sqrt(2^-52) times the norm by default; `reproduce` FreeSurfer's bound, named | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -4851,6 +4855,16 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
   0 (FS-1096, status 1 by default); a 4-D input's random target always frame 1 (FS-1097, kept); the
   debug folder two bytes short (FS-1098, the folder by default). fMRIPrep and recon-all: none of them
   on their calls (`--inittp 1 --fixtp --noit`, one thread). Found 2026-11-24.
+- **FS-1099, FS-1100, FS-1311, FS-1312** (relay 51 of track C, `mri_robust_template`'s affine mean
+  space, `--affine` without `--fixtp`, queue 3.2-15; measured with fs-robust's probe, family `logm`,
+  seeds 1, 7, 13: 9,600 calls of the matrix logarithm, exponential and geometric mean, and the
+  template probe's affine cases against the official sources rebuilt with the exponential's numbers
+  defined): every official affine mean space is memory contents (FS-1311: the exponential reads
+  uninitialized memory; the method's numbers in both modes); the logarithm refuses about one ordinary
+  near-identity transform in twenty for a rounding-level imaginary part (FS-1312, a looser bound by
+  default); a term missing from the equations between eigenvalue groups (FS-1100, correct by default);
+  a nonpositive real eigenvalue's message followed by a non-principal logarithm (FS-1099, status 1 by
+  default). fMRIPrep and recon-all: none (they pass `--fixtp`). Found 2026-11-24.
 
 ### FS-809 to FS-812 zlib 1.2.11 (Ubuntu 22.04's build): deflatePrime with bytes waiting, the stored window's hash count, the dictionary past the window — (a, memory and out of bounds; rules A and B)
 - **What:** `deflatePrime` called while compressed bytes wait behind some already handed out writes its bits at the

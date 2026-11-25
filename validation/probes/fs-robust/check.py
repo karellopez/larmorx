@@ -23,6 +23,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from collections import Counter
@@ -178,7 +179,8 @@ NANBITS = ("FS-968", "SVDNAN")
 
 
 def nan_canonical(line: str) -> str:
-    """The line with every double or float token that is a NaN replaced by ``NaN``."""
+    """The line with every double or float token that is a NaN replaced by ``NaN``, and the NaNs'
+    printed signs (``-nan`` in VNL's matrices on standard error) dropped."""
     out = []
     for tok in line.split(" "):
         if len(tok) == 16 and all(c in "0123456789abcdef" for c in tok):
@@ -186,7 +188,7 @@ def nan_canonical(line: str) -> str:
             if (v >> 52) & 0x7FF == 0x7FF and v & ((1 << 52) - 1):
                 tok = "NaN"
         out.append(tok)
-    return " ".join(out)
+    return re.sub(r" *-?nan", " nan", " ".join(out))
 
 
 # The port's lines for a path of LAPACK it does not port (ZLAQR0, where ZLAHQR does not converge:
@@ -246,11 +248,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument(
         "--family",
-        choices=("helpers", "sqrtm", "regstep", "reg"),
+        choices=("helpers", "sqrtm", "regstep", "reg", "logm"),
         default="helpers",
         help="the seeded stream: the helpers (part 1), the matrix square root's (schur, sqrtm), "
         "the registration step's (3.2-03: rgauss, regress, trans, quat, rstep) or the "
-        "registration's (3.2-03 part 2: rreg)",
+        "registration's (3.2-03 part 2: rreg) or the matrix logarithm's and exponential's (3.2-15: "
+        "logm, expm, geomean)",
     )
     ap.add_argument(
         "--cases",
@@ -292,6 +295,22 @@ def main(argv: list[str] | None = None) -> int:
     if done.returncode != 0:
         raise SystemExit(f"fsrobust failed ({done.returncode}): {done.stderr[-2000:]}")
     official = done.stdout.splitlines()
+    # FS-1311 (memory contents): the official matrix exponential reads its Pade coefficients from
+    # uninitialized stack memory; its cases are compared with fsrobust-pade (MyMatrix.cpp with the
+    # coefficients' arrays static, build.sh), the unpatched line counted apart
+    pade_official: list[str] | None = None
+    if a.family == "logm":
+        pdone = oracle_cache.run(
+            [exe.with_name("fsrobust-pade"), cases_path],
+            env=env,
+            policy=oracle_cache.Policy(threads=1, family="freesurfer"),
+            timeout=7200,
+            runner="fs-robust-probe",
+        )
+        if pdone.returncode != 0:
+            raise SystemExit(f"fsrobust-pade failed ({pdone.returncode}): {pdone.stderr[-2000:]}")
+        pade_official = pdone.stdout.splitlines()
+        assert len(pade_official) == len(official)
 
     def port_lines(mode: str) -> list[tuple[str, list[str]]]:
         out = subprocess.run(
@@ -323,8 +342,13 @@ def main(argv: list[str] | None = None) -> int:
     hashed = hashlib.sha256()
     heavies = skipped_hashed = 0
     first_differ = []
-    for case, c, (r, ids), (f, fids) in zip(cases, official, rep, fix, strict=True):
+    pade_cases = pade_unpatched_same = 0
+    for k, (case, c, (r, ids), (f, fids)) in enumerate(zip(cases, official, rep, fix, strict=True)):
         cmd = case.split()[0]
+        if pade_official is not None and "FS-1311" in ids:
+            pade_cases += 1
+            pade_unpatched_same += c == pade_official[k]
+            c = pade_official[k]
         for x in ids:
             rep_ids[x] += 1
         if NOTPORTED in r:
@@ -376,6 +400,8 @@ def main(argv: list[str] | None = None) -> int:
         "fix_differ_without_notice": dict(fix_unexplained),
         "fix_notices": dict(fix_ids),
         "official_sha256_skip": hashed.hexdigest(),
+        "pade_reference_cases": pade_cases,
+        "pade_unpatched_identical": pade_unpatched_same,
         "skipped_total": sum(skipped.values()),
         "hashed_skip": skipped_hashed,
         "hashed_heavy": heavies,

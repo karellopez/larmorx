@@ -30,6 +30,7 @@ reproduces the original copyright and MIT notice.
 | `math/log10f.rs` (`log10f`; 2026-11-16, for FreeSurfer's GCA morph) | `src/binary32/log10/log10f.c` (`1a6c83703332…`) | bit-identical to the C (gcc 11.4, `-O2 -ffp-contract=off`) on all 2^32 inputs (2026-11-16, `validation/investigations/coremath-log10f/`); checksums as for `expf`; a zero gives -inf, `x < 0` the positive quiet NaN `0x7fc00000` glibc's `log10f` gives (the C returns `0xffc00000`; `Libm::log10f`'s two choices then differ only by rounding), a NaN itself quieted; errno and the flags dropped. CORE-MATH's double `log10` rounded to `float` differs from it on one positive float (`0x0efeee7a`, double rounding), glibc 2.35's `log10f` on 29,787,060 of the 2,139,095,039 positive finite floats (same folder) |
 | `math/log2.rs` (`log2`; 2026-11-23, for FreeSurfer's joint-histogram costs, `mri_robust_register --cost MI\|NMI\|ECC`) | `src/binary64/log2/log2.c` (`cr_log2`, `as_log2_refine`) | bit-identical to the C (gcc 11.4, `-O2 -ffp-contract=off`, as a shared library) on every power of two, 22 special values, all 33,238 cases of `log2.wc` at ±x and 2,147,483,648 seeded arguments in eight families (`validation/probes/coremath-log2/`, log `oracles/logs/fs-found-c-r47-coremath-log2-28.log`); the tables transcribed mechanically; round to nearest only, `errno` dropped; `x < 0` gives `f64::NAN` (`0x7ff8...`) as `math/log.rs` does (the C's `0.0 / 0.0` is the target's default NaN) |
 | `math/tanh.rs` | `src/binary64/tanh/tanh.c` (`e89441340424…`) | bit-identical to the C (gcc 11.4, `-O2 -ffp-contract=off`, as a shared library) on all 31,440 cases of `tanh.wc` at ±x and 805 million random inputs (log-uniform bit patterns from 2^-80 to 2^6, uniform on (-25, 25) and (-1, 1)), FMA and portable copies alike (2026-10-30, for BET's smoothness weight; `validation/investigations/cleanroom-bet/tanh-verify/`, `coremath`); the tables transcribed mechanically (`coremath_tables.py`); round to nearest only, errno dropped |
+| `math/log1p.rs` (`log1p`; 2026-11-24, queue item 3.2-15) | `src/binary64/log1p/log1p.c` (`068da268a928…`, Alexei Sibidanov's) | bit-identical to the C (gcc 11.4, `-O2 -ffp-contract=off`) on 6,000,000 arguments (uniform on (-1.25, 1.25) and random bit patterns; `validation/probes/fs-robust/clogrt.c`'s comparison, 2026-11-24); the fast path's tables `rf`, `lf` and the accurate path's `rt`, `ln` transcribed mechanically as bit patterns; `__builtin_fma` is `f64::mul_add`, `__builtin_roundeven` `f64::round_ties_even`; round to nearest only, errno and the flags dropped; `x < -1` the positive quiet NaN (the C's `0.0 / 0.0` is the processor's default NaN) |
 | `math/log10.rs` (`log10`; `Libm::log10` chooses it or `log10_glibc` by the mode; 2026-11-14) | `src/binary64/log10/log10.c` (`a83f2e651a55…`), `src/binary64/log10/dint.h` (`3bdfe6175e6d…`) | bit-identical to the C (gcc 11.4, `-O2 -ffp-contract=off`, as a shared library) on 2,147,614,729 arguments: every hard-to-round case of `log10.wc` (65,518) at ±x, 45 special values and powers of ten, and 2^28 in each of eight families (random bit patterns, uniform on (0, 1000), next to 1 where the accurate path runs, log-uniform normal numbers, subnormal numbers, the powers of ten from 1e-323 to 1e308 moved by ±3 ulp, p-values, integers and dyadic fractions), the FMA copy (the portable one equals it: `fma_copies_are_bit_identical`); the C's results equal mpmath's log10 at 400 bits rounded to nearest on all of `log10.wc` and 299,850 seeded arguments (2026-11-14, `validation/probes/coremath-log10/`, logs `oracles/logs/fs-found-c-r22-coremath-log10-*.log`). The accurate path's dint arithmetic, its logarithm, its tables `_INVERSE_2`, `_LOG_INV_2`, `P_2` and the polynomial `P` are log.c's (`coremath_tables.py --check-shared`), so `log10.rs` uses `log.rs`'s (`pub(super)`); its own parts: the fast-path tables `_INVERSE`, `_LOG_INV` (log.c's but for `i = 511, 512`; transcribed mechanically), the normalisation, `d_mul`, `ONE_OVER_LOG10`, the powers-of-ten shortcut, `dint_tod` (its own sticky bit). Round to nearest only, errno and the flags dropped; a NaN argument gives itself quieted and `x < 0` the positive quiet NaN (the C's `0.0 / 0.0` is the processor's default NaN), as glibc's `log10` gives them; glibc 2.35's `log10` is not correctly rounded on 0.02 to 28 % of those families' arguments (the probe's counts) |
 
 **Not ported from CORE-MATH: `math/tanh_glibc.rs`** (2026-10-30), the hyperbolic tangent with glibc
@@ -863,6 +864,37 @@ paths return `Zgees::NotPorted`. `XERBLA`'s line is the Fortran one (` ** On ent
 gfortran's complex arithmetic is `crate::cplx`'s (below); `ABS` and `SQRT` of a complex number are the
 decided `cabs` and `csqrt`.
 
+## Reference LAPACK 3.10.0's reordering of a complex Schur form (`src/lapack_ztrsen.rs`; queue item 3.2-15, 2026-11-24)
+
+**Ported** from Reference-LAPACK v3.10.0 (the archive above; modified BSD licence, NOTICE lists it):
+`SRC/ztrsen.f` (`323241a43787`) with `JOB = 'N'` and `COMPQ = 'V'` (its condition numbers, `ZLACPY`,
+`ZTRSYL`, `ZLACN2` and `ZLANGE`, are not reached and not ported; an argument check fails only for an
+invalid call, which no caller makes), `ztrexc.f` (`cf47edec8f4e`, `COMPQ = 'V'`), `zlartg.f90`
+(`9476434adcfc`, the 3.10 version with Anderson's safe scaling and `la_constants.f90`'s `dsafmin`,
+`dsafmax`, `drtmin`, `drtmax`, `143e0dd5e885`) and `zrot.f` (`177df020e813`), as Ubuntu 22.04's
+`liblapack.a` (3.10.0-2ubuntu1, gfortran 11) computes them: gfortran's complex arithmetic
+(`crate::cplx`: the plain product, Smith's division, a real promoted to `(x, +0)`), `MAX` and `MIN` as
+`MAXSD` and `MINSD`. Checked through the replica that calls it (`validation/probes/fs-robust/`, family
+`logm`: identical results on every reordered Schur form of 9,600 cases).
+
+## vnl's complex singular value decomposition (`src/vnl_svd_complex.rs`; queue item 3.2-15, 2026-11-24)
+
+**Ported** from VXL as ITK v4.13.2 bundles it (BSD-3-Clause; LINPACK, BLAS and libf2c from netlib):
+`core/vnl/algo/vnl_svd.hxx` (`378746d23eb0`: the constructor with `job = 21`, the absolute values of the
+singular values, `zero_out_absolute(0)`, `solve` of a matrix and of a vector), `core/vnl/vnl_sse.h`
+(`e15f0f79a015`: the generic matrix-vector product), `v3p/netlib/linpack/zsvdc.c` (`370f5bf018bf`),
+`v3p/netlib/blas/zscal.c` (`46fb260bfdad`), `zaxpy.c` (`79afb95d53a4`), `zdotc.c` (`c5ae0c4b3361`),
+`zdrot.c` (`2c4818526f9e`), `zswap.c` (`dd5ec4cf97fc`), `dznrm2.c` (`9083d173fad9`), `drotg.c`
+(`a61681baf455`), `dcabs1.c` (`79d73ac8b194`), `v3p/netlib/libf2c/z_abs.c` (`38c414d9bfa6`), `cabs.c`
+(`7c2756a62159`, `f__cabs`), `z_div.c` (`0ea30d710e3b`, without `IEEE_COMPLEX_DIVIDE`: a zero divisor
+is `DivisionByZero`, the C code's `sig_die("complex division by zero", 1)`, `sig_die.c` `5a221dd26c21`),
+`d_cnjg.c` (`5184800c65de`). The f2c statements in their order and 1-based indices; libf2c's `abs` as
+`x >= 0 ? x : -x` and `max` as `a >= b ? a : b`; `zsvdc`'s test of a zero element (`dabs(dreal(z)) +
+dabs(dimag(z)) == 0`, `dimag` as a product by `(0, -1)`) is exactly "both parts zero". Changes: its
+iteration's deflation steps do not count towards `maxit` and can repeat for ever on an infinite or NaN
+entry (ITK-116, as `vnl_svd.rs`'s): a state seen before ends it (`never_returns`). `vnl_svd`'s own
+arithmetic is C++'s (`crate::cplx`). Checked through the replica that calls it, as above.
+
 ## The C, C++ and Fortran runtimes' complex arithmetic (`src/cplx.rs`; queue item 3.2-02, 2026-11-20)
 
 **Written** from published algorithms and black-box measurements (Apache-2.0; no runtime's code read):
@@ -878,6 +910,15 @@ divergences from the system's functions: `csqrt` near overflow with a much small
 million random bit patterns), and wherever glibc's `hypot` misses the last bit; libgcc's (GCC 12)
 `__divdc3` where a divisor's part is zero, subnormal or huge (1,825 of 50,625 special combinations beyond
 the NaNs' bits) and both functions' NaN bits (the investigation's "libgcc's division"): an open item.
+2026-11-24 (queue item 3.2-15): `clog`, the project's decided complex logarithm (glibc 2.35's `clog` is
+not correctly rounded and matched no simple formula on 0.1 to 15 % of 2 x 10^6 arguments per family,
+measured as a black box: `validation/probes/fs-robust/clogrt.c`'s header): the imaginary part the
+correctly rounded `atan2`; the real part half the correctly rounded `log1p` of `|z|^2 - 1` (the squares
+split exactly by fused multiply-adds, two error-free sums, rounded once) where that lies in (-1/2, 1/2),
+otherwise the correctly rounded `log` of the correctly rounded `hypot`; glibc's special values (C11
+Annex G with its NaN `0x7ff8...`, measured). Bit-identical to the same function in C on CORE-MATH's
+functions (`clogrt.c`) on 6,000,000 arguments (near the unit circle, very near it, log-uniform, random
+bit patterns, near the real axis).
 
 **`vnl_matrix`'s complex matrices** (the same item): `VnlCMatrix` (`vnl_matrix<std::complex<double>>`:
 `vnl_complexify.h`, `vnl_real.h`, `vnl_imag.h`, `vnl_matrix.hxx`'s `conjugate_transpose`, product and

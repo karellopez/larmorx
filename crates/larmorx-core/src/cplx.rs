@@ -316,6 +316,66 @@ pub fn csqrt(z: C64) -> C64 {
     C64::new(re, im)
 }
 
+/// The complex logarithm the project decided for `clog` (C's `clog`, C++'s `std::log` of a
+/// `std::complex<double>`; glibc 2.35's `clog` is not correctly rounded and its form is not
+/// public: it differs from every simple formula on 0.1 to 15 % of arguments, measured as a black
+/// box): the imaginary part the correctly rounded `atan2(y, x)` ([`math::atan2`]), the
+/// real part `log |z|` from correctly rounded functions: where `|z|^2 - 1` (each square split
+/// exactly into a product and its error, `p + e` with a fused multiply-add, then `(p_x - 1) +
+/// p_y` by two error-free sums and the low parts added in order, rounded once) is above `-1/2`
+/// and below `1/2`, half the correctly rounded `log1p` of it ([`math::log1p`]: accurate near the
+/// unit circle), otherwise the correctly
+/// rounded `log` of the correctly rounded `hypot` (relative error below an ulp and a half there).
+/// The special values are C11 Annex G's as glibc's were measured (`clog(+-0 + i y) = -inf + i
+/// atan2(y, +-0)`; an infinite part gives `+inf`; a NaN part gives glibc's NaN `0x7ff8...` in
+/// both parts, or `+inf` in the real part when the other part is infinite).
+pub fn clog(z: C64) -> C64 {
+    let (x, y) = (z.re, z.im);
+    if x.is_nan() || y.is_nan() {
+        let re = if x.is_infinite() || y.is_infinite() {
+            f64::INFINITY
+        } else {
+            QNAN
+        };
+        return C64::new(re, QNAN);
+    }
+    let im = math::atan2(y, x);
+    if x.is_infinite() || y.is_infinite() {
+        return C64::new(f64::INFINITY, im);
+    }
+    if x == 0.0 && y == 0.0 {
+        return C64::new(f64::NEG_INFINITY, im);
+    }
+    C64::new(clog_re(x, y), im)
+}
+
+/// [`clog`]'s real part of a finite `x + i y`, not both zero.
+fn clog_re(x: f64, y: f64) -> f64 {
+    let px = x * x;
+    let ex = x.mul_add(x, -px);
+    let py = y * y;
+    let ey = y.mul_add(y, -py);
+    // two error-free sums: (px - 1) + py
+    let (h1, l1) = two_sum(px, -1.0);
+    let (h, l2) = two_sum(h1, py);
+    let lo = ((l1 + l2) + ex) + ey;
+    let d = h + lo;
+    if d > -0.5 && d < 0.5 {
+        0.5 * math::log1p(d)
+    } else {
+        math::log(math::hypot(x, y))
+    }
+}
+
+/// Knuth's error-free sum: `(s, e)` with `s = a + b` rounded and `s + e = a + b` exactly.
+#[inline(always)]
+fn two_sum(a: f64, b: f64) -> (f64, f64) {
+    let s = a + b;
+    let bb = s - a;
+    let e = (a - (s - bb)) + (b - bb);
+    (s, e)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -371,6 +431,40 @@ mod tests {
             cabs(C64::new(s, f64::INFINITY)).to_bits(),
             0x7ffc_0000_0000_0456
         );
+    }
+
+    /// The decided `clog`: glibc's special values (measured as a black box) and the two real
+    /// parts' paths.
+    #[test]
+    fn clog_special_values_and_paths() {
+        let b = |x: u64, y: u64| {
+            let r = clog(C64::new(f64::from_bits(x), f64::from_bits(y)));
+            (r.re.to_bits(), r.im.to_bits())
+        };
+        let (z, nz, one, inf, minf, nan, snan) = (
+            0u64,
+            0x8000_0000_0000_0000u64,
+            0x3ff0_0000_0000_0000u64,
+            0x7ff0_0000_0000_0000u64,
+            0xfff0_0000_0000_0000u64,
+            0x7ff8_0000_0000_0000u64,
+            0xfff4_0000_0000_0456u64,
+        );
+        assert_eq!(b(z, z), (minf, z));
+        assert_eq!(b(nz, z), (minf, 0x4009_21fb_5444_2d18));
+        assert_eq!(b(nz, nz), (minf, 0xc009_21fb_5444_2d18));
+        assert_eq!(b(z, inf), (inf, 0x3ff9_21fb_5444_2d18));
+        assert_eq!(b(minf, inf), (inf, 0x4002_d97c_7f33_21d2));
+        assert_eq!(b(inf, snan), (inf, nan));
+        assert_eq!(b(snan, minf), (inf, nan));
+        assert_eq!(b(one, snan), (nan, nan));
+        assert_eq!(b(snan, one), (nan, nan));
+        assert_eq!(b(one, z), (z, z));
+        // near the unit circle (log1p) and far from it (log of hypot)
+        let near = clog(C64::new(0.6, 0.8000001));
+        assert!(near.re > 7.99e-8 && near.re < 8.01e-8);
+        let far = clog(C64::new(3.0, 4.0));
+        assert_eq!(far.re, math::log(5.0));
     }
 
     /// Smith's division and Annex G's recoveries.

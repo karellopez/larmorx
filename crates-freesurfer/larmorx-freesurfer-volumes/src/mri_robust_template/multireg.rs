@@ -28,9 +28,9 @@
 //! port runs them one after the other, FreeSurfer's order at one thread, which its results depend
 //! on (the sums of the centroids, the lines' order; FS-1081).
 //!
-//! The affine mean space (`--affine` without `--fixtp`) needs the matrix logarithm and exponential
-//! (`MyMatrix::GeometricMean`), queue item 3.2-15: it ends here with FreeSurfer's step and `is not
-//! ported yet`.
+//! The affine mean space (`--affine` without `--fixtp`) is the geometric mean of the linear parts
+//! (`MyMatrix::GeometricMean`: the matrix logarithm and exponential, queue item 3.2-15,
+//! `larmorx_freesurfer_robust::matrixlog`).
 
 // the matrices and the inputs' lists are indexed as FreeSurfer's code indexes them
 #![allow(clippy::needless_range_loop)]
@@ -67,6 +67,7 @@ use larmorx_freesurfer_mri::vol_geom::{extract_i_to_r, extract_r_to_i, reinit_ca
 use larmorx_freesurfer_mri::voxel::{mri_get_vox_val, mri_set_vox_val};
 use larmorx_freesurfer_robust::costs::centroid;
 use larmorx_freesurfer_robust::debug::print_fixed4;
+use larmorx_freesurfer_robust::matrixlog::geometric_mean3;
 use larmorx_freesurfer_robust::mymatrix::{
     Mat3, Mat4, convert_matrix2vnl, get_m_from_rt, get_rt_from_m, lta2matrix, mul3,
     polar_decomposition, polar2_decomposition, ras_matrix2lta, rotation_mean, vox_matrix2lta,
@@ -1219,12 +1220,7 @@ impl MultiRegistration {
         let meanr = if self.rigid {
             rotation_mean(g, r.out, r.err, &mras3, self.frobnormthresh)?
         } else {
-            let _ = r.out.flush();
-            let _ = writeln!(
-                r.err,
-                "MyMatrix::GeometricMean (the affine mean space: --affine without --fixtp) {NOT_PORTED}"
-            );
-            return Err(Fatal::Exit(1));
+            geometric_mean3(g, r.out, r.err, &mras3)?
         };
         if self.debug != 0 {
             let _ = writeln!(r.out, "{}", matlab_print_long(&dyn3(&meanr), "meanr"));

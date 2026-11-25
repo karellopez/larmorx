@@ -13,7 +13,7 @@ the command line's own paths and failures), runs the official ``mri_robust_templ
 ``--upstream-defects`` ``reproduce`` and ``fix``, and compares the lines (exit status, standard
 output, standard error, every file written; the line of the time taken masked): ``reproduce``
 must give FreeSurfer's on every case but those where FreeSurfer's result is undefined (``SKIP``)
-and those the port does not run yet (``is not ported yet``: the affine mean space), which are
+and those the port does not run yet (``is not ported yet``), which are
 counted, not compared; ``fix`` may differ only where a defect it corrects changed the result (its
 notices). Prints the counts and the hash the port's recorded test checks
 (``tests/fs_robtmpl_official.rs``).

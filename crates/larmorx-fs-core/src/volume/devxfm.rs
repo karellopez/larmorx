@@ -9,8 +9,7 @@ use std::io::Read;
 
 use larmorx_core::defects::{FS_167, FS_887};
 
-use super::ltaread::FileSystem;
-use crate::files::path_of;
+use super::ltaread::{FileSystem, TransformInputs};
 use crate::maths::matrix::Matrix;
 use crate::maths::{Output, Returned};
 use crate::mri::geom::DIAG_SHOW;
@@ -111,8 +110,12 @@ impl Process {
     /// The header of an MGH or MGZ volume (`specs/freesurfer-io.md` §43, the header alone): a
     /// volume without voxels of the header's extent, type and frames, its geometry (the coronal
     /// orientation without the RAS flag). `None` where the reader gives none.
-    pub fn mgh_read_header(&mut self, name: &[u8]) -> Result<Option<Mri>, Stop> {
-        let Ok(raw) = std::fs::read(path_of(name)) else {
+    pub fn mgh_read_header(
+        &mut self,
+        name: &[u8],
+        inputs: &mut dyn TransformInputs,
+    ) -> Result<Option<Mri>, Stop> {
+        let Ok(raw) = inputs.read_file(name) else {
             let mut m = b"mghRead(".to_vec();
             m.extend_from_slice(name);
             m.extend_from_slice(b", -1): could not open file");
@@ -217,16 +220,30 @@ impl Process {
         self.devolve_xfm_with_subjects_dir(subject, xfm, xfmname, None)
     }
 
-    /// `DevolveXFMWithSubjectsDir(subject, XFM, xfmname, sdir)` (§63): the subject's original
-    /// volume's header (`orig.mgz`, `orig.mgh`, the slice folder `orig`), the transform read
-    /// (made coronal RAS when voxel-to-voxel) unless given, then `XFM (N inv(T))`. Nothing
-    /// (after its line on standard output) where a step fails.
+    /// `DevolveXFMWithSubjectsDir(subject, XFM, xfmname, sdir)` (§63) on the file system:
+    /// [`Process::devolve_xfm_from`].
     pub fn devolve_xfm_with_subjects_dir(
         &mut self,
         subject: &[u8],
         xfm: Option<&mut Matrix>,
         xfmname: Option<&[u8]>,
         sdir: Option<&[u8]>,
+    ) -> Result<Returned<Matrix>, Stop> {
+        self.devolve_xfm_from(subject, xfm, xfmname, sdir, &mut FileSystem)
+    }
+
+    /// `DevolveXFMWithSubjectsDir(subject, XFM, xfmname, sdir)` (§63), the folders and files read
+    /// through `inputs`: the subject's original volume's header (`orig.mgz`, `orig.mgh`, the
+    /// slice folder `orig`), the transform read (made coronal RAS when voxel-to-voxel) unless
+    /// given, then `XFM (N inv(T))`. Nothing (after its line on standard output) where a step
+    /// fails.
+    pub fn devolve_xfm_from(
+        &mut self,
+        subject: &[u8],
+        xfm: Option<&mut Matrix>,
+        xfmname: Option<&[u8]>,
+        sdir: Option<&[u8]>,
+        inputs: &mut dyn TransformInputs,
     ) -> Result<Returned<Matrix>, Stop> {
         let sd = match sdir {
             Some(s) => s.to_vec(),
@@ -242,7 +259,7 @@ impl Process {
         base.push(b'/');
         base.extend_from_slice(subject);
         self.devxfm_path(&base)?;
-        if !std::fs::metadata(path_of(&base)).is_ok_and(|m| m.is_dir()) {
+        if !inputs.is_dir(&base) {
             let mut b = b"ERROR: cannot find subject ".to_vec();
             b.extend_from_slice(subject);
             b.extend_from_slice(b" in ");
@@ -265,10 +282,10 @@ impl Process {
                 b.push(b'\n');
                 self.put_out(&b);
             }
-            if std::fs::File::open(path_of(&name)).is_err() {
+            if !inputs.opens(&name) {
                 continue;
             }
-            if let Some(m) = self.mgh_read_header(&name)? {
+            if let Some(m) = self.mgh_read_header(&name, inputs)? {
                 header = Some(m);
                 break;
             }
@@ -280,7 +297,7 @@ impl Process {
                 b.push(b'\n');
                 self.put_out(&b);
             }
-            if std::fs::metadata(path_of(&orig)).is_ok_and(|m| m.is_dir()) {
+            if inputs.is_dir(&orig) {
                 // the slice folder's reader: its description file must open (not probed beyond)
                 let mut info = orig.clone();
                 info.extend_from_slice(b"/COR-.info");
@@ -304,14 +321,14 @@ impl Process {
             path.extend_from_slice(b"/mri/transforms/");
             path.extend_from_slice(xfmname.unwrap_or(b"talairach.xfm"));
             self.devxfm_path(&path)?;
-            if std::fs::File::open(path_of(&path)).is_err() {
+            if !inputs.opens(&path) {
                 let mut b = b"ERROR: could not open ".to_vec();
                 b.extend_from_slice(&path);
                 b.extend_from_slice(b" for reading \n");
                 self.put_out(&b);
                 return Ok(Returned::Nothing);
             }
-            let Some(mut lta) = self.lta_read_ex(&path, &mut FileSystem)? else {
+            let Some(mut lta) = self.lta_read_ex(&path, inputs)? else {
                 let mut b = b"ERROR: reading ".to_vec();
                 b.extend_from_slice(&path);
                 b.push(b'\n');

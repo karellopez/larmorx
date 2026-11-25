@@ -6,6 +6,8 @@ use larmorx_fs_core::files::path_of;
 use larmorx_fs_core::maths::Returned;
 use larmorx_fs_core::maths::matrix::Matrix;
 use larmorx_fs_core::mri::{Mri, VolGeom};
+use larmorx_fs_core::volume::ltaread::TransformInputs;
+use larmorx_fs_core::volume::ltawrite::TransformOutputs;
 use larmorx_fs_core::volume::vlist::VoxelList;
 use larmorx_fs_core::{Process, Stop};
 
@@ -166,6 +168,62 @@ fn putvf(
     }
 }
 
+/// The golden cases' writer target: the file in memory; an empty name, or one in the folder
+/// `no/`, does not open (`ENOENT`).
+#[derive(Default)]
+struct MemOut {
+    file: Option<Vec<u8>>,
+}
+
+impl TransformOutputs for MemOut {
+    fn create(&mut self, name: &[u8]) -> Result<(), i32> {
+        if name.is_empty() || name.starts_with(b"no/") {
+            return Err(2);
+        }
+        self.file = Some(Vec::new());
+        Ok(())
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        if let Some(f) = self.file.as_mut() {
+            f.extend_from_slice(bytes);
+        }
+    }
+}
+
+/// The subjects' folders and files of a `devxfm` line, for the file system or in memory (the
+/// golden cases' `devxfmmem`).
+#[derive(Default)]
+struct Subjects {
+    dirs: Vec<Vec<u8>>,
+    files: Vec<(Vec<u8>, Vec<u8>)>,
+}
+
+impl TransformInputs for Subjects {
+    fn read_file(&mut self, name: &[u8]) -> Result<Vec<u8>, i32> {
+        match self.files.iter().find(|(n, _)| n.as_slice() == name) {
+            Some((_, b)) => Ok(b.clone()),
+            None => Err(2),
+        }
+    }
+
+    fn volume_geometry(&mut self, _p: &mut Process, name: &[u8]) -> Result<Option<VolGeom>, i32> {
+        if self.files.iter().any(|(n, _)| n.as_slice() == name) {
+            Ok(None)
+        } else {
+            Err(2)
+        }
+    }
+
+    fn is_dir(&mut self, name: &[u8]) -> bool {
+        self.dirs.iter().any(|d| d.as_slice() == name)
+    }
+
+    fn opens(&mut self, name: &[u8]) -> bool {
+        self.files.iter().any(|(n, _)| n.as_slice() == name)
+    }
+}
+
 /// M, a volume or none: `null`, or W P.
 fn getwn(p: &mut Process, l: &mut Line) -> Result<Option<Mri>, Stop> {
     if l.take("null") {
@@ -234,6 +292,23 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
                 rmtree(&path_of(d));
             }
         }
+        "ltawrmem" => {
+            // the golden cases' `ltawr`: `k LTA name`, the file in memory (a name that is empty or
+            // in the folder `no/` does not open: `ENOENT`)
+            let _k = l.geti();
+            let lta = getlta(p, l)?;
+            let name = l.getx();
+            let mut out = MemOut::default();
+            p.flush();
+            p.errno = 0;
+            let r = p.lta_write_to(&lta, &name, &mut out)?;
+            p.flush();
+            l.puti(i64::from(r));
+            match out.file {
+                Some(b) => l.out(hexbytes(&b)),
+                None => l.out("nofile"),
+            }
+        }
         // -- §63
         "ltapt" => {
             let lta = getlta(p, l)?;
@@ -299,7 +374,9 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
             l.puti(i64::from(r));
             putlta(l, Some(&lta));
         }
-        "devxfm" => {
+        "devxfm" | "devxfmmem" => {
+            // the subjects' folder `subjects`: mk 0 none, 1 subjects/<subject>, 2 also its
+            // mri/transforms, the original volume and the transform file (README.md)
             let mk = l.geti();
             let subj = l.getx();
             let sd = if l.take("null") { None } else { Some(l.getx()) };
@@ -308,8 +385,6 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
             let ob = if ok == 1 || ok == 2 { l.getx() } else { Vec::new() };
             let xb = if l.take("nofile") { None } else { Some(l.getx()) };
             let mut x = l.getm(p)?;
-            let root = path_of(b"subjects");
-            rmtree(&root);
             let mut base = b"subjects/".to_vec();
             base.extend_from_slice(&subj);
             let sub = |s: &[u8]| {
@@ -317,36 +392,48 @@ pub(super) fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop>
                 b.extend_from_slice(s);
                 b
             };
+            let mut m = Subjects::default();
             if mk >= 1 {
-                let _ = make_dir(b"subjects");
-                let _ = make_dir(&base);
+                m.dirs.push(b"subjects".to_vec());
+                m.dirs.push(base.clone());
             }
             if mk >= 2 {
-                let _ = make_dir(&sub(b"/mri"));
-                let _ = make_dir(&sub(b"/mri/transforms"));
+                m.dirs.push(sub(b"/mri"));
+                m.dirs.push(sub(b"/mri/transforms"));
                 match ok {
-                    1 => {
-                        let _ = std::fs::write(path_of(&sub(b"/mri/orig.mgz")), &ob);
-                    }
-                    2 => {
-                        let _ = std::fs::write(path_of(&sub(b"/mri/orig.mgh")), &ob);
-                    }
-                    3 => {
-                        let _ = make_dir(&sub(b"/mri/orig"));
-                    }
+                    1 => m.files.push((sub(b"/mri/orig.mgz"), ob.clone())),
+                    2 => m.files.push((sub(b"/mri/orig.mgh"), ob.clone())),
+                    3 => m.dirs.push(sub(b"/mri/orig")),
                     _ => {}
                 }
                 if let Some(xb) = &xb {
                     let mut t = b"/mri/transforms/".to_vec();
                     t.extend_from_slice(name.as_deref().unwrap_or(b"talairach.xfm"));
-                    let _ = std::fs::write(path_of(&sub(&t)), xb);
+                    m.files.push((sub(&t), xb.clone()));
+                }
+            }
+            let disk = c == "devxfm";
+            let root = path_of(b"subjects");
+            if disk {
+                rmtree(&root);
+                for d in &m.dirs {
+                    let _ = make_dir(d);
+                }
+                for (f, b) in &m.files {
+                    let _ = std::fs::write(path_of(f), b);
                 }
             }
             p.flush();
             p.errno = 0;
-            let r = p.devolve_xfm_with_subjects_dir(&subj, x.as_mut(), name.as_deref(), sd.as_deref());
+            let r = if disk {
+                p.devolve_xfm_with_subjects_dir(&subj, x.as_mut(), name.as_deref(), sd.as_deref())
+            } else {
+                p.devolve_xfm_from(&subj, x.as_mut(), name.as_deref(), sd.as_deref(), &mut m)
+            };
             p.flush();
-            rmtree(&root);
+            if disk {
+                rmtree(&root);
+            }
             let r = r?;
             putm_res(l, &r, x.as_ref());
         }

@@ -303,11 +303,27 @@ const GOLDEN: &[(&str, &str)] = &[
     ),
     (
         "part11a.fix",
-        "06309d872bd237bd9306514ab979c1d43ee51e9f58d766e48444cdf8c632309e",
+        "43bb797bd521343d77d133fe193bc04f84c79c21d6fbeccb999561dfb740e274",
     ),
     (
         "part11a.reproduce",
-        "4d58e5239368bfc08f8ce3a277081ba924a83b37787a2dbb5026d507760a95f8",
+        "9a9295c376090091ec10dd98c950672c454646a23e020c3135f0469e0d60b323",
+    ),
+    (
+        "part11b.fix",
+        "b27c8dfa564760c973de32c277d33970d1ae234bdc3e02be2d3c05c57b335996",
+    ),
+    (
+        "part11b.reproduce",
+        "ee5d16a95fb5770acb84fc410bc1a7f5b861fa71eeba0f59e009b4273431df39",
+    ),
+    (
+        "part11b-writers.fix",
+        "bbf2a654af4edf7ba270490be593ec3eeaf80ba93478f300fe9881f95eb2b97e",
+    ),
+    (
+        "part11b-writers.reproduce",
+        "90703dedecc99d56842b2c71df9168ded74438cf8c2836cdb998229f957fd4c6",
     ),
 ];
 
@@ -4682,4 +4698,304 @@ const PART11A: &[(&str, Make)] = &[
 #[test]
 fn part11a_fills_topology_binary_volumes_and_lists() {
     group("part11a", PART11A, 4);
+}
+
+/// VF, a voxel list with its fields: VL, or `f alloc nvox type mask k` and `k` voxels (indices
+/// 0 to 3, values with ties and NaN).
+fn vf(g: &mut G) -> String {
+    if g.one_in(3) {
+        return format!("{} {}", g.int(1, 6), g.int(0, 6));
+    }
+    let alloc = g.int(1, 6);
+    let k = g.int(0, alloc + 1);
+    let mut p = vec![
+        "f".to_owned(),
+        alloc.to_string(),
+        g.int(0, alloc).to_string(),
+        g.int(0, 2).to_string(),
+        g.int(0, 15).to_string(),
+        k.to_string(),
+    ];
+    for _ in 0..k {
+        for _ in 0..4 {
+            p.push(g.int(0, 3).to_string());
+        }
+        for _ in 0..3 {
+            p.push(g.pick(&["3f000000", "3fc00000", "c0000000"]).to_owned());
+        }
+        p.push(
+            g.pick(&["3f800000", "40000000", "40000000", "7fc00000", "80000000"])
+                .to_owned(),
+        );
+        p.push(g.f(false));
+    }
+    p.join(" ")
+}
+
+/// An array of 0 to 2 transforms of a type over a fresh pool, with the pool and its ends.
+fn p11b_lta(g: &mut G, types: &[&str], most: i64) -> (String, Vec<(String, String)>, usize, usize) {
+    let pool = lta_pool(g);
+    let ty = g.pick(types).to_owned();
+    let lo = if g.one_in(8) { 0 } else { 1 };
+    let n = g.int(lo, most) as usize;
+    let (lta, s, d) = pool_lta(g, &pool, &ty, n, false, None);
+    (lta, pool, s, d)
+}
+
+/// Part 11b (§62 to §65): the commands without files; the writers and `DevolveXFM` are
+/// `part11b_writers`'.
+const PART11B: &[(&str, Make)] = &[
+    ("ltadvg", |g| g.geom(true)),
+    ("ltapt", |g| {
+        let (lta, ..) = p11b_lta(g, &["0", "1"], 3);
+        let m = if g.one_in(2) {
+            "null".to_owned()
+        } else {
+            format!("4 4 {}", ["00000000"; 16].join(" "))
+        };
+        format!(
+            "{lta} {} {} {} {m} {}",
+            g.f(false),
+            g.f(false),
+            g.f(false),
+            g.pick(&["0", "77"])
+        )
+    }),
+    ("ltaxf", |g| {
+        let (lta, pool, s, d) = p11b_lta(g, &["0", "1", "2", "1", "0", "14"], 2);
+        let w = pool_w(&pool, s);
+        let dst = if g.one_in(2) {
+            "new".to_owned()
+        } else {
+            pool_w(&pool, d)
+        };
+        format!("{w} 0 {dst} {lta} {}", g.pick(&["-1", "0", "1", "3"]))
+    }),
+    ("ltacor", |g| p11b_lta(g, &["0"], 1).0),
+    ("fixmni", |g| format!("{} {} {}", g.f(true), g.f(true), g.f(true))),
+    ("ltamod", |g| {
+        let (lta, pool, s, d) = p11b_lta(g, &["0", "1"], 2);
+        let a = if g.one_in(3) {
+            "null".to_owned()
+        } else {
+            format!("{} 0", pool_w(&pool, s))
+        };
+        let b = if g.one_in(3) {
+            "null".to_owned()
+        } else {
+            format!("{} 0", pool_w(&pool, (d + g.int(0, 1) as usize) % 3))
+        };
+        let t = dbits([f64::from(f32::EPSILON), 1e-3, 0.0, f64::NAN][g.below(4) as usize]);
+        format!("{lta} {a} {b} {t}")
+    }),
+    ("angrm", |g| format!("{} {} {}", g.d(true), g.d(true), g.d(true))),
+    ("affp2m", |g| {
+        let p: Vec<String> = (0..12).map(|_| g.d(true)).collect();
+        let m = if g.one_in(2) { "null".to_owned() } else { g.mat4() };
+        format!("{} {m}", p.join(" "))
+    }),
+    ("affm2p", |g| g.mat4()),
+    ("ltarot", |g| p11b_lta(g, &["0", "1"], 1).0),
+    ("rmsmj", |g| format!("{} {} {}", pool_mat(g), pool_mat(g), g.d(true))),
+    ("vlcre", |g| {
+        let e = ext(g, 2, 4);
+        let k = pi(g, &[0, 3]);
+        let fr = g.int(1, 2);
+        let w = bin_w(g, e, k, fr);
+        let (lo, hi) = (
+            g.pick(&["3f800000", "00000000"]),
+            g.pick(&["3f800000", "40000000"]),
+        );
+        let l = if g.one_in(3) { "null".to_owned() } else { vf(g) };
+        format!("{w} {lo} {hi} {l} {} {}", g.int(0, 2), g.int(0, 1))
+    }),
+    ("vlsort", |g| {
+        let a = vf(g);
+        let b = if g.one_in(2) { "null".to_owned() } else { vf(g) };
+        format!("{a} {b}")
+    }),
+    ("vlfree", |g| if g.one_in(2) { "null".to_owned() } else { vf(g) }),
+    ("vlstat", |g| {
+        let a = vf(g);
+        let m = if g.one_in(3) {
+            "null".to_owned()
+        } else {
+            let e = ext(g, 2, 4);
+            bin_w(g, e, 3, 1)
+        };
+        format!("{a} {m}")
+    }),
+    ("vlcopy", |g| {
+        let a = vf(g);
+        let b = if g.one_in(2) { "null".to_owned() } else { vf(g) };
+        format!("{} {a} {b} {} {}", g.int(0, 1), g.int(0, 2), g.int(0, 3))
+    }),
+    ("vladd", |g| {
+        let a = vf(g);
+        format!(
+            "{} {a} {} {} {} {} {} {} {} {}",
+            g.int(0, 3),
+            g.int(0, 3),
+            g.int(0, 3),
+            g.int(0, 3),
+            g.f(false),
+            g.f(false),
+            g.f(false),
+            g.f(false),
+            g.f(false)
+        )
+    }),
+];
+
+#[test]
+fn part11b_moves_rotations_and_voxel_lists() {
+    group("part11b", PART11B, 4);
+}
+
+/// The bytes as `x<hex>`.
+fn xh(b: &[u8]) -> String {
+    let mut s = "x".to_owned();
+    for x in b {
+        s.push_str(&format!("{x:02x}"));
+    }
+    s
+}
+
+/// CRC-32 (gzip's).
+fn crc32(b: &[u8]) -> u32 {
+    let mut c = 0xffff_ffffu32;
+    for &x in b {
+        c ^= u32::from(x);
+        for _ in 0..8 {
+            c = if c & 1 != 0 { (c >> 1) ^ 0xedb8_8320 } else { c >> 1 };
+        }
+    }
+    !c
+}
+
+/// A gzip stream of one stored block (the same bytes on every platform).
+fn gzip_stored(b: &[u8]) -> Vec<u8> {
+    let mut o = vec![0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 3, 1];
+    let n = b.len() as u16;
+    o.extend_from_slice(&n.to_le_bytes());
+    o.extend_from_slice(&(!n).to_le_bytes());
+    o.extend_from_slice(b);
+    o.extend_from_slice(&crc32(b).to_le_bytes());
+    o.extend_from_slice(&(b.len() as u32).to_le_bytes());
+    o
+}
+
+/// An MGH header (big-endian): version 1, the extent, frames 1, type 0, dof 0, the RAS flag and,
+/// with it, sizes, cosines and centre; then `pad` zero bytes of voxels.
+fn mgh_header(g: &mut G, ras: bool, pad: usize) -> Vec<u8> {
+    let mut o = Vec::new();
+    for v in [1, g.int(1, 4), g.int(1, 4), g.int(1, 3), 1, 0, 0] {
+        o.extend_from_slice(&(v as i32).to_be_bytes());
+    }
+    o.extend_from_slice(&i16::from(ras).to_be_bytes());
+    if ras {
+        let mut f: Vec<u32> = (0..3).map(|_| u32::from_str_radix(&g.size(false), 16).unwrap_or(0)).collect();
+        f.extend(g.cosines(false).iter().map(|s| u32::from_str_radix(s, 16).unwrap_or(0)));
+        f.extend((0..3).map(|_| g.fbits(false)));
+        for x in f {
+            o.extend_from_slice(&x.to_be_bytes());
+        }
+    }
+    o.extend(std::iter::repeat_n(0u8, pad));
+    o
+}
+
+/// The writers (`ltawrmem`: §62 in memory) and `DevolveXFMWithSubjectsDir` (`devxfmmem`: §63 on
+/// a subjects' folder in memory), with the environment's prefixes.
+#[test]
+fn part11b_writers() {
+    let seed = 0x5eed_11b0u64;
+    let env = Environment::new();
+    for (mode, tag) in [
+        (UpstreamDefects::Fix, "fix"),
+        (UpstreamDefects::Reproduce, "reproduce"),
+    ] {
+        let mut g = G(seed);
+        let mut all = Vec::new();
+        let mut lines = Vec::new();
+        for _ in 0..24 {
+            let (lta, ..) = p11b_lta(&mut g, &["0", "1", "2", "12", "14", "15", "3"], 2);
+            let name = g.pick(&[
+                "t.lta", "t.LTA", "t.xfm", "t.XFM", "t.dat", "t.reg", "t.fslmat", "t.txt", "t",
+                "no/t.lta", "no/t.xfm", "",
+            ]);
+            let mut pre = vec![format!(
+                "+env=FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING={}",
+                g.pick(&["T0", ""])
+            )];
+            match g.below(4) {
+                0 => pre.push("+env=USER=u1".to_owned()),
+                1 => pre.push("+env=USER=".to_owned()),
+                2 => pre.push("+env=LOGNAME=l2".to_owned()),
+                _ => {}
+            }
+            if g.one_in(2) {
+                pre.push("+env=FSLOUTPUTTYPE=NIFTI_GZ".to_owned());
+            }
+            lines.push(format!("{} ltawrmem {} {lta} {}", pre.join(" "), g.int(0, 1), xh(name.as_bytes())));
+        }
+        for _ in 0..16 {
+            let mk = pi(&mut g, &[0, 1, 2, 2, 2]);
+            let subj = g.pick(&["bert", "s1"]);
+            let sd = g.pick(&["null", "subjects", "subjects", "nowhere"]);
+            let sdx = if sd == "null" {
+                "null".to_owned()
+            } else {
+                xh(sd.as_bytes())
+            };
+            let pre = if sd == "null" && g.one_in(2) {
+                "+env=SUBJECTS_DIR=subjects "
+            } else {
+                ""
+            };
+            let diag = if g.one_in(3) { "+gdiag=10000040 " } else { "" };
+            let ras = !g.one_in(4);
+            let ok = pi(&mut g, &[0, 1, 1, 2, 3]);
+            let orig = match ok {
+                1 => {
+                    let h = mgh_header(&mut g, ras, 4);
+                    let b = if g.one_in(6) { b"not gzip".to_vec() } else { gzip_stored(&h) };
+                    format!("1 {}", xh(&b))
+                }
+                2 => format!("2 {}", xh(&mgh_header(&mut g, ras, 0))),
+                k => k.to_string(),
+            };
+            let (name, text) = match g.below(4) {
+                0 => (
+                    "null",
+                    "MNI Transform File\n\nTransform_Type = Linear;\nLinear_Transform =\n 1.1 0.02 0 -2.5\n -0.01 0.95 0.1 14\n 0 -0.05 1.05 -7.25;\n",
+                ),
+                1 => ("x7265672e6c7461", "not a transform\n"),
+                2 => (
+                    "null",
+                    "MNI Transform File\n\nTransform_Type = Linear;\nLinear_Transform =\n 1 0 0 2\n 0 1 0 -3\n 0 0 1 4;\n",
+                ),
+                _ => ("null", ""),
+            };
+            let xb = if text.is_empty() {
+                "nofile".to_owned()
+            } else {
+                xh(text.as_bytes())
+            };
+            let m = if g.one_in(4) { pool_mat(&mut g) } else { "null".to_owned() };
+            lines.push(format!(
+                "{pre}{diag}devxfmmem {mk} {} {sdx} {name} {orig} {xb} {m}",
+                xh(subj.as_bytes())
+            ));
+        }
+        for line in &lines {
+            let toks: Vec<String> = line.split_whitespace().map(str::to_owned).collect();
+            let res = volume_cmd::run_line(&toks, mode, &env);
+            all.extend_from_slice(line.as_bytes());
+            all.push(b'\n');
+            all.extend_from_slice(res.as_bytes());
+            all.push(b'\n');
+        }
+        check(&format!("part11b-writers.{tag}"), &all);
+    }
 }
